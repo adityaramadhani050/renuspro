@@ -100,7 +100,8 @@ function _getInvoiceById(ss, idInvoice) {
         ppnNominal:  parseFloat(data[i][13]) || 0,
         total:       parseFloat(data[i][14]) || 0,
         metaJson:    data[i][15] ? data[i][15].toString() : '{}',
-        catatan:     data[i][17] ? data[i][17].toString() : ''
+        catatan:     data[i][17] ? data[i][17].toString() : '',
+        bankAccount: data[i][19] ? data[i][19].toString() : ''
       };
     }
   }
@@ -250,6 +251,9 @@ function _sisipkanBarisInvoice(sheet, cache, inv, meta, col) {
     });
   });
 
+  // 5) Satu baris kosong di akhir agar isi terkesan di tengah kotak item
+  baris.push({ type: 'tail', desc: '' });
+
   const totalRows = baris.length;
   if (totalRows === 0) return anchorRow + 1;
 
@@ -386,34 +390,40 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
     row++;
   });
 
-  // Terbilang
+  // ── Note | Bank Account (dua kolom) ──
+  const mid    = Math.ceil(NCOLS / 2);
+  const leftW  = mid;
+  const rightW = NCOLS - mid;
+  const noteVal = (inv.catatan || '').toString();
+  const bankVal = (inv.bankAccount || '').toString();
+
+  // Header Note / Bank Account
   sheet.insertRowsAfter(row - 1, 1);
-  sheet.getRange(row, 1, 1, NCOLS)
-    .merge()
-    .setValue('Terbilang: # ' + _capitalize(terbilangIndo(inv.total)) + ' Rupiah #')
-    .setBackground('#fffce6')
-    .setFontColor('#665500')
-    .setFontStyle('italic')
-    .setWrap(true)
-    .setVerticalAlignment('middle')
-    .setHorizontalAlignment('left');
-  sheet.setRowHeight(row, 26);
+  sheet.getRange(row, 1, 1, leftW).merge()
+    .setValue('Note')
+    .setBackground('#d9d9d9').setFontWeight('bold').setFontColor('#000000')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+  sheet.getRange(row, mid + 1, 1, rightW).merge()
+    .setValue('Bank Account')
+    .setBackground('#d9d9d9').setFontWeight('bold').setFontColor('#000000')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 22);
   row++;
 
-  // Catatan (opsional)
-  if (inv.catatan) {
-    sheet.insertRowsAfter(row - 1, 1);
-    sheet.getRange(row, 1, 1, NCOLS)
-      .merge()
-      .setValue('Catatan: ' + inv.catatan)
-      .setBackground('#ffffff')
-      .setFontColor('#444444')
-      .setWrap(true)
-      .setVerticalAlignment('top')
-      .setHorizontalAlignment('left');
-    sheet.setRowHeight(row, Math.max(28, Math.ceil(inv.catatan.length / 90) * 16 + 12));
-    row++;
-  }
+  // Isi Note / Bank Account
+  sheet.insertRowsAfter(row - 1, 1);
+  sheet.getRange(row, 1, 1, leftW).merge()
+    .setValue(noteVal)
+    .setBackground('#f2f2f2').setFontColor('#000000')
+    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
+  sheet.getRange(row, mid + 1, 1, rightW).merge()
+    .setValue(bankVal)
+    .setBackground('#f2f2f2').setFontColor('#000000')
+    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
+  const noteLines = Math.max((noteVal.match(/\n/g) || []).length + 1, Math.ceil(noteVal.length / 45));
+  const bankLines = (bankVal.match(/\n/g) || []).length + 1;
+  sheet.setRowHeight(row, Math.max(44, Math.max(noteLines, bankLines, 2) * 16 + 10));
+  row++;
 
   // Spacer
   sheet.insertRowsAfter(row - 1, 1);

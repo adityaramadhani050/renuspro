@@ -55,7 +55,7 @@
                 <i class="fa-solid fa-file-invoice"></i>
               </span>
               <div>
-                <h3 class="text-base font-bold text-slate-800">Buat Invoice Baru</h3>
+                <h3 id="inv-modal-title" class="text-base font-bold text-slate-800">Buat Invoice Baru</h3>
                 <p class="text-xs text-slate-400">Nomor: <span id="inv-nomor-preview" class="font-bold text-blue-600">-</span></p>
               </div>
               <button onclick="document.getElementById('modal-invoice').classList.add('hidden')"
@@ -147,10 +147,16 @@
                 </div>
               </div>
 
-              <!-- Catatan -->
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan (opsional)</label>
-                <input type="text" id="inv-catatan" placeholder="Termin pembayaran, rekening, dll" class="input-field text-sm">
+              <!-- Note & Bank Account -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Note (opsional)</label>
+                  <textarea id="inv-catatan" rows="3" placeholder="Catatan pada invoice..." class="input-field text-sm"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bank Account</label>
+                  <textarea id="inv-bank" rows="3" placeholder="Bank BSI 7336418717&#10;A/N. PT. Renus Global Indonesia" class="input-field text-sm"></textarea>
+                </div>
               </div>
 
               <!-- Ringkasan -->

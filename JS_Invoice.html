@@ -5,6 +5,9 @@
     let _invoiceWOList   = [];
     let _invoiceNextNo   = '';
     let _cachedInvoiceData = [];
+    let _invoiceEditId   = null;   // null = mode buat, isi = mode edit
+    let _invoiceEditDpp  = 0;      // dpp lama (untuk koreksi sisa saat edit)
+    const _BANK_DEFAULT  = 'Bank BSI 7336418717\nA/N. PT. Renus Global Indonesia';
 
     // ── Helper tanggal yyyy-mm-dd → dd/MM/yyyy ──
     function _toDDMMYYYY(str) {
@@ -58,6 +61,9 @@
           </td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
+              <button onclick='bukaModalEditInvoice(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Invoice">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
               <button onclick='exportInvoicePDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Invoice">
                 <i class="fa-solid fa-file-pdf"></i>
               </button>
@@ -101,11 +107,16 @@
       google.script.run.withSuccessHandler(function(res) {
         toggleLoader(false);
         if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _invoiceEditId = null;
+        _invoiceEditDpp = 0;
         _invoiceWOList = res.woList || [];
         _invoiceNextNo = res.nextNo || '';
+        document.getElementById('inv-modal-title').innerText = 'Buat Invoice Baru';
+        document.getElementById('inv-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Invoice';
         document.getElementById('inv-nomor-preview').innerText = _invoiceNextNo;
 
         const sel = document.getElementById('inv-wo');
+        sel.disabled = false;
         sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
         _invoiceWOList.forEach(w => {
           if (w.sisaDpp > 0) sel.add(new Option(`${w.noWO} — ${w.namaKlien} (sisa Rp ${Math.round(w.sisaDpp).toLocaleString('id-ID')})`, w.noWO));
@@ -122,6 +133,7 @@
         document.getElementById('inv-tanggal').valueAsDate = new Date();
         document.getElementById('inv-tglpo').value = '';
         document.getElementById('inv-catatan').value = '';
+        document.getElementById('inv-bank').value = _BANK_DEFAULT;
         document.getElementById('inv-po-penawaran').innerText = '-';
         document.getElementById('inv-scope').innerHTML =
           '<p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>';
@@ -134,6 +146,63 @@
         toggleLoader(false);
         showNotification('Gagal: ' + (err.message || err), 'error');
       }).getInvoiceInitialData();
+    }
+
+    // ── Form Edit Invoice ──
+    window.bukaModalEditInvoice = function(item) {
+      toggleLoader(true, 'Memuat data invoice...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _invoiceEditId  = item.id;
+        _invoiceEditDpp = item.dpp || 0;
+        _invoiceWOList  = res.woList || [];
+        document.getElementById('inv-modal-title').innerText = 'Edit Invoice';
+        document.getElementById('inv-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Invoice';
+        document.getElementById('inv-nomor-preview').innerText = item.id;
+
+        // Pastikan WO invoice ada di dropdown meski sisa 0 (karena sedang diedit)
+        const sel = document.getElementById('inv-wo');
+        sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
+        _invoiceWOList.forEach(w => {
+          sel.add(new Option(`${w.noWO} — ${w.namaKlien}`, w.noWO));
+        });
+        sel.value = item.noWO;
+        sel.disabled = true; // WO tidak boleh diubah saat edit
+
+        // Muat info & scope WO
+        onInvoiceWOChange();
+
+        // Pre-fill nilai dari invoice
+        document.getElementById('inv-jenis').value = item.jenis || 'DP';
+        document.getElementById('inv-tanggal').value = _toISO(item.tanggal);
+        document.getElementById('inv-catatan').value = item.catatan || '';
+        document.getElementById('inv-bank').value = item.bankAccount || _BANK_DEFAULT;
+
+        // PO: jika noPO != noPenawaran → ada PO
+        const adaPO = item.noPO && item.noPO !== item.noPenawaran;
+        document.getElementById('inv-ada-po').checked = !!adaPO;
+        document.getElementById('inv-nopo').value = adaPO ? item.noPO : '';
+        document.getElementById('inv-tglpo').value = adaPO ? _toISO(item.tglPO) : '';
+        onInvoicePOToggle();
+
+        // Nominal & persen
+        onInvoiceJenisChange();
+        document.getElementById('inv-nominal').value = formatNominalRupiah(item.dpp || 0);
+        onInvoiceNominalInput(); // sinkronkan persen dari nominal
+
+        document.getElementById('modal-invoice').classList.remove('hidden');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).getInvoiceInitialData();
+    };
+
+    // Konversi dd/MM/yyyy → yyyy-MM-dd untuk input date
+    function _toISO(str) {
+      if (!str) return '';
+      const p = str.toString().split('/');
+      return p.length === 3 ? `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}` : '';
     }
 
     function _currentInvoiceWO() {
@@ -154,8 +223,8 @@
       document.getElementById('inv-info-project').innerText = wo.namaProject;
       document.getElementById('inv-info-grand').innerText   = 'Rp ' + Math.round(wo.nilaiKontrak).toLocaleString('id-ID');
       document.getElementById('inv-info-ppn').innerText     = wo.ppnRate > 0 ? (wo.ppnRate + '%') : 'Tidak ada';
-      document.getElementById('inv-info-ditagih').innerText = 'Rp ' + Math.round(wo.ditagihDpp).toLocaleString('id-ID');
-      document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(wo.sisaDpp).toLocaleString('id-ID');
+      document.getElementById('inv-info-ditagih').innerText = 'Rp ' + Math.round(wo.ditagihDpp - (_invoiceEditId ? _invoiceEditDpp : 0)).toLocaleString('id-ID');
+      document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(_invEffSisa(wo)).toLocaleString('id-ID');
       document.getElementById('inv-po-penawaran').innerText = wo.id || '-';
 
       _renderScopeInvoice(wo);
@@ -218,6 +287,11 @@
       cont.innerHTML = html;
     }
 
+    // Sisa kontrak efektif (saat edit, tambahkan kembali dpp invoice ini)
+    function _invEffSisa(wo) {
+      return (wo ? wo.sisaDpp : 0) + (_invoiceEditId ? _invoiceEditDpp : 0);
+    }
+
     // Hitung DPP berdasarkan jenis, lalu PPN otomatis dari penawaran
     function _computeInvoice() {
       const wo = _currentInvoiceWO();
@@ -225,7 +299,7 @@
       const jenis = document.getElementById('inv-jenis').value;
 
       let dpp = 0;
-      if (jenis === 'Pelunasan')  dpp = wo.sisaDpp;
+      if (jenis === 'Pelunasan')  dpp = _invEffSisa(wo);
       else if (jenis === 'Penuh') dpp = wo.nilaiKontrak;
       else                        dpp = pN(document.getElementById('inv-nominal').value); // DP/Termin
       const ppnPersen  = wo.ppnRate || 0;
@@ -247,8 +321,9 @@
 
       const jenis = document.getElementById('inv-jenis').value;
       const c = _computeInvoice();
+      const effSisa = _invEffSisa(wo);
       if (c.dpp <= 0) return showNotification('Nilai tagihan harus lebih dari 0!', 'error');
-      if (c.dpp > wo.sisaDpp + 1) return showNotification('Nilai tagihan melebihi sisa kontrak (Rp ' + Math.round(wo.sisaDpp).toLocaleString('id-ID') + ').', 'error');
+      if (c.dpp > effSisa + 1) return showNotification('Nilai tagihan melebihi sisa kontrak (Rp ' + Math.round(effSisa).toLocaleString('id-ID') + ').', 'error');
 
       // PO: jika ada → pakai input; jika tidak → pakai No. Penawaran sebagai referensi
       const adaPO = document.getElementById('inv-ada-po').checked;
@@ -257,30 +332,41 @@
       if (adaPO && !noPO) return showNotification('No. PO belum diisi.', 'error');
 
       const payload = {
-        noWO:       wo.noWO,
-        tanggal:    _toDDMMYYYY(document.getElementById('inv-tanggal').value),
-        jenis:      jenis,
-        inputMode:  'nominal',
-        persen:     (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
-        dpp:        c.dpp,
-        noPO:       noPO,
-        tglPO:      tglPO,
-        catatan:    document.getElementById('inv-catatan').value.trim(),
-        dibuatOleh: (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
+        noWO:        wo.noWO,
+        tanggal:     _toDDMMYYYY(document.getElementById('inv-tanggal').value),
+        jenis:       jenis,
+        inputMode:   'nominal',
+        persen:      (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
+        dpp:         c.dpp,
+        noPO:        noPO,
+        tglPO:       tglPO,
+        catatan:     document.getElementById('inv-catatan').value.trim(),
+        bankAccount: document.getElementById('inv-bank').value.trim(),
+        dibuatOleh:  (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
       };
 
-      toggleLoader(true, 'Menyimpan invoice...');
-      google.script.run.withSuccessHandler(function(res) {
+      const editing = !!_invoiceEditId;
+      if (editing) payload.id = _invoiceEditId;
+
+      toggleLoader(true, editing ? 'Memperbarui invoice...' : 'Menyimpan invoice...');
+      const handler = function(res) {
         toggleLoader(false);
         if (res.success) {
           showNotification(res.message);
           document.getElementById('modal-invoice').classList.add('hidden');
           loadInvoice();
         } else showNotification(res.message, 'error');
-      }).withFailureHandler(function(err) {
+      };
+      const failure = function(err) {
         toggleLoader(false);
         showNotification('Gagal: ' + (err.message || err), 'error');
-      }).simpanInvoice(payload);
+      };
+
+      if (editing) {
+        google.script.run.withSuccessHandler(handler).withFailureHandler(failure).editInvoice(payload);
+      } else {
+        google.script.run.withSuccessHandler(handler).withFailureHandler(failure).simpanInvoice(payload);
+      }
     }
 
     function ubahStatusBayarInvoice(id, sel) {

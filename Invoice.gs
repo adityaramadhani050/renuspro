@@ -34,8 +34,9 @@
  * 15 total           Nilai tagih (DPP + PPN)
  * 16 metaJson        { scope:[kelompok penawaran], nilaiKontrak, inputMode }
  * 17 statusBayar     Belum Lunas | Lunas
- * 18 catatan
+ * 18 catatan         (Note)
  * 19 dibuatOleh
+ * 20 bankAccount     (rekening tujuan, multi-baris)
  */
 
 function buatSheetInvoiceDefault(ss) {
@@ -45,7 +46,7 @@ function buatSheetInvoiceDefault(ss) {
     'No Invoice', 'No WO', 'No Penawaran', 'Tanggal', 'Jenis', 'Persen',
     'No PO', 'Tgl PO', 'Klien ID', 'Nama Klien', 'Nama Project',
     'DPP', 'PPN (%)', 'PPN Nominal', 'Total', 'Rincian Item (JSON)',
-    'Status Bayar', 'Catatan', 'Dibuat Oleh'
+    'Status Bayar', 'Catatan', 'Dibuat Oleh', 'Bank Account'
   ]);
   return sheet;
 }
@@ -186,7 +187,8 @@ function simpanInvoice(payload) {
       wo.klienId, wo.namaKlien, wo.namaProject,
       dpp, ppnPersen, ppnNominal, total,
       JSON.stringify(meta), 'Belum Lunas',
-      payload.catatan || '', payload.dibuatOleh || 'Sales Executive'
+      payload.catatan || '', payload.dibuatOleh || 'Sales Executive',
+      payload.bankAccount || ''
     ]);
 
     SpreadsheetApp.flush();
@@ -198,6 +200,84 @@ function simpanInvoice(payload) {
     };
   } catch (e) {
     return { success: false, message: 'Gagal menyimpan invoice: ' + e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// ── Edit invoice yang sudah ada ─────────────────────────────────────────────
+function editInvoice(payload) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Invoice_Main');
+    if (!sheet) return { success: false, message: 'Sheet Invoice_Main tidak ditemukan.' };
+
+    const data = sheet.getDataRange().getValues();
+    let rowIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === payload.id) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) return { success: false, message: 'Invoice tidak ditemukan.' };
+
+    const noWO = data[rowIdx][1] ? data[rowIdx][1].toString() : '';
+    const oldDpp = parseFloat(data[rowIdx][11]) || 0;
+
+    // Data WO (sumber kebenaran)
+    const wo = getWorkOrderList().find(function(w) { return w.noWO === noWO; });
+    if (!wo) return { success: false, message: 'Work Order sumber tidak ditemukan.' };
+
+    const nilaiKontrak = Math.max(0, (wo.subtotal || 0) - (wo.diskon || 0));
+    const ppnPersen    = nilaiKontrak > 0 ? Math.round((wo.pajak || 0) / nilaiKontrak * 100) : 0;
+
+    // Sisa kontrak tidak termasuk invoice ini sendiri
+    const ditagihLain = (_getTagihanMap(ss)[noWO] || 0) - oldDpp;
+    const sisaDpp = Math.max(0, nilaiKontrak - ditagihLain);
+
+    const jenis = payload.jenis || 'Penuh';
+    let dpp, persen;
+    if (jenis === 'Pelunasan')          { dpp = sisaDpp; persen = 0; }
+    else if (jenis === 'Penuh')         { dpp = nilaiKontrak; persen = 100; }
+    else if (payload.inputMode === 'nominal') {
+      dpp = Math.round(parseFloat(payload.dpp) || 0);
+      persen = nilaiKontrak > 0 ? Math.round(dpp / nilaiKontrak * 100) : 0;
+    } else {
+      persen = parseFloat(payload.persen) || 0;
+      dpp = Math.round(persen / 100 * nilaiKontrak);
+    }
+
+    if (dpp <= 0) return { success: false, message: 'Nilai tagihan harus lebih dari 0.' };
+    if (dpp > sisaDpp + 1) {
+      return { success: false, message: 'Nilai tagihan (Rp ' + dpp.toLocaleString('id-ID') +
+        ') melebihi sisa kontrak yang bisa ditagih (Rp ' + Math.round(sisaDpp).toLocaleString('id-ID') + ').' };
+    }
+
+    const ppnNominal = Math.round(dpp * ppnPersen / 100);
+    const total      = dpp + ppnNominal;
+
+    let scope = [];
+    try { scope = JSON.parse(wo.items || '[]'); } catch (e) { scope = []; }
+    const meta = { scope: scope, nilaiKontrak: nilaiKontrak, inputMode: payload.inputMode || 'persen' };
+
+    const r = rowIdx + 1; // 1-based
+    sheet.getRange(r, 4).setValue(payload.tanggal);          // Tanggal
+    sheet.getRange(r, 5).setValue(jenis);                    // Jenis
+    sheet.getRange(r, 6).setValue(persen);                   // Persen
+    sheet.getRange(r, 7).setValue(payload.noPO || '');       // No PO
+    sheet.getRange(r, 8).setValue(payload.tglPO || '');      // Tgl PO
+    sheet.getRange(r, 12).setValue(dpp);                     // DPP
+    sheet.getRange(r, 13).setValue(ppnPersen);               // PPN %
+    sheet.getRange(r, 14).setValue(ppnNominal);              // PPN Nominal
+    sheet.getRange(r, 15).setValue(total);                   // Total
+    sheet.getRange(r, 16).setValue(JSON.stringify(meta));    // meta
+    sheet.getRange(r, 18).setValue(payload.catatan || '');   // Catatan
+    sheet.getRange(r, 20).setValue(payload.bankAccount || ''); // Bank Account
+
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Invoice ' + payload.id + ' berhasil diperbarui!' };
+  } catch (e) {
+    return { success: false, message: 'Gagal memperbarui invoice: ' + e.toString() };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
@@ -240,7 +320,8 @@ function getInvoiceList() {
         items:       data[i][15] ? data[i][15].toString() : '[]',
         statusBayar: data[i][16] ? data[i][16].toString() : 'Belum Lunas',
         catatan:     data[i][17] ? data[i][17].toString() : '',
-        dibuatOleh:  data[i][18] ? data[i][18].toString() : ''
+        dibuatOleh:  data[i][18] ? data[i][18].toString() : '',
+        bankAccount: data[i][19] ? data[i][19].toString() : ''
       });
     }
 

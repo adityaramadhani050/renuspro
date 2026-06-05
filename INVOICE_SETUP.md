@@ -40,8 +40,9 @@ Agar export berfungsi, sheet **Template_Invoice** wajib punya named range beriku
 | G | Price (IDR) |
 | H | Amount (IDR) |
 
-> Footer (TOTAL, PPN, GRAND TOTAL, Terbilang, Catatan, Tanda tangan) **digenerate
-> otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
+> Footer (TOTAL, PPN, GRAND TOTAL, blok **Note | Bank Account**, Tanda tangan)
+> **digenerate otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
+> Bank Account diambil dari input di form pembuatan/edit invoice.
 
 ### Isi otomatis zona item (layout baru)
 Sistem mengisi zona item dengan satu **baris tagihan utama** lalu **scope read-only**:
