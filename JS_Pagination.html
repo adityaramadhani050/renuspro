@@ -2,6 +2,7 @@
 // ── State Pagination ──────────────────────────────────────────────
 const _pgState = {
   penawaran: { page: 1, perPage: 10, data: [] },
+  workorder: { page: 1, perPage: 10, data: [] },
   produk:    { page: 1, perPage: 10, data: [] },
   template:  { page: 1, perPage: 10, data: [] },
   customer:  { page: 1, perPage: 10, data: [] },
@@ -196,6 +197,7 @@ function _pgRender(tipe) {
   const sliced = state.data.slice(start, start + state.perPage);
 
   if (tipe === 'penawaran') _renderTabelPenawaran(sliced);
+  if (tipe === 'workorder') _pgRenderWorkOrder(sliced);
   if (tipe === 'produk')    _pgRenderProduk(sliced);
   if (tipe === 'template')  _pgRenderTemplate(sliced);
   if (tipe === 'customer')  _pgRenderCustomer(sliced);

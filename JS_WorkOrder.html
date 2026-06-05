@@ -1,0 +1,81 @@
+<script>
+    // ================================================================
+    // FITUR WORK ORDER
+    // Menampung seluruh penawaran berstatus Deal (punya No WO).
+    // No WO = ID utama, akan dipakai fitur Invoice & Kwitansi.
+    // ================================================================
+
+    let _cachedWorkOrderData = [];
+
+    function _pgRenderWorkOrder(data) {
+      const tbody = document.getElementById('table-workorder');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">
+          <i class="fas fa-clipboard-list mr-2"></i>Belum ada Work Order. WO terbit otomatis saat penawaran berstatus <b>Deal</b>.
+        </td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map(i => {
+        const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+          <td class="p-4 whitespace-nowrap">
+            <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-100">
+              <i class="fa-solid fa-clipboard-check text-[11px]"></i>${i.noWO}
+            </span>
+          </td>
+          <td class="p-4 max-w-[200px]">
+            <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}<span class="text-slate-400 font-normal text-[10px] ml-1">Rev${i.rev}</span></p>
+            <p class="text-[11px] text-slate-400 font-medium truncate leading-tight">${i.tanggal}</p>
+          </td>
+          <td class="p-4 max-w-[240px]">
+            <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.namaKlien}</p>
+            <p class="font-semibold text-slate-700 truncate leading-snug">${i.namaProject}</p>
+          </td>
+          <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
+          <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
+          <td class="p-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick='exportPenawaranPDF(${itemJson})'
+                class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export Quotation PDF">
+                <i class="fa-solid fa-file-pdf"></i>
+              </button>
+              <span class="text-slate-300 p-1.5 cursor-not-allowed" title="Invoice & Kwitansi — segera hadir">
+                <i class="fa-solid fa-file-invoice text-xs"></i>
+              </span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    window.loadWorkOrder = function() {
+      const tbody = document.getElementById('table-workorder');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...
+        </td></tr>`;
+      }
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+          _cachedWorkOrderData = data || [];
+          const search = document.getElementById('search-workorder');
+          if (search) search.value = '';
+          _pgState.workorder.data = _cachedWorkOrderData;
+          _pgState.workorder.page = 1;
+          _injectPgBar('workorder', '#table-workorder');
+          _pgRender('workorder');
+        }).getWorkOrderList();
+      }
+    };
+
+    window.filterWorkOrder = function() {
+      const q = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
+      _pgState.workorder.data = _cachedWorkOrderData.filter(d => {
+        if (!q) return true;
+        const hay = (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase();
+        return hay.includes(q);
+      });
+      _pgState.workorder.page = 1;
+      _pgRender('workorder');
+    };
+</script>
