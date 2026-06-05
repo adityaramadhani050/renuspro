@@ -1,0 +1,40 @@
+      <section id="page-users" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Manajemen User</h2>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-users" oninput="filterTabelUsers()"
+                placeholder="Cari nama, username..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                      focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+            </div>
+            <button onclick="bukaModalTambahUser()"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold
+                    shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-user-plus text-sm"></i> Tambah User
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabel Users -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th class="p-4">ID</th>
+                <th class="p-4">Nama Lengkap</th>
+                <th class="p-4">Username</th>
+                <th class="p-4 text-center">Role</th>
+                <th class="p-4 text-center">Status</th>
+                <th class="p-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-users" class="text-sm">
+              <tr><td colspan="6" class="p-8 text-center text-slate-500">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data user...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>

@@ -1,0 +1,120 @@
+<script>
+// ================================================================
+// DASHBOARD FILTER BY DATE
+// ================================================================
+(function() {
+
+  // State filter aktif
+  window._dbFilter = {
+    mode: 'thisMonth', // 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
+    from: null,        // Date object
+    to:   null         // Date object
+  };
+
+  // ── Set preset ──────────────────────────────────────────────
+  window.setDashboardPreset = function(mode) {
+    window._dbFilter.mode = mode;
+
+    // Update tombol aktif
+    document.querySelectorAll('.db-preset-btn').forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById('db-preset-' + mode);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // Toggle custom range
+    const customRange = document.getElementById('db-custom-range');
+    if (mode === 'custom') {
+      customRange.classList.remove('hidden');
+      customRange.style.display = 'flex';
+      return; // tunggu user klik Terapkan
+    } else {
+      customRange.classList.add('hidden');
+    }
+
+    // Hitung from & to berdasarkan mode
+    const now = new Date();
+    const y   = now.getFullYear();
+    const m   = now.getMonth();
+
+    if (mode === 'thisMonth') {
+      window._dbFilter.from = new Date(y, m, 1);
+      window._dbFilter.to   = new Date(y, m + 1, 0);
+    } else if (mode === 'lastMonth') {
+      const lm = m === 0 ? 11 : m - 1;
+      const ly = m === 0 ? y - 1 : y;
+      window._dbFilter.from = new Date(ly, lm, 1);
+      window._dbFilter.to   = new Date(ly, lm + 1, 0);
+    } else if (mode === 'thisYear') {
+      window._dbFilter.from = new Date(y, 0, 1);
+      window._dbFilter.to   = new Date(y, 11, 31);
+    }
+
+    _updatePeriodLabel();
+    _dbRawCache = null;
+    loadDashboard();
+  };
+
+  // ── Apply custom range ───────────────────────────────────────
+  window.applyCustomDashboardFilter = function() {
+    const fromVal = document.getElementById('db-date-from').value;
+    const toVal   = document.getElementById('db-date-to').value;
+
+    if (!fromVal || !toVal) {
+      showNotification('Pilih tanggal awal dan akhir!', 'error');
+      return;
+    }
+    if (fromVal > toVal) {
+      showNotification('Tanggal awal tidak boleh lebih dari tanggal akhir!', 'error');
+      return;
+    }
+
+    window._dbFilter.from = new Date(fromVal);
+    window._dbFilter.to   = new Date(toVal);
+    window._dbFilter.mode = 'custom';
+
+    _updatePeriodLabel();
+    _dbRawCache = null;
+    loadDashboard();
+  };
+
+  // ── Label periode aktif ──────────────────────────────────────
+  function _updatePeriodLabel() {
+    const el = document.getElementById('db-active-period');
+    if (!el) return;
+    const f = window._dbFilter;
+    const fmt = function(d) {
+      if (!d) return '';
+      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+    el.innerText = fmt(f.from) + ' – ' + fmt(f.to);
+    el.classList.remove('hidden');
+    el.style.display = '';
+  }
+
+  // ── Init saat load ───────────────────────────────────────────
+  // Set default thisMonth
+  const now = new Date();
+  window._dbFilter.from = new Date(now.getFullYear(), now.getMonth(), 1);
+  window._dbFilter.to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  // Jalankan _updatePeriodLabel setelah DOM siap
+  document.addEventListener('DOMContentLoaded', function() {
+    _updatePeriodLabel();
+  });
+  setTimeout(_updatePeriodLabel, 300);
+
+})();
+
+function refreshDashboard() {
+      // Animasi ikon refresh
+      const btn = document.getElementById('db-refresh-btn');
+      if (btn) btn.querySelector('i').classList.add('fa-spin');
+      // Hapus cache → paksa fetch ulang
+      _dbRawCache = null;
+      loadDashboard(true);
+      setTimeout(function() {
+        if (btn) btn.querySelector('i').classList.remove('fa-spin');
+      }, 1500);
+    }
+</script>

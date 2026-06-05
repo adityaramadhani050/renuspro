@@ -1,0 +1,175 @@
+<script>
+        // --- RIWAYAT REVISI ---
+    function bukaRiwayatRevisi(noPenawaran, namaProject) {
+      document.getElementById('riwayat-subtitle').innerText = noPenawaran + ' — ' + namaProject;
+      document.getElementById('riwayat-list').innerHTML =
+        '<p class="text-xs text-slate-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat...</p>';
+      document.getElementById('riwayat-detail').innerHTML =
+        '<p class="text-sm text-slate-400 text-center mt-8">Pilih revisi di sebelah kiri.</p>';
+      document.getElementById('modal-riwayat-revisi').classList.remove('hidden');
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(data => renderRiwayatList(data))
+          .withFailureHandler(err => {
+            document.getElementById('riwayat-list').innerHTML =
+              '<p class="text-xs text-rose-500 text-center py-4">Gagal memuat data.</p>';
+          })
+          .getRiwayatRevisi(noPenawaran);
+      }
+    }
+
+    function renderRiwayatList(data) {
+      const container = document.getElementById('riwayat-list');
+      if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Tidak ada data revisi.</p>';
+        return;
+      }
+      container.innerHTML = data.map((item, idx) => {
+        const isLatest = idx === 0;
+        return `<button onclick='pilihRevisi(${JSON.stringify(item).replace(/'/g,"&#39;")})'
+          id="btn-rev-${item.rev}"
+          class="w-full text-left px-3 py-3 rounded-xl border transition hover:border-violet-300 hover:bg-violet-50
+                ${isLatest ? 'border-violet-400 bg-violet-50' : 'border-slate-200 bg-white'}">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-extrabold ${isLatest ? 'text-violet-700' : 'text-slate-600'}">
+              <i class="fa-solid fa-code-branch mr-1"></i>Rev ${item.rev}
+            </span>
+            ${isLatest ? '<span class="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-md">Latest</span>' : ''}
+          </div>
+          <p class="text-[11px] text-slate-500 font-medium"><i class="fa-regular fa-calendar mr-1"></i>${item.tanggal}</p>
+          <p class="text-[11px] text-slate-400 mt-0.5"><i class="fa-regular fa-user mr-1"></i>${item.dibuatOleh}</p>
+          <p class="text-[11px] font-bold mt-1 ${item.marginPersen >= 25 ? 'text-emerald-600' : 'text-rose-500'}">
+            Margin: ${parseFloat(item.marginPersen).toFixed(1)}% &nbsp;|&nbsp; Rp ${Math.round(item.grandTotal).toLocaleString('id-ID')}
+          </p>
+        </button>`;
+      }).join('');
+
+      // Auto-pilih revisi pertama (latest)
+      if (data.length > 0) pilihRevisi(data[0]);
+    }
+
+    function pilihRevisi(item) {
+      // Highlight tombol yang dipilih
+      document.querySelectorAll('#riwayat-list button').forEach(btn => {
+        btn.classList.remove('border-violet-400', 'bg-violet-50', 'ring-2', 'ring-violet-200');
+        btn.classList.add('border-slate-200', 'bg-white');
+      });
+      const activeBtn = document.getElementById('btn-rev-' + item.rev);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-slate-200', 'bg-white');
+        activeBtn.classList.add('border-violet-400', 'bg-violet-50', 'ring-2', 'ring-violet-200');
+      }
+
+      const rp = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
+      const mClass = item.marginPersen >= 25 ? 'bg-emerald-600' : 'bg-rose-600';
+      const statusConfig = {
+        'On-Progress': 'bg-blue-100 text-blue-700',
+        'Deal':        'bg-emerald-100 text-emerald-800',
+        'Fail':        'bg-rose-100 text-rose-700'
+      };
+      const statusClass = statusConfig[item.status] || 'bg-slate-100 text-slate-600';
+
+      let itemsHtml = '';
+      try {
+        const kelompokList = JSON.parse(item.items);
+        itemsHtml = kelompokList.map(k => `
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-blue-700 text-white text-xs font-bold px-3 py-2">${k.kelompok}. ${k.namaKelompok}</div>
+            <table class="w-full text-xs border-collapse">
+              <thead><tr class="bg-slate-50 text-slate-400 font-bold uppercase">
+                <th class="p-2 text-left">Deskripsi</th>
+                <th class="p-2 text-center">Qty</th>
+                <th class="p-2 text-center">Unit</th>
+                <th class="p-2 text-right">Harga</th>
+                <th class="p-2 text-right">Total</th>
+              </tr></thead>
+              <tbody>
+                ${k.subItems.map(s => `<tr class="border-t border-slate-100">
+                  <td class="p-2 text-slate-700">${s.deskripsi}</td>
+                  <td class="p-2 text-center">${s.qty}</td>
+                  <td class="p-2 text-center text-slate-400">${s.unit}</td>
+                  <td class="p-2 text-right">Rp ${s.harga.toLocaleString('id-ID')}</td>
+                  <td class="p-2 text-right font-bold">Rp ${s.total.toLocaleString('id-ID')}</td>
+                </tr>`).join('')}
+              </tbody>
+              <tfoot><tr class="bg-slate-50 border-t border-slate-200">
+                <td colspan="4" class="p-2 text-right font-bold text-slate-600">Sub-Total ${k.kelompok}:</td>
+                <td class="p-2 text-right font-extrabold text-blue-800">Rp ${k.subtotal.toLocaleString('id-ID')}</td>
+              </tr></tfoot>
+            </table>
+          </div>`).join('');
+      } catch(e) {
+        itemsHtml = '<p class="text-xs text-slate-400">Data item tidak tersedia.</p>';
+      }
+
+      document.getElementById('riwayat-detail').innerHTML = `
+        <div class="space-y-4">
+          <!-- Header info rev -->
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <span class="text-sm font-extrabold text-violet-700">
+                <i class="fa-solid fa-code-branch mr-1"></i>Revisi ${item.rev}
+              </span>
+              <span class="ml-2 text-xs text-slate-400">${item.tanggal}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold px-2 py-1 rounded-lg ${statusClass}">${item.status}</span>
+              <span class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md ${mClass}">
+                ${parseFloat(item.marginPersen).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <!-- Info grid -->
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-xs text-slate-400 font-bold uppercase mb-1">Nama Project</p>
+              <p class="font-semibold text-slate-800 text-xs">${item.namaProject}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-xs text-slate-400 font-bold uppercase mb-1">Klien</p>
+              <p class="font-semibold text-slate-800 text-xs">${item.namaKlien}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-xs text-slate-400 font-bold uppercase mb-1">Dibuat Oleh</p>
+              <p class="font-semibold text-slate-800 text-xs">${item.dibuatOleh}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-xs text-slate-400 font-bold uppercase mb-1">Berlaku Hingga</p>
+              <p class="font-semibold text-slate-800 text-xs">${item.validUntil || '-'}</p>
+            </div>
+          </div>
+
+          <!-- Kalkulasi -->
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1.5">
+              <p class="font-bold text-amber-800 uppercase text-[10px]">Analisis Margin</p>
+              <div class="flex justify-between"><span class="text-slate-500">Total (Exc PPN)</span><span class="font-bold">${rp(item.subtotal - item.diskon)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Total HPP</span><span class="font-bold text-rose-600">${rp(item.hpp)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Estimasi Profit</span><span class="font-bold text-emerald-700">${rp(item.profit)}</span></div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+              <p class="font-bold text-slate-500 uppercase text-[10px]">Rincian Harga</p>
+              <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span class="font-bold">${rp(item.subtotal)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Diskon</span><span class="font-bold text-rose-500">- ${rp(item.diskon)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">PPN</span><span class="font-bold">${rp(item.pajak)}</span></div>
+              <div class="flex justify-between font-extrabold text-blue-900 pt-1 border-t border-slate-200">
+                <span>Grand Total</span><span>${rp(item.grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item rincian -->
+          <div>
+            <p class="text-xs font-bold text-slate-500 uppercase mb-2">Rincian Item</p>
+            ${itemsHtml}
+          </div>
+        </div>`;
+    }
+    // Reset search saat data di-reload
+    function resetSearch(tipe) {
+      const el = document.getElementById('search-' + tipe);
+      if (el) el.value = '';
+    }
+</script>

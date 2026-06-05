@@ -1,0 +1,127 @@
+<script>
+function toggleSidebar() {
+  var sidebar = document.getElementById('main-sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var icon    = document.getElementById('hamburger-icon');
+
+  if (!sidebar) {
+    console.warn('[RenusPro] #main-sidebar tidak ditemukan. Pastikan id="main-sidebar" sudah ditambahkan ke tag <aside>.');
+    return;
+  }
+
+  var isOpen = sidebar.classList.contains('sidebar-open');
+
+  if (isOpen) {
+    // Tutup sidebar
+    sidebar.classList.remove('sidebar-open');
+    if (overlay) overlay.classList.remove('open');
+    if (icon) icon.className = 'fas fa-bars text-base';
+  } else {
+    // Buka sidebar
+    sidebar.classList.add('sidebar-open');
+    if (overlay) overlay.classList.add('open');
+    if (icon) icon.className = 'fas fa-times text-base';
+  }
+}
+
+function closeSidebar() {
+  var sidebar = document.getElementById('main-sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var icon    = document.getElementById('hamburger-icon');
+
+  if (!sidebar) return;
+  sidebar.classList.remove('sidebar-open');
+  if (overlay) overlay.classList.remove('open');
+  if (icon) icon.className = 'fas fa-bars text-base';
+}
+
+// Auto-close sidebar saat nav item diklik di mobile
+(function() {
+  function _attachNavClosers() {
+    document.querySelectorAll('.nav-item').forEach(function(btn) {
+      // Hindari attach listener duplikat
+      if (btn.dataset.sidebarClose) return;
+      btn.dataset.sidebarClose = '1';
+      btn.addEventListener('click', function() {
+        if (window.innerWidth < 768) closeSidebar();
+      });
+    });
+  }
+  // Attach saat DOM siap
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _attachNavClosers);
+  } else {
+    _attachNavClosers();
+  }
+})();
+
+// Tutup sidebar saat tombol Escape ditekan
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeSidebar();
+});
+
+function _detectPenawaranType(kelompokList) {
+  const keywords = ['jasa', 'instalasi', 'komisioning', 'commissioning', 'pemasangan', 'pasang', 'instal', 'install'];
+  for (const k of kelompokList) {
+    const namaK = (k.namaKelompok || '').toLowerCase();
+    if (keywords.some(kw => namaK.includes(kw))) return 'jasa';
+    for (const si of (k.subItems || [])) {
+      const desc = (si.deskripsi || '').toLowerCase();
+      if (keywords.some(kw => desc.includes(kw))) return 'jasa';
+    }
+  }
+  return 'only';
+}
+
+async function _mergePdfDenganTC(mainPdfBytes, kelompokList) {
+  const { PDFDocument } = PDFLib;
+  const tipe = _detectPenawaranType(kelompokList);
+
+  // Ambil B64 dari server
+  const tcB64 = await new Promise((resolve, reject) => {
+    if (tipe === 'jasa') {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .getTcPdfJasaB64();
+    } else {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .getTcPdfMaterialB64();
+    }
+  });
+
+  const tcBinary = atob(tcB64);
+  const tcBytes  = new Uint8Array(tcBinary.length);
+  for (let i = 0; i < tcBinary.length; i++) tcBytes[i] = tcBinary.charCodeAt(i);
+
+  const mainDoc = await PDFDocument.load(mainPdfBytes);
+  const tcDoc   = await PDFDocument.load(tcBytes);
+
+  const tcPages = await mainDoc.copyPages(tcDoc, tcDoc.getPageIndices());
+  tcPages.forEach(page => mainDoc.addPage(page));
+
+  return await mainDoc.save();
+}
+
+function _initSelectProdukDiBaris(kontainer) {
+  // kontainer bisa berupa div kelompok atau tr baris
+  const selects = kontainer.querySelectorAll
+    ? kontainer.querySelectorAll('.select-produk:not([data-sd-init])')
+    : [];
+
+  selects.forEach(function(sel) {
+    if (sel.dataset.sdInit) return;
+    const uid = 'sd-produk-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    sel.id = uid;
+    initSearchableDropdown(uid, {
+      placeholder: '-- Pilih Item --',
+      searchPlaceholder: 'Cari produk/jasa...',
+      onChange: function() {
+        onItemSelectChanged(sel);
+      }
+    });
+  });
+}
+</script>

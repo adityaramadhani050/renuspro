@@ -1,0 +1,239 @@
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    body.login-active {
+      overflow: hidden !important;
+    }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .page-section { display: none; }
+    .page-section.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+    .nav-item.active { background-color: #f1f5f9; color: #1e40af; font-weight: 600; border-right: 4px solid #1e40af; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .input-field { width: 100%; padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; outline: none; transition: all 0.2s; background: #fff; }
+    .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+
+      /* ── Login Screen ── */
+      #login-screen {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        min-width: 100vw; min-height: 100vh;
+        z-index: 99999;
+        background: #0f172a;
+        /* background-image: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%); */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        margin: 0; padding: 0;
+        box-sizing: border-box;
+      }
+      #login-screen.hidden {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      .login-card {
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 24px;
+        padding: 40px 36px;
+        width: 100%; max-width: 400px;
+        box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+      }
+      .login-input {
+        width: 100%; padding: 12px 16px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 12px; color: #fff;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 14px; outline: none;
+        transition: border-color 0.2s, background 0.2s;
+      }
+      .login-input:focus {
+        border-color: #60a5fa;
+        background: rgba(255,255,255,0.12);
+      }
+      .login-input::placeholder { color: rgba(255,255,255,0.35); }
+      .login-btn {
+        width: 100%; padding: 13px;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: #fff; border: none; border-radius: 12px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 14px; font-weight: 700; cursor: pointer;
+        transition: opacity 0.2s, transform 0.1s;
+        box-shadow: 0 8px 24px rgba(37,99,235,0.4);
+      }
+      .login-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+      .login-btn:active { transform: translateY(0); }
+      .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+      .login-error {
+        background: rgba(239,68,68,0.15);
+        border: 1px solid rgba(239,68,68,0.3);
+        color: #fca5a5; border-radius: 10px;
+        padding: 10px 14px; font-size: 13px;
+        display: none;
+      }
+      .login-error.show { display: block; }
+
+      /* ── Role badge ── */
+      .role-badge-admin { background: #dbeafe; color: #1e40af; }
+      .role-badge-sales { background: #dcfce7; color: #166534; }
+
+      /* ── Password visibility toggle ── */
+      .pw-wrap { position: relative; }
+      .pw-toggle {
+        position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.4);
+        padding: 4px; transition: color 0.2s;
+      }
+      .pw-toggle:hover { color: rgba(255,255,255,0.7); }
+
+      /* ── Ganti Password Modal ── */
+      #modal-ganti-pw input { background: #f8fafc; }
+
+      /* ── Mobile Sidebar Overlay ── */
+      #sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,0.5);
+        z-index: 30;
+        backdrop-filter: blur(2px);
+      }
+      #sidebar-overlay.open { display: block; }
+
+      aside.mobile-open {
+        transform: translateX(0) !important;
+      }
+
+      @media (min-width: 768px) {
+        #main-sidebar {
+          display: flex !important;
+          position: relative;
+          transform: none !important;
+        }
+      }
+    
+      /* Mobile: sidebar slide-in dari kiri */
+      @media (max-width: 767px) {
+        #main-sidebar {
+          display: flex !important;   /* Harus flex agar layout sidebar benar */
+          position: fixed;
+          top: 0; left: 0;
+          height: 100%;
+          z-index: 40;
+          transform: translateX(-100%);   /* Tersembunyi di luar layar */
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+        }
+        /* Saat sidebar terbuka */
+        #main-sidebar.sidebar-open {
+          transform: translateX(0) !important;
+        }
+        /* Pastikan main content tidak bergeser */
+        main {
+          width: 100% !important;
+          margin-left: 0 !important;
+        }
+      }
+
+    .sd-wrap { position: relative; }
+    .sd-display {
+      width: 100%; padding: 0.5rem 2rem 0.5rem 1rem;
+      border: 1px solid #e2e8f0; border-radius: 0.5rem;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.75rem center;
+      font-size: 0.875rem; font-weight: 500;
+      color: #1e293b; cursor: pointer;
+      transition: all 0.2s; outline: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-height: 38px;
+    }
+    .sd-display:focus, .sd-display.open {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+    .sd-display.placeholder { color: #94a3b8; font-weight: 400; }
+    .sd-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 0.625rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      z-index: 9999; display: none; flex-direction: column;
+      max-height: 260px; overflow: hidden;
+    }
+    .sd-dropdown.open { display: flex; }
+    .sd-search-wrap {
+      padding: 8px 8px 6px;
+      border-bottom: 1px solid #f1f5f9;
+      flex-shrink: 0;
+    }
+    .sd-search {
+      width: 100%; padding: 6px 10px 6px 30px;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      font-size: 12px; outline: none; background: #f8fafc;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .sd-search:focus { border-color: #3b82f6; background: #fff; }
+    .sd-search-icon {
+      position: absolute; left: 16px; top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8; font-size: 11px; pointer-events: none;
+    }
+    .sd-list {
+      overflow-y: auto; flex: 1;
+      padding: 4px 0;
+    }
+    .sd-option {
+      padding: 7px 12px; font-size: 13px; cursor: pointer;
+      transition: background 0.1s; color: #1e293b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sd-option:hover, .sd-option.focused { background: #eff6ff; color: #1d4ed8; }
+    .sd-option.selected { background: #dbeafe; color: #1d4ed8; font-weight: 600; }
+    .sd-option.no-result { color: #94a3b8; font-style: italic; cursor: default; }
+    .sd-option.no-result:hover { background: transparent; color: #94a3b8; }
+    /* hidden native select tetap ada di DOM untuk form submit */
+    .sd-native { display: none !important; }
+
+    /* ── Fix: dropdown tidak terpotong di dalam tabel ── */
+    .sd-wrap {
+      position: static;
+    }
+
+    /* Tabel item kelompok: izinkan overflow agar dropdown bisa keluar */
+    .block-kelompok table,
+    .block-kelompok .overflow-x-auto {
+      overflow: visible !important;
+    }
+
+    .block-kelompok tbody,
+    .block-kelompok tr,
+    .block-kelompok td {
+      overflow: visible !important;
+    }
+
+    /* Dropdown pakai fixed positioning agar tidak terpotong apapun */
+    .sd-dropdown {
+      position: fixed !important;
+      z-index: 99999 !important;
+      max-height: 220px;
+      min-width: 220px;
+    }
+    /* ── Dashboard Filter Preset Buttons ── */
+    .db-preset-btn {
+      background: #fff;
+      color: #64748b;
+      border-color: #e2e8f0;
+    }
+    .db-preset-btn:hover {
+      background: #f1f5f9;
+      color: #1e40af;
+      border-color: #bfdbfe;
+    }
+    .db-preset-btn.active {
+      background: #1e40af;
+      color: #fff;
+      border-color: #1e40af;
+    }
+  </style>

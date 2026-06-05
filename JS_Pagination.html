@@ -1,0 +1,448 @@
+<script>
+// ── State Pagination ──────────────────────────────────────────────
+const _pgState = {
+  penawaran: { page: 1, perPage: 10, data: [] },
+  produk:    { page: 1, perPage: 10, data: [] },
+  template:  { page: 1, perPage: 10, data: [] },
+  customer:  { page: 1, perPage: 10, data: [] },
+};
+
+// ── Style injeksi sekali ──────────────────────────────────────────
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .pg-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      gap: 8px;
+      padding: 10px 16px;
+      border-top: 1px solid #f1f5f9;
+      background: #f8fafc;
+      border-radius: 0 0 16px 16px;
+    }
+    .pg-info {
+      font-size: 12px;
+      color: #94a3b8;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .pg-info strong { color: #334155; font-weight: 700; }
+    .pg-nav {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .pg-btn {
+      min-width: 30px;
+      height: 30px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 7px;
+      line-height: 1;
+    }
+    .pg-btn:hover:not(:disabled):not(.pg-active) {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #1e40af;
+    }
+    .pg-btn.pg-active {
+      background: #1e40af;
+      color: #fff;
+      border-color: #1e40af;
+      cursor: default;
+    }
+    .pg-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .pg-ellipsis {
+      font-size: 12px;
+      color: #94a3b8;
+      padding: 0 2px;
+      line-height: 30px;
+    }
+    .pg-perpage {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .pg-perpage span {
+      font-size: 11px;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+    .pg-perpage select {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 4px 6px;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+      height: 28px;
+    }
+    .pg-perpage select:focus {
+      border-color: #3b82f6;
+    }
+    @media (max-width: 640px) {
+      .pg-wrap { flex-wrap: wrap; }
+      .pg-info { order: 1; width: 100%; }
+      .pg-nav  { order: 2; }
+      .pg-perpage { order: 3; margin-left: auto; }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// ── Render pagination bar ─────────────────────────────────────────
+function _renderPaginationBar(tipe) {
+  const state     = _pgState[tipe];
+  const totalData = state.data.length;
+  const totalPage = Math.max(1, Math.ceil(totalData / state.perPage));
+  const curPage   = Math.min(state.page, totalPage);
+  state.page      = curPage;
+
+  const bar = document.getElementById('pg-bar-' + tipe);
+  if (!bar) return;
+
+  const from  = totalData === 0 ? 0 : (curPage - 1) * state.perPage + 1;
+  const to    = Math.min(curPage * state.perPage, totalData);
+  const pages = _buildPageNumbers(curPage, totalPage);
+
+  const navBtns = pages.map(p => {
+    if (p === '...') return `<span class="pg-ellipsis">…</span>`;
+    return `<button onclick="_pgGo('${tipe}',${p})"
+      class="pg-btn${p === curPage ? ' pg-active' : ''}"
+      ${p === curPage ? 'disabled' : ''}>${p}</button>`;
+  }).join('');
+
+  bar.innerHTML = `
+    <span class="pg-info">
+      <strong>${from}</strong>–<strong>${to}</strong>
+      <span style="margin:0 3px">dari</span>
+      <strong>${totalData}</strong> data
+    </span>
+
+    <div class="pg-nav">
+      <button onclick="_pgGo('${tipe}',${curPage - 1})"
+        class="pg-btn" ${curPage <= 1 ? 'disabled' : ''}
+        title="Halaman sebelumnya">
+        <i class="fa-solid fa-chevron-left" style="font-size:10px"></i>
+      </button>
+      ${navBtns}
+      <button onclick="_pgGo('${tipe}',${curPage + 1})"
+        class="pg-btn" ${curPage >= totalPage ? 'disabled' : ''}
+        title="Halaman berikutnya">
+        <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>
+      </button>
+    </div>
+
+    <div class="pg-perpage">
+      <span>Baris:</span>
+      <select onchange="_pgSetPerPage('${tipe}',this.value)">
+        ${[10, 20, 25, 50, 100].map(n =>
+          `<option value="${n}"${n === state.perPage ? ' selected' : ''}>${n}</option>`
+        ).join('')}
+      </select>
+    </div>`;
+}
+
+function _buildPageNumbers(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  if (cur <= 4) {
+    return [1, 2, 3, 4, 5, '...', total];
+  } else if (cur >= total - 3) {
+    return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+  } else {
+    return [1, '...', cur - 1, cur, cur + 1, '...', total];
+  }
+}
+
+function _pgGo(tipe, page) {
+  const total = Math.ceil(_pgState[tipe].data.length / _pgState[tipe].perPage);
+  if (page < 1 || page > total) return;
+  _pgState[tipe].page = page;
+  _pgRender(tipe);
+  // Scroll ke atas tabel
+  const tbl = document.getElementById('table-' + tipe);
+  if (tbl) tbl.closest('.overflow-x-auto, .bg-white')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _pgSetPerPage(tipe, val) {
+  _pgState[tipe].perPage = parseInt(val);
+  _pgState[tipe].page    = 1;
+  _pgRender(tipe);
+}
+
+// ── Render halaman saat ini ───────────────────────────────────────
+function _pgRender(tipe) {
+  const state  = _pgState[tipe];
+  const start  = (state.page - 1) * state.perPage;
+  const sliced = state.data.slice(start, start + state.perPage);
+
+  if (tipe === 'penawaran') _renderTabelPenawaran(sliced);
+  if (tipe === 'produk')    _pgRenderProduk(sliced);
+  if (tipe === 'template')  _pgRenderTemplate(sliced);
+  if (tipe === 'customer')  _pgRenderCustomer(sliced);
+
+  _renderPaginationBar(tipe);
+}
+
+// ── Inject wrapper bar (sekali saja) ─────────────────────────────
+function _injectPgBar(tipe, tbodySelector) {
+  const barId = 'pg-bar-' + tipe;
+  if (document.getElementById(barId)) return;
+
+  // Cari closest .overflow-x-auto atau .bg-white pembungkus tabel
+  const tbody  = document.querySelector(tbodySelector);
+  if (!tbody) return;
+  const tableWrap = tbody.closest('.overflow-x-auto') || tbody.closest('.bg-white.rounded-2xl');
+  if (!tableWrap) return;
+
+  const bar = document.createElement('div');
+  bar.id    = barId;
+  bar.className = 'pg-wrap';
+  tableWrap.insertAdjacentElement('afterend', bar);
+}
+
+// ================================================================
+// OVERRIDE FUNGSI RENDER
+// ================================================================
+
+// ── PENAWARAN ─────────────────────────────────────────────────────
+window.filterPenawaran = function() {
+  const q      = (document.getElementById('search-penawaran').value || '').toLowerCase().trim();
+  const sales  = (document.getElementById('filter-sales').value  || '').trim();
+  const status = (document.getElementById('filter-status').value || '').trim();
+  const bulan  = (document.getElementById('filter-bulan').value  || '').trim();
+  const tahun  = (document.getElementById('filter-tahun').value  || '').trim();
+
+  const filtered = _cachedPenawaranData.filter(d => {
+    if (q) {
+      const hay = (d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (sales  && d.dibuatOleh !== sales)  return false;
+    if (status && d.status !== status)     return false;
+    if (bulan || tahun) {
+      const parts = (d.tanggal || '').split('/');
+      if (parts.length !== 3) return false;
+      if (bulan && parts[1] !== bulan) return false;
+      if (tahun && parts[2] !== tahun) return false;
+    }
+    return true;
+  });
+
+  _pgState.penawaran.data = filtered;
+  _pgState.penawaran.page = 1;
+  _pgRender('penawaran');
+
+  const infoEl = document.getElementById('filter-result-info');
+  const adaFilter = q || sales || status || bulan || tahun;
+  if (infoEl) {
+    infoEl.innerText = adaFilter
+      ? `Menampilkan ${filtered.length} dari ${_cachedPenawaranData.length} penawaran`
+      : '';
+  }
+};
+
+window.resetFilterPenawaran = function() {
+  document.getElementById('search-penawaran').value = '';
+  document.getElementById('filter-sales').value  = '';
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-bulan').value  = '';
+  document.getElementById('filter-tahun').value  = '';
+  _pgState.penawaran.data = _cachedPenawaranData;
+  _pgState.penawaran.page = 1;
+  _pgRender('penawaran');
+  const infoEl = document.getElementById('filter-result-info');
+  if (infoEl) infoEl.innerText = '';
+};
+
+window.loadPenawaran = function() {
+  if (typeof google !== 'undefined') {
+    google.script.run.withSuccessHandler(function(data) {
+      _cachedPenawaranData = data || [];
+      _isiDropdownFilterPenawaran(data);
+      _pgState.penawaran.data = data;
+      _pgState.penawaran.page = 1;
+      _injectPgBar('penawaran', '#table-penawaran');
+      _pgRender('penawaran');
+    }).getPenawaranList();
+  }
+};
+
+// ── PRODUK ────────────────────────────────────────────────────────
+let _cachedProdukData = [];
+
+function _pgRenderProduk(data) {
+  const tbody = document.getElementById('table-produk');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">
+      <i class="fas fa-search mr-2"></i>Tidak ada data produk.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(i => {
+    const margin = i.harga > 0 ? (((i.harga - i.hpp) / i.harga) * 100).toFixed(1) : 0;
+    const mc = margin >= 25 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+      <td class="p-4 font-bold text-slate-600">${i.sku}</td>
+      <td class="p-4 font-semibold">${i.nama}</td>
+      <td class="p-4 text-slate-500 text-center">${i.unit}</td>
+      <td class="p-4 text-right font-bold text-slate-800">Rp ${i.harga.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right font-medium text-rose-600">Rp ${i.hpp.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
+      <td class="p-4 text-center">
+        <div class="flex items-center justify-center gap-2">
+          <button onclick='bukaModalEditProduk(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button onclick="konfirmasiHapus('produk','${i.sku}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.loadProduk = function() {
+  if (typeof google !== 'undefined') {
+    google.script.run.withSuccessHandler(function(data) {
+      _cachedProdukData = data || [];
+      resetSearch('produk');
+      _pgState.produk.data = data;
+      _pgState.produk.page = 1;
+      _injectPgBar('produk', '#table-produk');
+      _pgRender('produk');
+    }).getProdukList();
+  }
+};
+
+// ── TEMPLATE ──────────────────────────────────────────────────────
+let _cachedTemplateKeys = [];
+
+function _pgRenderTemplate(keys) {
+  const tbody = document.getElementById('table-template');
+  const tpl   = erpState.templatePaket;
+  if (!keys || keys.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">Belum ada template paket.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = keys.map(id => {
+    const t = tpl[id];
+    if (!t) return '';
+    const items = t.items || [];
+    const estimasi = items.reduce((s, item) => {
+      const h = item.harga || ((erpState.produk || []).find(p => p.id === item.produkId) || {}).harga || 0;
+      return s + (item.qty || 0) * h;
+    }, 0);
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+      <td class="p-4 font-bold text-teal-700">${id}</td>
+      <td class="p-4 font-semibold text-slate-800">${t.nama}</td>
+      <td class="p-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-lg">${items.length} item</span></td>
+      <td class="p-4 text-right font-bold text-slate-700">Rp ${estimasi.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-center">
+        <div class="flex items-center justify-center gap-1">
+          <button onclick="lihatDetailTemplate('${id}')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Lihat Detail"><i class="fa-solid fa-eye text-sm"></i></button>
+          <button onclick="bukaModalEditTemplate('${id}')" class="text-teal-600 hover:bg-teal-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
+          <button onclick="konfirmasiHapus('template','${id}','${t.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.loadTemplate = function() {
+  resetSearch('template');
+  const tpl  = erpState.templatePaket;
+  const keys = Object.keys(tpl).sort((a, b) => {
+    return (parseInt(a.replace(/[^\d]/g,''))||0) - (parseInt(b.replace(/[^\d]/g,''))||0);
+  });
+  _cachedTemplateKeys    = keys;
+  _pgState.template.data = keys;
+  _pgState.template.page = 1;
+  _injectPgBar('template', '#table-template');
+  _pgRender('template');
+};
+
+// ── CUSTOMER ──────────────────────────────────────────────────────
+let _cachedCustomerData = [];
+
+function _pgRenderCustomer(data) {
+  const tbody = document.getElementById('table-customer');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">
+      <i class="fas fa-search mr-2"></i>Tidak ada data klien.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(i => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+      <td class="p-4 font-bold text-slate-600">${i.id}</td>
+      <td class="p-4 font-bold text-slate-800">${i.nama}</td>
+      <td class="p-4 text-slate-600">${i.perusahaan}</td>
+      <td class="p-4 text-slate-500">${i.alamat}</td>
+      <td class="p-4 text-slate-600 font-medium">${i.kontak}</td>
+      <td class="p-4 text-center">
+        <div class="flex items-center justify-center gap-2">
+          <button onclick='bukaModalEditCustomer(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button onclick="konfirmasiHapus('customer','${i.id}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+window.loadCustomer = function() {
+  if (typeof google !== 'undefined') {
+    google.script.run.withSuccessHandler(function(data) {
+      _cachedCustomerData = data || [];
+      resetSearch('customer');
+      _pgState.customer.data = data;
+      _pgState.customer.page = 1;
+      _injectPgBar('customer', '#table-customer');
+      _pgRender('customer');
+    }).getCustomerList();
+  }
+};
+
+// ── Override filterTabel ──────────────────────────────────────────
+window.filterTabel = function(tipe) {
+  if (tipe === 'produk') {
+    const q = document.getElementById('search-produk').value.toLowerCase().trim();
+    _pgState.produk.data = _cachedProdukData.filter(i =>
+      (i.sku + i.nama + i.unit).toLowerCase().includes(q));
+    _pgState.produk.page = 1;
+    _pgRender('produk');
+    return;
+  }
+  if (tipe === 'template') {
+    const q = document.getElementById('search-template').value.toLowerCase().trim();
+    _pgState.template.data = _cachedTemplateKeys.filter(id => {
+      const t = erpState.templatePaket[id];
+      return (id + (t ? t.nama : '')).toLowerCase().includes(q);
+    });
+    _pgState.template.page = 1;
+    _pgRender('template');
+    return;
+  }
+  if (tipe === 'customer') {
+    const q = document.getElementById('search-customer').value.toLowerCase().trim();
+    _pgState.customer.data = _cachedCustomerData.filter(i =>
+      (i.id + i.nama + i.perusahaan + i.alamat + i.kontak).toLowerCase().includes(q));
+    _pgState.customer.page = 1;
+    _pgRender('customer');
+    return;
+  }
+};
+</script>

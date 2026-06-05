@@ -1,0 +1,290 @@
+<script>
+// ================================================================
+// SEARCHABLE DROPDOWN ENGINE
+// ================================================================
+(function() {
+
+  // Registry semua instance SD
+  const _sdInstances = {};
+
+  /**
+   * Inisialisasi searchable dropdown
+   * @param {string} nativeId  - id dari <select> native
+   * @param {object} opts      - { onChange, placeholder, searchPlaceholder }
+   */
+  window.initSearchableDropdown = function(nativeId, opts = {}) {
+    const native = document.getElementById(nativeId);
+    if (!native) return;
+
+    // Hindari inisialisasi ganda
+    if (native.dataset.sdInit === '1') return;
+    native.dataset.sdInit = '1';
+    native.classList.add('sd-native');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'sd-wrap';
+    native.parentNode.insertBefore(wrap, native);
+    wrap.appendChild(native);
+
+    // Tombol display
+    const display = document.createElement('div');
+    display.className = 'sd-display placeholder';
+    display.tabIndex  = 0;
+    display.setAttribute('role', 'combobox');
+    display.innerText = opts.placeholder || '-- Pilih --';
+    wrap.insertBefore(display, native);
+
+    // Dropdown panel
+    const dropdown = document.createElement('div');
+    dropdown.className = 'sd-dropdown';
+
+    // Search wrapper
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'sd-search-wrap';
+    searchWrap.style.position = 'relative';
+
+    const searchIcon = document.createElement('i');
+    searchIcon.className = 'fa-solid fa-magnifying-glass sd-search-icon';
+    searchWrap.appendChild(searchIcon);
+
+    const search = document.createElement('input');
+    search.type        = 'text';
+    search.className   = 'sd-search';
+    search.placeholder = opts.searchPlaceholder || 'Cari...';
+    searchWrap.appendChild(search);
+    dropdown.appendChild(searchWrap);
+
+    // List
+    const list = document.createElement('div');
+    list.className = 'sd-list';
+    dropdown.appendChild(list);
+
+    wrap.appendChild(dropdown);
+
+    // Store instance
+    const inst = { native, display, dropdown, search, list, opts, focusedIdx: -1 };
+    _sdInstances[nativeId] = inst;
+
+    // ── Build / Rebuild list dari options native select ──
+    function buildList(filter) {
+      list.innerHTML = '';
+      inst.focusedIdx = -1;
+
+      const q = (filter || '').toLowerCase().trim();
+
+      // Kumpulkan semua option (kecuali value='')
+      let options = Array.from(native.options).filter(o => o.value !== '');
+
+      // Sort by text
+      options.sort((a, b) => a.text.localeCompare(b.text, 'id'));
+
+      // Filter
+      if (q) options = options.filter(o => o.text.toLowerCase().includes(q));
+
+      if (options.length === 0) {
+        const noResult = document.createElement('div');
+        noResult.className  = 'sd-option no-result';
+        noResult.innerText  = 'Tidak ditemukan';
+        list.appendChild(noResult);
+        return;
+      }
+
+      options.forEach((o, idx) => {
+        const item = document.createElement('div');
+        item.className     = 'sd-option' + (o.value === native.value ? ' selected' : '');
+        item.innerText     = o.text;
+        item.dataset.value = o.value;
+        item.dataset.idx   = idx;
+
+        item.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          selectOption(o.value, o.text);
+        });
+        list.appendChild(item);
+      });
+    }
+
+    function selectOption(value, text) {
+      native.value = value;
+      display.innerText  = value ? text : (opts.placeholder || '-- Pilih --');
+      display.classList.toggle('placeholder', !value);
+      closeDropdown();
+      // Trigger change event di native select
+      native.dispatchEvent(new Event('change', { bubbles: true }));
+      if (opts.onChange) opts.onChange(value, text);
+    }
+
+    function openDropdown() {
+      // Tutup semua dropdown lain dulu
+      Object.values(_sdInstances).forEach(function(other) {
+        if (other !== inst) {
+          other.dropdown.classList.remove('open');
+        }
+      });
+
+      dropdown.classList.add('open');
+      display.classList.add('open');
+      search.value = '';
+      buildList('');
+
+      // Posisikan dropdown pakai fixed berdasarkan posisi display button
+      _repositionDropdown();
+
+      search.focus();
+    }
+
+    function _repositionDropdown() {
+      const rect = display.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const dropH = 260; // max-height dropdown
+
+      // Tentukan apakah dropdown muncul ke bawah atau ke atas
+      const spaceBelow = viewportH - rect.bottom;
+      const goUp = spaceBelow < dropH && rect.top > dropH;
+
+      dropdown.style.left   = rect.left + 'px';
+      dropdown.style.width  = rect.width + 'px';
+      dropdown.style.top    = '';
+      dropdown.style.bottom = '';
+
+      if (goUp) {
+        dropdown.style.bottom = (viewportH - rect.top + 4) + 'px';
+        dropdown.style.top    = 'auto';
+      } else {
+        dropdown.style.top    = (rect.bottom + 4) + 'px';
+        dropdown.style.bottom = 'auto';
+      }
+    }
+
+    function closeDropdown() {
+      dropdown.classList.remove('open');
+      display.classList.remove('open');
+    }
+
+    // ── Event listeners ──
+    display.addEventListener('click', function() {
+      dropdown.classList.contains('open') ? closeDropdown() : openDropdown();
+    });
+
+    display.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
+      if (e.key === 'Escape') closeDropdown();
+    });
+
+    search.addEventListener('input', function() {
+      buildList(search.value);
+    });
+
+    search.addEventListener('keydown', function(e) {
+      const items = list.querySelectorAll('.sd-option:not(.no-result)');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        inst.focusedIdx = Math.min(inst.focusedIdx + 1, items.length - 1);
+        items.forEach((el, i) => el.classList.toggle('focused', i === inst.focusedIdx));
+        if (items[inst.focusedIdx]) items[inst.focusedIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        inst.focusedIdx = Math.max(inst.focusedIdx - 1, 0);
+        items.forEach((el, i) => el.classList.toggle('focused', i === inst.focusedIdx));
+        if (items[inst.focusedIdx]) items[inst.focusedIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && inst.focusedIdx >= 0) {
+        e.preventDefault();
+        const focused = items[inst.focusedIdx];
+        if (focused) selectOption(focused.dataset.value, focused.innerText);
+      } else if (e.key === 'Escape') {
+        closeDropdown();
+      }
+    });
+
+    // Klik di luar = tutup
+    document.addEventListener('click', function(e) {
+      if (!wrap.contains(e.target)) closeDropdown();
+    });
+
+    // Reposisi saat scroll atau resize
+    window.addEventListener('scroll', function() {
+      if (dropdown.classList.contains('open')) _repositionDropdown();
+    }, true);
+
+    window.addEventListener('resize', function() {
+      if (dropdown.classList.contains('open')) _repositionDropdown();
+    });
+
+    // ── API publik ──
+    inst.refresh = function() {
+      // Sinkronisasi display dengan nilai native saat ini
+      const selOpt = native.options[native.selectedIndex];
+      if (selOpt && selOpt.value) {
+        display.innerText = selOpt.text;
+        display.classList.remove('placeholder');
+      } else {
+        display.innerText = opts.placeholder || '-- Pilih --';
+        display.classList.add('placeholder');
+      }
+      native.dataset.sdInit = '1'; // tetap tanda sudah init
+    };
+
+    inst.setValue = function(value) {
+      const opt = Array.from(native.options).find(o => o.value === value);
+      if (opt) {
+        native.value = value;
+        display.innerText = value ? opt.text : (opts.placeholder || '-- Pilih --');
+        display.classList.toggle('placeholder', !value);
+      } else {
+        native.value = '';
+        display.innerText = opts.placeholder || '-- Pilih --';
+        display.classList.add('placeholder');
+      }
+    };
+
+    inst.reset = function() {
+      inst.setValue('');
+    };
+  };
+
+  // ── Helper: rebuild dropdown yg sudah init ──
+  window.sdRefresh = function(nativeId) {
+    const inst = _sdInstances[nativeId];
+    if (inst && inst.refresh) inst.refresh();
+  };
+
+  window.sdSetValue = function(nativeId, value) {
+    const inst = _sdInstances[nativeId];
+    if (inst && inst.setValue) inst.setValue(value);
+  };
+
+  window.sdReset = function(nativeId) {
+    const inst = _sdInstances[nativeId];
+    if (inst && inst.reset) inst.reset();
+  };
+
+  // Inisialisasi saat muatSeluruhDataAwal selesai
+  // Override muatSeluruhDataAwal agar init SD setelah data klien dimuat
+  const _origMuatAwal = window.muatSeluruhDataAwal;
+  window.muatSeluruhDataAwal = function(showLoadingUI) {
+    if (_origMuatAwal) _origMuatAwal.call(window, showLoadingUI);
+    // Init setelah sedikit delay agar DOM klienSelect sudah terisi
+    setTimeout(function() {
+      _initAllSD();
+    }, 400);
+  };
+
+  function _initAllSD() {
+    // 1. Klien Select di form penawaran
+    if (document.getElementById('klienSelect') &&
+        !document.getElementById('klienSelect').dataset.sdInit) {
+      initSearchableDropdown('klienSelect', {
+        placeholder: '-- Pilih Klien --',
+        searchPlaceholder: 'Cari nama klien...',
+        onChange: function(val) {
+          const sel = document.getElementById('klienSelect');
+          onKlienChanged(sel);
+        }
+      });
+    } else if (document.getElementById('klienSelect')) {
+      sdRefresh('klienSelect');
+    }
+  }
+
+})();
+</script>

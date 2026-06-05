@@ -1,0 +1,260 @@
+      <section id="page-penawaran" class="page-section">
+        
+        <!-- Tampilan Daftar (Tabel) Penawaran -->
+        <div id="view-daftar-penawaran">
+          <!-- Header -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Manajemen Penawaran</h2>
+            <button onclick="bukaTambahPenawaran()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center">
+              <i class="fas fa-plus"></i> Buat Penawaran Baru
+            </button>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-4 mb-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+              <!-- Search -->
+              <div class="col-span-2 sm:col-span-1 relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="search-penawaran" oninput="filterPenawaran()"
+                  placeholder="Cari no, project, klien..."
+                  class="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+              </div>
+
+              <!-- Filter Sales -->
+              <div id="filter-sales-wrap">
+                <select id="filter-sales" onchange="filterPenawaran()"
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                  <option value="">Semua Sales</option>
+                </select>
+              </div>
+
+              <!-- Filter Status -->
+              <div>
+                <select id="filter-status" onchange="filterPenawaran()"
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                  <option value="">Semua Status</option>
+                  <option value="On-Progress">On-Progress</option>
+                  <option value="Deal">Deal</option>
+                  <option value="Fail">Fail</option>
+                </select>
+              </div>
+
+              <!-- Filter Bulan & Tahun -->
+              <div class="flex gap-2">
+                <select id="filter-bulan" onchange="filterPenawaran()"
+                  class="flex-1 px-2 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                  <option value="">Semua Bulan</option>
+                  <option value="01">Januari</option>
+                  <option value="02">Februari</option>
+                  <option value="03">Maret</option>
+                  <option value="04">April</option>
+                  <option value="05">Mei</option>
+                  <option value="06">Juni</option>
+                  <option value="07">Juli</option>
+                  <option value="08">Agustus</option>
+                  <option value="09">September</option>
+                  <option value="10">Oktober</option>
+                  <option value="11">November</option>
+                  <option value="12">Desember</option>
+                </select>
+                <select id="filter-tahun" onchange="filterPenawaran()"
+                  class="w-24 px-2 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                  <option value="">Tahun</option>
+                </select>
+              </div>
+
+            </div>
+
+            <!-- Info hasil filter + reset -->
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <p id="filter-result-info" class="text-xs text-slate-400 font-medium"></p>
+              <button onclick="resetFilterPenawaran()"
+                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition">
+                <i class="fas fa-rotate-left text-[10px]"></i> Reset Filter
+              </button>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-x-auto">
+            <table class="w-full min-w-[1000px] text-left border-collapse">
+              <thead><tr id="thead-penawaran" class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider font-bold">
+                <th class="p-3 whitespace-nowrap">No Quot & Tanggal</th>
+                <th class="p-3">Klien & Nama Project</th>
+                <th class="p-3 whitespace-nowrap">Sales</th>
+                <th class="p-3 text-right whitespace-nowrap">Nilai Penawaran</th>
+                <th class="p-3 text-center whitespace-nowrap">Margin</th>
+                <th class="p-3 text-center whitespace-nowrap">Status</th>
+                <th class="p-3 text-center whitespace-nowrap">Revisi</th>
+                <th class="p-3 text-center whitespace-nowrap">Aksi</th>
+              </tr></thead>
+              <tbody id="table-penawaran" class="text-sm">
+                <tr><td colspan="9" class="p-8 text-center text-slate-500">
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data penawaran...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tampilan Form Pembuat Penawaran -->
+        <div id="view-form-penawaran" class="hidden">
+          <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
+            <div>
+              <button onclick="toggleFormPenawaran()" class="text-slate-500 hover:text-blue-600 font-semibold text-sm mb-2 flex items-center gap-1 transition"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>
+              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Sistem Pembuat Penawaran Baru</h2>
+            </div>
+          </div>
+
+          <!-- FORM PENAWARAN -->
+          <form id="mainQuotationForm" onsubmit="handleFormSubmission(event)" class="space-y-6 max-w-6xl mx-auto">
+            
+            <!-- KARTU 1: DATA KLIEN & NO SURAT -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="border-b border-slate-100 pb-4 mb-5 flex items-center gap-3">
+                <span class="bg-blue-50 text-blue-700 h-8 w-8 rounded-xl flex items-center justify-center font-bold">1</span>
+                <h2 class="text-lg font-bold text-slate-900">Informasi Dasar & Klien</h2>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between border-b border-blue-50 pb-2">
+                    <h3 class="text-xs font-bold text-blue-800 uppercase tracking-wider"><i class="fa-solid fa-user-tie mr-1.5"></i> Data Klien</h3>
+                    <button type="button" onclick="bukaModalCustomerDariForm()" title="+ Tambah Klien"
+                      class="flex items-center gap-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1 rounded-lg transition">
+                      <i class="fa-solid fa-user-plus text-xs"></i> Tambah Klien
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Klien / Perusahaan</label>
+                      <div>
+                        <select id="klienSelect" onchange="onKlienChanged(this)" 
+                          class="input-field text-sm font-medium bg-slate-50 w-full" required>
+                          <option value="">-- Pilih Klien --</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori Klien</label>
+                      <input type="text" id="klienCompany" class="input-field text-sm bg-slate-50 text-slate-500" readonly placeholder="Otomatis Terisi">
+                    </div>
+                  </div>
+
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. Telepon / Email</label>
+                    <input type="text" id="klienKontak" class="input-field text-sm bg-slate-50 text-slate-500" readonly placeholder="Otomatis Terisi">
+                  </div>
+                  
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lokasi / Alamat</label>
+                    <textarea id="klienAddress" rows="2" class="input-field text-sm bg-slate-50 text-slate-500" readonly placeholder="Otomatis Terisi"></textarea>
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <h3 class="text-xs font-bold text-blue-800 uppercase tracking-wider border-b border-blue-50 pb-2"><i class="fa-solid fa-file-invoice mr-1.5"></i> Informasi Penawaran</h3>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Project</label>
+                    <input type="text" id="namaProject" class="input-field text-sm font-medium" placeholder="Contoh: Instalasi PLTS On-Grid 10 kWp" required>
+                  </div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. Penawaran</label>
+                    <input type="text" id="noPenawaran" class="input-field text-sm bg-blue-50 font-mono font-bold text-blue-800" readonly>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tgl Penawaran</label>
+                      <input type="date" id="tglPenawaran" class="input-field text-sm" required>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tgl Expired</label>
+                      <input type="date" id="validUntil" class="input-field text-sm" required>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- KARTU 2: RINCIAN PRODUK & KALKULASI HARGA -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="border-b border-slate-100 pb-4 mb-5 flex items-center gap-3">
+                <span class="bg-blue-50 text-blue-700 h-8 w-8 rounded-xl flex items-center justify-center font-bold">2</span>
+                <h2 class="text-lg font-bold text-slate-900">Rincian Penawaran</h2>
+              </div>
+              
+              <!-- Container Item Dinamis -->
+              <div id="containerKelompok" class="space-y-6"></div>
+              
+              <div class="mt-6 mb-4 flex justify-start">
+                <button type="button" onclick="tambahKelompokBaru()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm"><i class="fa-solid fa-folder-plus"></i> Tambah Sub-Paket Baru</button>
+              </div>
+
+              <!-- Kalkulasi -->
+              <div class="mt-8 border-t border-slate-200 pt-6 flex flex-col md:flex-row justify-between items-start gap-6">
+                <!-- Margin Internal -->
+                <div class="w-full md:w-1/2 bg-amber-50 p-5 rounded-xl border border-amber-200 text-slate-800 space-y-3">
+                  <div class="flex items-center gap-2 border-b border-amber-200 pb-2 mb-2">
+                    <span class="text-amber-600 text-lg"><i class="fa-solid fa-chart-line"></i></span>
+                    <h3 class="text-xs font-bold text-amber-900 uppercase tracking-wide">Analisis Margin Internal</h3>
+                  </div>
+                  <div class="flex justify-between text-xs text-slate-600"><span>Nilai Penawaran (Sebelum PPN):</span><span class="font-bold text-slate-900">Rp <span id="txtJualBersihInternal">0</span></span></div>
+                  <div class="flex justify-between text-xs text-slate-600"><span>Total Modal (HPP):</span><span class="font-bold text-rose-700">Rp <span id="txtHppSemua">0</span></span></div>
+                  <div class="flex justify-between border-t border-amber-200 pt-2 text-xs"><span class="font-bold text-slate-700">Estimasi Margin:</span><span id="lblProfitInternal" class="font-bold text-emerald-700">Rp <span id="txtProfitInternal">0</span></span></div>
+                  <div class="flex justify-between text-xs pt-1"><span class="font-bold text-slate-700">Persentase:</span>
+                    <div class="flex items-center gap-2">
+                      <span id="lblTargetStatus" class="text-[10px] font-extrabold uppercase"></span>
+                      <span id="badgeMarginInternal" class="text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md"><span id="txtMarginInternal">0</span>%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Ringkasan Klien -->
+                <div class="w-full md:w-1/2 space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                  <div class="flex justify-between text-sm text-slate-600 font-bold"><span>Subtotal:</span><span class="text-slate-900">Rp <span id="txtSubtotalSemua">0</span></span></div>
+                  <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-t border-slate-200 pt-3 text-sm">
+                    <span class="text-slate-600 font-bold">Diskon:</span>
+                    <div class="flex items-center gap-2">
+                      <div class="relative w-24"><input type="number" id="inputDiskonPersen" value="0" step="any" oninput="hitungKalkulasiGabungan(false)" class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span></div>
+                      <span class="text-xs text-slate-400 font-bold">/</span>
+                      <div class="relative w-32"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span><input type="text" id="inputDiskonNominal" oninput="formatAksiDiskonNominal(this)" class="w-full pl-8 pr-2 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none" placeholder="0"></div>
+                    </div>
+                  </div>
+                  <div class="flex justify-between items-center border-t border-slate-200 pt-3 text-sm gap-4">
+                    <span class="text-slate-600 font-bold">Pajak / PPN:</span>
+                    <div class="flex items-center gap-3">
+                      <div class="relative w-24"><input type="number" id="inputPajakPersen" value="11" step="any" oninput="hitungKalkulasiGabungan(false)" class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span></div>
+                      <span class="font-bold text-slate-700 min-w-[100px] text-right">Rp <span id="txtPajakNominal">0</span></span>
+                    </div>
+                  </div>
+                  <div class="flex justify-between items-center text-base font-extrabold text-blue-900 border-t border-slate-300 pt-4">
+                    <span>GRAND TOTAL:</span><span class="text-lg">Rp <span id="txtGrandTotalSemua">0</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- KARTU 3: CATATAN & S&K -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+                <h2 class="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2"><i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i>Catatan Tambahan</h2>
+                <textarea id="catatanTambahan" rows="8" class="input-field text-sm" placeholder="Contoh: Harga belum termasuk biaya perizinan..."></textarea>
+              </div>
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+                <h2 class="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2"><i class="fa-solid fa-handshake mr-2 text-blue-600"></i>Syarat & Ketentuan Komerisal</h2>
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status Material</label><select id="tc_material" class="input-field py-1.5 text-sm"><option>Ready Stock</option><option>Indent</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Down Payment</label><select id="tc_dp" class="input-field py-1.5 text-sm"><option>30% From PO</option><option>50% From PO</option><option>Cover GIRO 30 days</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Term 2 Payment</label><select id="tc_term" class="input-field py-1.5 text-sm"><option>50% Material On Site</option><option>50% Before Shipping</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Final Payment</label><select id="tc_final" class="input-field py-1.5 text-sm"><option>After BAST</option><option>100% Before Shipping</option><option>70% Before Shipping</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pengiriman</label><select id="tc_delivery_time" class="input-field py-1.5 text-sm"><option>10-14 Days After PO</option><option>4-6 Weeks After PO</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kondisi Pengiriman</label><select id="tc_delivery_cond" class="input-field py-1.5 text-sm"><option>Franco SBY/JKT</option><option>DDP Site</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Garansi Material</label><select id="tc_warranty" class="input-field py-1.5 text-sm"><option>Back to Back from Manufacture</option><option>Exclude</option><option>-</option></select></div>
+                  <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Paket Bonus</label><select id="tc_bonus" class="input-field py-1.5 text-sm"><option>-</option><option>Free Packing</option><option>Free Shipping Cost</option></select></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOMBOL SUBMIT -->
+            <div class="flex justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
+              <button type="button" onclick="resetFormQuotation(true)" class="px-6 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 text-sm font-bold text-slate-600 transition">Reset Form</button>
+              <button type="submit" id="btnSubmitForm" class="px-8 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran</button>
+            </div>
+          </form>
+        </div>
+
+      </section>
