@@ -4,7 +4,6 @@
     // ================================================================
     let _invoiceWOList   = [];
     let _invoiceNextNo   = '';
-    let _invoiceLines    = [];
     let _cachedInvoiceData = [];
 
     // ── Helper tanggal yyyy-mm-dd → dd/MM/yyyy ──
@@ -109,22 +108,25 @@
         const sel = document.getElementById('inv-wo');
         sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
         _invoiceWOList.forEach(w => {
-          if (w.sisa > 0) sel.add(new Option(`${w.noWO} — ${w.namaKlien} (sisa Rp ${Math.round(w.sisa).toLocaleString('id-ID')})`, w.noWO));
+          if (w.sisaDpp > 0) sel.add(new Option(`${w.noWO} — ${w.namaKlien} (sisa Rp ${Math.round(w.sisaDpp).toLocaleString('id-ID')})`, w.noWO));
         });
 
         // Reset form
+        document.getElementById('inv-wo').value = '';
         document.getElementById('inv-wo-info').classList.add('hidden');
         document.getElementById('inv-jenis').value = 'DP';
-        document.getElementById('inv-persen').value = 50;
-        document.getElementById('inv-ppn').value = 11;
+        document.getElementById('inv-persen').value = 30;
+        document.getElementById('inv-nominal').value = '';
+        document.querySelector('input[name="inv-mode"][value="persen"]').checked = true;
         document.getElementById('inv-nopo').value = '';
         document.getElementById('inv-tanggal').valueAsDate = new Date();
         document.getElementById('inv-tglpo').value = '';
         document.getElementById('inv-catatan').value = '';
-        _invoiceLines = [];
-        _renderInvoiceLines();
-        _sumInvoice();
+        document.getElementById('inv-scope').innerHTML =
+          '<p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>';
+        onInvoiceModeChange();
         onInvoiceJenisChange();
+        hitungInvoice();
 
         document.getElementById('modal-invoice').classList.remove('hidden');
       }).withFailureHandler(function(err) {
@@ -141,147 +143,105 @@
     function onInvoiceWOChange() {
       const wo = _currentInvoiceWO();
       const info = document.getElementById('inv-wo-info');
-      if (!wo) { info.classList.add('hidden'); _invoiceLines = []; _renderInvoiceLines(); _sumInvoice(); return; }
+      if (!wo) { info.classList.add('hidden'); _renderScopeInvoice(null); hitungInvoice(); return; }
       info.classList.remove('hidden');
       document.getElementById('inv-info-klien').innerText   = wo.namaKlien;
       document.getElementById('inv-info-project').innerText = wo.namaProject;
-      document.getElementById('inv-info-grand').innerText   = 'Rp ' + wo.grandTotal.toLocaleString('id-ID');
-      document.getElementById('inv-info-ditagih').innerText = 'Rp ' + Math.round(wo.ditagih).toLocaleString('id-ID');
-      document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(wo.sisa).toLocaleString('id-ID');
+      document.getElementById('inv-info-grand').innerText   = 'Rp ' + Math.round(wo.nilaiKontrak).toLocaleString('id-ID');
+      document.getElementById('inv-info-ppn').innerText     = wo.ppnRate > 0 ? (wo.ppnRate + '%') : 'Tidak ada';
+      document.getElementById('inv-info-ditagih').innerText = 'Rp ' + Math.round(wo.ditagihDpp).toLocaleString('id-ID');
+      document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(wo.sisaDpp).toLocaleString('id-ID');
 
-      // Default PPN dari rate WO
-      const netSub = (wo.subtotal || 0) - (wo.diskon || 0);
-      const rate = netSub > 0 ? Math.round((wo.pajak || 0) / netSub * 100) : 0;
-      document.getElementById('inv-ppn').value = rate;
-
-      _regenInvoiceLines();
+      _renderScopeInvoice(wo);
+      hitungInvoice();
     }
 
     function onInvoiceJenisChange() {
       const jenis = document.getElementById('inv-jenis').value;
-      document.getElementById('inv-persen-wrap').style.display = (jenis === 'DP' || jenis === 'Termin') ? '' : 'none';
-      _regenInvoiceLines();
+      // Pengaturan nominal hanya relevan untuk DP/Termin
+      const showNominal = (jenis === 'DP' || jenis === 'Termin');
+      document.getElementById('inv-nominal-wrap').style.display = showNominal ? '' : 'none';
+      hitungInvoice();
     }
 
-    // Regenerasi baris otomatis sesuai jenis
-    function _regenInvoiceLines() {
+    function onInvoiceModeChange() {
+      const mode = (document.querySelector('input[name="inv-mode"]:checked') || {}).value || 'persen';
+      document.getElementById('inv-persen-wrap').style.display        = (mode === 'persen')  ? '' : 'none';
+      document.getElementById('inv-nominal-input-wrap').style.display = (mode === 'nominal') ? '' : 'none';
+      hitungInvoice();
+    }
+
+    // Render scope read-only dari item penawaran (deskripsi, qty, unit — tanpa harga)
+    function _renderScopeInvoice(wo) {
+      const cont = document.getElementById('inv-scope');
+      if (!wo) { cont.innerHTML = '<p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>'; return; }
+      let kelompokList = [];
+      try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
+      if (!kelompokList.length) { cont.innerHTML = '<p class="text-slate-400 italic">Tidak ada rincian item pada penawaran.</p>'; return; }
+
+      let html = '';
+      kelompokList.forEach(k => {
+        const namaK = (k.namaKelompok || k.nama || '').toString();
+        if (namaK) html += `<p class="font-bold text-blue-700 mt-1.5 first:mt-0">${namaK.toUpperCase()}</p>`;
+        (k.subItems || k.items || []).forEach(s => {
+          html += `<div class="flex justify-between gap-2 pl-2">
+            <span class="text-slate-600">• ${s.deskripsi || ''}</span>
+            <span class="text-slate-400 whitespace-nowrap">${s.qty || ''} ${s.unit || ''}</span>
+          </div>`;
+        });
+      });
+      cont.innerHTML = html;
+    }
+
+    // Hitung DPP berdasarkan jenis + mode, lalu PPN otomatis dari penawaran
+    function _computeInvoice() {
       const wo = _currentInvoiceWO();
-      if (!wo) { _invoiceLines = []; _renderInvoiceLines(); _sumInvoice(); return; }
+      if (!wo) return { dpp: 0, ppnPersen: 0, ppnNominal: 0, total: 0 };
       const jenis = document.getElementById('inv-jenis').value;
-      const ppn   = parseFloat(document.getElementById('inv-ppn').value) || 0;
-      const rate  = ppn / 100;
+      const mode  = (document.querySelector('input[name="inv-mode"]:checked') || {}).value || 'persen';
 
-      if (jenis === 'Penuh') {
-        let kelompokList = [];
-        try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
-        _invoiceLines = [];
-        kelompokList.forEach(k => (k.subItems || []).forEach(s => {
-          _invoiceLines.push({
-            deskripsi: s.deskripsi || '', qty: s.qty || 1, unit: s.unit || '',
-            harga: s.harga || 0, amount: (s.qty || 0) * (s.harga || 0)
-          });
-        }));
-        if ((wo.diskon || 0) > 0) {
-          _invoiceLines.push({ deskripsi: 'Diskon', qty: 1, unit: '-', harga: -(wo.diskon), amount: -(wo.diskon) });
-        }
-      } else {
-        let totalTagih;
-        let desc;
-        const project = wo.namaProject || '';
-        if (jenis === 'Pelunasan') {
-          totalTagih = wo.sisa;
-          desc = 'Pelunasan Pembayaran - ' + project;
-        } else {
-          const p = parseFloat(document.getElementById('inv-persen').value) || 0;
-          totalTagih = Math.round(p / 100 * wo.grandTotal);
-          desc = (jenis === 'DP' ? 'Uang Muka (DP) ' : 'Pembayaran Termin ') + p + '% - ' + project;
-        }
-        const dpp = Math.round(totalTagih / (1 + rate));
-        _invoiceLines = [{ deskripsi: desc, qty: 1, unit: 'paket', harga: dpp, amount: dpp }];
+      let dpp = 0;
+      if (jenis === 'Pelunasan')      dpp = wo.sisaDpp;
+      else if (jenis === 'Penuh')     dpp = wo.nilaiKontrak;
+      else if (mode === 'nominal')    dpp = pN(document.getElementById('inv-nominal').value);
+      else {
+        const p = parseFloat(document.getElementById('inv-persen').value) || 0;
+        dpp = Math.round(p / 100 * wo.nilaiKontrak);
       }
-      _renderInvoiceLines();
-      _sumInvoice();
+      const ppnPersen  = wo.ppnRate || 0;
+      const ppnNominal = Math.round(dpp * ppnPersen / 100);
+      return { dpp: dpp, ppnPersen: ppnPersen, ppnNominal: ppnNominal, total: dpp + ppnNominal };
     }
 
-    // Dipanggil dari input persen/ppn
     function hitungInvoice() {
-      const jenis = document.getElementById('inv-jenis').value;
-      if (jenis !== 'Penuh') _regenInvoiceLines();
-      else _sumInvoice();
-    }
-
-    function _renderInvoiceLines() {
-      const cont = document.getElementById('inv-lines');
-      if (!_invoiceLines.length) { cont.innerHTML = '<p class="text-xs text-slate-400 italic">Pilih Work Order untuk mengisi rincian.</p>'; return; }
-      cont.innerHTML = _invoiceLines.map((l, idx) => `
-        <div class="flex gap-2 items-center">
-          <input type="text" value="${(l.deskripsi || '').replace(/"/g,'&quot;')}" oninput="onInvLineEdit(${idx},'deskripsi',this.value)"
-            class="input-field text-xs flex-1" placeholder="Deskripsi tagihan">
-          <input type="text" value="${formatNominalRupiah(l.amount || 0)}" oninput="onInvLineEdit(${idx},'amount',this.value)"
-            class="input-field text-xs w-32 text-right" placeholder="0">
-          <button type="button" onclick="hapusBarisInvoice(${idx})" class="text-rose-500 hover:bg-rose-50 px-1.5 py-1 rounded">
-            <i class="fa-regular fa-trash-can text-xs"></i>
-          </button>
-        </div>`).join('');
-    }
-
-    function onInvLineEdit(idx, field, val) {
-      if (!_invoiceLines[idx]) return;
-      if (field === 'amount') {
-        const num = pN(val);
-        _invoiceLines[idx].amount = num;
-        _invoiceLines[idx].harga  = num; // sinkron untuk baris manual
-      } else {
-        _invoiceLines[idx][field] = val;
-      }
-      _sumInvoice();
-    }
-
-    function tambahBarisInvoice() {
-      _invoiceLines.push({ deskripsi: '', qty: 1, unit: 'paket', harga: 0, amount: 0 });
-      _renderInvoiceLines();
-      _sumInvoice();
-    }
-
-    function hapusBarisInvoice(idx) {
-      _invoiceLines.splice(idx, 1);
-      _renderInvoiceLines();
-      _sumInvoice();
-    }
-
-    function _sumInvoice() {
-      const dpp = _invoiceLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-      const ppn = parseFloat(document.getElementById('inv-ppn').value) || 0;
-      const ppnNom = Math.round(dpp * ppn / 100);
-      const total = dpp + ppnNom;
-      document.getElementById('inv-dpp').innerText        = Math.round(dpp).toLocaleString('id-ID');
-      document.getElementById('inv-ppn-nominal').innerText = ppnNom.toLocaleString('id-ID');
-      document.getElementById('inv-total').innerText      = Math.round(total).toLocaleString('id-ID');
+      const c = _computeInvoice();
+      document.getElementById('inv-dpp').innerText         = Math.round(c.dpp).toLocaleString('id-ID');
+      document.getElementById('inv-ppn-label').innerText   = c.ppnPersen > 0 ? ('(' + c.ppnPersen + '%)') : '';
+      document.getElementById('inv-ppn-nominal').innerText = Math.round(c.ppnNominal).toLocaleString('id-ID');
+      document.getElementById('inv-total').innerText       = Math.round(c.total).toLocaleString('id-ID');
     }
 
     function submitInvoice() {
       const wo = _currentInvoiceWO();
       if (!wo) return showNotification('Silakan pilih Work Order!', 'error');
-      if (!_invoiceLines.length) return showNotification('Minimal 1 baris tagihan!', 'error');
-      const dpp = _invoiceLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-      if (dpp <= 0) return showNotification('Nilai tagihan harus lebih dari 0!', 'error');
 
       const jenis = document.getElementById('inv-jenis').value;
+      const mode  = (document.querySelector('input[name="inv-mode"]:checked') || {}).value || 'persen';
+      const c = _computeInvoice();
+      if (c.dpp <= 0) return showNotification('Nilai tagihan harus lebih dari 0!', 'error');
+      if (c.dpp > wo.sisaDpp + 1) return showNotification('Nilai tagihan melebihi sisa kontrak (Rp ' + Math.round(wo.sisaDpp).toLocaleString('id-ID') + ').', 'error');
+
       const payload = {
-        noWO:        wo.noWO,
-        noPenawaran: wo.id,
-        tanggal:     _toDDMMYYYY(document.getElementById('inv-tanggal').value),
-        jenis:       jenis,
-        persen:      (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
-        noPO:        document.getElementById('inv-nopo').value.trim(),
-        tglPO:       _toDDMMYYYY(document.getElementById('inv-tglpo').value),
-        klienId:     wo.klienId,
-        namaKlien:   wo.namaKlien,
-        namaProject: wo.namaProject,
-        ppnPersen:   parseFloat(document.getElementById('inv-ppn').value) || 0,
-        catatan:     document.getElementById('inv-catatan').value.trim(),
-        items:       _invoiceLines,
-        dibuatOleh:  (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
+        noWO:       wo.noWO,
+        tanggal:    _toDDMMYYYY(document.getElementById('inv-tanggal').value),
+        jenis:      jenis,
+        inputMode:  mode,
+        persen:     (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
+        dpp:        c.dpp,
+        noPO:       document.getElementById('inv-nopo').value.trim(),
+        tglPO:      _toDDMMYYYY(document.getElementById('inv-tglpo').value),
+        catatan:    document.getElementById('inv-catatan').value.trim(),
+        dibuatOleh: (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
       };
 
       toggleLoader(true, 'Menyimpan invoice...');

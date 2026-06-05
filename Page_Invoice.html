@@ -73,18 +73,19 @@
                 </select>
               </div>
 
-              <!-- Info WO -->
+              <!-- Info WO (otomatis dari penawaran) -->
               <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs grid grid-cols-2 gap-2">
                 <div><span class="text-slate-400">Klien:</span> <span id="inv-info-klien" class="font-bold text-slate-700"></span></div>
                 <div><span class="text-slate-400">Project:</span> <span id="inv-info-project" class="font-bold text-slate-700"></span></div>
-                <div><span class="text-slate-400">Grand Total:</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
+                <div><span class="text-slate-400">Nilai Kontrak (DPP):</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
+                <div><span class="text-slate-400">PPN Penawaran:</span> <span id="inv-info-ppn" class="font-bold text-slate-700"></span></div>
                 <div><span class="text-slate-400">Sudah Ditagih:</span> <span id="inv-info-ditagih" class="font-bold text-amber-600"></span></div>
-                <div class="col-span-2"><span class="text-slate-400">Sisa Tagihan:</span> <span id="inv-info-sisa" class="font-extrabold text-emerald-600"></span></div>
+                <div><span class="text-slate-400">Sisa Bisa Ditagih:</span> <span id="inv-info-sisa" class="font-extrabold text-emerald-600"></span></div>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis Tagihan</label>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan Pembayaran</label>
                   <select id="inv-jenis" onchange="onInvoiceJenisChange()" class="input-field text-sm">
                     <option value="DP">DP (Uang Muka)</option>
                     <option value="Termin">Termin</option>
@@ -92,21 +93,38 @@
                     <option value="Penuh">Penuh</option>
                   </select>
                 </div>
-                <div id="inv-persen-wrap">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Persentase (%)</label>
-                  <input type="number" id="inv-persen" min="1" max="100" value="50" oninput="hitungInvoice()" class="input-field text-sm">
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Invoice</label>
                   <input type="date" id="inv-tanggal" class="input-field text-sm">
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PPN (%)</label>
-                  <input type="number" id="inv-ppn" min="0" max="100" value="11" oninput="hitungInvoice()" class="input-field text-sm">
+              </div>
+
+              <!-- Pengaturan nominal (DP/Termin): persentase atau nominal -->
+              <div id="inv-nominal-wrap" class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                <div class="flex items-center gap-4">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Atur Nominal Berdasarkan</label>
+                  <div class="flex items-center gap-3 text-sm">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="inv-mode" value="persen" checked onchange="onInvoiceModeChange()"> Persentase
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="inv-mode" value="nominal" onchange="onInvoiceModeChange()"> Nominal
+                    </label>
+                  </div>
                 </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div id="inv-persen-wrap">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Persentase (%)</label>
+                    <input type="number" id="inv-persen" min="1" max="100" value="30" oninput="hitungInvoice()" class="input-field text-sm">
+                  </div>
+                  <div id="inv-nominal-input-wrap" style="display:none">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Nominal DPP (Rp)</label>
+                    <input type="text" id="inv-nominal" inputmode="numeric" oninput="hitungInvoice()" class="input-field text-sm text-right" placeholder="0">
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. PO Pelanggan</label>
                   <input type="text" id="inv-nopo" placeholder="PO/2026/.." class="input-field text-sm">
@@ -117,15 +135,12 @@
                 </div>
               </div>
 
-              <!-- Baris item -->
+              <!-- Rincian/scope (otomatis dari penawaran, read-only) -->
               <div>
-                <div class="flex items-center justify-between mb-2">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Rincian Tagihan</label>
-                  <button type="button" onclick="tambahBarisInvoice()" class="text-blue-600 text-xs font-bold hover:bg-blue-50 px-2 py-1 rounded">
-                    <i class="fa-solid fa-plus"></i> Tambah Baris
-                  </button>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rincian / Scope (otomatis dari penawaran)</label>
+                <div id="inv-scope" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 max-h-44 overflow-y-auto">
+                  <p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>
                 </div>
-                <div id="inv-lines" class="space-y-2"></div>
               </div>
 
               <!-- Catatan -->
@@ -136,9 +151,9 @@
 
               <!-- Ringkasan -->
               <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm space-y-1">
-                <div class="flex justify-between"><span class="text-slate-500">Subtotal (DPP)</span><span class="font-bold text-slate-700">Rp <span id="inv-dpp">0</span></span></div>
-                <div class="flex justify-between"><span class="text-slate-500">PPN</span><span class="font-bold text-slate-700">Rp <span id="inv-ppn-nominal">0</span></span></div>
-                <div class="flex justify-between text-base border-t border-blue-200 pt-1 mt-1"><span class="font-extrabold text-slate-800">TOTAL</span><span class="font-extrabold text-blue-700">Rp <span id="inv-total">0</span></span></div>
+                <div class="flex justify-between"><span class="text-slate-500">DPP (Nilai Tagih)</span><span class="font-bold text-slate-700">Rp <span id="inv-dpp">0</span></span></div>
+                <div class="flex justify-between"><span class="text-slate-500">PPN <span id="inv-ppn-label"></span></span><span class="font-bold text-slate-700">Rp <span id="inv-ppn-nominal">0</span></span></div>
+                <div class="flex justify-between text-base border-t border-blue-200 pt-1 mt-1"><span class="font-extrabold text-slate-800">GRAND TOTAL</span><span class="font-extrabold text-blue-700">Rp <span id="inv-total">0</span></span></div>
               </div>
             </div>
 

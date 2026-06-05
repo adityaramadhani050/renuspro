@@ -40,8 +40,15 @@ Agar export berfungsi, sheet **Template_Invoice** wajib punya named range beriku
 | G | Price (IDR) |
 | H | Amount (IDR) |
 
-> Footer (Subtotal/DPP, PPN, TOTAL, Terbilang, Catatan, Tanda tangan) **digenerate
+> Footer (TOTAL, PPN, GRAND TOTAL, Terbilang, Catatan, Tanda tangan) **digenerate
 > otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
+
+### Isi otomatis zona item (layout baru)
+Sistem mengisi zona item dengan satu **baris tagihan utama** lalu **scope read-only**:
+- **Baris A**: `A | <Nama Project> | Qty=1 | Unit=Ls | Price=DPP | Amount=DPP`
+- Baris keterangan pembayaran: mis. *"DP 30% dari total kontrak Rp 119.000.000"*
+- Label **"Deskripsi:"** lalu rincian scope dari penawaran (kelompok + item:
+  deskripsi, qty, unit — **tanpa harga**).
 
 ## Daftar named range Template_Kwitansi
 

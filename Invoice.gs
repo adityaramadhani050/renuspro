@@ -7,23 +7,32 @@
  * & terkunci. Nilai baris (items) bersifat pre-tax (DPP); PPN dihitung
  * di footer.
  *
+ * Alur: pilih Work Order → sistem ambil data penawaran → user pilih
+ * keterangan pembayaran (DP/Termin/Pelunasan/Penuh) & atur nominal
+ * berdasarkan PERSENTASE dari nilai kontrak (DPP penawaran) atau NOMINAL.
+ * PPN terdeteksi otomatis dari penawaran. Rincian/scope diisi otomatis
+ * (read-only) dari item penawaran.
+ *
+ * Basis persentase = nilai kontrak DPP = (subtotal − diskon) penawaran.
+ * Tagihan DPP per WO tidak boleh melebihi nilai kontrak DPP.
+ *
  * Sheet Invoice_Main — kolom (1-based):
  *  1 id              No Invoice (mis. 271/RGI-INV/VI/2026)
  *  2 noWO            No Work Order sumber
  *  3 noPenawaran     No Penawaran referensi
  *  4 tanggal         Tanggal invoice (dd/MM/yyyy)
  *  5 jenis           DP | Termin | Pelunasan | Penuh
- *  6 persen          Persentase tagih (0 jika tidak relevan)
+ *  6 persen          Persentase tagih thd nilai kontrak (0 jika nominal)
  *  7 noPO            No PO pelanggan
  *  8 tglPO           Tanggal PO pelanggan
  *  9 klienId
  * 10 namaKlien       (snapshot)
  * 11 namaProject     (snapshot)
- * 12 dpp             Subtotal pre-tax (jumlah amount baris)
+ * 12 dpp             Nilai tagih pre-tax (DPP invoice ini)
  * 13 ppnPersen
  * 14 ppnNominal
  * 15 total           Nilai tagih (DPP + PPN)
- * 16 itemsJson       Baris invoice [{deskripsi,qty,unit,harga,amount}]
+ * 16 metaJson        { scope:[kelompok penawaran], nilaiKontrak, inputMode }
  * 17 statusBayar     Belum Lunas | Lunas
  * 18 catatan
  * 19 dibuatOleh
@@ -65,7 +74,7 @@ function generateNextInvoiceNumber(ss) {
   return `${next}/RGI-INV/${mon}/${yr}`;
 }
 
-// ── Total yang sudah ditagih per WO ─────────────────────────────────────────
+// ── DPP yang sudah ditagih per WO (basis pre-tax) ───────────────────────────
 function _getTagihanMap(ss) {
   const map = {};
   const sheet = ss.getSheetByName('Invoice_Main');
@@ -73,8 +82,8 @@ function _getTagihanMap(ss) {
   const d = sheet.getDataRange().getValues();
   for (let i = 1; i < d.length; i++) {
     const noWO = d[i][1] ? d[i][1].toString() : '';
-    const total = parseFloat(d[i][14]) || 0; // kolom 15 = Total
-    if (noWO) map[noWO] = (map[noWO] || 0) + total;
+    const dpp = parseFloat(d[i][11]) || 0; // kolom 12 = DPP (pre-tax)
+    if (noWO) map[noWO] = (map[noWO] || 0) + dpp;
   }
   return map;
 }
@@ -87,21 +96,25 @@ function getInvoiceInitialData() {
     const tagihMap = _getTagihanMap(ss);
 
     const woEnriched = woList.map(function(w) {
-      const ditagih = tagihMap[w.noWO] || 0;
+      const nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0)); // DPP penawaran
+      const ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+      const ditagihDpp = tagihMap[w.noWO] || 0;
       return {
-        noWO:        w.noWO,
-        id:          w.id,
-        rev:         w.rev,
-        namaProject: w.namaProject,
-        namaKlien:   w.namaKlien,
-        klienId:     w.klienId,
-        subtotal:    w.subtotal,
-        diskon:      w.diskon,
-        pajak:       w.pajak,
-        grandTotal:  w.grandTotal,
-        items:       w.items,
-        ditagih:     ditagih,
-        sisa:        Math.max(0, w.grandTotal - ditagih)
+        noWO:         w.noWO,
+        id:           w.id,
+        rev:          w.rev,
+        namaProject:  w.namaProject,
+        namaKlien:    w.namaKlien,
+        klienId:      w.klienId,
+        subtotal:     w.subtotal,
+        diskon:       w.diskon,
+        pajak:        w.pajak,
+        grandTotal:   w.grandTotal,
+        items:        w.items,
+        nilaiKontrak: nilaiKontrak,
+        ppnRate:      ppnRate,
+        ditagihDpp:   ditagihDpp,
+        sisaDpp:      Math.max(0, nilaiKontrak - ditagihDpp)
       };
     });
 
@@ -119,35 +132,60 @@ function simpanInvoice(payload) {
     const ss = getSpreadsheet();
     const sheet = ss.getSheetByName('Invoice_Main') || buatSheetInvoiceDefault(ss);
 
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    const dpp = items.reduce(function(s, it) { return s + (parseFloat(it.amount) || 0); }, 0);
-    if (dpp <= 0) return { success: false, message: 'Nilai invoice harus lebih dari 0.' };
+    // Ambil ulang data WO (sumber kebenaran) untuk validasi & snapshot
+    const woList = getWorkOrderList();
+    const wo     = woList.find(function(w) { return w.noWO === payload.noWO; });
+    if (!wo) return { success: false, message: 'Work Order tidak ditemukan.' };
 
-    const ppnPersen  = parseFloat(payload.ppnPersen) || 0;
+    const nilaiKontrak = Math.max(0, (wo.subtotal || 0) - (wo.diskon || 0)); // DPP penawaran
+    const ppnPersen    = nilaiKontrak > 0 ? Math.round((wo.pajak || 0) / nilaiKontrak * 100) : 0;
+
+    // Tentukan DPP tagihan
+    const jenis = payload.jenis || 'Penuh';
+    const tagihMap   = _getTagihanMap(ss);
+    const ditagihDpp = tagihMap[payload.noWO] || 0;
+    const sisaDpp    = Math.max(0, nilaiKontrak - ditagihDpp);
+
+    let dpp, persen;
+    if (jenis === 'Pelunasan') {
+      dpp = sisaDpp;
+      persen = 0;
+    } else if (jenis === 'Penuh') {
+      dpp = nilaiKontrak;
+      persen = 100;
+    } else if (payload.inputMode === 'nominal') {
+      dpp = Math.round(parseFloat(payload.dpp) || 0);
+      persen = nilaiKontrak > 0 ? Math.round(dpp / nilaiKontrak * 100) : 0;
+    } else { // persentase
+      persen = parseFloat(payload.persen) || 0;
+      dpp = Math.round(persen / 100 * nilaiKontrak);
+    }
+
+    if (dpp <= 0) return { success: false, message: 'Nilai tagihan harus lebih dari 0.' };
+
+    // Validasi tidak melebihi sisa DPP kontrak
+    if (dpp > sisaDpp + 1) { // toleransi pembulatan 1
+      return { success: false, message: 'Nilai tagihan (Rp ' + dpp.toLocaleString('id-ID') +
+        ') melebihi sisa kontrak yang bisa ditagih (Rp ' + Math.round(sisaDpp).toLocaleString('id-ID') + ').' };
+    }
+
     const ppnNominal = Math.round(dpp * ppnPersen / 100);
     const total      = dpp + ppnNominal;
 
-    // Validasi tidak melebihi sisa tagihan WO
-    const tagihMap = _getTagihanMap(ss);
-    const woList   = getWorkOrderList();
-    const wo       = woList.find(function(w) { return w.noWO === payload.noWO; });
-    if (!wo) return { success: false, message: 'Work Order tidak ditemukan.' };
-    const sisa = wo.grandTotal - (tagihMap[payload.noWO] || 0);
-    if (total > sisa + 1) { // toleransi pembulatan 1
-      return { success: false, message: 'Nilai invoice (Rp ' + total.toLocaleString('id-ID') +
-        ') melebihi sisa tagihan WO (Rp ' + Math.round(sisa).toLocaleString('id-ID') + ').' };
-    }
+    // Scope read-only dari penawaran (struktur kelompok)
+    let scope = [];
+    try { scope = JSON.parse(wo.items || '[]'); } catch (e) { scope = []; }
+    const meta = { scope: scope, nilaiKontrak: nilaiKontrak, inputMode: payload.inputMode || 'persen' };
 
     const noInvoice = generateNextInvoiceNumber(ss);
 
     sheet.appendRow([
-      noInvoice, payload.noWO, payload.noPenawaran || wo.id, payload.tanggal,
-      payload.jenis || 'Penuh', parseFloat(payload.persen) || 0,
+      noInvoice, payload.noWO, wo.id, payload.tanggal,
+      jenis, persen,
       payload.noPO || '', payload.tglPO || '',
-      payload.klienId || wo.klienId, payload.namaKlien || wo.namaKlien,
-      payload.namaProject || wo.namaProject,
+      wo.klienId, wo.namaKlien, wo.namaProject,
       dpp, ppnPersen, ppnNominal, total,
-      JSON.stringify(items), 'Belum Lunas',
+      JSON.stringify(meta), 'Belum Lunas',
       payload.catatan || '', payload.dibuatOleh || 'Sales Executive'
     ]);
 

@@ -27,14 +27,13 @@ function exportInvoiceDariTemplate(idInvoice) {
     if (!inv) return { success: false, message: 'Invoice tidak ditemukan.' };
 
     const klien = _getKlienMap(ss)[inv.klienId] || {};
-    let items = [];
-    try { items = JSON.parse(inv.itemsJson || '[]'); } catch (e) {}
+    const meta = _parseInvoiceMeta(inv);
 
     const cache = _buildNamedRangeCache(ss);
 
     _bersihkanZonaInvoice(sheet, cache);
     _isiHeaderInvoice(cache, inv, klien);
-    const rowSetelahItem = _sisipkanBarisInvoice(sheet, cache, items);
+    const rowSetelahItem = _sisipkanBarisInvoice(sheet, cache, inv, meta);
     _sisipkanFooterInvoice(sheet, rowSetelahItem, inv);
 
     SpreadsheetApp.flush();
@@ -87,12 +86,25 @@ function _getInvoiceById(ss, idInvoice) {
         ppnPersen:   parseFloat(data[i][12]) || 0,
         ppnNominal:  parseFloat(data[i][13]) || 0,
         total:       parseFloat(data[i][14]) || 0,
-        itemsJson:   data[i][15] ? data[i][15].toString() : '[]',
+        metaJson:    data[i][15] ? data[i][15].toString() : '{}',
         catatan:     data[i][17] ? data[i][17].toString() : ''
       };
     }
   }
   return null;
+}
+
+// Ambil scope (kelompok penawaran) & nilai kontrak dari meta JSON kolom 16.
+function _parseInvoiceMeta(inv) {
+  let meta = {};
+  try { meta = JSON.parse(inv.metaJson || '{}'); } catch (e) { meta = {}; }
+  // Kompatibilitas: data lama menyimpan array item langsung.
+  if (Array.isArray(meta)) meta = { scope: meta, nilaiKontrak: 0, inputMode: 'persen' };
+  return {
+    scope:        Array.isArray(meta.scope) ? meta.scope : [],
+    nilaiKontrak: parseFloat(meta.nilaiKontrak) || 0,
+    inputMode:    meta.inputMode || 'persen'
+  };
 }
 
 // ── Bersihkan zona dinamis invoice ──────────────────────────────────────────
@@ -124,50 +136,105 @@ function _isiHeaderInvoice(cache, inv, klien) {
   set('inv_klien_kontak',    klien.kontak     || '');
 }
 
-// ── Sisipkan baris item invoice (flat) ──────────────────────────────────────
-function _sisipkanBarisInvoice(sheet, cache, items) {
+// ── Sisipkan baris invoice: 1 baris tagih komposit + scope read-only ────────
+// Layout mengikuti template:
+//   Baris A : No="A" | Deskripsi=Nama Project (tebal) | Qty=1 | Unit=Ls | Price=DPP | Amount=DPP
+//   Baris   : keterangan pembayaran ("DP 30% dari total kontrak Rp ...")
+//   Baris   : "Deskripsi:"
+//   Baris   : header kelompok + sub-item (deskripsi + qty + unit, TANPA harga)
+function _sisipkanBarisInvoice(sheet, cache, inv, meta) {
   const anchor = cache.get('inv_item_zone_start');
   if (!anchor) { Logger.log('inv_item_zone_start tidak ditemukan'); return sheet.getLastRow() + 1; }
 
   const anchorRow = anchor.getRow();
   const NCOLS = 8;
   const COL_NO = 0, COL_DESC = 1, COL_QTY = 4, COL_UNIT = 5, COL_HARGA = 6, COL_TOTAL = 7;
-  const C_ALT = '#f3f3f3', C_TEXT = '#000000';
+  const C_ALT = '#f3f3f3', C_TEXT = '#000000', C_BLUE = '#1a3a8f';
 
-  const totalRows = items.length;
+  // Bangun daftar baris (deskripsi grup)
+  const scope = Array.isArray(meta.scope) ? meta.scope : [];
+
+  // 1) Baris utama tagihan
+  const baris = [];
+  baris.push({
+    type: 'main',
+    no: 'A',
+    desc: inv.namaProject || '',
+    qty: 1, unit: 'Ls',
+    harga: inv.dpp, total: inv.dpp
+  });
+
+  // 2) Keterangan pembayaran
+  baris.push({ type: 'ket', desc: _ketPembayaranInvoice(inv, meta) });
+
+  // 3) Spacer + label "Deskripsi:"
+  baris.push({ type: 'spacer', desc: '' });
+  baris.push({ type: 'label', desc: 'Deskripsi:' });
+
+  // 4) Scope per kelompok
+  scope.forEach(function(k) {
+    const namaK = (k.namaKelompok || k.nama || '').toString();
+    if (namaK) baris.push({ type: 'kelompok', desc: namaK.toUpperCase() });
+    (k.subItems || k.items || []).forEach(function(s) {
+      baris.push({
+        type: 'item',
+        desc: s.deskripsi || '',
+        qty:  s.qty  || '',
+        unit: s.unit || ''
+      });
+    });
+  });
+
+  const totalRows = baris.length;
   if (totalRows === 0) return anchorRow + 1;
 
   sheet.insertRowsAfter(anchorRow, totalRows);
-
-  // Salin format dari baris anchor
   sheet.getRange(anchorRow, 1, 1, NCOLS).copyTo(
     sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS),
     SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
   );
 
-  const ALIGN = ['center', 'left', 'left', 'left', 'center', 'center', 'right', 'right'];
+  const ALIGN_MAIN = ['center', 'left', 'left', 'left', 'center', 'center', 'right', 'right'];
 
   const values = [], backgrounds = [], fontColors = [], fontWeights = [], numFormats = [], aligns = [];
 
-  items.forEach(function(it, idx) {
+  baris.forEach(function(b) {
     const row = new Array(NCOLS).fill('');
-    row[COL_NO]    = idx + 1;
-    row[COL_DESC]  = it.deskripsi || '';
-    row[COL_QTY]   = it.qty   || '';
-    row[COL_UNIT]  = it.unit  || '';
-    row[COL_HARGA] = it.harga || 0;
-    row[COL_TOTAL] = (it.amount != null ? it.amount : (it.qty || 0) * (it.harga || 0)) || 0;
-
     const fmt = new Array(NCOLS).fill('@');
-    fmt[COL_HARGA] = '#,##0';
-    fmt[COL_TOTAL] = '#,##0';
+    const fc  = new Array(NCOLS).fill(C_TEXT);
+    const fw  = new Array(NCOLS).fill('normal');
+
+    if (b.type === 'main') {
+      row[COL_NO]    = b.no;
+      row[COL_DESC]  = b.desc;
+      row[COL_QTY]   = b.qty;
+      row[COL_UNIT]  = b.unit;
+      row[COL_HARGA] = b.harga || 0;
+      row[COL_TOTAL] = b.total || 0;
+      fmt[COL_HARGA] = '#,##0';
+      fmt[COL_TOTAL] = '#,##0';
+      fw[COL_DESC]   = 'bold';
+    } else if (b.type === 'ket') {
+      row[COL_DESC] = b.desc;
+    } else if (b.type === 'label') {
+      row[COL_DESC] = b.desc;
+      fw[COL_DESC]  = 'bold';
+    } else if (b.type === 'kelompok') {
+      row[COL_DESC] = b.desc;
+      fw[COL_DESC]  = 'bold';
+      fc[COL_DESC]  = C_BLUE;
+    } else if (b.type === 'item') {
+      row[COL_DESC] = b.desc;
+      row[COL_QTY]  = b.qty;
+      row[COL_UNIT] = b.unit;
+    } // spacer: kosong
 
     values.push(row);
     backgrounds.push(new Array(NCOLS).fill(C_ALT));
-    fontColors.push(new Array(NCOLS).fill(C_TEXT));
-    fontWeights.push(new Array(NCOLS).fill('normal'));
+    fontColors.push(fc);
+    fontWeights.push(fw);
     numFormats.push(fmt);
-    aligns.push(ALIGN.slice());
+    aligns.push(ALIGN_MAIN.slice());
   });
 
   const zone = sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS);
@@ -178,19 +245,38 @@ function _sisipkanBarisInvoice(sheet, cache, items) {
   zone.setNumberFormats(numFormats);
   zone.setHorizontalAlignments(aligns);
 
-  // Merge deskripsi (kolom B-D) per baris
-  items.forEach(function(it, idx) {
+  // Merge deskripsi (kolom B-D) per baris + atur tinggi
+  baris.forEach(function(b, idx) {
     const r = anchorRow + 1 + idx;
     try {
       sheet.getRange(r, 2, 1, 3).merge();
       sheet.getRange(r, 2).setWrap(true).setVerticalAlignment('middle').setHorizontalAlignment('left');
-      const desc = it.deskripsi || '';
+      const desc = (b.desc || '').toString();
       const lines = Math.max(1, Math.ceil(desc.length / 55));
-      sheet.setRowHeight(r, Math.max(20, lines * 16 + 6));
+      sheet.setRowHeight(r, b.type === 'spacer' ? 8 : Math.max(20, lines * 16 + 6));
     } catch (e) {}
   });
 
   return anchorRow + 1 + totalRows;
+}
+
+// Susun kalimat keterangan pembayaran untuk baris invoice.
+function _ketPembayaranInvoice(inv, meta) {
+  const nilai = meta.nilaiKontrak || 0;
+  const totalKontrakStr = 'Rp ' + Math.round(nilai).toLocaleString('id-ID');
+  const jenis = inv.jenis || 'Penuh';
+  const persen = parseFloat(inv.persen) || 0;
+
+  if (jenis === 'Pelunasan') {
+    return 'Pelunasan dari total kontrak ' + totalKontrakStr;
+  }
+  if (jenis === 'Penuh') {
+    return 'Pembayaran penuh dari total kontrak ' + totalKontrakStr;
+  }
+  // DP / Termin
+  const label = (jenis === 'DP') ? 'DP' : 'Termin';
+  const persenStr = persen > 0 ? (' ' + persen + '%') : '';
+  return label + persenStr + ' dari total kontrak ' + totalKontrakStr;
 }
 
 // ── Footer invoice: subtotal/PPN/total + terbilang + catatan + ttd ──────────
@@ -199,9 +285,9 @@ function _sisipkanFooterInvoice(sheet, startRow, inv) {
   let row = startRow;
 
   const rincian = [
-    { label: 'Subtotal (DPP)', value: inv.dpp,        bold: false },
+    { label: 'TOTAL',          value: inv.dpp,        bold: false },
     { label: 'PPN ' + (inv.ppnPersen || 0) + '%', value: inv.ppnNominal, bold: false, skip: !(inv.ppnNominal > 0) },
-    { label: 'TOTAL',          value: inv.total,      bold: true }
+    { label: 'GRAND TOTAL',    value: inv.total,      bold: true }
   ].filter(function(r) { return !r.skip; });
 
   sheet.insertRowsAfter(row - 1, rincian.length);
