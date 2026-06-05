@@ -51,15 +51,18 @@ sistem hanya mengisi sel-sel ini lalu export.
 
 | Named range | Tunjuk ke sel | Isi otomatis |
 |---|---|---|
-| `kw_no` | sel nomor kwitansi | No kwitansi (271/RGI-KW/VI/2026) |
-| `kw_tanggal` | sel tanggal | Tanggal terima |
-| `kw_terima_dari` | sel "Telah terima dari" | Nama klien/pembayar |
-| `kw_jumlah` | sel nominal angka | Jumlah (Rp) |
-| `kw_terbilang` | sel terbilang | Jumlah dalam huruf + "Rupiah" |
-| `kw_untuk` | sel "Untuk pembayaran" | Deskripsi pembayaran |
-| `kw_ref_invoice` | sel referensi invoice | No invoice terkait |
+| `kw_no` | sel di sebelah **Nomor** | No kwitansi (178/RGI-KW/XII/2025) |
+| `kw_metode` | sel di sebelah **Pembayaran** | Metode (Transfer/Tunai) |
+| `kw_ref_invoice` | sel di sebelah **No. Invoice** | No invoice terkait |
+| `kw_terima_dari` | sel di sebelah **Sudah Terima Dari** | Nama klien/pembayar |
+| `kw_terbilang` | sel di sebelah **Banyaknya Uang** | Jumlah dalam huruf + "Rupiah" (Title Case) |
+| `kw_untuk` | sel di sebelah **Untuk Pembayaran** | Deskripsi pembayaran |
+| `kw_jumlah` | sel nominal besar (mis. `Rp7.490.600`) | Jumlah angka — beri format sel `"Rp"#,##0` |
+| `kw_tanggal` | sel tanggal kanan (mis. *Surabaya, 24 Desember 2025*) | Otomatis terisi `Surabaya, <tgl panjang>` |
 
-> Karena tidak ada baris dinamis, **tidak perlu** named range zona item untuk kwitansi.
+> - `kw_jumlah` diisi **angka** — format tampilan (Rp, ribuan) diatur lewat format sel.
+> - `kw_tanggal` sudah termasuk prefix **"Surabaya, "** + tanggal format panjang Indonesia.
+> - Karena tidak ada baris dinamis, **tidak perlu** named range zona item untuk kwitansi.
 
 ## Sheet data (dibuat otomatis)
 - **Invoice_Main** — dibuat otomatis saat invoice pertama disimpan (tak perlu manual).

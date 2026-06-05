@@ -30,10 +30,11 @@ function exportKwitansiDariTemplate(idKwitansi) {
     };
 
     set('kw_no',          kw.id);
-    set('kw_tanggal',     kw.tanggal);
+    set('kw_tanggal',     _formatTanggalKwitansi(kw.tanggal));
+    set('kw_metode',      kw.metode || 'Transfer');
     set('kw_terima_dari', kw.terimaDari);
     set('kw_jumlah',      kw.jumlah);
-    set('kw_terbilang',   _capitalize(terbilangIndo(kw.jumlah)) + ' Rupiah');
+    set('kw_terbilang',   _titleCase(terbilangIndo(kw.jumlah)) + ' Rupiah');
     set('kw_untuk',       kw.untuk);
     set('kw_ref_invoice', kw.noInvoice);
 
@@ -48,6 +49,27 @@ function exportKwitansiDariTemplate(idKwitansi) {
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
+}
+
+// "Tujuh Juta Empat Ratus ..." (huruf awal tiap kata kapital)
+function _titleCase(s) {
+  return (s || '').toString().replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+}
+
+// "24/12/2025" → "Surabaya, 24 Desember 2025"
+function _formatTanggalKwitansi(tgl) {
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli',
+                 'Agustus','September','Oktober','November','Desember'];
+  let d, m, y;
+  if (tgl instanceof Date) {
+    d = tgl.getDate(); m = tgl.getMonth(); y = tgl.getFullYear();
+  } else {
+    const p = (tgl || '').toString().split('/'); // dd/MM/yyyy
+    if (p.length !== 3) return 'Surabaya, ' + (tgl || '');
+    d = parseInt(p[0], 10); m = parseInt(p[1], 10) - 1; y = parseInt(p[2], 10);
+  }
+  if (isNaN(d) || isNaN(m) || isNaN(y) || m < 0 || m > 11) return 'Surabaya, ' + (tgl || '');
+  return 'Surabaya, ' + d + ' ' + bulan[m] + ' ' + y;
 }
 
 function _getKwitansiById(ss, idKwitansi) {
