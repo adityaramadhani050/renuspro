@@ -43,10 +43,23 @@ Agar export berfungsi, sheet **Template_Invoice** wajib punya named range beriku
 > Footer (Subtotal/DPP, PPN, TOTAL, Terbilang, Catatan, Tanda tangan) **digenerate
 > otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
 
-## Template_Kwitansi (menyusul)
-Sheet & named range untuk kwitansi akan didokumentasikan saat fitur Kwitansi dibuat.
-Rencana named range: `kw_no`, `kw_tanggal`, `kw_terima_dari`, `kw_jumlah`,
-`kw_terbilang`, `kw_untuk`, `kw_ref_invoice`.
+## Daftar named range Template_Kwitansi
+
+Buat sheet **Template_Kwitansi** (desain bebas: kop, judul "KWITANSI", dll),
+lalu tambahkan named range berikut. Kwitansi **tidak** punya baris dinamis —
+sistem hanya mengisi sel-sel ini lalu export.
+
+| Named range | Tunjuk ke sel | Isi otomatis |
+|---|---|---|
+| `kw_no` | sel nomor kwitansi | No kwitansi (271/RGI-KW/VI/2026) |
+| `kw_tanggal` | sel tanggal | Tanggal terima |
+| `kw_terima_dari` | sel "Telah terima dari" | Nama klien/pembayar |
+| `kw_jumlah` | sel nominal angka | Jumlah (Rp) |
+| `kw_terbilang` | sel terbilang | Jumlah dalam huruf + "Rupiah" |
+| `kw_untuk` | sel "Untuk pembayaran" | Deskripsi pembayaran |
+| `kw_ref_invoice` | sel referensi invoice | No invoice terkait |
+
+> Karena tidak ada baris dinamis, **tidak perlu** named range zona item untuk kwitansi.
 
 ## Sheet data (dibuat otomatis)
 - **Invoice_Main** — dibuat otomatis saat invoice pertama disimpan (tak perlu manual).

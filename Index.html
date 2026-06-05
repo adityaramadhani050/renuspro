@@ -38,6 +38,9 @@
         <button onclick="navigate('invoice')" id="nav-invoice" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-file-invoice w-6"></i> Invoice
         </button>
+        <button onclick="navigate('kwitansi')" id="nav-kwitansi" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-receipt w-6"></i> Kwitansi
+        </button>
         <button onclick="navigate('produk')" id="nav-produk" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-box w-6"></i> Produk / Jasa
         </button>
@@ -116,6 +119,7 @@
       <?!= include('Page_Penawaran'); ?>
       <?!= include('Page_WorkOrder'); ?>
       <?!= include('Page_Invoice'); ?>
+      <?!= include('Page_Kwitansi'); ?>
       <?!= include('Page_Produk'); ?>
       <?!= include('Page_Template'); ?>
       <?!= include('Page_Customer'); ?>
@@ -134,6 +138,7 @@
   <?!= include('JS_Penawaran_List'); ?>
   <?!= include('JS_WorkOrder'); ?>
   <?!= include('JS_Invoice'); ?>
+  <?!= include('JS_Kwitansi'); ?>
   <?!= include('JS_Form_Penawaran'); ?>
   <?!= include('JS_Riwayat'); ?>
   <?!= include('JS_Template'); ?>

@@ -1,0 +1,201 @@
+<script>
+    // ================================================================
+    // FITUR KWITANSI
+    // ================================================================
+    let _kwitansiInvoiceList = [];
+    let _kwitansiNextNo      = '';
+    let _cachedKwitansiData  = [];
+
+    function _pgRenderKwitansi(data) {
+      const tbody = document.getElementById('table-kwitansi');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">
+          <i class="fas fa-receipt mr-2"></i>Belum ada kwitansi. Klik <b>Buat Kwitansi</b> setelah pembayaran invoice diterima.
+        </td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map(i => {
+        const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+          <td class="p-4 max-w-[200px]">
+            <p class="font-bold text-emerald-700 whitespace-nowrap">${i.id}</p>
+            <p class="text-[11px] text-slate-400 font-medium">${i.tanggal || ''}</p>
+          </td>
+          <td class="p-4">
+            <p class="font-semibold text-blue-700 text-xs whitespace-nowrap">${i.noInvoice || '-'}</p>
+            <p class="text-[11px] text-slate-400">${i.noWO || ''}</p>
+          </td>
+          <td class="p-4 font-semibold text-slate-700">${i.terimaDari || '-'}</td>
+          <td class="p-4 max-w-[240px]"><p class="text-slate-600 truncate">${i.untuk || '-'}</p></td>
+          <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.jumlah.toLocaleString('id-ID')}</td>
+          <td class="p-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick='exportKwitansiPDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Kwitansi">
+                <i class="fa-solid fa-file-pdf"></i>
+              </button>
+              <button onclick="konfirmasiHapus('kwitansi','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    window.loadKwitansi = function() {
+      const tbody = document.getElementById('table-kwitansi');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data kwitansi...</td></tr>`;
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+          _cachedKwitansiData = data || [];
+          const s = document.getElementById('search-kwitansi'); if (s) s.value = '';
+          _pgState.kwitansi.data = _cachedKwitansiData;
+          _pgState.kwitansi.page = 1;
+          _injectPgBar('kwitansi', '#table-kwitansi');
+          _pgRender('kwitansi');
+        }).getKwitansiList();
+      }
+    };
+
+    window.filterKwitansi = function() {
+      const q = (document.getElementById('search-kwitansi').value || '').toLowerCase().trim();
+      _pgState.kwitansi.data = _cachedKwitansiData.filter(d => {
+        if (!q) return true;
+        return (d.id + d.noInvoice + d.noWO + d.terimaDari + d.untuk).toLowerCase().includes(q);
+      });
+      _pgState.kwitansi.page = 1;
+      _pgRender('kwitansi');
+    };
+
+    // ── Form ──
+    function bukaModalBuatKwitansi() {
+      toggleLoader(true, 'Memuat invoice...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _kwitansiInvoiceList = res.invoiceList || [];
+        _kwitansiNextNo = res.nextNo || '';
+        document.getElementById('kw-nomor-preview').innerText = _kwitansiNextNo;
+
+        const sel = document.getElementById('kw-invoice');
+        sel.innerHTML = '<option value="">-- Pilih Invoice --</option>';
+        _kwitansiInvoiceList.forEach(inv => {
+          sel.add(new Option(`${inv.id} — ${inv.namaKlien} (Rp ${inv.total.toLocaleString('id-ID')})`, inv.id));
+        });
+
+        document.getElementById('kw-tanggal').valueAsDate = new Date();
+        document.getElementById('kw-metode').value = 'Transfer';
+        document.getElementById('kw-terima').value = '';
+        document.getElementById('kw-untuk').value = '';
+        document.getElementById('kw-jumlah').value = '';
+        document.getElementById('kw-catatan').value = '';
+        document.getElementById('kw-terbilang').innerText = '';
+
+        document.getElementById('modal-kwitansi').classList.remove('hidden');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).getKwitansiInitialData();
+    }
+
+    function _currentKwitansiInvoice() {
+      const id = document.getElementById('kw-invoice').value;
+      return _kwitansiInvoiceList.find(inv => inv.id === id) || null;
+    }
+
+    function onKwitansiInvoiceChange() {
+      const inv = _currentKwitansiInvoice();
+      if (!inv) return;
+      document.getElementById('kw-terima').value = inv.namaKlien || '';
+      document.getElementById('kw-untuk').value  = 'Pembayaran ' + inv.jenis + (inv.persen ? ' ' + inv.persen + '%' : '') +
+        ' - ' + inv.namaProject + ' (Invoice ' + inv.id + ')';
+      document.getElementById('kw-jumlah').value = formatNominalRupiah(inv.total || 0);
+      onKwitansiJumlahInput();
+    }
+
+    function onKwitansiJumlahInput() {
+      const n = pN(document.getElementById('kw-jumlah').value);
+      const el = document.getElementById('kw-terbilang');
+      el.innerText = n > 0 ? '# ' + _terbilangClient(n) + ' Rupiah #' : '';
+    }
+
+    function submitKwitansi() {
+      const inv = _currentKwitansiInvoice();
+      const jumlah = pN(document.getElementById('kw-jumlah').value);
+      const terima = document.getElementById('kw-terima').value.trim();
+      if (!terima) return showNotification('Isi "Terima Dari"!', 'error');
+      if (jumlah <= 0) return showNotification('Jumlah harus lebih dari 0!', 'error');
+
+      const payload = {
+        noInvoice:  inv ? inv.id : '',
+        noWO:       inv ? inv.noWO : '',
+        tanggal:    _toDDMMYYYY(document.getElementById('kw-tanggal').value),
+        terimaDari: terima,
+        jumlah:     jumlah,
+        untuk:      document.getElementById('kw-untuk').value.trim(),
+        metode:     document.getElementById('kw-metode').value,
+        catatan:    document.getElementById('kw-catatan').value.trim(),
+        dibuatOleh: (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
+      };
+
+      toggleLoader(true, 'Menyimpan kwitansi...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          document.getElementById('modal-kwitansi').classList.add('hidden');
+          loadKwitansi();
+        } else showNotification(res.message, 'error');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).simpanKwitansi(payload);
+    }
+
+    function exportKwitansiPDF(item) {
+      document.getElementById('preview-pdf-title').innerText = 'Kwitansi — ' + item.id;
+      document.getElementById('preview-pdf-subtitle').innerText = (item.terimaDari || '') + ' · Rp ' + item.jumlah.toLocaleString('id-ID');
+      document.getElementById('preview-pdf-loading').classList.remove('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+      document.getElementById('modal-preview-pdf').classList.remove('hidden');
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          _activePdfBase64 = res.pdfBase64;
+          _activePdfName   = res.fileName;
+          renderPDFDariBase64(res.pdfBase64);
+        } else {
+          document.getElementById('preview-pdf-loading').innerHTML = `
+            <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
+            <button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
+        }
+      }).withFailureHandler(function(err) {
+        document.getElementById('preview-pdf-loading').innerHTML = `
+          <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
+      }).exportKwitansiDariTemplate(item.id);
+    }
+
+    // ── Terbilang versi klien (untuk preview di form) ──
+    function _terbilangClient(n) {
+      n = Math.floor(Math.abs(n || 0));
+      if (n === 0) return 'nol';
+      const satuan = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+      function konv(x) {
+        if (x < 12) return satuan[x];
+        if (x < 20) return konv(x - 10) + ' belas';
+        if (x < 100) return satuan[Math.floor(x/10)] + ' puluh' + (x%10 ? ' ' + konv(x%10) : '');
+        if (x < 200) return 'seratus' + (x%100 ? ' ' + konv(x%100) : '');
+        if (x < 1000) return satuan[Math.floor(x/100)] + ' ratus' + (x%100 ? ' ' + konv(x%100) : '');
+        if (x < 2000) return 'seribu' + (x%1000 ? ' ' + konv(x%1000) : '');
+        if (x < 1000000) return konv(Math.floor(x/1000)) + ' ribu' + (x%1000 ? ' ' + konv(x%1000) : '');
+        if (x < 1000000000) return konv(Math.floor(x/1000000)) + ' juta' + (x%1000000 ? ' ' + konv(x%1000000) : '');
+        if (x < 1000000000000) return konv(Math.floor(x/1000000000)) + ' miliar' + (x%1000000000 ? ' ' + konv(x%1000000000) : '');
+        return konv(Math.floor(x/1000000000000)) + ' triliun' + (x%1000000000000 ? ' ' + konv(x%1000000000000) : '');
+      }
+      const s = konv(n).replace(/\s+/g, ' ').trim();
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+</script>
