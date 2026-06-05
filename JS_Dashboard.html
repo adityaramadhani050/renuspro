@@ -481,7 +481,7 @@
                   <span class="text-[10px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md">${p.deals} deal</span>
                 </div>
                 <div class="flex justify-between items-center mb-1.5">
-                  <span class="text-[10px] text-slate-400">Actual: <b class="text-slate-700">Rp ${p.rev.toLocaleString('id-ID')}</b></span>
+                  <span class="text-[10px] text-slate-400">Actual: <b class="text-slate-700">Rp ${(p.rev / 1e6).toFixed(1)}Jt</b></span>
                   <span class="text-[10px] text-slate-400">Target: <b class="text-slate-600">Rp ${p.target}Jt</b></span>
                 </div>
                 <div class="bg-slate-200 rounded-full h-2 overflow-hidden mb-1">

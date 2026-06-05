@@ -378,40 +378,9 @@ function bukaModalCustomerDariForm() {
   modal.classList.remove('hidden');
 }
 
-// ── Patch navigate() agar load users saat klik nav ───────────────────────
-// Simpan referensi navigate asli lalu override
-const _navigateOriginal = navigate;
-navigate = function(pageId) {
-  _navigateOriginal(pageId);
-  if (pageId === 'users') loadUsers();
-};
-
-// ── Patch eksekusiHapus untuk tipe 'user' ─────────────────────────────────
-const _eksekusiHapusOriginal = eksekusiHapus;
-eksekusiHapus = function(tipe, id) {
-  if (tipe === 'user') {
-    document.getElementById('modal-hapus').classList.add('hidden');
-    toggleLoader(true, 'Menghapus User...');
-    if (typeof google !== 'undefined') {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          toggleLoader(false);
-          if (res.success) { showNotification(res.message); loadUsers(); }
-          else showNotification(res.message, 'error');
-        })
-        .withFailureHandler(function(err) {
-          toggleLoader(false); showNotification(err.message, 'error');
-        })
-        .hapusUser(id);
-    }
-    return;
-  }
-  _eksekusiHapusOriginal(tipe, id);
-};
-
-// ── Patch getActiveUserName — gunakan _currentUser ────────────────────────
-// Fungsi ini tidak lagi perlu memanggil GAS, tapi tetap ada untuk kompatibilitas.
-// Nama user sekarang diambil dari _currentUser setelah login.
+// Catatan: cabang 'users' pada navigate() dan 'user' pada eksekusiHapus()
+// kini sudah menyatu di definisi aslinya (JS_Core & JS_Form_Penawaran),
+// sehingga tidak perlu lagi di-patch di sini.
 
 // ── Tutup modal saat klik backdrop ───────────────────────────────────────
 ['modal-user', 'modal-ganti-pw'].forEach(function(id) {

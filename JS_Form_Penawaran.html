@@ -547,10 +547,23 @@
       document.getElementById('modal-hapus').classList.remove('hidden');
     }
 
-    // GANTI fungsi eksekusiHapus yang sudah ada:
     function eksekusiHapus(tipe, id) {
       document.getElementById('modal-hapus').classList.add('hidden');
-      toggleLoader(true, "Menghapus Data...");
+      toggleLoader(true, tipe === 'user' ? "Menghapus User..." : "Menghapus Data...");
+
+      if (tipe === 'user') {
+        if (typeof google !== 'undefined') {
+          google.script.run
+            .withSuccessHandler(res => {
+              toggleLoader(false);
+              if (res.success) { showNotification(res.message); loadUsers(); }
+              else showNotification(res.message, "error");
+            })
+            .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+            .hapusUser(id);
+        }
+        return;
+      }
 
       if (tipe === 'penawaran') {
         const [noPenawaran, rev] = id.split('|');
