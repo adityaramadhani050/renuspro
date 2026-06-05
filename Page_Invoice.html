@@ -99,40 +99,44 @@
                 </div>
               </div>
 
-              <!-- Pengaturan nominal (DP/Termin): persentase atau nominal -->
-              <div id="inv-nominal-wrap" class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
-                <div class="flex items-center gap-4">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Atur Nominal Berdasarkan</label>
-                  <div class="flex items-center gap-3 text-sm">
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="inv-mode" value="persen" checked onchange="onInvoiceModeChange()"> Persentase
-                    </label>
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="inv-mode" value="nominal" onchange="onInvoiceModeChange()"> Nominal
-                    </label>
+              <!-- Pengaturan nominal (DP/Termin): persentase & nominal linked -->
+              <div id="inv-nominal-wrap" class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Atur Nominal Tagihan</label>
+                <div class="flex items-center gap-2">
+                  <div class="relative w-28">
+                    <input type="number" id="inv-persen" value="30" step="any" oninput="onInvoicePersenInput()"
+                      class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none">
+                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                  </div>
+                  <span class="text-xs text-slate-400 font-bold">/</span>
+                  <div class="relative flex-1">
+                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                    <input type="text" id="inv-nominal" oninput="onInvoiceNominalInput()"
+                      class="w-full pl-8 pr-2 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none" placeholder="0">
                   </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                  <div id="inv-persen-wrap">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Persentase (%)</label>
-                    <input type="number" id="inv-persen" min="1" max="100" value="30" oninput="hitungInvoice()" class="input-field text-sm">
-                  </div>
-                  <div id="inv-nominal-input-wrap" style="display:none">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Nominal DPP (Rp)</label>
-                    <input type="text" id="inv-nominal" inputmode="numeric" oninput="hitungInvoice()" class="input-field text-sm text-right" placeholder="0">
-                  </div>
-                </div>
+                <p class="text-[11px] text-slate-400 mt-1.5">Persentase dari nilai kontrak (DPP). Ubah salah satu, yang lain menyesuaikan.</p>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. PO Pelanggan</label>
-                  <input type="text" id="inv-nopo" placeholder="PO/2026/.." class="input-field text-sm">
+              <!-- PO Pelanggan: toggle ada / tidak ada -->
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                <label class="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="checkbox" id="inv-ada-po" onchange="onInvoicePOToggle()" class="w-4 h-4">
+                  <span class="font-bold text-slate-600">Ada PO dari customer?</span>
+                </label>
+                <div id="inv-po-fields" class="grid grid-cols-2 gap-4" style="display:none">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">No. PO Pelanggan</label>
+                    <input type="text" id="inv-nopo" placeholder="PO/2026/.." class="input-field text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Tgl. PO</label>
+                    <input type="date" id="inv-tglpo" class="input-field text-sm">
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tgl. PO</label>
-                  <input type="date" id="inv-tglpo" class="input-field text-sm">
-                </div>
+                <p id="inv-po-hint" class="text-[11px] text-slate-400">
+                  Tidak ada PO — referensi memakai No. Penawaran <span id="inv-po-penawaran" class="font-bold text-slate-500"></span>.
+                </p>
               </div>
 
               <!-- Rincian/scope (otomatis dari penawaran, read-only) -->
