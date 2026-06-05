@@ -1,0 +1,5 @@
+# Konfigurasi clasp lokal — berisi Script ID, jangan di-commit.
+.clasp.json
+
+# Kredensial clasp
+.clasprc.json

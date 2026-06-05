@@ -1,0 +1,662 @@
+<script>
+    // ============================================================
+    // SISTEM EXPORT & PREVIEW QUOTATION PDF
+    // ============================================================
+
+    let _activePdfDoc  = null;
+    let _activePdfName = '';
+
+    // Variabel global untuk menyimpan PDF aktif (base64 version)
+    let _activePdfBase64 = null;
+
+    function tutupPreviewPDF() {
+      document.getElementById('modal-preview-pdf').classList.add('hidden');
+
+      const wrap    = document.getElementById('preview-pdf-canvas-wrap');
+      const loading = document.getElementById('preview-pdf-loading');
+
+      // Reset canvas wrap
+      wrap.innerHTML      = '';
+      wrap.style.display  = '';
+      wrap.style.visibility = '';
+      wrap.classList.add('hidden');
+
+      // Reset loading ke state awal dan pastikan terlihat kembali
+      loading.classList.remove('hidden');
+      loading.innerHTML = `
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div>
+        <p class="text-sm font-medium">Membuat preview...</p>`;
+
+      _activePdfDoc  = null;
+      _activePdfBase64 = null
+      _activePdfName = '';
+    }
+
+function exportPenawaranPDF(item) {
+  document.getElementById('preview-pdf-title').innerText =
+    'Preview — ' + item.id + ' Rev' + item.rev;
+  document.getElementById('preview-pdf-subtitle').innerText =
+    item.namaProject + ' · ' + item.namaKlien;
+  document.getElementById('preview-pdf-loading').classList.remove('hidden');
+  document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+  document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+  document.getElementById('modal-preview-pdf').classList.remove('hidden');
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(async function(res) {
+        if (res.success) {
+          try {
+            let kelompokList = [];
+            try { kelompokList = JSON.parse(item.items || '[]'); } catch(e) {}
+
+            const mainBinary = atob(res.pdfBase64);
+            const mainBytes  = new Uint8Array(mainBinary.length);
+            for (let i = 0; i < mainBinary.length; i++) mainBytes[i] = mainBinary.charCodeAt(i);
+
+            const mergedBytes = await _mergePdfDenganTC(mainBytes, kelompokList);
+
+            let binaryStr = '';
+            for (let i = 0; i < mergedBytes.length; i++) binaryStr += String.fromCharCode(mergedBytes[i]);
+            _activePdfBase64 = btoa(binaryStr);
+            _activePdfName   = res.fileName;
+
+            renderPDFDariBase64(_activePdfBase64);
+          } catch(mergeErr) {
+            console.warn('Merge T&C gagal, tampilkan tanpa lampiran:', mergeErr);
+            _activePdfBase64 = res.pdfBase64;
+            _activePdfName   = res.fileName;
+            renderPDFDariBase64(res.pdfBase64);
+          }
+        } else {
+          document.getElementById('preview-pdf-loading').innerHTML = `
+            <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
+            <button onclick="tutupPreviewPDF()"
+              class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
+        }
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById('preview-pdf-loading').innerHTML = `
+          <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
+      })
+      .exportQuotationDariTemplate(item);
+  } else {
+    setTimeout(() => buatDokumenPDF(item), 80);
+  }
+}
+
+// Render PDF dari base64 string ke canvas
+async function renderPDFDariBase64(base64String) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Decode base64 → ArrayBuffer
+    const binaryStr = atob(base64String);
+    const bytes     = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    const pdfDoc = await pdfjsLib.getDocument({ data: bytes.buffer }).promise;
+    const wrap   = document.getElementById('preview-pdf-canvas-wrap');
+    wrap.innerHTML    = '';
+    wrap.style.display    = 'flex';
+    wrap.style.flexDirection = 'column';
+    wrap.style.visibility = 'hidden';
+
+    const wrapW = Math.min(wrap.clientWidth || 340, 700);
+
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page     = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const scale    = (wrapW - 16) / viewport.width;
+      const vp       = page.getViewport({ scale });
+
+      if (pdfDoc.numPages > 1) {
+        const label     = document.createElement('p');
+        label.innerText = `Halaman ${pageNum} / ${pdfDoc.numPages}`;
+        label.style.cssText =
+          'font-size:11px;color:#94a3b8;font-weight:600;text-align:center;margin:0;';
+        wrap.appendChild(label);
+      }
+
+      const canvas        = document.createElement('canvas');
+      canvas.width        = vp.width;
+      canvas.height       = vp.height;
+      canvas.style.cssText =
+        'width:100%;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5);' +
+        'background:#fff;display:block;';
+      wrap.appendChild(canvas);
+
+      await page.render({
+        canvasContext: canvas.getContext('2d'),
+        viewport: vp
+      }).promise;
+    }
+
+    wrap.style.visibility = 'visible';
+    wrap.classList.remove('hidden');
+    document.getElementById('preview-pdf-loading').classList.add('hidden');
+
+  } catch(err) {
+    document.getElementById('preview-pdf-loading').innerHTML = `
+      <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+      <p class="text-sm text-rose-400">Gagal render preview: ${err.message}</p>`;
+  }
+}
+
+function downloadQuotationPDF() {
+  // Prioritas: gunakan base64 dari server (template Sheet)
+  if (_activePdfBase64) {
+    const byteChars = atob(_activePdfBase64);
+    const byteArr   = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteArr[i] = byteChars.charCodeAt(i);
+    }
+    const blob = new Blob([byteArr], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = _activePdfName || 'quotation.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('PDF berhasil didownload: ' + _activePdfName);
+    return;
+  }
+  // Fallback jsPDF
+  if (_activePdfDoc) {
+    _activePdfDoc.save(_activePdfName);
+  }
+}
+
+    async function renderPDFKeCanvas(doc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const pdfBytes = doc.output('arraybuffer');
+      const pdfDoc   = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+      const wrap     = document.getElementById('preview-pdf-canvas-wrap');
+      wrap.innerHTML = '';
+
+      // Tampilkan wrap dulu agar clientWidth terukur, tapi masih transparan
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.visibility = 'hidden'; // tidak terlihat tapi sudah punya dimensi
+
+      // Ambil lebar setelah wrap visible secara layout
+      const wrapW = Math.min(wrap.clientWidth || 340, 700);
+
+      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        const page     = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1 });
+        const scale    = (wrapW - 16) / viewport.width;
+        const vp       = page.getViewport({ scale });
+
+        if (pdfDoc.numPages > 1) {
+          const label     = document.createElement('p');
+          label.innerText = `Halaman ${pageNum} / ${pdfDoc.numPages}`;
+          label.style.cssText = 'font-size:11px;color:#94a3b8;font-weight:600;text-align:center;margin:0;';
+          wrap.appendChild(label);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        canvas.style.cssText = 'width:100%;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5);background:#fff;display:block;';
+        wrap.appendChild(canvas);
+
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      }
+
+      // Setelah semua halaman selesai, tampilkan dan sembunyikan loading
+      wrap.style.visibility = 'visible';
+      wrap.classList.remove('hidden');
+      document.getElementById('preview-pdf-loading').classList.add('hidden');
+    }
+
+function buatDokumenPDF(item) {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    // ── KONSTANTA ──────────────────────────────────────────────────────────
+    const PW   = 210;
+    const ML   = 14;
+    const MR   = 14;
+    const CW   = PW - ML - MR;
+    const BLUE = [0, 51, 153];
+
+    const rpNum = v => Math.round(Math.abs(v)).toLocaleString('id-ID');
+
+    // Data pendukung
+    const klien = (erpState.klien || []).find(k => k.id === item.klienId) || {};
+    let tc = {};
+    try { tc = JSON.parse(item.termConditions || '{}'); } catch (e) {}
+    let kelompokList = [];
+    try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
+
+    // ── LOGO RENUS (kiri atas) ─────────────────────────────────────────────
+    // Kotak biru latar logo
+    doc.setFillColor(...BLUE);
+    doc.rect(ML, 10, 26, 10, 'F');
+
+    // Ikon panah/petir kecil di dalam kotak (dibuat manual dengan polygon)
+    doc.setFillColor(255, 255, 255);
+    // Gambar simbol "F" / panah miring kecil sebagai ikon brand
+    // Menggunakan segitiga + batang horisontal untuk menyerupai logo
+    const ix = ML + 2.5;
+    const iy = 11;
+    // Panah ke kanan atas (chevron)
+    doc.triangle(ix, iy + 7, ix + 3, iy + 3.5, ix + 3, iy + 7, 'F');
+    doc.triangle(ix + 2.5, iy + 7, ix + 5.5, iy + 3.5, ix + 5.5, iy + 7, 'F');
+    // Batang horisontal tengah
+    doc.setFillColor(255, 255, 255);
+    doc.rect(ix, iy + 4.5, 5.5, 1.2, 'F');
+
+    // Teks "RENUS" di dalam kotak biru
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('RENUS', ML + 16, 16.2, { align: 'center' });
+
+    // Info perusahaan di bawah logo
+    doc.setTextColor(...BLUE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 24);
+
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text('Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari', ML, 28);
+    doc.text('Kec. Rungkut, Kota Surabaya 60293', ML, 32);
+    doc.setTextColor(...BLUE);
+    doc.text('Email : admin@renergynusantara | renergynusantara@gmail.com', ML, 36);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Telp : 0895-6059-84308 | 0813-5820-8282', ML, 40);
+
+    // ── HEADER KANAN: "Quotation" + info doc ──────────────────────────────
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(28);
+    doc.text('Quotation', PW - MR, 20, { align: 'right' });
+
+    const infoLX = PW - MR - 44;
+    const infoRX = PW - MR;
+    [
+      ['Date',        item.tanggal   || ''],
+      ['Quotation #', item.id        || ''],
+      ['Rev',         String(item.rev ?? '0')],
+    ].forEach((r, idx) => {
+      const y = 28 + idx * 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(50, 50, 50);
+      doc.text(r[0], infoLX, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(20, 20, 20);
+      doc.text(r[1], infoRX, y, { align: 'right' });
+    });
+
+    // ── QUOTATION TO ───────────────────────────────────────────────────────
+    let curY = 45;
+
+    doc.setFillColor(...BLUE);
+    doc.rect(ML, curY, CW, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('Quotation To :', ML + 2, curY + 4.2);
+    curY += 6;
+
+    doc.setFillColor(248, 249, 252);
+    doc.rect(ML, curY, CW, 26, 'F');
+    doc.setDrawColor(210, 215, 230);
+    doc.setLineWidth(0.2);
+    doc.rect(ML, curY, CW, 26);
+
+    const c1L = ML + 2;
+    const c1V = ML + 30;
+    const c2L = ML + (CW / 2) + 2;
+    const c2V = PW - MR;
+
+    const clientRows = [
+      ['Name',          klien.nama      || item.namaKlien  || '',
+       'Quotation valid until:', item.validUntil || '-'],
+      ['Company Name',  klien.perusahaan || '',
+       'Prepared by:',          item.dibuatOleh || ''],
+      ['Street Address', klien.alamat   || '', '', ''],
+      ['Contact',       klien.kontak    || '', '', ''],
+    ];
+
+    clientRows.forEach((r, idx) => {
+      const y = curY + 5.5 + idx * 5.5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(70, 70, 70);
+      doc.text(r[0], c1L, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(20, 20, 20);
+      doc.text(r[1], c1V, y);
+      if (r[2]) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(70, 70, 70);
+        doc.text(r[2], c2L + 5, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(20, 20, 20);
+        doc.text(r[3], c2V - 3, y, { align: 'right' });
+      }
+    });
+    curY += 29;
+
+    // ── TABEL ITEM ─────────────────────────────────────────────────────────
+    // Kelompok normal + kelompok DISCOUNT (jika ada) masuk ke tabel
+    const tableBody = [];
+
+    kelompokList.forEach((k, ki) => {
+      const letter = String.fromCharCode(65 + ki); // A, B, C, D...
+      const isDiscount = (k.namaKelompok || '').toUpperCase().includes('DISCOUNT') ||
+                         (k.namaKelompok || '').toUpperCase().includes('DISKON');
+
+      // Baris header kelompok
+      tableBody.push([
+        {
+          content: letter,
+          styles: {
+            fontStyle: 'bold',
+            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
+            fontStyle: isDiscount ? 'bolditalic' : 'bold',
+          },
+        },
+        {
+          content: k.namaKelompok,
+          styles: {
+            fontStyle: isDiscount ? 'bolditalic' : 'bold',
+            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
+          },
+        },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
+        {
+          content: isDiscount
+            ? (k.subtotal < 0 ? '-' : '') + rpNum(k.subtotal)
+            : rpNum(k.subtotal),
+          styles: {
+            halign: 'right',
+            fontStyle: isDiscount ? 'bolditalic' : 'bold',
+            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
+          },
+        },
+      ]);
+
+      // Baris sub-item
+      k.subItems.forEach((s, si) => {
+        const isNeg = (s.total || 0) < 0 || (s.harga || 0) < 0;
+        tableBody.push([
+          { content: String(si + 1), styles: { halign: 'center', fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] } },
+          { content: s.deskripsi, styles: { fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] } },
+          { content: String(s.qty), styles: { halign: 'center', fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] } },
+          { content: s.unit || '', styles: { halign: 'center', fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] } },
+          {
+            content: s.harga ? (isNeg ? '-' : '') + rpNum(s.harga) : '',
+            styles: { halign: 'right', fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] },
+          },
+          {
+            content: s.total ? (isNeg ? '-' : '') + rpNum(s.total) : '',
+            styles: { halign: 'right', fontStyle: isNeg ? 'italic' : 'normal', textColor: isNeg ? [160, 0, 0] : [40, 40, 40] },
+          },
+        ]);
+      });
+    });
+
+    doc.autoTable({
+      startY: curY,
+      head: [[
+        { content: 'No.',          styles: { halign: 'center' } },
+        { content: 'Description',  styles: { halign: 'left'   } },
+        { content: 'Qty',          styles: { halign: 'center' } },
+        { content: 'Unit',         styles: { halign: 'center' } },
+        { content: 'Price (IDR)',  styles: { halign: 'center' } },
+        { content: 'Amount (IDR)', styles: { halign: 'center' } },
+      ]],
+      body: tableBody,
+      theme: 'grid',
+      margin: { left: ML, right: MR },
+      columnStyles: {
+        0: { cellWidth: 10,   halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 14,   halign: 'center' },
+        3: { cellWidth: 14,   halign: 'center' },
+        4: { cellWidth: 28,   halign: 'right'  },
+        5: { cellWidth: 28,   halign: 'right'  },
+      },
+      headStyles: {
+        fillColor:  BLUE,
+        textColor:  [255, 255, 255],
+        fontStyle:  'bold',
+        fontSize:   8,
+        lineColor:  [255, 255, 255],
+        lineWidth:  0.3,
+      },
+      bodyStyles: {
+        fontSize:    7.5,
+        textColor:   [40, 40, 40],
+        lineColor:   [200, 205, 220],
+        lineWidth:   0.2,
+        cellPadding: 1.8,
+      },
+      alternateRowStyles: { fillColor: [255, 255, 255] },
+      styles: { overflow: 'linebreak' },
+    });
+
+    curY = doc.lastAutoTable.finalY;
+
+    // ── SUMMARY: SUBTOTAL / DISKON / PPN / GRAND TOTAL (kanan bawah tabel) ─
+    curY += 4;
+    const colLabelX = PW - MR - 56;
+    const colValX   = PW - MR;
+    const rowH      = 6;
+    let   sy        = curY;
+
+    const netSub = item.subtotal - (item.diskon || 0);
+
+    const summaryLines = [];
+    summaryLines.push({ label: 'Subtotal',    value: 'Rp ' + rpNum(item.subtotal), bold: false, highlight: false });
+    if (item.diskon > 0) {
+      summaryLines.push({ label: 'Diskon',    value: '- Rp ' + rpNum(item.diskon), bold: false, highlight: false, red: true });
+    }
+    if (item.pajak > 0) {
+      const pajakPct = netSub > 0 ? Math.round((item.pajak / netSub) * 100) : 11;
+      summaryLines.push({ label: 'PPN ' + pajakPct + '%', value: 'Rp ' + rpNum(item.pajak), bold: false, highlight: false });
+    }
+    summaryLines.push({ label: 'GRAND TOTAL', value: 'Rp ' + rpNum(item.grandTotal), bold: true, highlight: true });
+
+    const summaryBoxW  = (PW - MR) - colLabelX;
+    const totalSummaryH = summaryLines.length * rowH + 2;
+
+    // Border luar seluruh summary
+    doc.setDrawColor(210, 215, 230);
+    doc.setLineWidth(0.2);
+    doc.rect(colLabelX, sy - 1, summaryBoxW, totalSummaryH + 1);
+
+    summaryLines.forEach((row, idx) => {
+      const ry = sy + 1 + idx * rowH;
+
+      if (row.highlight) {
+        doc.setFillColor(235, 240, 255);
+        doc.rect(colLabelX, ry - 0.5, summaryBoxW, rowH + 1, 'F');
+        // garis batas atas grand total
+        doc.setDrawColor(180, 190, 220);
+        doc.setLineWidth(0.3);
+        doc.line(colLabelX, ry - 0.5, colLabelX + summaryBoxW, ry - 0.5);
+      }
+
+      doc.setFontSize(8);
+      if (row.bold) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...BLUE);
+      } else if (row.red) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(180, 0, 0);
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(50, 50, 50);
+      }
+      doc.text(row.label, colLabelX + 3, ry + 4);
+      doc.text(row.value,  colValX - 2,   ry + 4, { align: 'right' });
+    });
+
+    curY = sy + totalSummaryH + 6;
+    
+        // ── CATATAN ───────────────────────────────────────────────────────
+        const catatan = tc.catatan || '';
+        if (catatan) {
+          if (curY > 248) { doc.addPage(); curY = 15; }
+          doc.setFillColor(255, 252, 230);
+          const catatanLines = doc.splitTextToSize(catatan, CW - 4);
+          const catatanH = catatanLines.length * 4.2 + 6;
+          doc.rect(ML, curY, CW, catatanH, 'F');
+          doc.setDrawColor(220, 200, 100);
+          doc.setLineWidth(0.2);
+          doc.rect(ML, curY, CW, catatanH);
+          doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(100, 80, 0);
+          doc.text('Catatan :', ML + 2, curY + 4.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(60, 50, 0);
+          doc.text(catatanLines, ML + 2, curY + 9);
+          curY += catatanH + 5;
+        }
+
+    // ── TERM & CONDITION ───────────────────────────────────────────────────
+    // Format: "Label: Value" — 2 kolom, sesuai permintaan
+    // Contoh: "Material Status: Ready Stock"
+    if (curY > 200) { doc.addPage(); curY = 15; }
+
+    doc.setFillColor(...BLUE);
+    doc.rect(ML, curY, CW, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('Term & Condition :', ML + 2, curY + 4.2);
+    curY += 8;
+
+    // Daftar T&C: { label, value }
+    // Sesuaikan field key dengan struktur data tc Anda
+    const tcItems = [
+      { label: 'Material Status',  value: tc.material_status || '-' },
+      { label: 'Down Payment',     value: tc.dp_status       || '-' },
+      { label: 'Term Payment',     value: tc.term_pay        || '-' },
+      { label: 'Final Payment',    value: tc.final_pay       || '-' },
+      { label: 'Delivery Time',    value: tc.delivery_time   || '-' },
+      { label: 'Delivery Cond.',   value: tc.delivery_cond   || '-' },
+      { label: 'Warranty',         value: tc.warranty        || '-' },
+      { label: 'Bonus',            value: tc.bonus           || '-' },
+    ];
+
+    const tcColCount = 2;
+    const tcItemW    = CW / tcColCount;
+    const tcRowH     = 6.5;
+    const tcRows2    = Math.ceil(tcItems.length / tcColCount);
+    const tcTotalH   = tcRows2 * tcRowH + 6;
+
+    doc.setFillColor(248, 249, 252);
+    doc.rect(ML, curY - 2, CW, tcTotalH, 'F');
+    doc.setDrawColor(210, 215, 230);
+    doc.setLineWidth(0.2);
+    doc.rect(ML, curY - 2, CW, tcTotalH);
+    // Garis vertikal pemisah dua kolom
+    doc.line(ML + tcItemW, curY - 2, ML + tcItemW, curY - 2 + tcTotalH);
+
+    tcItems.forEach((tcItem, idx) => {
+      const col = idx % tcColCount;
+      const row = Math.floor(idx / tcColCount);
+      const x   = ML + 3 + col * tcItemW;
+      const y   = curY + 4 + row * tcRowH;
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(60, 60, 60);
+
+      // Label bold
+      doc.setFont('helvetica', 'bold');
+      const labelText = tcItem.label + ': ';
+      doc.text(labelText, x, y);
+
+      // Value normal, menyambung setelah label
+      const labelW = doc.getTextWidth(labelText);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(20, 20, 20);
+
+      // Wrap value jika terlalu panjang
+      const maxValW = tcItemW - labelW - 5;
+      const valLines = doc.splitTextToSize(tcItem.value, maxValW);
+      doc.text(valLines, x + labelW, y);
+    });
+
+    curY += tcTotalH + 4;
+
+    // ── FOOTER ─────────────────────────────────────────────────────────────
+    if (curY > 255) { doc.addPage(); curY = 15; }
+
+    doc.setDrawColor(210, 215, 230);
+    doc.setLineWidth(0.3);
+    doc.line(ML, curY, PW - MR, curY);
+    curY += 5;
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(
+      'If you have any questions concerning this quotation, contact Name, Phone Number, E-mail',
+      ML, curY
+    );
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text('THANK YOU FOR YOUR BUSINESS!', ML, curY + 5);
+
+    // Tanda tangan kanan
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text('Best Regard,', PW - MR, curY, { align: 'right' });
+
+    const namaText = item.dibuatOleh || 'Sales Executive';
+    const namaY    = curY + 12;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(20, 20, 20);
+    doc.text(namaText, PW - MR, namaY, { align: 'right' });
+
+    // Underline nama
+    const namaW = doc.getTextWidth(namaText);
+    doc.setDrawColor(20, 20, 20);
+    doc.setLineWidth(0.3);
+    doc.line(PW - MR - namaW, namaY + 1, PW - MR, namaY + 1);
+
+    // ── RENDER PREVIEW ──────────────────────────────────────────────────────
+    const pdfName  = `Quotation_${item.id.replace(/\//g, '-')}_Rev${item.rev}.pdf`;
+    _activePdfDoc  = doc;
+    _activePdfName = pdfName;
+
+    renderPDFKeCanvas(doc).catch(err => {
+      document.getElementById('preview-pdf-loading').innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+        <p class="text-sm text-rose-400">Gagal render preview: ${err.message}</p>`;
+    });
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('preview-pdf-loading').innerHTML =
+      `<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+      <p class="text-sm text-rose-400">Gagal membuat PDF: ${err.message}</p>`;
+    showNotification('Gagal generate PDF: ' + err.message, 'error');
+  }
+}
+</script>

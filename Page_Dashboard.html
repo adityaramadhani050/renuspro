@@ -1,0 +1,172 @@
+      <section id="page-dashboard" class="page-section active">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 id="dashboard-title" class="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Ringkasan Performa</h2>
+
+          <!-- Filter Tanggal Dashboard -->
+          <div id="dashboard-filter-wrap" class="flex flex-wrap items-center gap-2">
+
+            <!-- Preset cepat -->
+            <div class="flex gap-1.5 flex-wrap">
+              <button onclick="setDashboardPreset('thisMonth')" id="db-preset-thisMonth"
+                class="db-preset-btn active text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap">
+                Bulan Ini
+              </button>
+              <button onclick="setDashboardPreset('lastMonth')" id="db-preset-lastMonth"
+                class="db-preset-btn text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap">
+                Bulan Lalu
+              </button>
+              <button onclick="setDashboardPreset('thisYear')" id="db-preset-thisYear"
+                class="db-preset-btn text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap">
+                Tahun Ini
+              </button>
+              <button onclick="setDashboardPreset('custom')" id="db-preset-custom"
+                class="db-preset-btn text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap">
+                Custom
+              </button>
+            </div>
+
+            <!-- Range custom (muncul saat pilih Custom) -->
+            <div id="db-custom-range" class="hidden flex items-center gap-2 flex-wrap">
+              <input type="date" id="db-date-from"
+                class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
+              <span class="text-xs text-slate-400 font-bold">s/d</span>
+              <input type="date" id="db-date-to"
+                class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
+              <button onclick="applyCustomDashboardFilter()"
+                class="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">
+                Terapkan
+              </button>
+            </div>
+
+            <!-- Label periode aktif -->
+            <span id="db-active-period"
+              class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg whitespace-nowrap hidden sm:inline">
+            </span>
+
+            <button onclick="refreshDashboard()" title="Refresh data"
+              class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-blue-100
+                    text-slate-400 hover:text-blue-600 transition flex-shrink-0" id="db-refresh-btn">
+              <i class="fa-solid fa-rotate-right text-xs"></i>
+            </button>
+
+          </div>
+        </div>
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+          <div class="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-150">
+            <div class="flex items-center justify-between mb-2 gap-1 min-w-0">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Total Revenue</p>
+              <span id="kpi-revenue-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex-shrink-0 max-w-[60px] truncate"></span>
+            </div>
+            <p id="kpi-revenue" class="text-lg sm:text-2xl font-extrabold text-slate-800">-</p>
+            <p id="kpi-revenue-sub" class="text-xs text-slate-400 mt-1 leading-tight break-words"></p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-150">
+            <div class="flex items-center justify-between mb-2 gap-1 min-w-0">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Target vs Actual</p>
+              <span id="kpi-target-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex-shrink-0 max-w-[60px] truncate"></span>
+            </div>
+            <p id="kpi-target-val" class="text-lg sm:text-2xl font-extrabold text-slate-800">-</p>
+            <div class="mt-2 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div id="kpi-target-bar" class="h-full bg-blue-500 rounded-full transition-all duration-700" style="width:0%"></div>
+            </div>
+            <p id="kpi-target-sub" class="text-xs text-slate-400 mt-1 leading-tight break-words"></p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-150">
+            <div class="flex items-center justify-between mb-2 gap-1 min-w-0">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Total Deals</p>
+              <div class="w-5 h-5 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg">
+                <i class="fas fa-handshake"></i>
+              </div>
+            </div>
+            <p id="kpi-deals" class="text-lg sm:text-2xl font-extrabold text-slate-800">-</p>
+            <p id="kpi-deals-sub" class="text-xs text-slate-400 mt-1"></p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-150">
+            <div class="flex items-center justify-between mb-2 gap-1 min-w-0">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Win Rate</p>
+              <span id="kpi-winrate-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 max-w-[60px] truncate"></span>
+            </div>
+            <p id="kpi-winrate" class="text-lg sm:text-2xl font-extrabold text-slate-800">-</p>
+            <div class="mt-2 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div id="kpi-winrate-bar" class="h-full bg-orange-400 rounded-full transition-all duration-700" style="width:0%"></div>
+            </div>
+            <p id="kpi-winrate-sub" class="text-xs text-slate-400 mt-1 leading-tight break-words"></p>
+          </div>
+
+        </div>
+
+        <!-- Row 2: Trend + Donut -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+          <!-- Monthly Trend (2/3) -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-150 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <i class="fas fa-chart-line text-blue-500"></i> Tren Revenue Bulanan
+              </h3>
+              <div class="flex gap-4 text-[10px] text-slate-500 font-bold">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-2 rounded-sm bg-blue-500 inline-block"></span>Revenue</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-0 border-t-2 border-dashed border-orange-400 inline-block"></span>Target</span>
+              </div>
+            </div>
+            <div class="relative w-full" style="height:200px">
+              <canvas id="db-trend-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Donut Pipeline (1/3) -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-150">
+            <h3 class="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">
+              <i class="fas fa-chart-pie text-blue-500"></i> Status Penawaran
+            </h3>
+            <div class="relative w-full" style="height:160px">
+              <canvas id="db-donut-chart"></canvas>
+            </div>
+            <div id="db-donut-legend" class="flex flex-col gap-2 mt-3"></div>
+          </div>
+
+        </div>
+
+        <!-- Row 3: Quotation Table + Leaderboard -->
+        <div id="row-dashboard-bottom" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          <!-- Recent Quotations (2/3) -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-150 lg:col-span-2 overflow-x-auto">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <i class="fas fa-file-invoice text-blue-500"></i> Penawaran Terbaru
+              </h3>
+              <button onclick="navigate('penawaran')"
+                class="text-[11px] font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1">
+                Lihat Semua <i class="fas fa-arrow-right text-[10px]"></i>
+              </button>
+            </div>
+            <table class="w-full text-left border-collapse min-w-[480px]">
+              <thead>
+                <tr class="border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="pb-2 pr-3">No Penawaran</th>
+                  <th class="pb-2 pr-3">Nama Project</th>
+                  <th class="pb-2 pr-3">Klien</th>
+                  <th class="pb-2 pr-3 text-right">Nilai</th>
+                  <th class="pb-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="db-quot-table" class="text-xs"></tbody>
+            </table>
+          </div>
+
+          <!-- Leaderboard (1/3) -->
+          <div id="card-leaderboard" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-150">
+            <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+              <i class="fas fa-trophy text-amber-500"></i> Top Performers
+            </h3>
+            <div id="db-leaderboard" class="flex flex-col gap-3"></div>
+          </div>
+
+        </div>
+      </section>

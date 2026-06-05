@@ -1,0 +1,116 @@
+<script>
+    // ── Data cache untuk filter penawaran ──────────────────────────
+    let _cachedPenawaranData = [];
+    function _isiDropdownFilterPenawaran(data) {
+      const isAdmin = _currentUser && _currentUser.role === 'admin';      
+      const salesSet = new Set();
+      data.forEach(d => { if (d.dibuatOleh) salesSet.add(d.dibuatOleh); });
+      const selSales = document.getElementById('filter-sales');
+      const current = selSales.value;
+      selSales.innerHTML = '<option value="">Semua Sales</option>';
+      [...salesSet].sort().forEach(s => {
+        const o = document.createElement('option');
+        o.value = s; o.text = s;
+        if (s === current) o.selected = true;
+        selSales.add(o);
+      });    
+    
+
+      // Dropdown Tahun — ambil dari data
+      const tahunSet = new Set();
+      data.forEach(d => {
+        if (d.tanggal) {
+          const parts = d.tanggal.split('/');
+          if (parts.length === 3) tahunSet.add(parts[2]);
+        }
+      });
+      const selTahun = document.getElementById('filter-tahun');
+      const currentTahun = selTahun.value;
+      selTahun.innerHTML = '<option value="">Tahun</option>';
+      [...tahunSet].sort((a,b) => b - a).forEach(y => {
+        const o = document.createElement('option');
+        o.value = y; o.text = y;
+        if (y === currentTahun) o.selected = true;
+        selTahun.add(o);
+      });
+    }
+    function _renderTabelPenawaran(data) {
+      const tbody = document.getElementById('table-penawaran');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">
+          <i class="fas fa-search mr-2"></i>Tidak ada penawaran yang sesuai filter.
+        </td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map(i => {
+        const marginClass = i.marginPersen >= 25
+          ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+        const statusConfig = {
+          'On-Progress': 'bg-blue-100 text-blue-700',
+          'Deal':        'bg-emerald-100 text-emerald-800',
+          'Fail':        'bg-rose-100 text-rose-700'
+        };
+        const statusClass = statusConfig[i.status] || 'bg-slate-100 text-slate-600';
+        const isAdmin = _currentUser && _currentUser.role === 'admin';
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+              <td class="p-4 max-w-[220px]">
+                <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}<span class="text-slate-400 font-normal text-[10px] ml-1">Rev${i.rev}</span></p>
+                <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.tanggal}</p>
+              </td>
+              <td class="p-4 max-w-[220px]">
+                <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.namaKlien}</p>
+                <p class="font-semibold text-slate-700 truncate leading-snug">${i.namaProject}</p>
+              </td>
+              <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
+              <td class="p-4 text-right font-bold text-slate-800">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
+              <td class="p-4 text-right">
+                <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${marginClass}">${parseFloat(i.marginPersen).toFixed(1)}%</span>
+              </td>
+              <td class="p-4 text-center">
+                <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)"
+                  class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusClass}">
+                  <option value="On-Progress" ${i.status==='On-Progress'?'selected':''}>On-Progress</option>
+                  <option value="Deal"        ${i.status==='Deal'?'selected':''}>Deal</option>
+                  <option value="Fail"        ${i.status==='Fail'?'selected':''}>Fail</option>
+                </select>
+              </td>
+              <td class="p-4 text-center">
+                <button onclick="bukaRiwayatRevisi('${i.id}', '${i.namaProject}')"
+                  class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg
+                        ${parseInt(i.rev) > 0
+                          ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                          : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}
+                        transition">
+                  <i class="fa-solid fa-code-branch text-[11px]"></i>
+                  Rev${i.rev}
+                </button>
+              </td>
+              <td class="p-4 text-center">
+                <div class="flex items-center justify-center gap-1">
+                <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                  class="text-teal-500 hover:bg-teal-50 p-1.5 rounded-lg transition" title="Salin sebagai Penawaran Baru">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+                <button onclick='exportPenawaranPDF(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                  class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export Quotation PDF">
+                  <i class="fa-solid fa-file-pdf"></i>
+                </button>
+                  ${i.status === 'Deal'
+                    ? `<span class="text-slate-300 p-1.5 cursor-not-allowed" title="Tidak dapat direvisi — status Deal">
+                        <i class="fa-solid fa-lock text-xs"></i>
+                      </span>`
+                    : `<button onclick='muatPenawaranKeForm(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                        class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Edit / Revisi">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                      </button>`
+                  }
+                  <button onclick="konfirmasiHapus('penawaran','${i.id}|${i.rev}','${i.id}')"
+                    class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>`;
+      }).join('');
+    }
+</script>

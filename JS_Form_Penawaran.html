@@ -1,0 +1,912 @@
+<script>
+    function salinPenawaran(item) {
+  // Pastikan tidak dalam edit mode
+  window._editMode = null;
+  document.getElementById('btnSubmitForm').innerHTML =
+    '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran';
+
+  // Reset form dulu ke kondisi bersih, lalu isi dengan data salinan
+  navigate('penawaran');
+  toggleFormPenawaran(true);
+
+  // Gunakan nomor penawaran BARU (bukan nomor yang disalin)
+  document.getElementById('noPenawaran').value = erpState.nextNo || 'Generating...';
+
+  // Isi nama project dengan prefix "COPY - "
+  document.getElementById('namaProject').value = 'COPY - ' + (item.namaProject || '');
+
+  // Set tanggal hari ini & expired +3 hari
+  document.getElementById('tglPenawaran').valueAsDate = new Date();
+  const vd = new Date(); vd.setDate(vd.getDate() + 3);
+  document.getElementById('validUntil').valueAsDate = vd;
+
+  // Set klien
+  const klienSel = document.getElementById('klienSelect');
+  sdSetValue('klienSelect', item.klienId);
+  onKlienChanged(klienSel);
+
+  // Isi Syarat & Ketentuan dari JSON
+  try {
+    const tc = JSON.parse(item.termConditions || '{}');
+    const setOpt = (id, val) => {
+      if (val && document.getElementById(id)) document.getElementById(id).value = val;
+    };
+    setOpt('tc_material',      tc.material_status);
+    setOpt('tc_dp',            tc.dp_status);
+    setOpt('tc_term',          tc.term_pay);
+    setOpt('tc_final',         tc.final_pay);
+    setOpt('tc_delivery_time', tc.delivery_time);
+    setOpt('tc_delivery_cond', tc.delivery_cond);
+    setOpt('tc_warranty',      tc.warranty);
+    setOpt('tc_bonus',         tc.bonus);
+    if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
+  } catch(e) {}
+
+  // Diskon & pajak
+  const savedDiskon = item.diskon || 0;
+  const savedPajak  = item.pajak  || 0;
+
+  // Bangun ulang kelompok item
+  document.getElementById('containerKelompok').innerHTML = '';
+  try {
+    const kelompokList = JSON.parse(item.items || '[]');
+    if (!kelompokList.length) tambahKelompokBaru();
+    else kelompokList.forEach(k => muatKelompokDariData(k));
+  } catch(e) { tambahKelompokBaru(); }
+
+  // Restore diskon & pajak
+  setTimeout(() => {
+    hitungKalkulasiGabungan();
+    const sub = kalkulasiGlobalState.subtotalSemua;
+    document.getElementById('inputDiskonNominal').value = formatNominalRupiah(savedDiskon);
+    document.getElementById('inputDiskonPersen').value  = sub > 0 ? +((savedDiskon / sub) * 100).toFixed(2) : 0;
+    const netSub = sub - savedDiskon;
+    document.getElementById('inputPajakPersen').value   = netSub > 0 ? +((savedPajak / netSub) * 100).toFixed(0) : 11;
+    hitungKalkulasiGabungan(true);
+  }, 150);
+
+  // Scroll ke atas
+  document.querySelector('.flex-1.overflow-y-auto').scrollTop = 0;
+
+  showNotification('Penawaran disalin! Silakan ubah detail & simpan sebagai penawaran baru.', 'success');
+}
+
+    // --- FORM SUBMIT (TAMBAH PRODUK / CUSTOMER) ---
+    function submitFormLain(e, fnName, formId) {
+      e.preventDefault();
+      toggleLoader(true, "Menyimpan Data...");
+      const formData = new FormData(e.target);
+      const dataObj = Object.fromEntries(formData.entries());
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          toggleLoader(false);
+          if(res.success) { 
+            showNotification(res.message); 
+            e.target.reset(); 
+            document.getElementById(formId).classList.add('hidden');
+            if(formId === 'modal-produk') {                           
+              loadProduk(); 
+              muatSeluruhDataAwal(false); 
+            } 
+            if(formId === 'modal-customer') {                        
+              loadCustomer(); 
+              muatSeluruhDataAwal(false); 
+            } 
+          }
+          else showNotification(res.message, "error");
+        }).withFailureHandler(err => { 
+          toggleLoader(false); 
+          showNotification(err, "error"); 
+        })[fnName](dataObj);
+      }
+    }
+
+    // =======================================================================
+    // LOGIKA INTI PEMBUAT PENAWARAN
+    // =======================================================================
+    
+    function muatSeluruhDataAwal(showLoadingUI = true) {
+      if(showLoadingUI) toggleLoader(true, "Sinkronisasi ERP...");
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          if (res.success) {
+            erpState.klien = res.klien || []; erpState.produk = res.produk || []; erpState.templatePaket = res.templatePaket || {}; erpState.nextNo = res.nextNo || "";
+            const sKlien = document.getElementById('klienSelect');
+            sKlien.innerHTML = '<option value="">-- Pilih Klien --</option>';
+            erpState.klien.forEach(k => { sKlien.add(new Option(k.nama, k.id)); });
+            document.getElementById('noPenawaran').value = erpState.nextNo;
+            if(showLoadingUI) {
+              document.getElementById('tglPenawaran').valueAsDate = new Date();
+              let vd = new Date(); vd.setDate(vd.getDate() + 3); document.getElementById('validUntil').valueAsDate = vd;
+              if(document.getElementById('containerKelompok').children.length === 0) tambahKelompokBaru();
+            }
+          } else showNotification("Gagal muat data: " + res.error, "error");
+          if(showLoadingUI) toggleLoader(false);
+        }).getInitialData();
+      } else { if(showLoadingUI) toggleLoader(false); }
+      // Init searchable dropdown setelah data klien termuat (DOM klienSelect siap)
+      setTimeout(function() { if (window._initAllSD) window._initAllSD(); }, 400);
+    }
+
+    function onKlienChanged(sel) {
+      const kl = erpState.klien.find(k => k.id === sel.value);
+      document.getElementById('klienCompany').value = kl ? kl.perusahaan : "";
+      document.getElementById('klienAddress').value = kl ? kl.alamat : "";
+      document.getElementById('klienKontak').value = kl ? kl.kontak : "";
+    }
+
+    function tambahKelompokBaru(idTpl = "") {
+      const cont = document.getElementById('containerKelompok');
+      const letCode = String.fromCharCode(65 + cont.children.length);
+      const div = document.createElement('div');
+      div.className = "bg-slate-50 border border-slate-200 rounded-xl p-4 relative block-kelompok";
+      div.setAttribute('data-letter', letCode);
+
+      let opsiHtml = `<option value="">-- Manual Kustom --</option>`;
+      Object.keys(erpState.templatePaket).forEach(k => { opsiHtml += `<option value="${k}" ${k===idTpl?'selected':''}>${erpState.templatePaket[k].nama}</option>`; });
+
+      div.innerHTML = `
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <span class="bg-blue-700 text-white font-bold min-w-8 h-8 px-2 rounded-lg inline-flex items-center justify-center text-sm flex-shrink-0">${letCode}</span>
+            <select onchange="onTemplatePaketChanged(this)" class="select-template-paket px-2 py-1 border border-slate-300 rounded-md text-xs font-bold w-full sm:w-56 flex-shrink-0">${opsiHtml}</select>
+            <input type="text" class="border border-slate-200 rounded-md bg-white text-sm font-bold text-slate-800 px-2 py-1 w-full nama-kelompok focus:outline-none focus:border-blue-400 min-w-0 flex-1" style="min-width:140px" placeholder="Nama Sub-Paket..." value="${idTpl?erpState.templatePaket[idTpl].nama:''}">
+          </div>
+          <button type="button" onclick="hapusKelompok(this)" class="text-rose-500 text-xs font-bold flex-shrink-0 px-2 py-1"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>
+        </div>
+        <div class="overflow-x-auto bg-white border border-slate-200 rounded-lg"><table class="w-full text-left border-collapse"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Deskripsi Produk/Jasa</th><th class="p-2 w-20 text-center">Qty</th><th class="p-2 w-20 text-center">Unit</th><th class="p-2 w-44">Harga Jual & HPP</th><th class="p-2 w-40 text-right">Total</th><th class="p-2 w-10 text-center">Aksi</th></tr></thead><tbody class="tbody-item-kelompok"></tbody></table></div>
+        <div class="flex justify-between items-center mt-3"><button type="button" onclick="tambahBarisItemDiKelompok(this)" class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button><div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok">0</span></span></div></div>
+      `;
+      cont.appendChild(div);
+      if (idTpl) muatItemDariTemplate(div.querySelector('.tbody-item-kelompok'), idTpl);
+      else tambahBarisItemDiKelompok(div.querySelector('.tbody-item-kelompok'), true);
+      
+      setTimeout(function() { _initSelectProdukDiBaris(div); }, 60);
+    }
+
+    // ── Init searchable pada select template paket & select produk di kelompok baru ──
+    function _initSDKelompok(div) {
+      // Template select
+      const tplSelect = div.querySelector('select.select-template-paket');
+      if (tplSelect && !tplSelect.id) {
+        const uid = 'sd-tpl-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+        tplSelect.id = uid;
+        // Tunggu DOM stabil
+        setTimeout(function() {
+          initSearchableDropdown(uid, {
+            placeholder: '-- Manual Kustom --',
+            searchPlaceholder: 'Cari template...'
+          });
+        }, 50);
+      }
+    }
+
+    function hapusKelompok(btn) { if(document.querySelectorAll('.block-kelompok').length > 1) { btn.closest('.block-kelompok').remove(); hitungKalkulasiGabungan(); } else showNotification("Minimal 1 kelompok!", "error"); }
+    function onTemplatePaketChanged(sel) { const b = sel.closest('.block-kelompok'); b.querySelector('.nama-kelompok').value = sel.value ? erpState.templatePaket[sel.value].nama : ''; const tb = b.querySelector('.tbody-item-kelompok'); tb.innerHTML=''; if(sel.value) muatItemDariTemplate(tb, sel.value); else tambahBarisItemDiKelompok(tb, true); }
+
+    function muatItemDariTemplate(tb, idTpl) {
+      const items = erpState.templatePaket[idTpl].items;
+      items.forEach(it => {
+        // Ambil data terkini dari erpState.produk
+        const produkData = erpState.produk.find(p => p.id === it.produkId) || {};
+
+        const hargaLive = produkData.harga || 0;
+        const hppLive   = produkData.hpp   || 0;
+        const unitLive  = produkData.unit  || '';
+
+        const tr = document.getElementById('barisItemTemplate').content.cloneNode(true);
+        const s  = tr.querySelector('.select-produk');
+        erpState.produk.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.id; o.text = p.nama;
+          o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
+          if (p.id === it.produkId) o.selected = true;
+          s.add(o);
+        });
+
+        tr.querySelector('.custom-deskripsi').value = it.deskripsi;
+        tr.querySelector('.input-qty').value        = it.qty;
+        tr.querySelector('.input-unit').value       = unitLive;
+        tr.querySelector('.input-harga').value      = formatNominalRupiah(hargaLive);
+        tr.querySelector('.input-hpp').value        = formatNominalRupiah(hppLive);
+
+        const sbrs = it.qty * hargaLive;
+        const hbrs = it.qty * hppLive;
+        const spanSub = tr.querySelector('.txt-subtotal-baris');
+        spanSub.innerText = sbrs.toLocaleString('id-ID');
+        spanSub.dataset.rawTotal = sbrs;
+        const spanHpp = tr.querySelector('.txt-hpp-baris');
+        spanHpp.innerText = hbrs.toLocaleString('id-ID');
+        spanHpp.dataset.rawHpp = hbrs;
+
+        tb.appendChild(tr);
+      });
+      tb.querySelectorAll('.baris-item').forEach((b, i) => b.querySelector('.item-index').innerText = i + 1);
+      hitungKalkulasiGabungan();
+    }
+
+    function tambahBarisItemDiKelompok(trigger, isElem=false) {
+      const tb = isElem ? trigger : trigger.closest('.block-kelompok').querySelector('.tbody-item-kelompok');
+      const tr = document.getElementById('barisItemTemplate').content.cloneNode(true);
+      const s = tr.querySelector('.select-produk');
+      // Sort produk by name
+      const sortedProduk = [...(erpState.produk || [])].sort((a,b) => a.nama.localeCompare(b.nama,'id'));
+      sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama; o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
+      tb.appendChild(tr);
+      tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1);
+      // Init searchable pada select yang baru ditambahkan
+      const newTr = tb.lastElementChild;
+      if (newTr) setTimeout(function() { _initSelectProdukDiBaris(newTr); }, 30);
+    }
+
+    function hapusBarisItem(btn) { const tb=btn.closest('tbody'); if(tb.querySelectorAll('.baris-item').length>1) { btn.closest('tr').remove(); tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1); hitungKalkulasiGabungan(); } }
+
+    function onItemSelectChanged(sel) {
+      const tr = sel.closest('tr'); const opt = sel.options[sel.selectedIndex];
+      if(!opt.value){ tr.querySelector('.custom-deskripsi').value=""; tr.querySelector('.input-unit').value=""; tr.querySelector('.input-harga').value="0"; tr.querySelector('.input-hpp').value="0"; }
+      else { tr.querySelector('.custom-deskripsi').value=opt.text; tr.querySelector('.input-unit').value=opt.dataset.unit; tr.querySelector('.input-harga').value=formatNominalRupiah(parseFloat(opt.dataset.harga)); tr.querySelector('.input-hpp').value=formatNominalRupiah(parseFloat(opt.dataset.hpp)); }
+      hitungSubtotalBaris(sel);
+    }
+
+    function formatNominalRupiah(n){ if(!n||isNaN(n))return"0"; const s=Math.abs(Math.round(n)).toString(); const m=s.length%3; let r=s.substr(0,m); const b=s.substr(m).match(/\d{3}/g); if(b)r+=(m?'.':'')+b.join('.'); return(n<0?'-':'')+r; }
+    function pN(str){ return parseFloat(str.toString().replace(/[^\d-]/g, ''))||0; }
+    function formatAksiHargaSatuan(e){ e.value=formatNominalRupiah(pN(e.value)); hitungSubtotalBaris(e); }
+    function formatAksiHppSatuan(e){ e.value=formatNominalRupiah(pN(e.value)); hitungSubtotalBaris(e); }
+    function formatAksiDiskonNominal(e){ e.value=formatNominalRupiah(pN(e.value)); hitungKalkulasiGabungan(true); }
+
+    function hitungSubtotalBaris(e){
+      const tr=e.closest('tr'); const q=parseFloat(tr.querySelector('.input-qty').value)||0; const h=pN(tr.querySelector('.input-harga').value); const hpp=pN(tr.querySelector('.input-hpp').value);
+      tr.querySelector('.txt-subtotal-baris').innerText=(q*h).toLocaleString('id-ID'); tr.querySelector('.txt-subtotal-baris').dataset.rawTotal=(q*h);
+      tr.querySelector('.txt-hpp-baris').innerText=(q*hpp).toLocaleString('id-ID'); tr.querySelector('.txt-hpp-baris').dataset.rawHpp=(q*hpp);
+      hitungKalkulasiGabungan();
+    }
+
+    function hitungKalkulasiGabungan(isDiskNom=false) {
+      let subG=0, hppG=0;
+      document.querySelectorAll('.block-kelompok').forEach(b => {
+        let subK=0; b.querySelectorAll('.baris-item').forEach(r => { subK+=parseFloat(r.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0; hppG+=parseFloat(r.querySelector('.txt-hpp-baris').dataset.rawHpp)||0; });
+        b.querySelector('.txt-subtotal-kelompok').innerText=subK.toLocaleString('id-ID'); b.querySelector('.txt-subtotal-kelompok').dataset.rawSubtotal=subK; subG+=subK;
+      });
+      document.getElementById('txtSubtotalSemua').innerText=subG.toLocaleString('id-ID');
+      const inP=document.getElementById('inputDiskonPersen'), inN=document.getElementById('inputDiskonNominal');
+      if(isDiskNom){ inP.value = subG>0?Number(((pN(inN.value)/subG)*100).toFixed(2)):0; } else { inN.value = formatNominalRupiah(subG*((parseFloat(inP.value)||0)/100)); }
+      let netSub=Math.max(0, subG-pN(inN.value)); const pNom = netSub*((parseFloat(document.getElementById('inputPajakPersen').value)||0)/100);
+      document.getElementById('txtPajakNominal').innerText=Math.round(pNom).toLocaleString('id-ID'); document.getElementById('txtGrandTotalSemua').innerText=Math.round(netSub+pNom).toLocaleString('id-ID');
+      
+      const prof=netSub-hppG; const m=(netSub>0?(prof/netSub)*100:0).toFixed(1);
+      document.getElementById('txtJualBersihInternal').innerText=Math.round(netSub).toLocaleString('id-ID'); document.getElementById('txtHppSemua').innerText=Math.round(hppG).toLocaleString('id-ID');
+      document.getElementById('txtProfitInternal').innerText=Math.round(prof).toLocaleString('id-ID'); document.getElementById('txtMarginInternal').innerText=m;
+      
+      kalkulasiGlobalState = { subtotalSemua:subG, diskonNominal:pN(inN.value), pajakNominal:Math.round(pNom), grandTotal:Math.round(netSub+pNom), totalHpp:hppG, profitInternal:prof, marginPersen:m };
+      const bdg = document.getElementById('badgeMarginInternal'), sts = document.getElementById('lblTargetStatus');
+      if(m<25){ bdg.className="text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md bg-rose-600 animate-pulse"; sts.innerText="🚨 <25%"; sts.className="text-[10px] font-extrabold text-rose-600"; }
+      else{ bdg.className="text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md bg-emerald-600"; sts.innerText="✅ OK"; sts.className="text-[10px] font-extrabold text-emerald-600"; }
+    }
+
+    function hitungMarginModalProduk() {
+      const form   = document.getElementById('modal-produk');
+      const harga  = pN(document.getElementById('modal-produk-harga')?.value || '0');
+      const hpp    = pN(document.getElementById('modal-produk-hpp')?.value || '0');
+      const margin = harga > 0 ? (((harga - hpp) / harga) * 100).toFixed(1) : 0;
+
+      const badge  = document.getElementById('modal-produk-margin-badge');
+      const status = document.getElementById('modal-produk-target-status');
+      badge.innerText = margin + '%';
+
+      if (margin >= 25) {
+        badge.className  = 'text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-600';
+        status.innerText = '✅ OK';
+        status.className = 'text-[10px] font-extrabold text-emerald-600';
+      } else {
+        badge.className  = 'text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-rose-600 animate-pulse';
+        status.innerText = '🚨 <25%';
+        status.className = 'text-[10px] font-extrabold text-rose-600';
+      }
+    }
+
+    function resetFormQuotation() {
+      // Reset semua field form standar
+      document.getElementById('mainQuotationForm').reset();
+
+      // Reset field yang tidak ter-reset oleh form.reset() karena readonly
+      document.getElementById('klienCompany').value = '';
+      document.getElementById('klienAddress').value = '';
+      document.getElementById('klienKontak').value  = '';
+      document.getElementById('klienSelect').value  = '';
+      sdReset('klienSelect');
+      document.getElementById('catatanTambahan').value = '';
+
+      // Reset tanggal
+      document.getElementById('tglPenawaran').valueAsDate = new Date();
+      const vd = new Date(); vd.setDate(vd.getDate() + 3);
+      document.getElementById('validUntil').valueAsDate = vd;
+
+      // Reset kalkulasi diskon & pajak ke default
+      document.getElementById('inputDiskonPersen').value  = '0';
+      document.getElementById('inputDiskonNominal').value = '0';
+      document.getElementById('inputPajakPersen').value   = '11';
+
+      // Reset container kelompok item
+      document.getElementById('containerKelompok').innerHTML = '';
+      tambahKelompokBaru();
+      hitungKalkulasiGabungan();
+
+      // Set nomor penawaran dari erpState
+      document.getElementById('noPenawaran').value = erpState.nextNo || 'Generating...';
+    }
+
+    function handleFormSubmission(e) {
+      e.preventDefault();
+      if(!document.getElementById('klienSelect').value) return showNotification("Silakan hubungkan Klien!", "error");
+      const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
+
+      const payload = {
+        noPenawaran: document.getElementById('noPenawaran').value, tanggal: document.getElementById('tglPenawaran').value, validUntil: document.getElementById('validUntil').value,
+        namaProject: document.getElementById('namaProject').value, klienId: document.getElementById('klienSelect').value, namaUser: '', catatan: document.getElementById('catatanTambahan').value,
+        subtotal: kalkulasiGlobalState.subtotalSemua, grandTotal: kalkulasiGlobalState.grandTotal,
+        termConditions: {
+          material_status: document.getElementById('tc_material').value, dp_status: document.getElementById('tc_dp').value, term_pay: document.getElementById('tc_term').value,
+          final_pay: document.getElementById('tc_final').value, delivery_time: document.getElementById('tc_delivery_time').value, delivery_cond: document.getElementById('tc_delivery_cond').value,
+          warranty: document.getElementById('tc_warranty').value, bonus: document.getElementById('tc_bonus').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
+          diskonNominal: kalkulasiGlobalState.diskonNominal, pajakPersen: parseFloat(document.getElementById('inputPajakPersen').value) ||0, pajakNominal: kalkulasiGlobalState.pajakNominal,
+          hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0
+        }, items: []
+      };
+
+      payload.namaUser = window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive';
+
+      blocks.forEach(b => {
+        const sub = { kelompok: b.dataset.letter, namaKelompok: b.querySelector('.nama-kelompok').value.toUpperCase(), subtotal: parseFloat(b.querySelector('.txt-subtotal-kelompok').dataset.rawSubtotal)||0, subItems: [] };
+        b.querySelectorAll('.baris-item').forEach((row, i) => {
+          sub.subItems.push({ noItem: i+1, produkId: row.querySelector('.select-produk').value, deskripsi: row.querySelector('.custom-deskripsi').value, qty: parseFloat(row.querySelector('.input-qty').value)||0, unit: row.querySelector('.input-unit').value||"unit", harga: pN(row.querySelector('.input-harga').value), hpp: pN(row.querySelector('.input-hpp').value), total: parseFloat(row.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0 });
+        }); payload.items.push(sub);
+      });
+
+      toggleLoader(true, window._editMode ? "Menyimpan Revisi..." : "Menyimpan Transaksi...");
+      const fnBackend = window._editMode ? 'editPenawaran' : 'simpanPenawaranKeSheet';
+
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            const wasEditing = !!window._editMode;
+            window._editMode = null;
+            document.getElementById('btnSubmitForm').innerHTML =
+              '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran';
+
+            if (!wasEditing) resetFormQuotation();
+            toggleFormPenawaran(false);
+            loadPenawaran();
+            _dbRawCache = null;
+            loadDashboard();
+
+            // Gunakan nextNo dari response langsung — lebih akurat daripada getInitialData ulang
+            if (res.nextNo) {
+              erpState.nextNo = res.nextNo;
+              document.getElementById('noPenawaran').value = res.nextNo;
+            } else {
+              // Fallback: refresh dari server hanya jika res.nextNo tidak tersedia
+              google.script.run
+                .withSuccessHandler(initRes => {
+                  if (initRes.success && initRes.nextNo) {
+                    erpState.nextNo = initRes.nextNo;
+                    if (!wasEditing) {
+                      document.getElementById('noPenawaran').value = initRes.nextNo;
+                    }
+                  }
+                })
+                .getInitialData();
+            }
+          } else showNotification(res.message, "error");
+        }).withFailureHandler(err => {
+          toggleLoader(false); showNotification(err, "error");
+        })[fnBackend](payload);
+      }
+    }
+
+    function toggleFormPenawaran(forceShow = null) {
+      const vTabel = document.getElementById('view-daftar-penawaran');
+      const vForm  = document.getElementById('view-form-penawaran');
+      if (forceShow === false || !vForm.classList.contains('hidden')) {
+        vForm.classList.add('hidden');
+        vTabel.classList.remove('hidden');
+        if (window._editMode) {
+          window._editMode = null;
+          document.getElementById('btnSubmitForm').innerHTML =
+            '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran Ke Database';
+        }
+      } else {
+        vForm.classList.remove('hidden');
+        vTabel.classList.add('hidden');
+      }
+    }
+
+    function submitTambahProduk(e) {
+      e.preventDefault();
+      const form = e.target;
+      const nama  = form.querySelector('[name="nama"]').value.trim();
+      const unit  = form.querySelector('[name="unit"]').value.trim();
+      const harga = pN(document.getElementById('modal-produk-harga').value); // ← pN()
+      const hpp   = pN(document.getElementById('modal-produk-hpp').value);   // ← pN()
+
+      if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
+
+      toggleLoader(true, "Menyimpan Produk...");
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) {
+              showNotification(res.message);
+              form.reset();
+              // Reset field format manual juga
+              document.getElementById('modal-produk-harga').value = '';
+              document.getElementById('modal-produk-hpp').value   = '';
+              document.getElementById('modal-produk').classList.add('hidden');
+              loadProduk();
+              muatSeluruhDataAwal(false);
+            } else {
+              showNotification(res.message, "error");
+            }
+          })
+          .withFailureHandler(err => {
+            toggleLoader(false);
+            showNotification("Gagal: " + err.message, "error");
+          })
+          .simpanProduk(nama, unit, harga, hpp);
+      }
+    }
+
+        // --- EDIT & DELETE PRODUK ---
+    function bukaModalEditProduk(item) {
+      document.getElementById('edit-produk-id').value    = item.sku;
+      document.getElementById('edit-produk-nama').value  = item.nama;
+      document.getElementById('edit-produk-unit').value  = item.unit;
+      document.getElementById('edit-produk-harga').value = formatNominalRupiah(item.harga); // ← format
+      document.getElementById('edit-produk-hpp').value   = formatNominalRupiah(item.hpp);   // ← format
+      hitungMarginEditProduk();
+      document.getElementById('modal-edit-produk').classList.remove('hidden');
+    }
+
+    function hitungMarginEditProduk() {
+      const harga  = pN(document.getElementById('edit-produk-harga').value);
+      const hpp    = pN(document.getElementById('edit-produk-hpp').value);
+      const margin = harga > 0 ? (((harga - hpp) / harga) * 100).toFixed(1) : 0;
+      const badge  = document.getElementById('edit-produk-margin-badge');
+      const status = document.getElementById('edit-produk-target-status');
+      badge.innerText = margin + '%';
+      if (margin >= 25) {
+        badge.className  = 'text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-600';
+        status.innerText = '✅ OK';
+        status.className = 'text-[10px] font-extrabold text-emerald-600';
+      } else {
+        badge.className  = 'text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-rose-600 animate-pulse';
+        status.innerText = '🚨 <25%';
+        status.className = 'text-[10px] font-extrabold text-rose-600';
+      }
+    }
+
+    function simpanEditProduk() {
+      const id    = document.getElementById('edit-produk-id').value;
+      const nama  = document.getElementById('edit-produk-nama').value.trim();
+      const unit  = document.getElementById('edit-produk-unit').value.trim();
+      const harga = pN(document.getElementById('edit-produk-harga').value); // ← pN()
+      const hpp   = pN(document.getElementById('edit-produk-hpp').value);   // ← pN()
+      if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
+      toggleLoader(true, "Menyimpan Perubahan...");
+      google.script.run
+        .withSuccessHandler(res => {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            document.getElementById('modal-edit-produk').classList.add('hidden');
+            loadProduk();
+            muatSeluruhDataAwal(false);
+          } else showNotification(res.message, "error");
+        })
+        .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+        .editProduk(id, nama, unit, harga, hpp); // ← sudah angka bersih
+    }
+
+    // --- EDIT & DELETE CUSTOMER ---
+    function bukaModalEditCustomer(item) {
+      document.getElementById('edit-customer-id').value          = item.id;
+      document.getElementById('edit-customer-nama').value        = item.nama;
+      document.getElementById('edit-customer-perusahaan').value  = item.perusahaan;
+      document.getElementById('edit-customer-telepon').value     = item.kontak;
+      document.getElementById('edit-customer-alamat').value      = item.alamat;
+      document.getElementById('modal-edit-customer').classList.remove('hidden');
+    }
+
+    function simpanEditCustomer() {
+      const id         = document.getElementById('edit-customer-id').value;
+      const nama       = document.getElementById('edit-customer-nama').value.trim();
+      const perusahaan = document.getElementById('edit-customer-perusahaan').value.trim();
+      const telepon    = document.getElementById('edit-customer-telepon').value.trim();
+      const alamat     = document.getElementById('edit-customer-alamat').value.trim();
+      if (!nama) return showNotification("Nama klien wajib diisi!", "error");
+      toggleLoader(true, "Menyimpan Perubahan...");
+      google.script.run
+        .withSuccessHandler(res => {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            document.getElementById('modal-edit-customer').classList.add('hidden');
+            loadCustomer();
+            muatSeluruhDataAwal(false);
+          } else showNotification(res.message, "error");
+        })
+        .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+        .editCustomer(id, nama, perusahaan, telepon, alamat);
+    }
+
+    // --- KONFIRMASI HAPUS UNIVERSAL ---
+    function konfirmasiHapus(tipe, id, nama) {
+      document.getElementById('hapus-nama-item').innerText = nama;
+      const btnHapus = document.getElementById('btn-konfirmasi-hapus');
+      btnHapus.onclick = () => eksekusiHapus(tipe, id);
+      document.getElementById('modal-hapus').classList.remove('hidden');
+    }
+
+    function eksekusiHapus(tipe, id) {
+      document.getElementById('modal-hapus').classList.add('hidden');
+      toggleLoader(true, tipe === 'user' ? "Menghapus User..." : "Menghapus Data...");
+
+      if (tipe === 'user') {
+        if (typeof google !== 'undefined') {
+          google.script.run
+            .withSuccessHandler(res => {
+              toggleLoader(false);
+              if (res.success) { showNotification(res.message); loadUsers(); }
+              else showNotification(res.message, "error");
+            })
+            .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+            .hapusUser(id);
+        }
+        return;
+      }
+
+      if (tipe === 'penawaran') {
+        const [noPenawaran, rev] = id.split('|');
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) { showNotification(res.message); loadPenawaran(); loadDashboard(); }
+            else showNotification(res.message, "error");
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+          .hapusPenawaran(noPenawaran, rev);
+        return;
+      }
+
+      // Di eksekusiHapus(), ganti blok template:
+      if (tipe === 'template') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) {
+              showNotification(res.message);
+              // Sama: refresh erpState dulu, loadTemplate() di dalam callback
+              google.script.run
+                .withSuccessHandler(initRes => {
+                  if (initRes.success) {
+                    erpState.templatePaket = initRes.templatePaket || {};
+                  }
+                  loadTemplate();
+                })
+                .getInitialData();
+            } else showNotification(res.message, 'error');
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, 'error'); })
+          .hapusTemplatePaket(id);
+        return;
+      }
+
+      const fnName = tipe === 'produk' ? 'hapusProduk' : 'hapusCustomer';
+      google.script.run
+        .withSuccessHandler(res => {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            if (tipe === 'produk')   { loadProduk();   muatSeluruhDataAwal(false); }
+            if (tipe === 'customer') { loadCustomer(); muatSeluruhDataAwal(false); }
+          } else showNotification(res.message, "error");
+        })
+        .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+        [fnName](id);
+    }
+
+    function submitTambahCustomer(e) {
+      e.preventDefault();
+      const form       = e.target;
+      const nama       = form.querySelector('[name="nama"]').value.trim();
+      const perusahaan = form.querySelector('[name="perusahaan"]').value.trim();
+      const telepon    = form.querySelector('[name="telepon"]').value.trim();
+      const alamat     = form.querySelector('[name="alamat"]').value.trim();
+
+      if (!nama) return showNotification("Nama klien wajib diisi!", "error");
+
+      // Tutup modal, tampilkan loader dengan pesan tahap 1
+      document.getElementById('modal-customer').classList.add('hidden');
+      toggleLoader(true, "Menyimpan data klien...");
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (!res.success) {
+              // Gagal — matikan loader, buka kembali modal
+              toggleLoader(false);
+              document.getElementById('modal-customer').classList.remove('hidden');
+              showNotification(res.message, "error");
+              return;
+            }
+
+            // Tahap 2: refresh data (loader tetap aktif)
+            if (window._customerDariForm) {
+              toggleLoader(true, "Memuat ulang daftar klien...");
+
+              google.script.run
+                .withSuccessHandler(function(initRes) {
+                  if (!initRes.success) {
+                    toggleLoader(false);
+                    showNotification('Klien tersimpan, tapi gagal refresh data.', 'error');
+                    return;
+                  }
+
+                  // Update state
+                  erpState.klien = initRes.klien || erpState.klien;
+
+                  // Tahap 3: isi dropdown (loader tetap aktif)
+                  toggleLoader(true, "Menerapkan pilihan klien...");
+
+                  const sel = document.getElementById('klienSelect');
+                  if (sel) {
+                    sel.innerHTML = '<option value="">-- Pilih Klien --</option>';
+                    erpState.klien.forEach(function(k) {
+                      sel.add(new Option(k.nama, k.id));
+                    });
+                  }
+
+                  // Cari klien yang baru disimpan dan auto-select
+                  const klienBaru = erpState.klien.find(function(k) {
+                    return k.nama.trim().toLowerCase() === nama.toLowerCase();
+                  });
+
+                  if (klienBaru && sel) {
+                    sdSetValue('klienSelect', klienBaru.id);
+                    onKlienChanged(sel);
+                    setTimeout(function() { sdRefresh('klienSelect'); }, 50);
+                  }
+
+                  // Reset flag
+                  window._customerDariForm = false;
+                  form.reset();
+
+                  // Matikan loader setelah semua selesai
+                  toggleLoader(false);
+                  showNotification('Klien "' + nama + '" berhasil ditambah & dipilih!');
+                })
+                .withFailureHandler(function(err) {
+                  window._customerDariForm = false;
+                  toggleLoader(false);
+                  showNotification("Klien tersimpan, gagal refresh: " + (err.message || err), "error");
+                })
+                .getInitialData();
+
+            } else {
+              // Dibuka dari menu Customer biasa — selesai di sini
+              form.reset();
+              toggleLoader(false);
+              showNotification(res.message);
+              loadCustomer();
+              muatSeluruhDataAwal(false);
+            }
+          })
+          .withFailureHandler(function(err) {
+            toggleLoader(false);
+            document.getElementById('modal-customer').classList.remove('hidden');
+            showNotification("Gagal: " + (err.message || err), "error");
+          })
+          .simpanCustomer(nama, perusahaan, telepon, alamat);
+
+      } else {
+        toggleLoader(false);
+        showNotification("Tidak terhubung ke server.", "error");
+      }
+    }
+
+        // --- UPDATE STATUS PENAWARAN ---
+    function ubahStatusPenawaran(noPenawaran, rev, selectEl) {
+      const statusBaru = selectEl.value;
+      const statusConfig = {
+        'On-Progress': 'bg-blue-100 text-blue-700',
+        'Deal':        'bg-emerald-100 text-emerald-800',
+        'Fail':        'bg-rose-100 text-rose-700'
+      };
+      selectEl.className = `text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusConfig[statusBaru] || 'bg-slate-100 text-slate-600'}`;
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res.success) {
+              showNotification(res.message);
+              loadPenawaran(); // ← reload tabel agar tombol edit terkunci/terbuka sesuai status baru
+            } else {
+              showNotification(res.message, "error");
+              loadPenawaran();
+            }
+          })
+          .withFailureHandler(err => { showNotification(err.message, "error"); loadPenawaran(); })
+          .updateStatusPenawaran(noPenawaran, rev, statusBaru);
+      }
+    }
+
+      // --- MUAT DATA PENAWARAN KE FORM UNTUK DIEDIT ---
+    function muatPenawaranKeForm(item) {
+      if (item.status === 'Deal') {
+        showNotification("Penawaran berstatus Deal tidak dapat direvisi.", "error");
+        return;
+      }
+      navigate('penawaran');
+      toggleFormPenawaran(true);
+
+      // Simpan flag edit mode
+      window._editMode = { noPenawaran: item.id, rev: item.rev, status: item.status };
+
+      // Isi field dasar
+      document.getElementById('noPenawaran').value  = item.id;
+      document.getElementById('namaProject').value  = item.namaProject;
+
+      // Konversi tanggal dd/MM/yyyy → yyyy-MM-dd
+      const toInputDate = str => {
+        if (!str || str === '-') return '';
+        const p = str.split('/');
+        return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : '';
+      };
+      document.getElementById('tglPenawaran').value = toInputDate(item.tanggal);
+      document.getElementById('validUntil').value   = toInputDate(item.validUntil);
+
+      // Set klien
+      const klienSel = document.getElementById('klienSelect');
+      sdSetValue('klienSelect', item.klienId);
+      onKlienChanged(klienSel);
+
+      // Isi Syarat & Ketentuan dari JSON
+      try {
+        const tc = JSON.parse(item.termConditions || '{}');
+        const setOpt = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
+        setOpt('tc_material',      tc.material_status);
+        setOpt('tc_dp',            tc.dp_status);
+        setOpt('tc_term',          tc.term_pay);
+        setOpt('tc_final',         tc.final_pay);
+        setOpt('tc_delivery_time', tc.delivery_time);
+        setOpt('tc_delivery_cond', tc.delivery_cond);
+        setOpt('tc_warranty',      tc.warranty);
+        setOpt('tc_bonus',         tc.bonus);
+        if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
+      } catch(e) {}
+
+      // Bangun ulang kelompok item
+      document.getElementById('containerKelompok').innerHTML = '';
+      try {
+        const kelompokList = JSON.parse(item.items || '[]');
+        if (!kelompokList.length) tambahKelompokBaru();
+        else kelompokList.forEach(k => muatKelompokDariData(k));
+      } catch(e) { tambahKelompokBaru(); }
+
+      // Restore diskon & pajak setelah DOM selesai dihitung
+      setTimeout(() => {
+        hitungKalkulasiGabungan();
+        const sub = kalkulasiGlobalState.subtotalSemua;
+        document.getElementById('inputDiskonNominal').value = formatNominalRupiah(item.diskon || 0);
+        document.getElementById('inputDiskonPersen').value  = sub > 0 ? +((item.diskon / sub) * 100).toFixed(2) : 0;
+        const netSub = sub - (item.diskon || 0);
+        document.getElementById('inputPajakPersen').value   = netSub > 0 ? +((item.pajak / netSub) * 100).toFixed(0) : 11;
+        hitungKalkulasiGabungan(true);
+      }, 150);
+
+      // Ubah teks & warna tombol submit
+      document.getElementById('btnSubmitForm').innerHTML =
+        '<i class="fa-solid fa-code-branch text-sky-300"></i> Simpan Revisi';
+
+      // Scroll ke atas
+      document.querySelector('.flex-1.overflow-y-auto').scrollTop = 0;
+    }
+
+    function muatKelompokDariData(k) {
+      const cont    = document.getElementById('containerKelompok');
+      const letCode = k.kelompok || String.fromCharCode(65 + cont.children.length);
+      const div     = document.createElement('div');
+      div.className = "bg-slate-50 border border-slate-200 rounded-xl p-4 relative block-kelompok";
+      div.setAttribute('data-letter', letCode);
+
+      // ── BUG FIX 1: Hapus referensi idTpl yang tidak terdefinisi ──
+      // Baris lama: value="${idTpl?erpState.templatePaket[idTpl].nama:''}"
+      // Baris baru: value="" (nama kelompok diisi dari data k.namaKelompok di bawah)
+      let opsiHtml = `<option value="">-- Manual Kustom --</option>`;
+      Object.keys(erpState.templatePaket).forEach(tk => {
+        opsiHtml += `<option value="${tk}">${erpState.templatePaket[tk].nama}</option>`;
+      });
+
+      div.innerHTML = `
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <span class="bg-blue-700 text-white font-bold min-w-8 h-8 px-2 rounded-lg inline-flex items-center justify-center text-sm flex-shrink-0">${letCode}</span>
+            <select onchange="onTemplatePaketChanged(this)" class="select-template-paket px-2 py-1 border border-slate-300 rounded-md text-xs font-bold w-full sm:w-56 flex-shrink-0">${opsiHtml}</select>
+            <input type="text" class="border border-slate-200 rounded-md bg-white text-sm font-bold text-slate-800 px-2 py-1 w-full nama-kelompok focus:outline-none focus:border-blue-400 min-w-0 flex-1" style="min-width:140px" placeholder="Nama Sub-Paket..." value="">
+          </div>
+          <button type="button" onclick="hapusKelompok(this)" class="text-rose-500 text-xs font-bold flex-shrink-0 px-2 py-1"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>
+        </div>
+        <div class="overflow-x-auto bg-white border border-slate-200 rounded-lg">
+          <table class="w-full text-left border-collapse">
+            <thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
+              <th class="p-2 w-10 text-center">No</th>
+              <th class="p-2">Deskripsi Produk/Jasa</th>
+              <th class="p-2 w-20 text-center">Qty</th>
+              <th class="p-2 w-20 text-center">Unit</th>
+              <th class="p-2 w-44">Harga Jual & HPP</th>
+              <th class="p-2 w-40 text-right">Total</th>
+              <th class="p-2 w-10 text-center">Aksi</th>
+            </tr></thead>
+            <tbody class="tbody-item-kelompok"></tbody>
+          </table>
+        </div>
+        <div class="flex justify-between items-center mt-3">
+          <button type="button" onclick="tambahBarisItemDiKelompok(this)"
+            class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded">
+            <i class="fa-solid fa-plus"></i> Tambah Item
+          </button>
+          <div class="text-xs font-bold text-slate-700">
+            Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok" data-raw-subtotal="0">0</span></span>
+          </div>
+        </div>`;
+      cont.appendChild(div);
+
+      // ── Isi nama kelompok dari data (setelah innerHTML set) ──
+      div.querySelector('.nama-kelompok').value = k.namaKelompok || '';
+
+      // ── Isi baris item ──
+      const tb = div.querySelector('.tbody-item-kelompok');
+      (k.subItems || []).forEach((si, idx) => {
+        const tr = document.getElementById('barisItemTemplate').content.cloneNode(true);
+        const s  = tr.querySelector('.select-produk');
+        erpState.produk.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.id; o.text = p.nama;
+          o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
+          if (p.id === si.produkId) o.selected = true;
+          s.add(o);
+        });
+        tr.querySelector('.item-index').innerText          = idx + 1;
+        tr.querySelector('.custom-deskripsi').value        = si.deskripsi || '';
+        tr.querySelector('.input-qty').value               = si.qty    || 1;
+        tr.querySelector('.input-unit').value              = si.unit   || '';
+        tr.querySelector('.input-harga').value             = formatNominalRupiah(si.harga || 0);
+        tr.querySelector('.input-hpp').value               = formatNominalRupiah(si.hpp   || 0);
+
+        const sbrs = (si.qty || 0) * (si.harga || 0);
+        const hbrs = (si.qty || 0) * (si.hpp   || 0);
+
+        const spanSub = tr.querySelector('.txt-subtotal-baris');
+        spanSub.innerText          = sbrs.toLocaleString('id-ID');
+        spanSub.dataset.rawTotal   = sbrs;   // ← konsisten dengan hitungKalkulasiGabungan()
+
+        const spanHpp = tr.querySelector('.txt-hpp-baris');
+        spanHpp.innerText          = hbrs.toLocaleString('id-ID');
+        spanHpp.dataset.rawHpp     = hbrs;   // ← konsisten
+
+        tb.appendChild(tr);
+      });
+
+      // ── Hitung sub-total kelompok dan tampilkan ──
+      // BUG FIX 2: dataset.rawSubtotal (camelCase) konsisten dengan data-raw-subtotal (kebab)
+      let subK = 0;
+      div.querySelectorAll('.txt-subtotal-baris').forEach(span => {
+        subK += parseFloat(span.dataset.rawTotal) || 0;
+      });
+      const spanSubK = div.querySelector('.txt-subtotal-kelompok');
+      spanSubK.innerText            = subK.toLocaleString('id-ID');
+      spanSubK.dataset.rawSubtotal  = subK;   // ← key yang dibaca hitungKalkulasiGabungan()
+    }  
+</script>

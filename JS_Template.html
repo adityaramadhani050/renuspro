@@ -1,0 +1,268 @@
+<script>
+    // ============================================================
+    // FITUR TEMPLATE PAKET
+    // ============================================================
+
+    // Template baris item di modal template
+    function buatBarisTemplate(produkList, item = null) {
+      const tr = document.createElement('tr');
+      tr.className = 'baris-template border-b border-slate-200 hover:bg-white transition';
+
+      let opsiProduk = `<option value="">-- Pilih Produk --</option>`;
+      produkList.forEach(p => {
+        const sel = item && p.id === item.produkId ? 'selected' : '';
+        opsiProduk += `<option value="${p.id}" data-unit="${p.unit}"
+          data-harga="${p.harga}" data-hpp="${p.hpp}" ${sel}>${p.nama}</option>`;
+      });
+
+      // Cari harga live dari produk yang sudah dipilih (jika edit mode)
+      const produkTerpilih = item ? produkList.find(p => p.id === item.produkId) : null;
+      const hargaLive = produkTerpilih ? produkTerpilih.harga : 0;
+      const hppLive   = produkTerpilih ? produkTerpilih.hpp   : 0;
+
+      tr.innerHTML = `
+        <td class="p-2 text-center text-xs font-bold text-slate-400 idx-baris"></td>
+        <td class="p-2">
+          <select onchange="onProdukTemplateChanged(this)"
+            class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-teal-400">
+            ${opsiProduk}
+          </select>
+        </td>
+        <td class="p-2">
+          <input type="text" class="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs deskripsi-tpl"
+            value="${item ? item.deskripsi : ''}" placeholder="Deskripsi...">
+        </td>
+        <td class="p-2">
+          <input type="number" step="any" min="0" value="${item ? item.qty : 1}"
+            oninput="hitungEstimasiTemplate()"
+            class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold qty-tpl">
+        </td>
+        <td class="p-2">
+          <input type="text" value="${produkTerpilih ? produkTerpilih.unit : ''}" readonly
+            class="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-center text-xs unit-tpl">
+        </td>
+        <td class="p-2">
+          <div class="relative">
+            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">Rp</span>
+            <input type="text" value="${formatNominalRupiah(hargaLive)}" readonly
+              class="w-full pl-7 pr-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs text-right font-bold harga-tpl text-slate-500">
+          </div>
+        </td>
+        <td class="p-2">
+          <div class="relative">
+            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-rose-400 font-bold">HPP</span>
+            <input type="text" value="${formatNominalRupiah(hppLive)}" readonly
+              class="w-full pl-8 pr-2 py-1.5 bg-rose-50 border border-rose-100 rounded-md text-xs text-right font-bold hpp-tpl text-rose-400">
+          </div>
+        </td>
+        <td class="p-2 text-center">
+          <button type="button" onclick="hapusBarisTemplate(this)"
+            class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition">
+            <i class="fa-regular fa-trash-can text-xs"></i>
+          </button>
+        </td>`;
+
+      updateNomorBarisTemplate();
+      return tr;
+    }
+
+    function updateNomorBarisTemplate() {
+      document.querySelectorAll('#tbody-template-items .baris-template')
+        .forEach((r, i) => { const idx = r.querySelector('.idx-baris'); if(idx) idx.innerText = i+1; });
+    }
+
+    function tambahBarisTemplate(item = null) {
+      const tb = document.getElementById('tbody-template-items');
+      const tr = buatBarisTemplate(erpState.produk, item);
+      tb.appendChild(tr);
+      updateNomorBarisTemplate();
+    }
+
+    function hapusBarisTemplate(btn) {
+      const tb = document.getElementById('tbody-template-items');
+      if (tb.querySelectorAll('.baris-template').length > 1) {
+        btn.closest('tr').remove();
+        updateNomorBarisTemplate();
+        hitungEstimasiTemplate();
+      } else {
+        showNotification('Minimal 1 item dalam template!', 'error');
+      }
+    }
+
+    function onProdukTemplateChanged(sel) {
+      const tr  = sel.closest('tr');
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt.value) {
+        tr.querySelector('.deskripsi-tpl').value = '';
+        tr.querySelector('.unit-tpl').value      = '';
+        tr.querySelector('.harga-tpl').value     = '0';
+        tr.querySelector('.hpp-tpl').value       = '0';
+        hitungEstimasiTemplate();
+        return;
+      }
+      tr.querySelector('.deskripsi-tpl').value = opt.text;
+      tr.querySelector('.unit-tpl').value      = opt.dataset.unit  || '';
+      tr.querySelector('.harga-tpl').value     = formatNominalRupiah(parseFloat(opt.dataset.harga) || 0);
+      tr.querySelector('.hpp-tpl').value       = formatNominalRupiah(parseFloat(opt.dataset.hpp)   || 0);
+      hitungEstimasiTemplate();
+    }
+
+    function formatHargaTpl(el) {
+      el.value = formatNominalRupiah(pN(el.value));
+    }
+
+    function hitungEstimasiTemplate() {
+      let total = 0;
+      document.querySelectorAll('#tbody-template-items .baris-template').forEach(tr => {
+        const qty   = parseFloat(tr.querySelector('.qty-tpl').value)   || 0;
+        const harga = pN(tr.querySelector('.harga-tpl').value);
+        total += qty * harga;
+      });
+      document.getElementById('txt-estimasi-template').innerText = total.toLocaleString('id-ID');
+    }
+
+    function bukaModalTambahTemplate() {
+      document.getElementById('modal-template-title').innerText = 'Tambah Paket Baru';
+      document.getElementById('template-edit-id').value = '';
+      document.getElementById('template-nama').value    = '';
+      document.getElementById('tbody-template-items').innerHTML = '';
+      // Generate ID otomatis
+      const existingIds = Object.keys(erpState.templatePaket);
+      let maxNum = 0;
+      existingIds.forEach(id => {
+        const m = id.match(/^PKT(\d+)/i);
+        if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+      });
+      const nextId = 'PKT' + String(maxNum + 1).padStart(3, '0');
+      document.getElementById('template-id').value = nextId;
+      tambahBarisTemplate();
+      hitungEstimasiTemplate();
+      document.getElementById('modal-template').classList.remove('hidden');
+    }
+
+    function bukaModalEditTemplate(id) {
+
+      if (!erpState.produk || erpState.produk.length === 0) {
+        showNotification('Data produk belum termuat, coba lagi.', 'error');
+        return;
+      }
+
+      const tpl = erpState.templatePaket[id];
+      if (!tpl) return showNotification('Template tidak ditemukan.', 'error');
+
+      document.getElementById('modal-template-title').innerText = 'Edit Paket';
+      document.getElementById('template-edit-id').value = id;
+      document.getElementById('template-id').value      = id;
+      document.getElementById('template-nama').value    = tpl.nama;
+      document.getElementById('tbody-template-items').innerHTML = '';
+
+      (tpl.items || []).forEach(item => tambahBarisTemplate(item));
+      if (!tpl.items || tpl.items.length === 0) tambahBarisTemplate();
+
+      hitungEstimasiTemplate();
+      document.getElementById('modal-template').classList.remove('hidden');
+    }
+
+    function tutupModalTemplate() {
+      document.getElementById('modal-template').classList.add('hidden');
+    }
+
+    function simpanTemplate() {
+      const editId = document.getElementById('template-edit-id').value.trim();
+      const id     = document.getElementById('template-id').value.trim();
+      const nama   = document.getElementById('template-nama').value.trim();
+
+      if (!id || !nama) return showNotification('ID dan nama template wajib diisi!', 'error');
+
+      const items = [];
+      let valid = true;
+      document.querySelectorAll('#tbody-template-items .baris-template').forEach((tr) => {
+        const produkId  = tr.querySelector('select').value;
+        const deskripsi = tr.querySelector('.deskripsi-tpl').value.trim();
+        const qty       = parseFloat(tr.querySelector('.qty-tpl').value) || 0;
+
+        if (!produkId || qty <= 0) { valid = false; return; }
+
+        // Hanya simpan 3 field — harga/hpp/unit diambil live dari Master_Produk
+        items.push({ produkId, deskripsi, qty });
+      });
+
+      if (!valid)        return showNotification('Pastikan semua item memiliki produk terpilih dan qty > 0!', 'error');
+      if (!items.length) return showNotification('Minimal 1 item dalam template!', 'error');
+
+      toggleLoader(true, 'Menyimpan Template...');
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) {
+              showNotification(res.message);
+              tutupModalTemplate();
+              google.script.run
+                .withSuccessHandler(initRes => {
+                  if (initRes.success) {
+                    erpState.klien         = initRes.klien        || erpState.klien;
+                    erpState.produk        = initRes.produk       || erpState.produk;
+                    erpState.templatePaket = initRes.templatePaket || {};
+                    erpState.nextNo        = initRes.nextNo       || erpState.nextNo;
+                    loadTemplate();
+                  }
+                })
+                .getInitialData();
+            } else showNotification(res.message, 'error');
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, 'error'); })
+          .simpanTemplatePaket(id, nama, JSON.stringify(items), editId);
+      }
+    }
+
+    function lihatDetailTemplate(id) {
+      const tpl = erpState.templatePaket[id];
+      if (!tpl) return;
+
+      document.getElementById('view-template-title').innerText = tpl.nama;
+      document.getElementById('view-template-id').innerText    = id;
+
+      let totalEstimasi = 0;
+      const rowsHtml = (tpl.items || []).map((s, i) => {
+        // Harga bisa dari item (sudah dienrich) atau fallback ke produk live
+        const produkLive = (erpState.produk || []).find(p => p.id === s.produkId) || {};
+        const harga = s.harga || produkLive.harga || 0;
+        const qty   = s.qty   || 0;
+        const unit  = s.unit  || produkLive.unit || '';
+        const total = qty * harga;
+        totalEstimasi += total;
+        return `<tr class="border-t border-slate-100 text-xs">
+          <td class="p-2 text-center text-slate-400 font-bold">${i+1}</td>
+          <td class="p-2 text-slate-700">${s.deskripsi}</td>
+          <td class="p-2 text-center">${qty}</td>
+          <td class="p-2 text-center text-slate-400">${unit}</td>
+          <td class="p-2 text-right">Rp ${harga.toLocaleString('id-ID')}</td>
+          <td class="p-2 text-right font-bold">Rp ${total.toLocaleString('id-ID')}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('view-template-body').innerHTML = `
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full text-left border-collapse">
+            <thead><tr class="bg-teal-700 text-white text-[10px] font-bold uppercase">
+              <th class="p-2 text-center">No</th>
+              <th class="p-2">Deskripsi</th>
+              <th class="p-2 text-center">Qty</th>
+              <th class="p-2 text-center">Unit</th>
+              <th class="p-2 text-right">Harga</th>
+              <th class="p-2 text-right">Total</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot><tr class="bg-teal-50 border-t border-teal-200">
+              <td colspan="5" class="p-2 text-right font-bold text-teal-700 text-xs">Nilai Paket:</td>
+              <td class="p-2 text-right font-extrabold text-teal-800 text-sm">
+                Rp ${totalEstimasi.toLocaleString('id-ID')}
+              </td>
+            </tfoot>
+          </table>
+        </div>`;
+
+      document.getElementById('modal-view-template').classList.remove('hidden');
+    }
+</script>

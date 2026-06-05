@@ -1,0 +1,520 @@
+<script>
+    // --- FETCH DATA DASHBOARD ---
+    let _dbTrendChart = null;
+
+    // ── Cache raw data dashboard ──────────────────────────────────
+    let _dbRawCache    = null;  // hasil dari getDashboardRawData
+    let _dbCacheLoading = false;
+
+    function loadDashboard(forceRefresh) {
+      if (typeof google === 'undefined') {
+        renderDashboard(getMockDashboardData());
+        return;
+      }
+
+      // Jika cache sudah ada dan tidak diminta refresh → langsung kalkulasi
+      if (_dbRawCache && !forceRefresh) {
+        const kalkulasi = _hitungDashboardDariCache(_dbRawCache);
+        renderDashboard(kalkulasi);
+        return;
+      }
+
+      // Belum ada cache → fetch dari server dengan animasi loading
+      if (_dbCacheLoading) return; // hindari double fetch
+      _dbCacheLoading = true;
+
+      _showDashboardSkeleton();
+
+      const isAdmin = _currentUser && _currentUser.role === 'admin';
+
+      google.script.run
+        .withSuccessHandler(function(raw) {
+          _dbCacheLoading = false;
+          if (raw && raw.success) {
+            _dbRawCache = raw;
+          } else {
+            _dbRawCache = { success: false, items: [], totalProducts: 0, totalCustomers: 0, isAdmin: isAdmin, namaUser: '' };
+          }
+          const kalkulasi = _hitungDashboardDariCache(_dbRawCache);
+          renderDashboard(kalkulasi);
+        })
+        .withFailureHandler(function() {
+          _dbCacheLoading = false;
+          renderDashboard(getMockDashboardData());
+        })
+        .getDashboardRawData(
+          _currentUser ? _currentUser.nama : 'Sales Executive',
+          isAdmin
+        );
+    }
+
+    // ── Skeleton loading saat fetch pertama ───────────────────────
+    function _showDashboardSkeleton() {
+      // KPI cards skeleton
+      ['kpi-revenue','kpi-target-val','kpi-deals','kpi-winrate'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.innerHTML = '<span class="inline-block w-24 h-6 bg-slate-200 rounded-lg animate-pulse"></span>';
+        }
+      });
+      ['kpi-revenue-sub','kpi-target-sub','kpi-deals-sub','kpi-winrate-sub'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<span class="inline-block w-20 h-3 bg-slate-100 rounded animate-pulse mt-1"></span>';
+      });
+      // Tabel recent quotes skeleton
+      const tbody = document.getElementById('db-quot-table');
+      if (tbody) {
+        tbody.innerHTML = Array(5).fill(0).map(function() {
+          return `<tr class="border-b border-slate-50">
+            ${Array(5).fill(0).map(function() {
+              return '<td class="py-2 pr-3"><span class="inline-block w-full h-3 bg-slate-100 rounded animate-pulse"></span></td>';
+            }).join('')}
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // ── Kalkulasi semua KPI dari raw cache + filter tanggal ───────
+    function _hitungDashboardDariCache(raw) {
+      const items    = raw.items || [];
+      const isAdmin  = raw.isAdmin || (_currentUser && _currentUser.role === 'admin');
+      const _f       = window._dbFilter || {};
+      const fFrom    = _f.from || null;
+      const fTo      = _f.to   || null;
+
+      // Buat filter timestamp
+      const fromMs = fFrom ? fFrom.getTime() : null;
+      const toMs   = fTo   ? (new Date(fTo.getFullYear(), fTo.getMonth(), fTo.getDate(), 23, 59, 59, 999)).getTime() : null;
+
+      // Periode sebelumnya untuk perbandingan
+      let prevFromMs = null, prevToMs = null;
+      if (fromMs && toMs) {
+        const rangeMs = toMs - fromMs;
+        prevToMs   = fromMs - 1;
+        prevFromMs = prevToMs - rangeMs;
+      }
+
+      const inRange = function(ts) {
+        if (!ts) return false;
+        if (fromMs && ts < fromMs) return false;
+        if (toMs   && ts > toMs)   return false;
+        return true;
+      };
+      const inPrevRange = function(ts) {
+        if (!ts || !prevFromMs) return false;
+        return ts >= prevFromMs && ts <= prevToMs;
+      };
+
+      // KPI periode ini
+      let revThis = 0, wonThis = 0, decidedThis = 0;
+      let revPrev = 0, wonPrev = 0, decidedPrev = 0;
+      let totalRevAllTime = 0;
+
+      // Chart: 6 bulan terakhir berdasarkan filter (untuk mode non-custom ikuti bulan)
+      // Jika custom range → bagi range jadi 6 segmen
+      const now      = new Date();
+      const curMonth = now.getMonth();
+      const curYear  = now.getFullYear();
+      const romanMonths = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+      // Siapkan 6 bucket chart
+      const chartBuckets = [];
+      if (_f.mode === 'custom' && fromMs && toMs) {
+        const segMs = (toMs - fromMs) / 6;
+        for (let i = 0; i < 6; i++) {
+          const bFrom = fromMs + i * segMs;
+          const bTo   = fromMs + (i + 1) * segMs - 1;
+          const d     = new Date(bFrom + segMs / 2);
+          chartBuckets.push({
+            label: d.getDate() + '/' + (d.getMonth()+1),
+            fromMs: bFrom, toMs: bTo
+          });
+        }
+      } else {
+        for (let m = 5; m >= 0; m--) {
+          let mo = curMonth - m, yr = curYear;
+          if (mo < 0) { mo += 12; yr--; }
+          const bFrom = new Date(yr, mo, 1).getTime();
+          const bTo   = new Date(yr, mo + 1, 0, 23, 59, 59, 999).getTime();
+          chartBuckets.push({ label: romanMonths[mo], fromMs: bFrom, toMs: bTo });
+        }
+      }
+
+      const chartRevenue = new Array(6).fill(0);
+
+      // Pipeline bulan ini
+      const pipeline = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
+
+      // Leaderboard
+      const salesMap = {};
+      const TARGET_PER_SALES_MONTHLY = 3600000000 / 12;
+
+      items.forEach(function(item) {
+        const ts      = item.tanggal; // timestamp ms atau null
+        const isDeal  = item.status === 'Deal';
+        const isFail  = item.status === 'Fail';
+        const inCur   = inRange(ts);
+        const inPrv   = inPrevRange(ts);
+
+        // All-time revenue untuk chart (bukan difilter periode)
+        if (isDeal) totalRevAllTime += item.grandTotal;
+
+        // KPI periode ini
+        if (inCur) {
+          decidedThis++;
+          if (isDeal) { revThis += item.grandTotal; wonThis++; }
+          // Pipeline
+          pipeline[item.status] = (pipeline[item.status] || 0) + 1;
+          // Leaderboard
+          const nama = item.dibuatOleh || 'Unknown';
+          if (!salesMap[nama]) salesMap[nama] = { name: nama, rev: 0, deals: 0 };
+          if (isDeal) { salesMap[nama].rev += item.grandTotal; salesMap[nama].deals++; }
+        }
+
+        // KPI periode lalu
+        if (inPrv) {
+          decidedPrev++;
+          if (isDeal) { revPrev += item.grandTotal; wonPrev++; }
+        }
+
+        // Chart buckets
+        if (isDeal && ts) {
+          chartBuckets.forEach(function(b, idx) {
+            if (ts >= b.fromMs && ts <= b.toMs) {
+              chartRevenue[idx] += item.grandTotal;
+            }
+          });
+        }
+      });
+
+      const winRate     = decidedThis > 0 ? Math.round((wonThis / decidedThis) * 100) : 0;
+      const prevWinRate = decidedPrev > 0 ? Math.round((wonPrev / decidedPrev) * 100) : 0;
+      const revChangePct = revPrev > 0
+        ? +((revThis - revPrev) / revPrev * 100).toFixed(2)
+        : (revThis > 0 ? 100 : 0);
+
+      const TARGET_MONTHLY = isAdmin ? 1200000000 : 300000000;
+
+      const divisor = isAdmin ? 1e9 : 1e6;
+      const monthlyRevenue  = chartRevenue.map(v => +(v / divisor).toFixed(2));
+      const monthlyTarget   = new Array(6).fill(+(TARGET_MONTHLY / divisor).toFixed(2));
+      const monthlyLabels   = chartBuckets.map(function(b) { return b.label; });
+
+      const pipelineArr = ['On-Progress','Deal','Fail']
+        .filter(function(s) { return pipeline[s] > 0; })
+        .map(function(s)    { return { stage: s, count: pipeline[s] }; });
+
+      const leaderboard = Object.values(salesMap)
+        .sort(function(a,b) { return b.rev - a.rev; })
+        .slice(0, 6)
+        .map(function(s) { return {
+          ...s,
+          target:    +(TARGET_PER_SALES_MONTHLY / 1e6).toFixed(2),
+          pctTarget: TARGET_PER_SALES_MONTHLY > 0 ? Math.round((s.rev / TARGET_PER_SALES_MONTHLY) * 100) : 0
+        }; });
+
+      // Recent quotes: 20 terbaru dari SEMUA data (tidak difilter periode)
+      const recentQuotes = [...items]
+        .sort(function(a,b) {
+          const nA = parseInt((a.id.match(/^(\d+)/) || [0,0])[1]);
+          const nB = parseInt((b.id.match(/^(\d+)/) || [0,0])[1]);
+          return nB - nA;
+        })
+        .slice(0, 20)
+        .map(function(q) { return {
+          id: q.id, namaProject: q.namaProject,
+          namaKlien: q.namaKlien, grandTotal: q.grandTotal, status: q.status
+        }; });
+
+      return {
+        revenue:          'Rp ' + revThis.toLocaleString('id-ID'),
+        revenuePrevMonth: 'Rp ' + revPrev.toLocaleString('id-ID'),
+        revenueChangePct: revChangePct,
+        targetAmount:     TARGET_MONTHLY,
+        actualAmount:     revThis,
+        activeQuotes:     wonThis,
+        prevMonthQuotes:  wonPrev,
+        winRate:          winRate,
+        prevWinRate:      prevWinRate,
+        totalProducts:    raw.totalProducts || 0,
+        totalCustomers:   raw.totalCustomers || 0,
+        monthlyLabels:    monthlyLabels,
+        monthlyRevenue:   monthlyRevenue,
+        monthlyTarget:    monthlyTarget,
+        pipeline:         pipelineArr,
+        leaderboard:      leaderboard,
+        recentQuotes:     recentQuotes,
+        isAdmin:          isAdmin,
+        namaUser:         raw.namaUser || ''
+      };
+    }
+
+    // Data contoh saat tidak terhubung ke Google Apps Script
+    function getMockDashboardData() {
+      return {
+        revenue: 'Rp 4.200.000.000',
+        revenuePrevMonth: 'Rp 3.700.000.000',
+        revenueChangePct: 12.4,
+        targetAmount: 5000000000,
+        actualAmount: 4200000000,
+        activeQuotes: 18,
+        prevMonthQuotes: 15,
+        winRate: 62,
+        prevWinRate: 64,
+        totalProducts: 11,
+        totalCustomers: 2,
+        monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+        monthlyRevenue: [1.8, 2.4, 2.1, 3.1, 3.8, 4.2],
+        monthlyTarget: [5, 5, 5, 5, 5, 5],
+        pipeline: [
+          { stage: 'On-Progress', count: 5 },
+          { stage: 'Deal',        count: 3 },
+          { stage: 'Fail',        count: 2 },
+        ],
+        leaderboard: [
+          { name: 'Adi Nugroho',   rev: 1.42, deals: 6 },
+          { name: 'Sari Dewi',     rev: 1.18, deals: 5 },
+          { name: 'Budi Santoso',  rev: 0.87, deals: 4 },
+          { name: 'Mega Pratiwi',  rev: 0.73, deals: 3 },
+        ],
+        recentQuotes: []
+      };
+    }
+
+    function renderDashboard(data) {
+      
+      let _isAdmin = false;
+      if (_currentUser && _currentUser.role === 'admin') { _isAdmin = true; }
+
+      // ── Update judul dengan nama user ──────────────────────────────
+      const _namaUser  = _currentUser ? _currentUser.nama : '';
+      const _titleEl   = document.getElementById('dashboard-title');
+      if (_titleEl) {
+        _titleEl.innerText = _isAdmin
+          ? 'Ringkasan Performa Tim Sales '
+          : 'Ringkasan Performa ' + _namaUser;
+      }
+
+      // ── Tampilkan/sembunyikan card Top Performers sesuai role ──────
+      const _cardLb = document.getElementById('card-leaderboard');
+      const _rowBot = document.getElementById('row-dashboard-bottom');
+      if (_cardLb && _rowBot) {
+        if (_isAdmin) {
+          _cardLb.classList.remove('hidden');
+          _rowBot.className = _rowBot.className.replace('lg:grid-cols-2', 'lg:grid-cols-3');
+          if (!_rowBot.className.includes('lg:grid-cols-3')) {
+            _rowBot.classList.add('lg:grid-cols-3');
+          }
+        } else {
+          _cardLb.classList.add('hidden');
+          _rowBot.className = _rowBot.className.replace('lg:grid-cols-3', 'lg:grid-cols-2');
+        }
+      }
+
+      // ── KPI Cards ──────────────────────────────────────────────
+      const revPct = data.revenueChangePct || 0;
+      document.getElementById('kpi-revenue').innerText = data.revenue || '-';
+      document.getElementById('kpi-revenue-badge').innerText =
+        (revPct >= 0 ? '▲ ' : '▼ ') + Math.abs(revPct).toFixed(1) + '%';
+      document.getElementById('kpi-revenue-badge').className =
+        'text-[10px] font-bold px-2 py-0.5 rounded-full ' +
+        (revPct >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
+      document.getElementById('kpi-revenue-sub').innerText =
+        'Bulan lalu: ' + (data.revenuePrevMonth || '-');
+
+      const achPct = data.targetAmount > 0
+        ? Math.round((data.actualAmount / data.targetAmount) * 100) : 0;
+      document.getElementById('kpi-target-val').innerText = achPct + '%';
+      document.getElementById('kpi-target-badge').innerText = 'Pencapaian';
+      document.getElementById('kpi-target-bar').style.width = Math.min(achPct, 100) + '%';
+      document.getElementById('kpi-target-sub').innerText =
+        'Target: ' + (data.targetAmount ? _isAdmin ? 'Rp ' + (data.targetAmount / 1e9).toFixed(1) + 'M' : 'Rp ' + (data.targetAmount / 1e6).toFixed(0) + 'Jt' : '-');
+
+      const dealsChange = (data.activeQuotes || 0) - (data.prevMonthQuotes || 0);
+      document.getElementById('kpi-deals').innerText = data.activeQuotes || '-';
+      document.getElementById('kpi-deals-sub').innerText =
+        (dealsChange >= 0 ? '▲ ' : '▼ ') + Math.abs(dealsChange) + ' dari bulan lalu';
+
+      const wr = data.winRate || 0;
+      const wrDiff = wr - (data.prevWinRate || wr);
+      document.getElementById('kpi-winrate').innerText = wr + '%';
+      document.getElementById('kpi-winrate-bar').style.width = wr + '%';
+      document.getElementById('kpi-winrate-badge').innerText =
+        (wrDiff >= 0 ? '▲ ' : '▼ ') + Math.abs(wrDiff).toFixed(1) + '%';
+      document.getElementById('kpi-winrate-badge').className =
+        'text-[10px] font-bold px-2 py-0.5 rounded-full ' +
+        (wrDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
+      document.getElementById('kpi-winrate-sub').innerText = 'Bulan lalu: ' + (data.prevWinRate || '-') + '%';
+
+      // ── Donut chart status penawaran ───────────────────────────
+      if (window.Chart) {
+        const pipeline = data.pipeline || [];
+
+        // Hitung jumlah per status dari pipeline
+        const stageMap = {};
+        pipeline.forEach(p => { stageMap[p.stage] = p.count; });
+
+        const onProg  = stageMap['On-Progress'] || 0;
+        const won     = stageMap['Deal'] || 0;
+        const fail    = stageMap['Fail'] || 0;
+        const total   = onProg + won + fail;
+
+        const pct = v => total > 0 ? Math.round((v / total) * 100) : 0;
+
+        const donutCtx = document.getElementById('db-donut-chart');
+        if (donutCtx) {
+          if (window._dbDonutChart) window._dbDonutChart.destroy();
+          window._dbDonutChart = new Chart(donutCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['On-Progress', 'Deal', 'Fail'],
+              datasets: [{
+                data: [onProg, won, fail],
+                backgroundColor: ['#3B82F6', '#10B981', '#EF4444'],
+                borderColor:     ['#3B82F6', '#10B981', '#EF4444'],
+                borderWidth: 0,
+                hoverOffset: 4,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '68%',
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => ` ${ctx.label}: ${ctx.raw} (${pct(ctx.raw)}%)`
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // Legend manual
+        const legendData = [
+          { label: 'On-Progress', count: onProg, color: '#3B82F6', bg: 'bg-blue-100',    text: 'text-blue-700'   },
+          { label: 'Deal',        count: won,    color: '#10B981', bg: 'bg-emerald-100',  text: 'text-emerald-800'},
+          { label: 'Fail',        count: fail,   color: '#EF4444', bg: 'bg-rose-100',     text: 'text-rose-700'   },
+        ];
+        document.getElementById('db-donut-legend').innerHTML = legendData.map(l => `
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${l.color}"></span>
+              <span class="text-slate-600">${l.label}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-800">${l.count}</span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ${l.bg} ${l.text}">${pct(l.count)}%</span>
+            </div>
+          </div>`).join('');
+      }
+
+      // ── Trend Chart ────────────────────────────────────────────
+      const ctx = document.getElementById('db-trend-chart');
+      if (_dbTrendChart) { _dbTrendChart.destroy(); }
+      _dbTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.monthlyLabels || [],
+          datasets: [
+            {
+              label: 'Revenue',
+              data: data.monthlyRevenue || [],
+              borderColor: '#3B82F6',
+              backgroundColor: 'rgba(59,130,246,0.08)',
+              fill: true,
+              tension: 0.4,
+              pointBackgroundColor: '#3B82F6',
+              pointRadius: 3,
+              borderWidth: 2,
+            },
+            {
+              label: 'Target',
+              data: data.monthlyTarget || [],
+              borderColor: '#FB923C',
+              borderDash: [5, 4],
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: false,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { display: false }, border: { display: false } },
+            y: {
+              ticks: { font: { size: 10 }, color: '#94a3b8', callback: v => _isAdmin ? 'Rp ' + v.toLocaleString('id-ID') + 'M' : 'Rp ' + v.toLocaleString('id-ID') + 'Jt'},
+              grid: { color: 'rgba(148,163,184,0.15)' },
+              border: { display: false }
+            }
+          }
+        }
+      });
+
+      // ── Leaderboard ────────────────────────────────────────────
+      const lb = data.leaderboard || [];
+      const rankColors  = ['#F59E0B', '#94A3B8', '#CD7C3A'];
+      const rankIcons   = ['🥇', '🥈', '🥉'];
+
+      document.getElementById('db-leaderboard').innerHTML = lb.length
+        ? lb.map((p, i) => {
+            const pct     = Math.min(p.pctTarget ?? Math.round((p.rev / (p.target || 1)) * 100), 100);
+            const rawPct  = p.pctTarget ?? Math.round((p.rev / (p.target || 1)) * 100);
+            const barColor = rawPct >= 100 ? '#10B981'
+                          : rawPct >= 70  ? '#3B82F6'
+                          : rawPct >= 40  ? '#F59E0B'
+                          : '#EF4444';
+            const pctLabel = rawPct >= 100
+              ? `<span class="text-emerald-600 font-extrabold">${rawPct}% ✅</span>`
+              : `<span style="color:${barColor}" class="font-extrabold">${rawPct}%</span>`;
+
+            return `
+              <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-base leading-none">${rankIcons[i] || (i+1)}</span>
+                  <span class="text-xs font-bold text-slate-700 flex-1 truncate">${p.name}</span>
+                  <span class="text-[10px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md">${p.deals} deal</span>
+                </div>
+                <div class="flex justify-between items-center mb-1.5">
+                  <span class="text-[10px] text-slate-400">Actual: <b class="text-slate-700">Rp ${(p.rev / 1e6).toFixed(1)}Jt</b></span>
+                  <span class="text-[10px] text-slate-400">Target: <b class="text-slate-600">Rp ${p.target}Jt</b></span>
+                </div>
+                <div class="bg-slate-200 rounded-full h-2 overflow-hidden mb-1">
+                  <div class="h-full rounded-full transition-all duration-700"
+                    style="width:${pct}%; background:${barColor}"></div>
+                </div>
+                <div class="flex justify-end">
+                  <span class="text-[10px]">${pctLabel} dari target</span>
+                </div>
+              </div>`;
+          }).join('')
+        : '<p class="text-xs text-slate-400 text-center py-4">Belum ada data deals.</p>';
+
+      // ── Recent Quotations ──────────────────────────────────────
+      const statusCls = {
+        'Deal':        'bg-emerald-100 text-emerald-800',
+        'On-Progress': 'bg-blue-100 text-blue-700',
+        'Fail':        'bg-rose-100 text-rose-700',
+      };
+      const quotes = (data.recentQuotes || []).slice(0, 20);
+      document.getElementById('db-quot-table').innerHTML = quotes.length
+        ? quotes.map((q, i) => `
+            <tr class="border-b border-slate-50 ${i % 2 === 1 ? 'bg-slate-50/50' : ''}">
+              <td class="py-2 pr-3 text-slate-500 font-mono">${q.id}</td>
+              <td class="py-2 pr-3 font-semibold text-slate-700 max-w-[140px] truncate">${q.namaProject}</td>
+              <td class="py-2 pr-3 text-slate-500 truncate">${q.namaKlien}</td>
+              <td class="py-2 pr-3 text-right font-bold text-slate-800">Rp ${q.grandTotal.toLocaleString('id-ID')}
+              </td>
+              <td class="py-2 text-center">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCls[q.status] || 'bg-slate-100 text-slate-500'}">${q.status}</span>
+              </td>
+            </tr>`)
+          .join('')
+        : '<tr><td colspan="5" class="py-6 text-center text-slate-400 text-xs">Belum ada data penawaran.</td></tr>';
+    }
+</script>

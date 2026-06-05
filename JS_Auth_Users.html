@@ -1,0 +1,397 @@
+<script>
+// ================================================================
+//  SISTEM LOGIN & MANAJEMEN USER — JavaScript
+// ================================================================
+
+// ── State session (in-memory + sessionStorage) ────────────────────────────
+// sessionStorage hilang saat tab/browser ditutup — cukup aman untuk GAS web app.
+let _currentUser = null; // { id, nama, username, role }
+
+function _saveSession(user) {
+  _currentUser = user;
+  try { sessionStorage.setItem('salespro_user', JSON.stringify(user)); } catch(e) {}
+}
+function _loadSession() {
+  try {
+    const raw = sessionStorage.getItem('salespro_user');
+    if (raw) { _currentUser = JSON.parse(raw); return true; }
+  } catch(e) {}
+  return false;
+}
+function _clearSession() {
+  _currentUser = null;
+  try { sessionStorage.removeItem('salespro_user'); } catch(e) {}
+}
+
+// ── Toggle visibility password ────────────────────────────────────────────
+function togglePwVisibility(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  const icon = btn.querySelector('i');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    icon.className = 'fa-solid fa-eye-slash text-sm';
+  } else {
+    inp.type = 'password';
+    icon.className = 'fa-solid fa-eye text-sm';
+  }
+}
+function togglePwVisibilityLight(inputId, btn) {
+  togglePwVisibility(inputId, btn);
+}
+
+// ── Render info user di sidebar ───────────────────────────────────────────
+function _renderUserSidebar(user) {
+  const nameEl   = document.getElementById('active-user-name');
+  const roleEl   = document.getElementById('active-user-role');
+  const avatarEl = document.getElementById('sidebar-avatar');
+  if (!user) return;
+
+  nameEl.innerText   = user.nama;
+  avatarEl.innerText = user.nama.charAt(0).toUpperCase();
+
+  const isAdmin = user.role === 'admin';
+  roleEl.innerHTML = `
+    <span class="h-1.5 w-1.5 inline-block rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
+    <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md
+      ${isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
+      ${isAdmin ? 'ADMIN' : 'SALES'}
+    </span>`;
+
+  // Tampilkan/sembunyikan nav Users sesuai role
+  const navUsers = document.getElementById('nav-users');
+  if (navUsers) navUsers.classList.toggle('hidden', !isAdmin);
+}
+
+// ── doLogin ───────────────────────────────────────────────────────────────
+function doLogin() {
+  const username = (document.getElementById('login-username').value || '').trim();
+  const password = (document.getElementById('login-password').value || '').trim();
+  const errBox   = document.getElementById('login-error');
+  const errMsg   = document.getElementById('login-error-msg');
+  const btn      = document.getElementById('login-btn');
+
+  errBox.classList.remove('show');
+
+  if (!username || !password) {
+    errMsg.innerText = 'Username dan password wajib diisi.';
+    errBox.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Memproses...';
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-2"></i> Masuk';
+        if (res && res.success) {
+          _onLoginSuccess(res.user, res.message);
+        } else {
+          // Tampilkan pesan error dari server, bukan error teknis
+          errMsg.innerText = (res && res.message) ? res.message : 'Username atau password salah.';
+          errBox.classList.add('show');
+          document.getElementById('login-password').value = '';
+          document.getElementById('login-password').focus();
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-2"></i> Masuk';
+        
+        const errStr = (err && err.message) ? err.message : err.toString();
+        
+        // Deteksi error permission/akses dokumen
+        if (errStr.includes('tidak memiliki izin') || 
+            errStr.includes('You do not have permission') ||
+            errStr.includes('access') ||
+            errStr.includes('Authorization') ||
+            errStr.includes('authorization')) {
+          errMsg.innerText = 'Terjadi kesalahan konfigurasi server. Hubungi administrator.';
+        } else {
+          errMsg.innerText = 'Gagal terhubung ke server: ' + errStr;
+        }
+        errBox.classList.add('show');
+      })
+      .loginUser(username, password);
+  } else {
+    // Fallback dev mode
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-2"></i> Masuk';
+    if (username === 'admin' && password === 'admin123') {
+      _onLoginSuccess(
+        { id:'U001', nama:'Administrator', username:'admin', role:'admin' },
+        'Login berhasil (dev mode)'
+      );
+    } else if (username === 'sales1' && password === 'sales123') {
+      _onLoginSuccess(
+        { id:'U002', nama:'Sales Executive', username:'sales1', role:'sales' },
+        'Login berhasil (dev mode)'
+      );
+    } else {
+      errMsg.innerText = 'Username atau password salah.';
+      errBox.classList.add('show');
+    }
+  }
+}
+
+// ── Setelah login berhasil ────────────────────────────────────────────────
+function _onLoginSuccess(user, message) {
+  _saveSession(user);
+  document.getElementById('login-screen').classList.add('hidden');
+  document.body.classList.remove('login-active');
+  _renderUserSidebar(user);
+  showNotification(message || ('Selamat datang, ' + user.nama + '!'));
+  muatSeluruhDataAwal(true);
+  navigate('dashboard');
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────
+function doLogout() {
+  document.getElementById('modal-logout').classList.remove('hidden');
+}
+
+function konfirmasiLogout() {
+  document.getElementById('modal-logout').classList.add('hidden');
+  _clearSession();
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.remove('show');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.body.classList.add('login-active');
+  toggleLoader(false);
+}
+
+// ── window.onload: cek sesi login dulu sebelum memuat aplikasi ────────────
+window.onload = function() {
+  document.getElementById('current-date').innerText =
+    new Date().toLocaleDateString('id-ID', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+  // Tambahkan ini:
+  if (!(_loadSession() && _currentUser)) {
+    document.body.classList.add('login-active');
+  }
+
+  if (_loadSession() && _currentUser) {
+    document.getElementById('login-screen').classList.add('hidden');
+    _renderUserSidebar(_currentUser);
+    muatSeluruhDataAwal(true);
+    navigate('dashboard');
+  }
+};
+
+// ── Ganti Password (Self-service) ─────────────────────────────────────────
+function bukaGantiPassword() {
+  document.getElementById('gp-old').value     = '';
+  document.getElementById('gp-new').value     = '';
+  document.getElementById('gp-confirm').value = '';
+  document.getElementById('modal-ganti-pw').classList.remove('hidden');
+}
+
+function submitGantiPassword() {
+  if (!_currentUser) return;
+  const old     = document.getElementById('gp-old').value.trim();
+  const nw      = document.getElementById('gp-new').value.trim();
+  const confirm = document.getElementById('gp-confirm').value.trim();
+  if (!old || !nw || !confirm) return showNotification('Semua field wajib diisi.', 'error');
+  if (nw !== confirm) return showNotification('Konfirmasi password tidak cocok.', 'error');
+  if (nw.length < 6)  return showNotification('Password baru minimal 6 karakter.', 'error');
+
+  toggleLoader(true, 'Menyimpan Password...');
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          document.getElementById('modal-ganti-pw').classList.add('hidden');
+        } else {
+          showNotification(res.message, 'error');
+        }
+      })
+      .withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification(err.message || 'Gagal menyimpan password.', 'error');
+      })
+      .gantiPassword(_currentUser.id, old, nw);
+  } else {
+    toggleLoader(false);
+    showNotification('Tidak terhubung ke server.', 'error');
+  }
+}
+
+// ── Manajemen User (Admin) ─────────────────────────────────────────────────
+function loadUsers() {
+  if (!_currentUser || _currentUser.role !== 'admin') {
+    navigate('dashboard'); return;
+  }
+  document.getElementById('search-users').value = '';
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        _renderTabelUsers(data);
+      })
+      .withFailureHandler(function() {
+        document.getElementById('table-users').innerHTML =
+          '<tr><td colspan="6" class="p-6 text-center text-rose-400">Gagal memuat data.</td></tr>';
+      })
+      .getUserList();
+  }
+}
+
+function _renderTabelUsers(data) {
+  const tbody = document.getElementById('table-users');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Belum ada data user.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(u) {
+    const isMe = _currentUser && u.id === _currentUser.id;
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition ${isMe ? 'bg-blue-50/50' : ''}">
+      <td class="p-4 font-bold text-slate-600">${u.id} ${isMe ? '<span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md ml-1">Anda</span>' : ''}</td>
+      <td class="p-4 font-semibold text-slate-800">${u.nama}</td>
+      <td class="p-4 font-mono text-slate-600 text-sm">${u.username}</td>
+      <td class="p-4 text-center">
+        <span class="text-xs font-extrabold px-2 py-1 rounded-lg
+          ${u.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
+          ${u.role.toUpperCase()}
+        </span>
+      </td>
+      <td class="p-4 text-center">
+        <span class="text-xs font-extrabold px-2 py-1 rounded-lg
+          ${u.aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}">
+          ${u.aktif ? 'Aktif' : 'Non-aktif'}
+        </span>
+      </td>
+      <td class="p-4 text-center">
+        <div class="flex items-center justify-center gap-1">
+          <button onclick='_bukaEditUser(${JSON.stringify(u)})'
+            class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          ${!isMe ? `<button onclick="konfirmasiHapus('user','${u.id}','${u.nama}')"
+            class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTabelUsers() {
+  const q = document.getElementById('search-users').value.toLowerCase();
+  document.querySelectorAll('#table-users tr').forEach(function(row) {
+    if (row.cells.length <= 1) return;
+    row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function bukaModalTambahUser() {
+  document.getElementById('modal-user-title').innerText = 'Tambah User Baru';
+  document.getElementById('modal-user-id').value        = '';
+  document.getElementById('modal-user-nama').value      = '';
+  document.getElementById('modal-user-username').value  = '';
+  document.getElementById('modal-user-password').value  = '';
+  document.getElementById('modal-user-role').value      = 'sales';
+  document.getElementById('modal-user-pw-hint').style.display = 'none';
+  document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
+  document.getElementById('modal-user').classList.remove('hidden');
+}
+
+function _bukaEditUser(u) {
+  document.getElementById('modal-user-title').innerText       = 'Edit User';
+  document.getElementById('modal-user-id').value              = u.id;
+  document.getElementById('modal-user-nama').value            = u.nama;
+  document.getElementById('modal-user-username').value        = u.username;
+  document.getElementById('modal-user-password').value        = '';
+  document.getElementById('modal-user-role').value            = u.role;
+  document.getElementById('modal-user-pw-hint').style.display = '';
+  document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
+  document.getElementById('modal-user-aktif').checked         = u.aktif;
+  document.getElementById('modal-user').classList.remove('hidden');
+}
+
+function tutupModalUser() {
+  document.getElementById('modal-user').classList.add('hidden');
+}
+
+function simpanUserModal() {
+  const id       = document.getElementById('modal-user-id').value.trim();
+  const nama     = document.getElementById('modal-user-nama').value.trim();
+  const username = document.getElementById('modal-user-username').value.trim();
+  const password = document.getElementById('modal-user-password').value.trim();
+  const role     = document.getElementById('modal-user-role').value;
+  const aktif    = document.getElementById('modal-user-aktif').checked;
+
+  if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
+  if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
+  if (password && password.length < 6 && password.length > 0)
+    return showNotification('Password minimal 6 karakter.', 'error');
+
+  toggleLoader(true, 'Menyimpan User...');
+  if (typeof google !== 'undefined') {
+    const fn = id ? 'editUser' : 'simpanUser';
+    const args = id
+      ? [id, nama, username, password, role, aktif]
+      : [nama, username, password, role];
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          tutupModalUser();
+          loadUsers();
+        } else {
+          showNotification(res.message, 'error');
+        }
+      })
+      .withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification(err.message || 'Gagal menyimpan.', 'error');
+      })
+      [fn].apply(null, args);
+  } else {
+    toggleLoader(false);
+    showNotification('Tidak terhubung ke server.', 'error');
+  }
+}
+
+function bukaModalCustomerDariForm() {
+  window._customerDariForm = true;
+  const form = document.querySelector('#modal-customer form');
+  if (form) form.reset();
+
+  const modal = document.getElementById('modal-customer');
+  
+  // Pindahkan modal ke body agar tidak terpengaruh stacking context section
+  if (modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
+
+  modal.classList.remove('hidden');
+}
+
+// Catatan: cabang 'users' pada navigate() dan 'user' pada eksekusiHapus()
+// kini sudah menyatu di definisi aslinya (JS_Core & JS_Form_Penawaran),
+// sehingga tidak perlu lagi di-patch di sini.
+
+// ── Tutup modal saat klik backdrop ───────────────────────────────────────
+['modal-user', 'modal-ganti-pw'].forEach(function(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', function(e) {
+      if (e.target === this) this.classList.add('hidden');
+    });
+  }
+});
+
+// Nama user aktif untuk payload penawaran (diambil dari sesi login).
+window._getCurrentUserNama = function() {
+  return _currentUser ? _currentUser.nama : 'Sales Executive';
+};
+</script>

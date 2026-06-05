@@ -1,0 +1,38 @@
+<script>
+    // --- STATE MANAGEMENT ---
+    let erpState = { klien: [], produk: [], templatePaket: {}, nextNo: "" };
+    let kalkulasiGlobalState = { subtotalSemua: 0, diskonNominal: 0, pajakNominal: 0, grandTotal: 0, totalHpp: 0, profitInternal: 0, marginPersen: 0 };
+    // --- SISTEM NOTIFIKASI & LOADER ---
+    function showNotification(message, type = "success") {
+      const toast = document.getElementById('globalNotification');
+      const icon = document.getElementById('globalNotifIcon');
+      toast.className = "fixed top-6 right-6 z-[110] transform transition-all duration-300 ease-out bg-white p-4 rounded-xl shadow-xl border flex items-center gap-3 max-w-sm ";
+      if (type === "success") { toast.classList.add("border-emerald-200", "bg-emerald-50"); icon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>'; } 
+      else { toast.classList.add("border-rose-200", "bg-rose-50"); icon.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-500 text-xl"></i>'; }
+      document.getElementById('globalNotifMessage').innerText = message;
+      toast.classList.remove('hidden'); setTimeout(() => toast.classList.remove('translate-x-full'), 50);
+      setTimeout(() => { toast.classList.add('translate-x-full'); setTimeout(() => toast.classList.add('hidden'), 300); }, 3500);
+    }
+    
+    function toggleLoader(show, text = "Memuat...") {
+      const l = document.getElementById('appLoader');
+      document.getElementById('loaderText').innerText = text;
+      show ? l.classList.remove('hidden') : l.classList.add('hidden');
+    }
+
+    // --- NAVIGASI DASHBOARD ---
+    function navigate(pageId) {
+      document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('page-' + pageId).classList.add('active');
+      document.getElementById('nav-' + pageId).classList.add('active');
+      if(pageId === 'dashboard') loadDashboard();
+      if(pageId === 'penawaran') { loadPenawaran(); toggleFormPenawaran(false); }
+      if(pageId === 'produk') loadProduk();
+      if(pageId === 'template') loadTemplate();
+      if(pageId === 'customer') loadCustomer();
+      if(pageId === 'users') loadUsers();
+    }
+
+    function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }
+</script>

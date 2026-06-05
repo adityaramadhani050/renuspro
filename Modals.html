@@ -1,0 +1,588 @@
+  <!-- Notifikasi Toast System -->
+  <div id="globalNotification" class="fixed top-6 right-6 z-50 transform translate-x-full transition-all duration-300 ease-out hidden bg-white p-4 rounded-xl shadow-2xl border flex items-center gap-3 max-w-sm">
+    <span id="globalNotifIcon" class="text-lg"></span><p id="globalNotifMessage" class="font-bold text-sm text-slate-800"></p>
+  </div>
+  
+  <!-- Overlay Loading -->
+  <div id="appLoader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex flex-col justify-center items-center text-white gap-4 transition-all duration-500 hidden">
+    <div class="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent shadow-2xl"></div>
+    <div class="text-center space-y-1"><p class="text-lg font-bold tracking-wider" id="loaderText">Menyinkronkan Database...</p></div>
+  </div>
+
+  <!-- TEMPLATE BARIS ITEM RINCIAN TABLE -->
+  <template id="barisItemTemplate">
+    <tr class="border-b border-slate-150 hover:bg-slate-50 transition duration-150 baris-item">
+      <td class="p-2 text-center text-xs font-bold text-slate-400 item-index">1</td>
+      <td class="p-2 space-y-1">
+        <select onchange="onItemSelectChanged(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-blue-500 select-produk" required><option value="">-- Pilih Item --</option></select>
+        <textarea placeholder="Deskripsi..." class="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs custom-deskripsi" rows="2" required></textarea>
+      </td>
+      <td class="p-2"><input type="number" step="any" min="0" value="1" oninput="hitungSubtotalBaris(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold input-qty" required></td>
+      <td class="p-2"><input type="text" class="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-center text-xs text-slate-500 input-unit" readonly></td>
+      <td class="p-2 space-y-1">
+        <div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">Rp</span><input type="text" oninput="formatAksiHargaSatuan(this)" class="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded-md text-xs font-bold input-harga" required></div>
+        <div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-rose-500 font-bold">HPP</span><input type="text" oninput="formatAksiHppSatuan(this)" class="w-full pl-8 pr-2 py-1.5 text-xs border border-rose-200 bg-rose-50 text-rose-900 rounded-md input-hpp" required></div>
+      </td>
+      <td class="p-2 text-right">
+        <div class="font-extrabold text-slate-800 text-xs">Rp <span class="txt-subtotal-baris">0</span></div>
+        <div class="text-[10px] text-rose-600 font-bold mt-1">HPP: Rp <span class="txt-hpp-baris" data-raw-hpp="0">0</span></div>
+      </td>
+      <td class="p-2 text-center"><button type="button" onclick="hapusBarisItem(this)" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition"><i class="fa-regular fa-trash-can"></i></button></td>
+    </tr>
+  </template>
+
+    <!-- MODAL EDIT PRODUK -->
+    <div id="modal-edit-produk" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+        <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+          <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-800">Edit Produk / Jasa</h3>
+            <p class="text-xs text-slate-400">Perubahan akan langsung tersimpan ke database</p>
+          </div>
+          <button onclick="document.getElementById('modal-edit-produk').classList.add('hidden')"
+            class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+          <input type="hidden" id="edit-produk-id">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item</label>
+              <input type="text" id="edit-produk-nama" class="input-field text-sm" required>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit</label>
+              <input type="text" id="edit-produk-unit" class="input-field text-sm" required>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                <input type="text" id="edit-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0"
+                  oninput="formatEditProdukHarga(this); hitungMarginEditProduk()">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Modal (Rp)</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">HPP</span>
+                <input type="text" id="edit-produk-hpp" class="input-field text-sm pl-8 text-right font-bold border-rose-200 bg-rose-50" placeholder="0"
+                  oninput="formatEditProdukHpp(this); hitungMarginEditProduk()">
+              </div>
+            </div>
+          </div>
+          <!-- Preview Margin -->
+          <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-900 uppercase tracking-wide">
+              <i class="fa-solid fa-chart-line mr-1"></i> Margin
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="edit-produk-target-status" class="text-[10px] font-extrabold"></span>
+              <span id="edit-produk-margin-badge" class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-400">0%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+          <button onclick="document.getElementById('modal-edit-produk').classList.add('hidden')"
+            class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button onclick="simpanEditProduk()"
+            class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL EDIT CUSTOMER -->
+    <div id="modal-edit-customer" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+        <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+          <span class="bg-purple-50 text-purple-600 h-9 w-9 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-user-pen"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-800">Edit Data Klien</h3>
+            <p class="text-xs text-slate-400">Perubahan akan langsung tersimpan ke database</p>
+          </div>
+          <button onclick="document.getElementById('modal-edit-customer').classList.add('hidden')"
+            class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+        <div class="px-6 py-5">
+          <input type="hidden" id="edit-customer-id">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Klien</label>
+              <input type="text" id="edit-customer-nama" class="input-field text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori Industri</label>
+              <input type="text" id="edit-customer-perusahaan" class="input-field text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kontak PIC</label>
+              <input type="text" id="edit-customer-telepon" class="input-field text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alamat</label>
+              <input type="text" id="edit-customer-alamat" class="input-field text-sm">
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+          <button onclick="document.getElementById('modal-edit-customer').classList.add('hidden')"
+            class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button onclick="simpanEditCustomer()"
+            class="px-6 py-2.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI HAPUS -->
+    <div id="modal-hapus" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+        <div class="px-6 pt-6 pb-4 text-center">
+          <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600 text-2xl"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mb-1">Konfirmasi Hapus</h3>
+          <p class="text-sm text-slate-500">Yakin ingin menghapus <span id="hapus-nama-item" class="font-bold text-slate-700"></span>? Tindakan ini tidak dapat dibatalkan.</p>
+        </div>
+        <div class="flex gap-3 px-6 pb-6">
+          <button onclick="document.getElementById('modal-hapus').classList.add('hidden')"
+            class="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button id="btn-konfirmasi-hapus"
+            class="flex-1 px-4 py-2.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-regular fa-trash-can"></i> Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+
+<!-- MODAL RIWAYAT REVISI -->
+<div id="modal-riwayat-revisi" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-3xl max-h-[90vh] flex flex-col">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
+      <span class="bg-violet-50 text-violet-600 h-9 w-9 rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-code-branch"></i>
+      </span>
+      <div>
+        <h3 class="text-base font-bold text-slate-800">Riwayat Revisi</h3>
+        <p id="riwayat-subtitle" class="text-xs text-slate-400"></p>
+      </div>
+      <button onclick="document.getElementById('modal-riwayat-revisi').classList.add('hidden')"
+        class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+
+      <!-- Panel Kiri: Daftar Revisi -->
+      <div class="w-full md:w-64 border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto flex-shrink-0">
+        <div id="riwayat-list" class="p-3 space-y-2">
+          <!-- diisi JS -->
+        </div>
+      </div>
+
+      <!-- Panel Kanan: Detail Revisi Terpilih -->
+      <div id="riwayat-detail" class="flex-1 overflow-y-auto p-5 space-y-4">
+        <p class="text-sm text-slate-400 text-center mt-8">Pilih revisi di sebelah kiri untuk melihat detail.</p>
+      </div>
+
+    </div>
+
+    <div class="flex justify-end px-6 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
+      <button onclick="document.getElementById('modal-riwayat-revisi').classList.add('hidden')"
+        class="px-5 py-2.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+        Tutup
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PREVIEW PDF -->
+<div id="modal-preview-pdf" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 px-2 py-2">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200" style="max-height:96vh;">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-200 flex-shrink-0">
+      <span class="bg-red-50 text-red-500 h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-file-pdf"></i>
+      </span>
+      <div class="flex-1 min-w-0">
+        <h3 class="text-sm font-bold text-slate-800 truncate" id="preview-pdf-title">Preview Quotation</h3>
+        <p class="text-xs text-slate-500 truncate" id="preview-pdf-subtitle"></p>
+      </div>
+      <button onclick="tutupPreviewPDF()"
+        class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition flex-shrink-0">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Area preview canvas -->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-100" style="min-height:0;">
+
+      <!-- Loading state -->
+      <div id="preview-pdf-loading"
+        class="flex flex-col items-center justify-center gap-3 text-slate-500 py-16">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div>
+        <p class="text-sm font-medium">Membuat preview...</p>
+      </div>
+
+      <!-- Canvas container -->
+      <div id="preview-pdf-canvas-wrap"
+        class="hidden items-center gap-3 py-4 px-2">
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between px-5 py-3.5 border-t border-slate-200 flex-shrink-0 gap-3">
+      <p class="text-xs text-slate-400 hidden sm:block">
+        <i class="fa-solid fa-circle-info mr-1"></i>
+        Tap halaman untuk zoom. Download untuk kualitas cetak.
+      </p>
+      <div class="flex gap-3 ml-auto">
+        <button onclick="tutupPreviewPDF()"
+          class="px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+          Tutup
+        </button>
+        <button onclick="downloadQuotationPDF()"
+          class="px-5 py-2.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-lg transition flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Download PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH / EDIT TEMPLATE PAKET -->
+<div id="modal-template" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-3xl max-h-[92vh] flex flex-col">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
+      <span class="bg-teal-50 text-teal-600 h-9 w-9 rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-layer-group"></i>
+      </span>
+      <div>
+        <h3 id="modal-template-title" class="text-base font-bold text-slate-800">Buat Paket Baru</h3>
+        <p class="text-xs text-slate-400">Item akan tersimpan sebagai paket yang bisa digunakan saat membuat penawaran</p>
+      </div>
+      <button onclick="tutupModalTemplate()"
+        class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+      <input type="hidden" id="template-edit-id">
+
+      <!-- Info dasar -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ID Paket</label>
+          <input type="text" id="template-id" class="input-field text-sm font-mono font-bold text-teal-800 bg-teal-50"
+            placeholder="Contoh: PKT002" readonly>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Paket</label>
+          <input type="text" id="template-nama" class="input-field text-sm"
+            placeholder="Contoh: PAKET PLTS ON-GRID 5KWP" required>
+        </div>
+      </div>
+
+      <!-- Tabel item template -->
+      <div>
+        <div class="flex items-center justify-between mb-2 gap-1 min-w-0">
+          <h4 class="text-sm font-bold text-slate-700">
+            <i class="fa-solid fa-list-ul mr-1.5 text-teal-600"></i>Daftar Item
+          </h4>
+          <button type="button" onclick="tambahBarisTemplate()"
+            class="text-teal-600 hover:bg-teal-50 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-200 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Tambah Item
+          </button>
+        </div>
+
+        <div class="overflow-x-auto bg-slate-50 border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
+                <th class="p-2 w-8 text-center">No</th>
+                <th class="p-2">Produk / Jasa</th>
+                <th class="p-2">Deskripsi</th>
+                <th class="p-2 w-20 text-center">Qty</th>
+                <th class="p-2 w-16 text-center">Unit</th>
+                <th class="p-2 w-32 text-right">Harga Jual</th>
+                <th class="p-2 w-32 text-right">HPP</th>
+                <th class="p-2 w-8 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-template-items">
+              <!-- diisi JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary estimasi nilai -->
+        <div class="mt-3 flex justify-end">
+          <div class="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 text-sm">
+            <span class="font-bold text-teal-800">Nilai Paket:</span>
+            <span class="font-extrabold text-teal-900 ml-2">Rp <span id="txt-estimasi-template">0</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
+      <button onclick="tutupModalTemplate()"
+        class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+        Batal
+      </button>
+      <button onclick="simpanTemplate()"
+        class="px-6 py-2.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+        <i class="fa-solid fa-floppy-disk"></i> Simpan Paket
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VIEW DETAIL TEMPLATE -->
+<div id="modal-view-template" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
+      <span class="bg-teal-50 text-teal-600 h-9 w-9 rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-eye"></i>
+      </span>
+      <div>
+        <h3 id="view-template-title" class="text-base font-bold text-slate-800">Detail Paket</h3>
+        <p id="view-template-id" class="text-xs text-slate-400"></p>
+      </div>
+      <button onclick="document.getElementById('modal-view-template').classList.add('hidden')"
+        class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto flex-1 px-6 py-5">
+      <div id="view-template-body"></div>
+    </div>
+    <div class="flex justify-end px-6 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
+      <button onclick="document.getElementById('modal-view-template').classList.add('hidden')"
+        class="px-5 py-2.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+        Tutup
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN (overlay penuh) -->
+<div id="login-screen">
+  <div class="login-card">
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-8">
+      <div class="bg-blue-600 text-white w-11 h-11 rounded-xl flex items-center justify-center
+                  font-extrabold text-xl shadow-lg">R</div>
+      <div>
+        <h1 class="text-white font-extrabold text-xl tracking-tight">Renus<span class="text-blue-400">Pro</span></h1>
+        <p class="text-slate-400 text-xs font-medium">PT. RENUS GLOBAL INDONESIA</p>
+      </div>
+    </div>
+
+    <h2 class="text-white font-bold text-lg mb-1">Selamat Datang</h2>
+    <p class="text-slate-400 text-sm mb-6">Masuk untuk mengakses dashboard</p>
+
+    <!-- Error box -->
+    <div id="login-error" class="login-error mb-4">
+      <i class="fa-solid fa-circle-exclamation mr-2"></i>
+      <span id="login-error-msg"></span>
+    </div>
+
+    <!-- Form -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Username</label>
+        <input type="text" id="login-username" class="login-input" placeholder="Masukkan username"
+          onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="login-password" class="login-input pr-10"
+            placeholder="Masukkan password"
+            onkeydown="if(event.key==='Enter') doLogin()">
+          <button type="button" class="pw-toggle" onclick="togglePwVisibility('login-password', this)">
+            <i class="fa-solid fa-eye text-sm"></i>
+          </button>
+        </div>
+      </div>
+      <button id="login-btn" class="login-btn" onclick="doLogin()">
+        <i class="fa-solid fa-right-to-bracket mr-2"></i> Masuk
+      </button>
+    </div>
+
+    <p class="text-slate-500 text-xs text-center mt-6">
+      Lupa password? Hubungi administrator sistem.
+    </p>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH / EDIT USER -->
+<div id="modal-user" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg">
+
+    <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+      <span class="bg-indigo-50 text-indigo-600 h-9 w-9 rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-user-gear"></i>
+      </span>
+      <div>
+        <h3 id="modal-user-title" class="text-base font-bold text-slate-800">Tambah User Baru</h3>
+        <p class="text-xs text-slate-400">Isi data akun di bawah ini</p>
+      </div>
+      <button onclick="tutupModalUser()"
+        class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <div class="px-6 py-5 space-y-4">
+      <input type="hidden" id="modal-user-id">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Lengkap</label>
+          <input type="text" id="modal-user-nama" class="input-field text-sm" placeholder="Nama lengkap">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Username</label>
+          <input type="text" id="modal-user-username" class="input-field text-sm" placeholder="username (lowercase)">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            Password
+          </label>
+          <div class="pw-wrap" style="--pw-color: #64748b;">
+            <input type="password" id="modal-user-password" class="input-field text-sm pr-10"
+              placeholder="Min. 6 karakter">
+            <button type="button" class="pw-toggle !text-slate-400 !right-3"
+              onclick="togglePwVisibilityLight('modal-user-password', this)" style="color:#94a3b8;">
+              <i class="fa-solid fa-eye text-sm"></i>
+            </button>
+          </div>
+          <span id="modal-user-pw-hint" class="text-slate-400 font-normal normal-case text-xs">(kosongkan jika tidak ingin diubah)</span>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Role</label>
+          <select id="modal-user-role" class="input-field text-sm">
+            <option value="sales">Sales</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <!-- Aktif toggle (hanya saat edit) -->
+      <div id="modal-user-aktif-wrap" class="hidden flex items-center gap-3 pt-1">
+        <input type="checkbox" id="modal-user-aktif" class="w-4 h-4 accent-indigo-600" checked>
+        <label for="modal-user-aktif" class="text-sm font-medium text-slate-700">Akun Aktif</label>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+      <button onclick="tutupModalUser()"
+        class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+        Batal
+      </button>
+      <button onclick="simpanUserModal()"
+        class="px-6 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold
+               shadow-md transition flex items-center gap-2">
+        <i class="fa-solid fa-floppy-disk"></i> Simpan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GANTI PASSWORD (Self-service) -->
+<div id="modal-ganti-pw" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+
+    <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+      <span class="bg-amber-50 text-amber-600 h-9 w-9 rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-key"></i>
+      </span>
+      <div>
+        <h3 class="text-base font-bold text-slate-800">Ganti Password</h3>
+        <p class="text-xs text-slate-400">Ubah password akun Anda</p>
+      </div>
+      <button onclick="document.getElementById('modal-ganti-pw').classList.add('hidden')"
+        class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password Lama</label>
+        <input type="password" id="gp-old" class="input-field text-sm" placeholder="Password saat ini">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password Baru</label>
+        <input type="password" id="gp-new" class="input-field text-sm" placeholder="Min. 6 karakter">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Konfirmasi Password Baru</label>
+        <input type="password" id="gp-confirm" class="input-field text-sm" placeholder="Ulangi password baru">
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+      <button onclick="document.getElementById('modal-ganti-pw').classList.add('hidden')"
+        class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+        Batal
+      </button>
+      <button onclick="submitGantiPassword()"
+        class="px-6 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold
+               shadow-md transition flex items-center gap-2">
+        <i class="fa-solid fa-floppy-disk"></i> Simpan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL KONFIRMASI LOGOUT -->
+<div id="modal-logout" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+    <div class="px-6 pt-6 pb-4 text-center">
+      <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fa-solid fa-right-from-bracket text-rose-600 text-2xl"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">Konfirmasi Logout</h3>
+      <p class="text-sm text-slate-500">Yakin ingin keluar dari <span class="font-bold text-slate-700">RenusPro</span>? Sesi Anda akan diakhiri.</p>
+    </div>
+    <div class="flex gap-3 px-6 pb-6">
+      <button onclick="document.getElementById('modal-logout').classList.add('hidden')"
+        class="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+        Batal
+      </button>
+      <button onclick="konfirmasiLogout()"
+        class="flex-1 px-4 py-2.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </button>
+    </div>
+  </div>
+</div>

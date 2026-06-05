@@ -1,0 +1,117 @@
+      <section id="page-produk" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Katalog Material & Jasa</h2>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-produk" oninput="filterTabel('produk')"
+                placeholder="Cari nama, ID..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+            </div>
+            <button onclick="document.getElementById('modal-produk').classList.remove('hidden')"
+              class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-plus"></i> Tambah Item Baru
+            </button>
+          </div>
+        </div>
+
+        <!-- MODAL TAMBAH PRODUK -->
+        <div id="modal-produk" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-box-open"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Tambah Item Produk / Jasa</h3>
+                <p class="text-xs text-slate-400">Isi detail item baru di bawah ini</p>
+              </div>
+              <button onclick="document.getElementById('modal-produk').classList.add('hidden')"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <form onsubmit="submitTambahProduk(event)">
+              <div class="px-6 py-5 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item</label>
+                    <input type="text" name="nama" required class="input-field text-sm" placeholder="Contoh: Panel Surya Jinko 625Wp">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit</label>
+                    <input type="text" name="unit" required class="input-field text-sm" placeholder="Contoh: unit, m, Ls, set, kWp">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                      <input type="text" id="modal-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0"
+                        oninput="formatModalProdukHarga(this); hitungMarginModalProduk()">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Modal (Rp)</label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">HPP</span>
+                      <input type="text" id="modal-produk-hpp" class="input-field text-sm pl-8 text-right font-bold border-rose-200 bg-rose-50" placeholder="0"
+                        oninput="formatModalProdukHpp(this); hitungMarginModalProduk()">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Preview Margin -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <span class="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                    <i class="fa-solid fa-chart-line mr-1"></i> Margin
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <span id="modal-produk-target-status" class="text-[10px] font-extrabold"></span>
+                    <span id="modal-produk-margin-badge" class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-400">0%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+                <button type="button"
+                  onclick="document.getElementById('modal-produk').classList.add('hidden')"
+                  class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                  Batal
+                </button>
+                <button type="submit"
+                  class="px-6 py-2.5 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Item
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+
+        <!-- TABEL PRODUK -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th class="p-4">ID</th>
+                <th class="p-4">Nama Item</th>
+                <th class="p-4 text-center">Unit</th>
+                <th class="p-4 text-right">Harga Jual</th>
+                <th class="p-4 text-right">HPP</th>
+                <th class="p-4 text-right">Margin</th>
+                <th class="p-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-produk" class="text-sm">
+              <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data produk...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
