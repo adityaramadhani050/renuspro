@@ -94,11 +94,85 @@ function getWorkOrderList() {
       });
     }
 
+    // Sisipkan catatan customer per No WO
+    const catatanMap = _getCatatanWOMap(ss);
+    list.forEach(wo => { wo.catatanCustomer = catatanMap[wo.noWO] || ''; });
+
     // Urutkan No WO terbaru di atas (numeric-aware)
     list.sort((a, b) => b.noWO.localeCompare(a.noWO, undefined, { numeric: true }));
     return list;
   } catch(e) {
     Logger.log('getWorkOrderList error: ' + e);
     return [];
+  }
+}
+
+// ── Catatan Customer per Work Order ─────────────────────────────────────────
+// Disimpan di sheet terpisah agar tidak mengubah struktur Penawaran_Main.
+// Kolom: [No WO, Catatan, Diupdate Oleh, Diupdate Pada]
+function buatSheetWorkOrderCatatan(ss) {
+  ss = ss || getSpreadsheet();
+  const sheet = ss.insertSheet('WorkOrder_Catatan');
+  sheet.appendRow(['No WO', 'Catatan', 'Diupdate Oleh', 'Diupdate Pada']);
+  return sheet;
+}
+
+function _getCatatanWOMap(ss) {
+  ss = ss || getSpreadsheet();
+  const map = {};
+  const sheet = ss.getSheetByName('WorkOrder_Catatan');
+  if (!sheet) return map;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return map;
+  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    const noWO = (data[i][0] !== '' && data[i][0] != null) ? data[i][0].toString() : '';
+    if (noWO) map[noWO] = data[i][1] ? data[i][1].toString() : '';
+  }
+  return map;
+}
+
+function getCatatanWO(noWO) {
+  try {
+    const map = _getCatatanWOMap();
+    return { success: true, catatan: map[String(noWO)] || '' };
+  } catch(e) {
+    return { success: false, catatan: '', message: e.toString() };
+  }
+}
+
+function simpanCatatanWO(noWO, catatan, namaUser) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('WorkOrder_Catatan') || buatSheetWorkOrderCatatan(ss);
+    noWO = String(noWO);
+    catatan = catatan || '';
+    const who = namaUser || 'Sales Executive';
+    const when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
+
+    const lastRow = sheet.getLastRow();
+    let targetRow = -1;
+    if (lastRow > 1) {
+      const woVals = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = 0; i < woVals.length; i++) {
+        const val = (woVals[i][0] !== '' && woVals[i][0] != null) ? woVals[i][0].toString() : '';
+        if (val === noWO) { targetRow = i + 2; break; }
+      }
+    }
+
+    if (targetRow === -1) {
+      sheet.appendRow([noWO, catatan, who, when]);
+    } else {
+      sheet.getRange(targetRow, 2, 1, 3).setValues([[catatan, who, when]]);
+    }
+
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Catatan Work Order tersimpan.', catatan: catatan };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
   }
 }

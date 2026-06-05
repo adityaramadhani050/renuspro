@@ -37,4 +37,42 @@
             </table>
           </div>
         </div>
+
+        <!-- Modal Catatan Customer -->
+        <div id="modal-catatan-wo" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-comment-dots text-amber-500"></i>
+                <h3 class="text-lg font-extrabold text-slate-800">Catatan Customer</h3>
+              </div>
+              <button onclick="tutupModalCatatanWO()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="p-6">
+              <div class="mb-3 text-sm">
+                <span class="font-bold text-emerald-700" id="catatan-wo-nomor"></span>
+                <span class="text-slate-400" id="catatan-wo-project"></span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">
+                Catatan / request / komunikasi dari customer untuk tim project. Akan ikut tercetak di PDF Work Order.
+              </p>
+              <textarea id="catatan-wo-text" rows="6"
+                placeholder="Contoh: Customer meminta panel dipasang menghadap timur. Pengiriman maksimal sebelum tanggal 20. Mohon koordinasi dengan Pak Budi (08xxxx) sebelum instalasi."
+                class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 resize-none"></textarea>
+              <input type="hidden" id="catatan-wo-id">
+            </div>
+            <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button onclick="tutupModalCatatanWO()"
+                class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">
+                Batal
+              </button>
+              <button onclick="kirimCatatanWO()"
+                class="px-5 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Catatan
+              </button>
+            </div>
+          </div>
+        </div>
       </section>

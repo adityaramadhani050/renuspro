@@ -33,6 +33,11 @@
           <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
+              <button onclick='bukaModalCatatanWO(${itemJson})'
+                class="relative ${i.catatanCustomer ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="Catatan Customer">
+                <i class="fa-solid fa-comment-dots"></i>
+                ${i.catatanCustomer ? '<span class="absolute top-0.5 right-0.5 w-2 h-2 bg-amber-500 rounded-full"></span>' : ''}
+              </button>
               <button onclick='exportWorkOrderPDF(${itemJson})'
                 class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Export PDF Work Order (Internal — dengan HPP)">
                 <i class="fa-solid fa-file-arrow-down"></i>
@@ -75,6 +80,47 @@
       });
       _pgState.workorder.page = 1;
       _pgRender('workorder');
+    };
+
+    // ================================================================
+    // CATATAN CUSTOMER PER WORK ORDER
+    // Komunikasi/notes dari customer ke sales untuk tim project.
+    // ================================================================
+    window.bukaModalCatatanWO = function(item) {
+      document.getElementById('catatan-wo-id').value      = item.noWO;
+      document.getElementById('catatan-wo-nomor').innerText = 'WO ' + item.noWO;
+      document.getElementById('catatan-wo-project').innerText = '  ·  ' + (item.namaProject || '');
+      document.getElementById('catatan-wo-text').value    = item.catatanCustomer || '';
+      document.getElementById('modal-catatan-wo').classList.remove('hidden');
+      setTimeout(() => document.getElementById('catatan-wo-text').focus(), 50);
+    };
+
+    window.tutupModalCatatanWO = function() {
+      document.getElementById('modal-catatan-wo').classList.add('hidden');
+    };
+
+    window.kirimCatatanWO = function() {
+      const noWO    = document.getElementById('catatan-wo-id').value;
+      const catatan = document.getElementById('catatan-wo-text').value.trim();
+      const namaUser = (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive');
+
+      toggleLoader(true, 'Menyimpan catatan...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res && res.success) {
+          showNotification('Catatan customer tersimpan.');
+          tutupModalCatatanWO();
+          // Update cache lokal agar indikator & PDF langsung sinkron tanpa reload penuh
+          const wo = _cachedWorkOrderData.find(w => String(w.noWO) === String(noWO));
+          if (wo) wo.catatanCustomer = catatan;
+          _pgRender('workorder');
+        } else {
+          showNotification((res && res.message) || 'Gagal menyimpan catatan.', 'error');
+        }
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).simpanCatatanWO(noWO, catatan, namaUser);
     };
 
     // ================================================================
@@ -250,7 +296,35 @@
           if (catatan) {
             const lines = doc.splitTextToSize(catatan, boxX - ML - 6);
             doc.text(lines, ML, ly);
+            ly += lines.length * 4.5;
           }
+        }
+
+        // ── Catatan dari Customer (highlight) — request/komunikasi untuk tim ──
+        const catatanCust = (item.catatanCustomer || '').trim();
+        if (catatanCust) {
+          const AMBER_BG   = [255, 247, 224];
+          const AMBER_LINE = [217, 119, 6];
+          const boxCW = boxX - ML - 4;                       // lebar area kiri
+          const custLines = doc.splitTextToSize(catatanCust, boxCW - 8);
+          const headH = 6;
+          const bodyH = custLines.length * 4.2 + 4;
+          let cy = ly + 4;
+          if (cy + headH + bodyH > PH - 12) { doc.addPage(); cy = 20; ly = 20; }
+
+          doc.setFillColor(AMBER_BG[0], AMBER_BG[1], AMBER_BG[2]);
+          doc.setDrawColor(AMBER_LINE[0], AMBER_LINE[1], AMBER_LINE[2]); doc.setLineWidth(0.3);
+          doc.rect(ML, cy, boxCW, headH + bodyH, 'FD');
+          // garis aksen kiri
+          doc.setFillColor(AMBER_LINE[0], AMBER_LINE[1], AMBER_LINE[2]);
+          doc.rect(ML, cy, 1.5, headH + bodyH, 'F');
+
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+          doc.setTextColor(146, 64, 14);
+          doc.text('CATATAN DARI CUSTOMER', ML + 5, cy + 4.2);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+          doc.setTextColor(60, 50, 40);
+          doc.text(custLines, ML + 5, cy + headH + 2);
         }
 
         // ── Footer ──
