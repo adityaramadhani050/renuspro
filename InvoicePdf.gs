@@ -40,10 +40,14 @@ function exportInvoiceDariTemplate(idInvoice) {
         '(No / Description / Qty / Unit / Price / Amount).' };
     }
 
+    // Deteksi kolom tabel dari baris header (tepat di atas anchor) — adaptif
+    // terhadap layout 6 kolom (A-F) maupun 8 kolom (A-H, deskripsi merge B-D).
+    const col = _detectInvoiceColumns(sheet, _getInvoiceAnchor(cache).getRow() - 1);
+
     _bersihkanZonaInvoice(sheet, cache);
     _isiHeaderInvoice(cache, inv, klien);
-    const rowSetelahItem = _sisipkanBarisInvoice(sheet, cache, inv, meta);
-    _sisipkanFooterInvoice(sheet, rowSetelahItem, inv);
+    const rowSetelahItem = _sisipkanBarisInvoice(sheet, cache, inv, meta, col);
+    _sisipkanFooterInvoice(sheet, rowSetelahItem, inv, col);
 
     SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
@@ -168,13 +172,48 @@ function _isiHeaderInvoice(cache, inv, klien) {
 //   Baris   : keterangan pembayaran ("DP 30% dari total kontrak Rp ...")
 //   Baris   : "Deskripsi:"
 //   Baris   : header kelompok + sub-item (deskripsi + qty + unit, TANPA harga)
-function _sisipkanBarisInvoice(sheet, cache, inv, meta) {
+// Deteksi indeks kolom (0-based) dari teks baris header tabel invoice.
+// Mengembalikan { no, desc, qty, unit, harga, total, ncols, descEnd }.
+// Default = layout 8 kolom (samakan Template_Quotation) bila deteksi gagal.
+function _detectInvoiceColumns(sheet, headerRow) {
+  const def = { no: 0, desc: 1, qty: 4, unit: 5, harga: 6, total: 7 };
+  try {
+    if (!headerRow || headerRow < 1) throw new Error('header row invalid');
+    const lastCol = Math.max(8, sheet.getLastColumn());
+    const vals = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
+    const f = {};
+    for (let i = 0; i < vals.length; i++) {
+      const t = (vals[i] == null ? '' : vals[i].toString()).toLowerCase().trim();
+      if (!t) continue;
+      if (f.no    == null && t.indexOf('no') === 0)                               f.no = i;
+      if (f.desc  == null && (t.indexOf('desc') >= 0 || t.indexOf('uraian') >= 0)) f.desc = i;
+      if (f.qty   == null && (t.indexOf('qty') >= 0 || t.indexOf('jumlah') >= 0 || t.indexOf('vol') >= 0)) f.qty = i;
+      if (f.unit  == null && (t.indexOf('unit') >= 0 || t.indexOf('satuan') >= 0)) f.unit = i;
+      if (f.harga == null && (t.indexOf('price') >= 0 || t.indexOf('harga') >= 0)) f.harga = i;
+      if (f.total == null && (t.indexOf('amount') >= 0 || t.indexOf('total') >= 0)) f.total = i;
+    }
+    if (f.qty != null && f.unit != null && f.harga != null && f.total != null) {
+      const col = {
+        no:    f.no   != null ? f.no   : 0,
+        desc:  f.desc != null ? f.desc : 1,
+        qty:   f.qty, unit: f.unit, harga: f.harga, total: f.total
+      };
+      col.ncols   = col.total + 1;
+      col.descEnd = Math.max(col.desc, col.qty - 1); // deskripsi merge desc..(qty-1)
+      return col;
+    }
+  } catch (e) { Logger.log('_detectInvoiceColumns gagal, pakai default: ' + e); }
+  def.ncols = 8; def.descEnd = 3;
+  return def;
+}
+
+function _sisipkanBarisInvoice(sheet, cache, inv, meta, col) {
   const anchor = _getInvoiceAnchor(cache);
   if (!anchor) { Logger.log('anchor zona item invoice tidak ditemukan'); return sheet.getLastRow() + 1; }
 
   const anchorRow = anchor.getRow();
-  const NCOLS = 8;
-  const COL_NO = 0, COL_DESC = 1, COL_QTY = 4, COL_UNIT = 5, COL_HARGA = 6, COL_TOTAL = 7;
+  const NCOLS = col.ncols;
+  const COL_NO = col.no, COL_DESC = col.desc, COL_QTY = col.qty, COL_UNIT = col.unit, COL_HARGA = col.harga, COL_TOTAL = col.total;
   const C_ALT = '#f3f3f3', C_TEXT = '#000000', C_BLUE = '#1a3a8f';
 
   // Bangun daftar baris (deskripsi grup)
@@ -220,7 +259,13 @@ function _sisipkanBarisInvoice(sheet, cache, inv, meta) {
     SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
   );
 
-  const ALIGN_MAIN = ['center', 'left', 'left', 'left', 'center', 'center', 'right', 'right'];
+  // Alignment per kolom (adaptif): No=center, Desc=left, Qty/Unit=center, Harga/Total=right
+  const ALIGN_MAIN = new Array(NCOLS).fill('left');
+  ALIGN_MAIN[COL_NO] = 'center';
+  ALIGN_MAIN[COL_QTY] = 'center';
+  ALIGN_MAIN[COL_UNIT] = 'center';
+  ALIGN_MAIN[COL_HARGA] = 'right';
+  ALIGN_MAIN[COL_TOTAL] = 'right';
 
   const values = [], backgrounds = [], fontColors = [], fontWeights = [], numFormats = [], aligns = [];
 
@@ -271,12 +316,14 @@ function _sisipkanBarisInvoice(sheet, cache, inv, meta) {
   zone.setNumberFormats(numFormats);
   zone.setHorizontalAlignments(aligns);
 
-  // Merge deskripsi (kolom B-D) per baris + atur tinggi
+  // Merge deskripsi (kolom desc..descEnd) per baris + atur tinggi
+  const descColStart = COL_DESC + 1;            // 1-based
+  const descColSpan  = Math.max(1, col.descEnd - COL_DESC + 1);
   baris.forEach(function(b, idx) {
     const r = anchorRow + 1 + idx;
     try {
-      sheet.getRange(r, 2, 1, 3).merge();
-      sheet.getRange(r, 2).setWrap(true).setVerticalAlignment('middle').setHorizontalAlignment('left');
+      if (descColSpan > 1) sheet.getRange(r, descColStart, 1, descColSpan).merge();
+      sheet.getRange(r, descColStart).setWrap(true).setVerticalAlignment('middle').setHorizontalAlignment('left');
       const desc = (b.desc || '').toString();
       const lines = Math.max(1, Math.ceil(desc.length / 55));
       sheet.setRowHeight(r, b.type === 'spacer' ? 8 : Math.max(20, lines * 16 + 6));
@@ -305,9 +352,14 @@ function _ketPembayaranInvoice(inv, meta) {
   return label + persenStr + ' dari total kontrak ' + totalKontrakStr;
 }
 
-// ── Footer invoice: subtotal/PPN/total + terbilang + catatan + ttd ──────────
-function _sisipkanFooterInvoice(sheet, startRow, inv) {
-  const NCOLS = 8;
+// ── Footer invoice: total/PPN/grand total + terbilang + catatan + ttd ───────
+function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
+  const NCOLS    = col.ncols;
+  const labelCol = col.harga + 1;  // 1-based kolom label (= kolom Price)
+  const valueCol = col.total + 1;  // 1-based kolom nilai (= kolom Amount)
+  const bgWidth  = Math.max(1, labelCol - 1);
+  const ttdStart = col.unit + 1;   // ttd mulai dari kolom Unit
+  const ttdSpan  = Math.max(1, NCOLS - col.unit);
   let row = startRow;
 
   const rincian = [
@@ -319,13 +371,13 @@ function _sisipkanFooterInvoice(sheet, startRow, inv) {
   sheet.insertRowsAfter(row - 1, rincian.length);
   rincian.forEach(function(r) {
     sheet.setRowHeight(row, 22);
-    sheet.getRange(row, 1, 1, 6).setBackground('#ffffff');
-    sheet.getRange(row, 7)
+    sheet.getRange(row, 1, 1, bgWidth).setBackground('#ffffff');
+    sheet.getRange(row, labelCol)
       .setValue(r.label)
       .setHorizontalAlignment('right')
       .setFontWeight(r.bold ? 'bold' : 'normal')
       .setFontColor(r.bold ? '#1a3a8f' : '#000000');
-    sheet.getRange(row, 8)
+    sheet.getRange(row, valueCol)
       .setValue(r.value)
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right')
@@ -370,15 +422,14 @@ function _sisipkanFooterInvoice(sheet, startRow, inv) {
 
   // Tanda tangan (kanan)
   sheet.insertRowsAfter(row - 1, 4);
-  sheet.getRange(row, 6, 1, 3)
+  sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
     .setValue('Hormat kami,')
     .setHorizontalAlignment('center')
     .setFontColor('#000000');
   sheet.setRowHeight(row, 20);
-  const ttdRow = row;
   row += 3;
-  sheet.getRange(row, 6, 1, 3)
+  sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
     .setValue('PT. RENUS GLOBAL INDONESIA')
     .setHorizontalAlignment('center')
