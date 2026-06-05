@@ -1,0 +1,117 @@
+      <section id="page-kwitansi" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Kwitansi</h2>
+            <p class="text-sm text-slate-400 font-medium mt-0.5">Tanda terima pembayaran atas invoice.</p>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-kwitansi" oninput="filterKwitansi()"
+                placeholder="Cari No kwitansi, invoice, klien..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                      focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+            </div>
+            <button onclick="bukaModalBuatKwitansi()"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold
+                    shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-plus text-sm"></i> Buat Kwitansi
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">No Kwitansi</th>
+                  <th class="p-4">Ref Invoice / WO</th>
+                  <th class="p-4">Terima Dari</th>
+                  <th class="p-4">Untuk</th>
+                  <th class="p-4 text-right">Jumlah</th>
+                  <th class="p-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-kwitansi" class="text-sm">
+                <tr><td colspan="6" class="p-8 text-center text-slate-500">
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data kwitansi...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ============ MODAL BUAT KWITANSI ============ -->
+        <div id="modal-kwitansi" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl max-h-[92vh] overflow-y-auto">
+
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-receipt"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Buat Kwitansi Baru</h3>
+                <p class="text-xs text-slate-400">Nomor: <span id="kw-nomor-preview" class="font-bold text-emerald-600">-</span></p>
+              </div>
+              <button onclick="document.getElementById('modal-kwitansi').classList.add('hidden')"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Invoice yang Dibayar</label>
+                <select id="kw-invoice" onchange="onKwitansiInvoiceChange()" class="input-field text-sm">
+                  <option value="">-- Pilih Invoice --</option>
+                </select>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal</label>
+                  <input type="date" id="kw-tanggal" class="input-field text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Metode</label>
+                  <select id="kw-metode" class="input-field text-sm">
+                    <option value="Transfer">Transfer</option>
+                    <option value="Tunai">Tunai</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Terima Dari</label>
+                <input type="text" id="kw-terima" placeholder="Nama klien / pembayar" class="input-field text-sm">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Untuk Pembayaran</label>
+                <input type="text" id="kw-untuk" placeholder="Pembayaran DP - Project.." class="input-field text-sm">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jumlah Diterima (Rp)</label>
+                <input type="text" id="kw-jumlah" oninput="onKwitansiJumlahInput()" placeholder="0" class="input-field text-sm text-right font-bold">
+                <p id="kw-terbilang" class="text-[11px] text-emerald-600 italic mt-1"></p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan (opsional)</label>
+                <input type="text" id="kw-catatan" placeholder="Keterangan tambahan" class="input-field text-sm">
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100 sticky bottom-0 bg-white">
+              <button type="button" onclick="document.getElementById('modal-kwitansi').classList.add('hidden')"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button type="button" onclick="submitKwitansi()"
+                class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Kwitansi
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>

@@ -169,9 +169,8 @@ function _sisipkanBarisItem(sheet, namedRangeCache, kelompokList) {
   const numFormats  = [];
   const alignments  = [];
 
-  let globalNo = 1;
-
   kelompokList.forEach(function(kelompok) {
+    let globalNo = 1;
     // ── Baris header kelompok ──
     const grpVals = new Array(NCOLS).fill('');
     grpVals[COL_NO]    = kelompok.kelompok      || '';

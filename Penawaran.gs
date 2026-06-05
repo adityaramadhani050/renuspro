@@ -62,7 +62,8 @@ function getPenawaranList() {
           marginPersen:  parseFloat(data[i][13]) || 0,
           termConditions: data[i][14] ? data[i][14].toString() : '{}',
           items:          data[i][15] ? data[i][15].toString() : '[]',
-          status:         data[i][16] ? data[i][16].toString() : 'On-Progress'
+          status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
+          noWO:           data[i][17] ? data[i][17].toString() : ''
         };
       }
     }
@@ -127,7 +128,8 @@ function getRiwayatRevisi(noPenawaran) {
         marginPersen:  parseFloat(data[i][13]) || 0,
         termConditions: data[i][14] ? data[i][14].toString() : '{}',
         items:          data[i][15] ? data[i][15].toString() : '[]',
-        status:         data[i][16] ? data[i][16].toString() : 'On-Progress'
+        status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
+        noWO:           data[i][17] ? data[i][17].toString() : ''
       });
     }
 
@@ -311,18 +313,42 @@ function simpanPenawaranKeSheet(payload) {
   }
 }
 function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
+  const lock = LockService.getScriptLock();
   try {
+    lock.waitLock(15000);
     const sheet = getSpreadsheet().getSheetByName('Penawaran_Main');
     if (!sheet) return { success: false, message: "Sheet tidak ditemukan." };
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
-        return { success: true, message: "Status diperbarui menjadi: " + statusBaru };
+
+        // ── Otomasi No WO (Kolom 18) ──
+        let noWO = data[i][17] ? data[i][17].toString() : '';
+        if (statusBaru === 'Deal') {
+          // Status menjadi Deal → terbitkan No WO jika belum ada
+          if (!noWO) {
+            noWO = generateNextWONumber(sheet);
+            sheet.getRange(i + 1, 18).setValue(Number(noWO));
+          }
+        } else {
+          // Keluar dari Deal → kosongkan No WO
+          if (noWO) {
+            sheet.getRange(i + 1, 18).setValue('');
+            noWO = '';
+          }
+        }
+
+        SpreadsheetApp.flush();
+        return { success: true, message: "Status diperbarui menjadi: " + statusBaru, noWO: noWO };
       }
     }
     return { success: false, message: "Penawaran tidak ditemukan." };
-  } catch(e) { return { success: false, message: e.toString() }; }
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
 }
 
 function hapusPenawaran(noPenawaran, rev) {

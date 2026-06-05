@@ -28,6 +28,9 @@
       document.getElementById('nav-' + pageId).classList.add('active');
       if(pageId === 'dashboard') loadDashboard();
       if(pageId === 'penawaran') { loadPenawaran(); toggleFormPenawaran(false); }
+      if(pageId === 'workorder') loadWorkOrder();
+      if(pageId === 'invoice') loadInvoice();
+      if(pageId === 'kwitansi') loadKwitansi();
       if(pageId === 'produk') loadProduk();
       if(pageId === 'template') loadTemplate();
       if(pageId === 'customer') loadCustomer();

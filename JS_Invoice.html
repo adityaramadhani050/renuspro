@@ -1,0 +1,336 @@
+<script>
+    // ================================================================
+    // FITUR INVOICE
+    // ================================================================
+    let _invoiceWOList   = [];
+    let _invoiceNextNo   = '';
+    let _invoiceLines    = [];
+    let _cachedInvoiceData = [];
+
+    // ── Helper tanggal yyyy-mm-dd → dd/MM/yyyy ──
+    function _toDDMMYYYY(str) {
+      if (!str) return '';
+      const p = str.split('-');
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : str;
+    }
+    function _jenisBadge(j) {
+      const map = {
+        'DP':        'bg-amber-100 text-amber-700',
+        'Termin':    'bg-blue-100 text-blue-700',
+        'Pelunasan': 'bg-violet-100 text-violet-700',
+        'Penuh':     'bg-emerald-100 text-emerald-800'
+      };
+      return map[j] || 'bg-slate-100 text-slate-600';
+    }
+
+    // ── List ──
+    function _pgRenderInvoice(data) {
+      const tbody = document.getElementById('table-invoice');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">
+          <i class="fas fa-file-invoice mr-2"></i>Belum ada invoice. Klik <b>Buat Invoice</b> untuk menagih Work Order.
+        </td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map(i => {
+        const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
+        const bayarClass = i.statusBayar === 'Lunas' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+          <td class="p-4 max-w-[200px]">
+            <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}</p>
+            <p class="text-[11px] text-slate-400 font-medium">${i.tanggal || ''}</p>
+          </td>
+          <td class="p-4">
+            <p class="font-semibold text-emerald-700 text-xs whitespace-nowrap"><i class="fa-solid fa-clipboard-check text-[10px]"></i> ${i.noWO}</p>
+            <p class="text-[11px] text-slate-400">${i.noPenawaran}</p>
+          </td>
+          <td class="p-4 max-w-[220px]">
+            <p class="text-[11px] text-slate-400 font-medium truncate">${i.namaKlien}</p>
+            <p class="font-semibold text-slate-700 truncate">${i.namaProject}</p>
+          </td>
+          <td class="p-4 text-center"><span class="text-[11px] font-bold px-2 py-1 rounded-lg ${_jenisBadge(i.jenis)}">${i.jenis}${i.persen ? ' '+i.persen+'%' : ''}</span></td>
+          <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.total.toLocaleString('id-ID')}</td>
+          <td class="p-4 text-center">
+            <select onchange="ubahStatusBayarInvoice('${i.id}', this)"
+              class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${bayarClass}">
+              <option value="Belum Lunas" ${i.statusBayar==='Belum Lunas'?'selected':''}>Belum Lunas</option>
+              <option value="Lunas" ${i.statusBayar==='Lunas'?'selected':''}>Lunas</option>
+            </select>
+          </td>
+          <td class="p-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick='exportInvoicePDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Invoice">
+                <i class="fa-solid fa-file-pdf"></i>
+              </button>
+              <button onclick="konfirmasiHapus('invoice','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    window.loadInvoice = function() {
+      const tbody = document.getElementById('table-invoice');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data invoice...</td></tr>`;
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+          _cachedInvoiceData = data || [];
+          const s = document.getElementById('search-invoice'); if (s) s.value = '';
+          _pgState.invoice.data = _cachedInvoiceData;
+          _pgState.invoice.page = 1;
+          _injectPgBar('invoice', '#table-invoice');
+          _pgRender('invoice');
+        }).getInvoiceList();
+      }
+    };
+
+    window.filterInvoice = function() {
+      const q = (document.getElementById('search-invoice').value || '').toLowerCase().trim();
+      _pgState.invoice.data = _cachedInvoiceData.filter(d => {
+        if (!q) return true;
+        return (d.id + d.noWO + d.noPenawaran + d.namaKlien + d.namaProject + d.jenis).toLowerCase().includes(q);
+      });
+      _pgState.invoice.page = 1;
+      _pgRender('invoice');
+    };
+
+    // ── Form Buat Invoice ──
+    function bukaModalBuatInvoice() {
+      toggleLoader(true, 'Memuat Work Order...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _invoiceWOList = res.woList || [];
+        _invoiceNextNo = res.nextNo || '';
+        document.getElementById('inv-nomor-preview').innerText = _invoiceNextNo;
+
+        const sel = document.getElementById('inv-wo');
+        sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
+        _invoiceWOList.forEach(w => {
+          if (w.sisa > 0) sel.add(new Option(`${w.noWO} — ${w.namaKlien} (sisa Rp ${Math.round(w.sisa).toLocaleString('id-ID')})`, w.noWO));
+        });
+
+        // Reset form
+        document.getElementById('inv-wo-info').classList.add('hidden');
+        document.getElementById('inv-jenis').value = 'DP';
+        document.getElementById('inv-persen').value = 50;
+        document.getElementById('inv-ppn').value = 11;
+        document.getElementById('inv-nopo').value = '';
+        document.getElementById('inv-tanggal').valueAsDate = new Date();
+        document.getElementById('inv-tglpo').value = '';
+        document.getElementById('inv-catatan').value = '';
+        _invoiceLines = [];
+        _renderInvoiceLines();
+        _sumInvoice();
+        onInvoiceJenisChange();
+
+        document.getElementById('modal-invoice').classList.remove('hidden');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).getInvoiceInitialData();
+    }
+
+    function _currentInvoiceWO() {
+      const id = document.getElementById('inv-wo').value;
+      return _invoiceWOList.find(w => w.noWO === id) || null;
+    }
+
+    function onInvoiceWOChange() {
+      const wo = _currentInvoiceWO();
+      const info = document.getElementById('inv-wo-info');
+      if (!wo) { info.classList.add('hidden'); _invoiceLines = []; _renderInvoiceLines(); _sumInvoice(); return; }
+      info.classList.remove('hidden');
+      document.getElementById('inv-info-klien').innerText   = wo.namaKlien;
+      document.getElementById('inv-info-project').innerText = wo.namaProject;
+      document.getElementById('inv-info-grand').innerText   = 'Rp ' + wo.grandTotal.toLocaleString('id-ID');
+      document.getElementById('inv-info-ditagih').innerText = 'Rp ' + Math.round(wo.ditagih).toLocaleString('id-ID');
+      document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(wo.sisa).toLocaleString('id-ID');
+
+      // Default PPN dari rate WO
+      const netSub = (wo.subtotal || 0) - (wo.diskon || 0);
+      const rate = netSub > 0 ? Math.round((wo.pajak || 0) / netSub * 100) : 0;
+      document.getElementById('inv-ppn').value = rate;
+
+      _regenInvoiceLines();
+    }
+
+    function onInvoiceJenisChange() {
+      const jenis = document.getElementById('inv-jenis').value;
+      document.getElementById('inv-persen-wrap').style.display = (jenis === 'DP' || jenis === 'Termin') ? '' : 'none';
+      _regenInvoiceLines();
+    }
+
+    // Regenerasi baris otomatis sesuai jenis
+    function _regenInvoiceLines() {
+      const wo = _currentInvoiceWO();
+      if (!wo) { _invoiceLines = []; _renderInvoiceLines(); _sumInvoice(); return; }
+      const jenis = document.getElementById('inv-jenis').value;
+      const ppn   = parseFloat(document.getElementById('inv-ppn').value) || 0;
+      const rate  = ppn / 100;
+
+      if (jenis === 'Penuh') {
+        let kelompokList = [];
+        try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
+        _invoiceLines = [];
+        kelompokList.forEach(k => (k.subItems || []).forEach(s => {
+          _invoiceLines.push({
+            deskripsi: s.deskripsi || '', qty: s.qty || 1, unit: s.unit || '',
+            harga: s.harga || 0, amount: (s.qty || 0) * (s.harga || 0)
+          });
+        }));
+        if ((wo.diskon || 0) > 0) {
+          _invoiceLines.push({ deskripsi: 'Diskon', qty: 1, unit: '-', harga: -(wo.diskon), amount: -(wo.diskon) });
+        }
+      } else {
+        let totalTagih;
+        let desc;
+        const project = wo.namaProject || '';
+        if (jenis === 'Pelunasan') {
+          totalTagih = wo.sisa;
+          desc = 'Pelunasan Pembayaran - ' + project;
+        } else {
+          const p = parseFloat(document.getElementById('inv-persen').value) || 0;
+          totalTagih = Math.round(p / 100 * wo.grandTotal);
+          desc = (jenis === 'DP' ? 'Uang Muka (DP) ' : 'Pembayaran Termin ') + p + '% - ' + project;
+        }
+        const dpp = Math.round(totalTagih / (1 + rate));
+        _invoiceLines = [{ deskripsi: desc, qty: 1, unit: 'paket', harga: dpp, amount: dpp }];
+      }
+      _renderInvoiceLines();
+      _sumInvoice();
+    }
+
+    // Dipanggil dari input persen/ppn
+    function hitungInvoice() {
+      const jenis = document.getElementById('inv-jenis').value;
+      if (jenis !== 'Penuh') _regenInvoiceLines();
+      else _sumInvoice();
+    }
+
+    function _renderInvoiceLines() {
+      const cont = document.getElementById('inv-lines');
+      if (!_invoiceLines.length) { cont.innerHTML = '<p class="text-xs text-slate-400 italic">Pilih Work Order untuk mengisi rincian.</p>'; return; }
+      cont.innerHTML = _invoiceLines.map((l, idx) => `
+        <div class="flex gap-2 items-center">
+          <input type="text" value="${(l.deskripsi || '').replace(/"/g,'&quot;')}" oninput="onInvLineEdit(${idx},'deskripsi',this.value)"
+            class="input-field text-xs flex-1" placeholder="Deskripsi tagihan">
+          <input type="text" value="${formatNominalRupiah(l.amount || 0)}" oninput="onInvLineEdit(${idx},'amount',this.value)"
+            class="input-field text-xs w-32 text-right" placeholder="0">
+          <button type="button" onclick="hapusBarisInvoice(${idx})" class="text-rose-500 hover:bg-rose-50 px-1.5 py-1 rounded">
+            <i class="fa-regular fa-trash-can text-xs"></i>
+          </button>
+        </div>`).join('');
+    }
+
+    function onInvLineEdit(idx, field, val) {
+      if (!_invoiceLines[idx]) return;
+      if (field === 'amount') {
+        const num = pN(val);
+        _invoiceLines[idx].amount = num;
+        _invoiceLines[idx].harga  = num; // sinkron untuk baris manual
+      } else {
+        _invoiceLines[idx][field] = val;
+      }
+      _sumInvoice();
+    }
+
+    function tambahBarisInvoice() {
+      _invoiceLines.push({ deskripsi: '', qty: 1, unit: 'paket', harga: 0, amount: 0 });
+      _renderInvoiceLines();
+      _sumInvoice();
+    }
+
+    function hapusBarisInvoice(idx) {
+      _invoiceLines.splice(idx, 1);
+      _renderInvoiceLines();
+      _sumInvoice();
+    }
+
+    function _sumInvoice() {
+      const dpp = _invoiceLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+      const ppn = parseFloat(document.getElementById('inv-ppn').value) || 0;
+      const ppnNom = Math.round(dpp * ppn / 100);
+      const total = dpp + ppnNom;
+      document.getElementById('inv-dpp').innerText        = Math.round(dpp).toLocaleString('id-ID');
+      document.getElementById('inv-ppn-nominal').innerText = ppnNom.toLocaleString('id-ID');
+      document.getElementById('inv-total').innerText      = Math.round(total).toLocaleString('id-ID');
+    }
+
+    function submitInvoice() {
+      const wo = _currentInvoiceWO();
+      if (!wo) return showNotification('Silakan pilih Work Order!', 'error');
+      if (!_invoiceLines.length) return showNotification('Minimal 1 baris tagihan!', 'error');
+      const dpp = _invoiceLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+      if (dpp <= 0) return showNotification('Nilai tagihan harus lebih dari 0!', 'error');
+
+      const jenis = document.getElementById('inv-jenis').value;
+      const payload = {
+        noWO:        wo.noWO,
+        noPenawaran: wo.id,
+        tanggal:     _toDDMMYYYY(document.getElementById('inv-tanggal').value),
+        jenis:       jenis,
+        persen:      (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
+        noPO:        document.getElementById('inv-nopo').value.trim(),
+        tglPO:       _toDDMMYYYY(document.getElementById('inv-tglpo').value),
+        klienId:     wo.klienId,
+        namaKlien:   wo.namaKlien,
+        namaProject: wo.namaProject,
+        ppnPersen:   parseFloat(document.getElementById('inv-ppn').value) || 0,
+        catatan:     document.getElementById('inv-catatan').value.trim(),
+        items:       _invoiceLines,
+        dibuatOleh:  (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
+      };
+
+      toggleLoader(true, 'Menyimpan invoice...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          document.getElementById('modal-invoice').classList.add('hidden');
+          loadInvoice();
+        } else showNotification(res.message, 'error');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).simpanInvoice(payload);
+    }
+
+    function ubahStatusBayarInvoice(id, sel) {
+      google.script.run.withSuccessHandler(function(res) {
+        showNotification(res.message, res.success ? 'success' : 'error');
+        loadInvoice();
+      }).withFailureHandler(function(err) {
+        showNotification(err.message || err, 'error'); loadInvoice();
+      }).updateStatusBayarInvoice(id, sel.value);
+    }
+
+    // ── Export PDF Invoice (reuse modal preview PDF) ──
+    function exportInvoicePDF(item) {
+      document.getElementById('preview-pdf-title').innerText = 'Invoice — ' + item.id;
+      document.getElementById('preview-pdf-subtitle').innerText = (item.namaProject || '') + ' · ' + (item.namaKlien || '');
+      document.getElementById('preview-pdf-loading').classList.remove('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+      document.getElementById('modal-preview-pdf').classList.remove('hidden');
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          _activePdfBase64 = res.pdfBase64;
+          _activePdfName   = res.fileName;
+          renderPDFDariBase64(res.pdfBase64);
+        } else {
+          document.getElementById('preview-pdf-loading').innerHTML = `
+            <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
+            <button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
+        }
+      }).withFailureHandler(function(err) {
+        document.getElementById('preview-pdf-loading').innerHTML = `
+          <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
+      }).exportInvoiceDariTemplate(item.id);
+    }
+</script>

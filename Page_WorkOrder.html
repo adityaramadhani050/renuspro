@@ -1,0 +1,40 @@
+      <section id="page-workorder" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Work Order</h2>
+            <p class="text-sm text-slate-400 font-medium mt-0.5">
+              Seluruh penawaran berstatus <span class="font-bold text-emerald-600">Deal</span> beserta nomor WO-nya.
+            </p>
+          </div>
+          <div class="relative flex-1 sm:flex-none sm:w-64 w-full">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="search-workorder" oninput="filterWorkOrder()"
+              placeholder="Cari No WO, penawaran, klien..."
+              class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                    focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+          </div>
+        </div>
+
+        <!-- Tabel Work Order -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">No WO</th>
+                  <th class="p-4">No Penawaran</th>
+                  <th class="p-4">Klien / Project</th>
+                  <th class="p-4">Sales</th>
+                  <th class="p-4 text-right">Grand Total</th>
+                  <th class="p-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-workorder" class="text-sm">
+                <tr><td colspan="6" class="p-8 text-center text-slate-500">
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
