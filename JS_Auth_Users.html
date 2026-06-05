@@ -392,12 +392,8 @@ function bukaModalCustomerDariForm() {
   }
 });
 
-const _handleFormSubmissionOriginal = handleFormSubmission;
-document.addEventListener('DOMContentLoaded', function() {}, false);
-const _origHandleForm = window.handleFormSubmission;
-if (_origHandleForm) {
-  window._getCurrentUserNama = function() {
-    return _currentUser ? _currentUser.nama : 'Sales Executive';
-  };
-}
+// Nama user aktif untuk payload penawaran (diambil dari sesi login).
+window._getCurrentUserNama = function() {
+  return _currentUser ? _currentUser.nama : 'Sales Executive';
+};
 </script>

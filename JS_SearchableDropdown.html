@@ -258,18 +258,9 @@
     if (inst && inst.reset) inst.reset();
   };
 
-  // Inisialisasi saat muatSeluruhDataAwal selesai
-  // Override muatSeluruhDataAwal agar init SD setelah data klien dimuat
-  const _origMuatAwal = window.muatSeluruhDataAwal;
-  window.muatSeluruhDataAwal = function(showLoadingUI) {
-    if (_origMuatAwal) _origMuatAwal.call(window, showLoadingUI);
-    // Init setelah sedikit delay agar DOM klienSelect sudah terisi
-    setTimeout(function() {
-      _initAllSD();
-    }, 400);
-  };
-
-  function _initAllSD() {
+  // Diekspos agar bisa dipanggil langsung dari muatSeluruhDataAwal()
+  // (sebelumnya dipasang via override fungsi — kini cukup panggil window._initAllSD).
+  window._initAllSD = function() {
     // 1. Klien Select di form penawaran
     if (document.getElementById('klienSelect') &&
         !document.getElementById('klienSelect').dataset.sdInit) {

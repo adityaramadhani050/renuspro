@@ -124,6 +124,8 @@
           if(showLoadingUI) toggleLoader(false);
         }).getInitialData();
       } else { if(showLoadingUI) toggleLoader(false); }
+      // Init searchable dropdown setelah data klien termuat (DOM klienSelect siap)
+      setTimeout(function() { if (window._initAllSD) window._initAllSD(); }, 400);
     }
 
     function onKlienChanged(sel) {
