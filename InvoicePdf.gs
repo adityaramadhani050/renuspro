@@ -31,6 +31,15 @@ function exportInvoiceDariTemplate(idInvoice) {
 
     const cache = _buildNamedRangeCache(ss);
 
+    // Validasi anchor sebelum operasi destruktif
+    if (!_anchorInvoiceValid(cache)) {
+      return { success: false, message:
+        'Named range "inv_item_zone_start" hilang/#REF. Perbaiki di sheet Template_Invoice: ' +
+        'hapus sisa baris footer di zona item, lalu buat ulang named range ' +
+        '"inv_item_zone_start" menunjuk ke satu baris kosong tepat di bawah header tabel ' +
+        '(No / Description / Qty / Unit / Price / Amount).' };
+    }
+
     _bersihkanZonaInvoice(sheet, cache);
     _isiHeaderInvoice(cache, inv, klien);
     const rowSetelahItem = _sisipkanBarisInvoice(sheet, cache, inv, meta);
@@ -105,6 +114,18 @@ function _parseInvoiceMeta(inv) {
     nilaiKontrak: parseFloat(meta.nilaiKontrak) || 0,
     inputMode:    meta.inputMode || 'persen'
   };
+}
+
+// Cek anchor inv_item_zone_start ada & tidak #REF (getRow tidak melempar error)
+function _anchorInvoiceValid(cache) {
+  try {
+    const anchor = cache.get('inv_item_zone_start');
+    if (!anchor) return false;
+    const r = anchor.getRow();
+    return r > 0;
+  } catch (e) {
+    return false; // #REF → getRow() melempar error
+  }
 }
 
 // ── Bersihkan zona dinamis invoice ──────────────────────────────────────────
