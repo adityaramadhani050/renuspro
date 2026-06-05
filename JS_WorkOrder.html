@@ -35,9 +35,9 @@
           <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button onclick='exportPenawaranPDF(${itemJson})'
-                class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export Quotation PDF">
-                <i class="fa-solid fa-file-pdf"></i>
+              <button onclick='exportWorkOrderPDF(${itemJson})'
+                class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Export PDF Work Order (Internal — dengan HPP)">
+                <i class="fa-solid fa-file-arrow-down"></i>
               </button>
               <span class="text-slate-300 p-1.5 cursor-not-allowed" title="Invoice & Kwitansi — segera hadir">
                 <i class="fa-solid fa-file-invoice text-xs"></i>
@@ -77,5 +77,195 @@
       });
       _pgState.workorder.page = 1;
       _pgRender('workorder');
+    };
+
+    // ================================================================
+    // EXPORT PDF WORK ORDER (INTERNAL)
+    // Acuan pelaksanaan project untuk tim — memuat HPP, total HPP,
+    // dan margin per item. BUKAN dokumen untuk pelanggan.
+    // ================================================================
+    window.exportWorkOrderPDF = function(item) {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+        const PW = 297, PH = 210, ML = 12, MR = 12;
+        const DARK  = [30, 41, 59];
+        const SLATE = [100, 116, 139];
+        const GREEN = [5, 150, 105];
+        const RED   = [190, 30, 30];
+        const BLUE  = [30, 64, 175];
+        const rp = v => Math.round(Math.abs(v || 0)).toLocaleString('id-ID');
+
+        let tc = {};            try { tc = JSON.parse(item.termConditions || '{}'); } catch (e) {}
+        let kelompokList = [];  try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
+
+        // ── Header band ──
+        doc.setFillColor(DARK[0], DARK[1], DARK[2]);
+        doc.rect(0, 0, PW, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+        doc.text('WORK ORDER', ML, 11);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.setTextColor(190, 200, 220);
+        doc.text('DOKUMEN INTERNAL — ACUAN PELAKSANAAN PROJECT (RAHASIA)', ML, 17);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+        doc.setTextColor(170, 195, 255);
+        doc.text('NO. WORK ORDER', PW - MR, 9, { align: 'right' });
+        doc.setFontSize(18); doc.setTextColor(255, 255, 255);
+        doc.text(String(item.noWO), PW - MR, 17, { align: 'right' });
+
+        // ── Info dua kolom ──
+        let y = 30;
+        const infoLeft = [
+          ['No Penawaran', item.id + '  (Rev ' + item.rev + ')'],
+          ['Tanggal',      item.tanggal || '-'],
+          ['Sales / PIC',  item.dibuatOleh || '-'],
+        ];
+        const infoRight = [
+          ['Klien',   item.namaKlien || '-'],
+          ['Project', item.namaProject || '-'],
+          ['Status',  item.status || 'Deal'],
+        ];
+        doc.setFontSize(8);
+        infoLeft.forEach((r, i) => {
+          const yy = y + i * 5;
+          doc.setFont('helvetica', 'bold');   doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], ML, yy);
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);    doc.text(': ' + r[1], ML + 26, yy);
+        });
+        infoRight.forEach((r, i) => {
+          const yy = y + i * 5;
+          doc.setFont('helvetica', 'bold');   doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], PW / 2, yy);
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);    doc.text(': ' + r[1], PW / 2 + 26, yy);
+        });
+        y += 18;
+
+        // ── Body tabel: header kelompok + item ──
+        const body = [];
+        kelompokList.forEach((k, ki) => {
+          const letter = k.kelompok || String.fromCharCode(65 + ki);
+          body.push([{
+            content: letter + '. ' + (k.namaKelompok || '').toUpperCase(),
+            colSpan: 9,
+            styles: { fillColor: [226, 232, 240], textColor: DARK, fontStyle: 'bold', halign: 'left' }
+          }]);
+          (k.subItems || []).forEach((s, si) => {
+            const qty       = s.qty   || 0;
+            const harga     = s.harga || 0;
+            const hpp       = s.hpp   || 0;
+            const totalJual = (s.total != null) ? s.total : qty * harga;
+            const totalHpp  = qty * hpp;
+            const margin    = totalJual > 0 ? ((totalJual - totalHpp) / totalJual * 100) : 0;
+            const mColor    = margin >= 25 ? GREEN : RED;
+            body.push([
+              String(si + 1),
+              s.deskripsi || '',
+              String(qty),
+              s.unit || '',
+              rp(harga),
+              rp(hpp),
+              rp(totalJual),
+              rp(totalHpp),
+              { content: margin.toFixed(1) + '%', styles: { textColor: mColor, fontStyle: 'bold', halign: 'center' } },
+            ]);
+          });
+        });
+
+        doc.autoTable({
+          startY: y,
+          head: [['No', 'Deskripsi Produk / Jasa', 'Qty', 'Unit', 'Harga Jual', 'HPP Satuan', 'Total Jual', 'Total HPP', 'Margin']],
+          body: body,
+          theme: 'grid',
+          margin: { left: ML, right: MR },
+          headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
+          columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 14, halign: 'center' },
+            3: { cellWidth: 16, halign: 'center' },
+            4: { cellWidth: 28, halign: 'right' },
+            5: { cellWidth: 28, halign: 'right' },
+            6: { cellWidth: 30, halign: 'right' },
+            7: { cellWidth: 30, halign: 'right' },
+            8: { cellWidth: 18, halign: 'center' },
+          },
+          styles: { overflow: 'linebreak' },
+        });
+
+        let curY = doc.lastAutoTable.finalY + 5;
+
+        // ── Ringkasan finansial (kanan) ──
+        const netSub      = (item.subtotal || 0) - (item.diskon || 0);
+        const totalHppAll = item.hpp || 0;
+        const profit      = (item.profit != null) ? item.profit : (netSub - totalHppAll);
+        const marginAll   = (item.marginPersen != null && item.marginPersen !== 0)
+          ? item.marginPersen
+          : (netSub > 0 ? (profit / netSub * 100) : 0);
+
+        const sumLines = [];
+        sumLines.push(['Subtotal (Jual)', 'Rp ' + rp(item.subtotal || 0), false, DARK]);
+        if ((item.diskon || 0) > 0) sumLines.push(['Diskon', '- Rp ' + rp(item.diskon), false, RED]);
+        if ((item.pajak || 0) > 0) {
+          const pct = netSub > 0 ? Math.round(item.pajak / netSub * 100) : 11;
+          sumLines.push(['PPN ' + pct + '%', 'Rp ' + rp(item.pajak), false, DARK]);
+        }
+        sumLines.push(['GRAND TOTAL',     'Rp ' + rp(item.grandTotal || 0), true,  BLUE]);
+        sumLines.push(['Total HPP',       'Rp ' + rp(totalHppAll),          false, RED]);
+        sumLines.push(['Estimasi Profit', 'Rp ' + rp(profit),               true,  GREEN]);
+        sumLines.push(['Margin',          Number(marginAll).toFixed(1) + '%', true, GREEN]);
+
+        const boxW = 90, boxX = PW - MR - boxW, rowH = 6;
+        if (curY + sumLines.length * rowH > PH - 14) { doc.addPage(); curY = 20; }
+
+        doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2);
+        doc.rect(boxX, curY, boxW, sumLines.length * rowH);
+        sumLines.forEach((r, i) => {
+          const ry = curY + i * rowH;
+          if (r[2]) { doc.setFillColor(245, 247, 250); doc.rect(boxX, ry, boxW, rowH, 'F'); }
+          doc.setFontSize(8);
+          doc.setFont('helvetica', r[2] ? 'bold' : 'normal');
+          doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+          doc.text(r[0], boxX + 3, ry + 4);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(r[3][0], r[3][1], r[3][2]);
+          doc.text(r[1], boxX + boxW - 3, ry + 4, { align: 'right' });
+        });
+
+        // ── Catatan project (kiri) — info pelaksanaan untuk tim ──
+        const tcPairs = [
+          ['Material',       tc.material_status],
+          ['Delivery Time',  tc.delivery_time],
+          ['Delivery Cond.', tc.delivery_cond],
+          ['Warranty',       tc.warranty],
+          ['Bonus',          tc.bonus],
+        ].filter(p => p[1]);
+        const catatan = tc.catatan || '';
+
+        let ly = curY;
+        if (tcPairs.length || catatan) {
+          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+          doc.text('Catatan Project:', ML, ly + 4); ly += 9;
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.setFontSize(7.5);
+          tcPairs.forEach(p => { doc.text('• ' + p[0] + ': ' + p[1], ML, ly); ly += 4.5; });
+          if (catatan) {
+            const lines = doc.splitTextToSize(catatan, boxX - ML - 6);
+            doc.text(lines, ML, ly);
+          }
+        }
+
+        // ── Footer ──
+        doc.setFontSize(7); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+        doc.text('Dokumen internal PT. Renus Global Indonesia — dilarang diberikan ke pelanggan.', ML, PH - 8);
+
+        const fname = 'WO_' + String(item.noWO) + '_' +
+          (item.namaProject || '').replace(/[\\/]/g, '-') + '.pdf';
+        doc.save(fname);
+        showNotification('PDF Work Order diunduh: ' + fname);
+      } catch (err) {
+        console.error(err);
+        showNotification('Gagal membuat PDF Work Order: ' + (err.message || err), 'error');
+      }
     };
 </script>
