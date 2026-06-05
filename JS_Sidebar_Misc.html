@@ -99,7 +99,11 @@ async function _mergePdfDenganTC(mainPdfBytes, kelompokList) {
   const mainDoc = await PDFDocument.load(mainPdfBytes);
   const tcDoc   = await PDFDocument.load(tcBytes);
 
-  const tcPages = await mainDoc.copyPages(tcDoc, tcDoc.getPageIndices());
+  // Hapus halaman kosong terakhir di file T&C sebelum di-merge
+  const totalTcPages = tcDoc.getPageCount();
+  const pageIndices  = Array.from({ length: totalTcPages - 1 }, (_, i) => i);
+
+  const tcPages = await mainDoc.copyPages(tcDoc, pageIndices);
   tcPages.forEach(page => mainDoc.addPage(page));
 
   return await mainDoc.save();
