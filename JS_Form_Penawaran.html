@@ -567,6 +567,18 @@
         return;
       }
 
+      if (tipe === 'invoice') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) { showNotification(res.message); loadInvoice(); }
+            else showNotification(res.message, "error");
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
+          .hapusInvoice(id);
+        return;
+      }
+
       if (tipe === 'penawaran') {
         const [noPenawaran, rev] = id.split('|');
         google.script.run

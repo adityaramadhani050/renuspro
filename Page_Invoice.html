@@ -1,0 +1,156 @@
+      <section id="page-invoice" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Invoice</h2>
+            <p class="text-sm text-slate-400 font-medium mt-0.5">
+              Penagihan dari Work Order — mendukung DP, Termin, Pelunasan, atau Penuh.
+            </p>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-invoice" oninput="filterInvoice()"
+                placeholder="Cari No invoice, WO, klien..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                      focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+            </div>
+            <button onclick="bukaModalBuatInvoice()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold
+                    shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-plus text-sm"></i> Buat Invoice
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabel Invoice -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">No Invoice</th>
+                  <th class="p-4">WO / Penawaran</th>
+                  <th class="p-4">Klien / Project</th>
+                  <th class="p-4 text-center">Jenis</th>
+                  <th class="p-4 text-right">Total</th>
+                  <th class="p-4 text-center">Status Bayar</th>
+                  <th class="p-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-invoice" class="text-sm">
+                <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                  <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data invoice...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ============ MODAL BUAT INVOICE ============ -->
+        <div id="modal-invoice" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-file-invoice"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Buat Invoice Baru</h3>
+                <p class="text-xs text-slate-400">Nomor: <span id="inv-nomor-preview" class="font-bold text-blue-600">-</span></p>
+              </div>
+              <button onclick="document.getElementById('modal-invoice').classList.add('hidden')"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+              <!-- Pilih WO -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Work Order (Deal)</label>
+                <select id="inv-wo" onchange="onInvoiceWOChange()" class="input-field text-sm">
+                  <option value="">-- Pilih Work Order --</option>
+                </select>
+              </div>
+
+              <!-- Info WO -->
+              <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs grid grid-cols-2 gap-2">
+                <div><span class="text-slate-400">Klien:</span> <span id="inv-info-klien" class="font-bold text-slate-700"></span></div>
+                <div><span class="text-slate-400">Project:</span> <span id="inv-info-project" class="font-bold text-slate-700"></span></div>
+                <div><span class="text-slate-400">Grand Total:</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
+                <div><span class="text-slate-400">Sudah Ditagih:</span> <span id="inv-info-ditagih" class="font-bold text-amber-600"></span></div>
+                <div class="col-span-2"><span class="text-slate-400">Sisa Tagihan:</span> <span id="inv-info-sisa" class="font-extrabold text-emerald-600"></span></div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis Tagihan</label>
+                  <select id="inv-jenis" onchange="onInvoiceJenisChange()" class="input-field text-sm">
+                    <option value="DP">DP (Uang Muka)</option>
+                    <option value="Termin">Termin</option>
+                    <option value="Pelunasan">Pelunasan</option>
+                    <option value="Penuh">Penuh</option>
+                  </select>
+                </div>
+                <div id="inv-persen-wrap">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Persentase (%)</label>
+                  <input type="number" id="inv-persen" min="1" max="100" value="50" oninput="hitungInvoice()" class="input-field text-sm">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Invoice</label>
+                  <input type="date" id="inv-tanggal" class="input-field text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PPN (%)</label>
+                  <input type="number" id="inv-ppn" min="0" max="100" value="11" oninput="hitungInvoice()" class="input-field text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. PO Pelanggan</label>
+                  <input type="text" id="inv-nopo" placeholder="PO/2026/.." class="input-field text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tgl. PO</label>
+                  <input type="date" id="inv-tglpo" class="input-field text-sm">
+                </div>
+              </div>
+
+              <!-- Baris item -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Rincian Tagihan</label>
+                  <button type="button" onclick="tambahBarisInvoice()" class="text-blue-600 text-xs font-bold hover:bg-blue-50 px-2 py-1 rounded">
+                    <i class="fa-solid fa-plus"></i> Tambah Baris
+                  </button>
+                </div>
+                <div id="inv-lines" class="space-y-2"></div>
+              </div>
+
+              <!-- Catatan -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan (opsional)</label>
+                <input type="text" id="inv-catatan" placeholder="Termin pembayaran, rekening, dll" class="input-field text-sm">
+              </div>
+
+              <!-- Ringkasan -->
+              <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm space-y-1">
+                <div class="flex justify-between"><span class="text-slate-500">Subtotal (DPP)</span><span class="font-bold text-slate-700">Rp <span id="inv-dpp">0</span></span></div>
+                <div class="flex justify-between"><span class="text-slate-500">PPN</span><span class="font-bold text-slate-700">Rp <span id="inv-ppn-nominal">0</span></span></div>
+                <div class="flex justify-between text-base border-t border-blue-200 pt-1 mt-1"><span class="font-extrabold text-slate-800">TOTAL</span><span class="font-extrabold text-blue-700">Rp <span id="inv-total">0</span></span></div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100 sticky bottom-0 bg-white">
+              <button type="button" onclick="document.getElementById('modal-invoice').classList.add('hidden')"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button type="button" id="inv-submit-btn" onclick="submitInvoice()"
+                class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Invoice
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
