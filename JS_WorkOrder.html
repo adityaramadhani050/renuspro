@@ -236,6 +236,19 @@
             8: { cellWidth: 18, halign: 'center' },
           },
           styles: { overflow: 'linebreak' },
+          // Bedakan kolom HPP (5 = HPP Satuan, 7 = Total HPP) dengan warna merah
+          didParseCell: function(data) {
+            if (data.column.index === 5 || data.column.index === 7) {
+              if (data.section === 'head') {
+                data.cell.styles.fillColor = [153, 27, 27];   // merah tua
+                data.cell.styles.textColor = [255, 255, 255];
+              } else if (data.section === 'body') {
+                data.cell.styles.fillColor = [254, 235, 235]; // rose muda
+                data.cell.styles.textColor = [190, 30, 30];   // merah
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          },
         });
 
         let curY = doc.lastAutoTable.finalY + 5;
