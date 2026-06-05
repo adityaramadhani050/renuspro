@@ -8,7 +8,7 @@
  * NAMED RANGE yang HARUS ada di sheet Template_Invoice:
  *   inv_no, inv_tanggal, inv_no_po, inv_tgl_po,
  *   inv_klien_nama, inv_klien_perusahaan, inv_klien_alamat, inv_klien_kontak,
- *   inv_item_zone_start  (baris jangkar di tabel item)
+ *   inv_item_zona_start  (baris jangkar di tabel item; "zone" juga diterima)
  *
  * Struktur kolom tabel item = SAMA seperti Template_Quotation:
  *   A(No) | B–D(Description, merge) | E(Qty) | F(Unit) | G(Price) | H(Amount)
@@ -34,9 +34,9 @@ function exportInvoiceDariTemplate(idInvoice) {
     // Validasi anchor sebelum operasi destruktif
     if (!_anchorInvoiceValid(cache)) {
       return { success: false, message:
-        'Named range "inv_item_zone_start" hilang/#REF. Perbaiki di sheet Template_Invoice: ' +
+        'Named range "inv_item_zona_start" hilang/#REF. Perbaiki di sheet Template_Invoice: ' +
         'hapus sisa baris footer di zona item, lalu buat ulang named range ' +
-        '"inv_item_zone_start" menunjuk ke satu baris kosong tepat di bawah header tabel ' +
+        '"inv_item_zona_start" menunjuk ke satu baris kosong tepat di bawah header tabel ' +
         '(No / Description / Qty / Unit / Price / Amount).' };
     }
 
@@ -116,10 +116,15 @@ function _parseInvoiceMeta(inv) {
   };
 }
 
-// Cek anchor inv_item_zone_start ada & tidak #REF (getRow tidak melempar error)
+// Ambil anchor zona item — menerima ejaan "zona" (ID) maupun "zone" (EN).
+function _getInvoiceAnchor(cache) {
+  return cache.get('inv_item_zona_start') || cache.get('inv_item_zone_start') || null;
+}
+
+// Cek anchor zona item ada & tidak #REF (getRow tidak melempar error)
 function _anchorInvoiceValid(cache) {
   try {
-    const anchor = cache.get('inv_item_zone_start');
+    const anchor = _getInvoiceAnchor(cache);
     if (!anchor) return false;
     const r = anchor.getRow();
     return r > 0;
@@ -131,8 +136,8 @@ function _anchorInvoiceValid(cache) {
 // ── Bersihkan zona dinamis invoice ──────────────────────────────────────────
 function _bersihkanZonaInvoice(sheet, cache) {
   try {
-    const anchor = cache.get('inv_item_zone_start');
-    if (!anchor) { Logger.log('inv_item_zone_start tidak ditemukan'); return; }
+    const anchor = _getInvoiceAnchor(cache);
+    if (!anchor) { Logger.log('anchor zona item invoice tidak ditemukan'); return; }
     const anchorRow = anchor.getRow();
     const lastRow = sheet.getLastRow();
     const delCount = lastRow - anchorRow;
@@ -164,8 +169,8 @@ function _isiHeaderInvoice(cache, inv, klien) {
 //   Baris   : "Deskripsi:"
 //   Baris   : header kelompok + sub-item (deskripsi + qty + unit, TANPA harga)
 function _sisipkanBarisInvoice(sheet, cache, inv, meta) {
-  const anchor = cache.get('inv_item_zone_start');
-  if (!anchor) { Logger.log('inv_item_zone_start tidak ditemukan'); return sheet.getLastRow() + 1; }
+  const anchor = _getInvoiceAnchor(cache);
+  if (!anchor) { Logger.log('anchor zona item invoice tidak ditemukan'); return sheet.getLastRow() + 1; }
 
   const anchorRow = anchor.getRow();
   const NCOLS = 8;
