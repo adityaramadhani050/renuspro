@@ -221,7 +221,7 @@ function _injectPgBar(tipe, tbodySelector) {
 }
 
 // ================================================================
-// OVERRIDE FUNGSI RENDER
+// FUNGSI LOADER + RENDER (sadar-pagination)
 // ================================================================
 
 // ── PENAWARAN ─────────────────────────────────────────────────────
@@ -416,7 +416,7 @@ window.loadCustomer = function() {
   }
 };
 
-// ── Override filterTabel ──────────────────────────────────────────
+// ── filterTabel (produk/template/customer) ────────────────────────
 window.filterTabel = function(tipe) {
   if (tipe === 'produk') {
     const q = document.getElementById('search-produk').value.toLowerCase().trim();

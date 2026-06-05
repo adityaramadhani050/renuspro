@@ -4,8 +4,7 @@
  */
 
 // ============================================================
-// SISTEM LOGIN — TAMBAHKAN KE Code.gs
-// Letakkan blok ini di bagian BAWAH file Code.gs yang sudah ada
+// SISTEM LOGIN & MANAJEMEN USER
 // ============================================================
 
 // ── Helper: buat / ambil sheet Master_User ────────────────────────────────

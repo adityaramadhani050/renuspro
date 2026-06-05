@@ -60,7 +60,6 @@ function getTemplatePaketMap(ss) {
     return {};
   }
 }
-// GANTI seluruh fungsi simpanTemplatePaket():
 function simpanTemplatePaket(id, nama, itemsJson, editId) {
   try {
     const ss    = getSpreadsheet();

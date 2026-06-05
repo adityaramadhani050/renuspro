@@ -80,7 +80,6 @@ function getPenawaranList() {
     return list;
   } catch(e) { return []; }
 }
-// TAMBAH fungsi baru getRiwayatRevisi():
 function getRiwayatRevisi(noPenawaran) {
   try {
     const ss = getSpreadsheet();

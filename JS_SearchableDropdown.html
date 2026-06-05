@@ -258,8 +258,8 @@
     if (inst && inst.reset) inst.reset();
   };
 
-  // Diekspos agar bisa dipanggil langsung dari muatSeluruhDataAwal()
-  // (sebelumnya dipasang via override fungsi — kini cukup panggil window._initAllSD).
+  // Diekspos agar bisa dipanggil langsung oleh muatSeluruhDataAwal()
+  // untuk menginisialisasi searchable dropdown setelah data klien termuat.
   window._initAllSD = function() {
     // 1. Klien Select di form penawaran
     if (document.getElementById('klienSelect') &&

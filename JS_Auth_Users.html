@@ -1,7 +1,6 @@
 <script>
 // ================================================================
-//  SISTEM LOGIN — JavaScript
-//  Letakkan di akhir file, setelah semua script yang sudah ada.
+//  SISTEM LOGIN & MANAJEMEN USER — JavaScript
 // ================================================================
 
 // ── State session (in-memory + sessionStorage) ────────────────────────────
@@ -164,8 +163,7 @@ function konfirmasiLogout() {
   toggleLoader(false);
 }
 
-// ── Override window.onload untuk cek session dulu ─────────────────────────
-// PENTING: GANTI window.onload yang sudah ada dengan ini
+// ── window.onload: cek sesi login dulu sebelum memuat aplikasi ────────────
 window.onload = function() {
   document.getElementById('current-date').innerText =
     new Date().toLocaleDateString('id-ID', {
