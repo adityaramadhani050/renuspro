@@ -50,7 +50,28 @@ mengubah perilaku**, hanya kerapian.
    fungsi frontend identik dengan versi lama (tidak ada fungsi live yang hilang);
    inventaris fungsi backend hanya kehilangan `getDashboardStats` (disengaja).
 
-## Cara deploy
+## Cara deploy (clasp)
 
-Unggah seluruh file `.gs` dan `.html` ke proyek Apps Script (mis. via `clasp push`).
-Entry point tetap `doGet`. Pastikan deploy **Execute as: Me** agar akses sheet konsisten.
+> **Penting:** script harus **terikat (container-bound) ke Google Sheet**, karena
+> aplikasi memakai `SpreadsheetApp.getActiveSpreadsheet()`. Jangan pakai project standalone.
+
+1. Install & login:
+   ```bash
+   npm install -g @google/clasp
+   clasp login
+   ```
+   Aktifkan Apps Script API di https://script.google.com/home/usersettings.
+2. Ambil **Script ID**: buka Sheet → Extensions → Apps Script → Project Settings → Script ID.
+3. Salin template config & isi Script ID:
+   ```bash
+   cp .clasp.json.template .clasp.json   # lalu edit isi scriptId
+   ```
+   (`.clasp.json` di-ignore git agar Script ID tidak ter-commit.)
+4. Push & deploy:
+   ```bash
+   clasp push
+   ```
+   Lalu di editor: **Deploy → New deployment → Web app** (Execute as: Me).
+
+Manifest `appsscript.json` sudah disertakan (timezone Asia/Jakarta, runtime V8,
+webapp execute-as-deployer). Entry point: `doGet`.
