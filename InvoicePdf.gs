@@ -67,8 +67,9 @@ function exportInvoiceDariTemplate(idInvoice) {
 }
 
 function _invoiceFileName(inv) {
-  const safe = (s) => (s || '').toString().replace(/[\\/]/g, '-');
-  return safe(inv.id) + '_' + safe(inv.jenis) + '_' + safe(inv.namaProject) + '.pdf';
+  const safe = (s) => (s || '').toString().replace(/\//g, '-');
+  return safe(inv.id) + '_' + safe(inv.jenis) + (inv.persen > 0 ? inv.persen + '%' : '') +
+    '_' + safe(inv.namaProject) + '_' + safe(inv.namaKlien) + '.pdf';
 }
 
 function _getInvoiceById(ss, idInvoice) {

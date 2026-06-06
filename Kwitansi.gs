@@ -2,7 +2,7 @@
  * RenusPro - PT. RENUS GLOBAL INDONESIA
  * Modul Kwitansi: tanda terima pembayaran (umumnya atas sebuah Invoice).
  *
- * No Kwitansi otomatis & terkunci, format: NNN/RGI-KW/[bulan romawi]/[tahun].
+ * No Kwitansi otomatis & terkunci, format: NNN/RGI/KWT/[bulan romawi]/[tahun].
  *
  * Sheet Kwitansi_Main — kolom (1-based):
  *  1 id          No Kwitansi
@@ -38,7 +38,7 @@ function generateNextKwitansiNumber(ss) {
     const ids = sheet.getRange(2, 1, rows - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       const val = ids[i][0] ? ids[i][0].toString() : '';
-      const m = val.match(/^(\d+)\/RGI-KW/);
+      const m = val.match(/^(\d+)\/RGI(?:-KW|\/KWT)/);
       if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; }
     }
   }
@@ -47,7 +47,7 @@ function generateNextKwitansiNumber(ss) {
   const mon  = roman[new Date().getMonth()];
   const yr   = new Date().getFullYear();
   const next = String(maxId + 1).padStart(3, '0');
-  return `${next}/RGI-KW/${mon}/${yr}`;
+  return `${next}/RGI/KWT/${mon}/${yr}`;
 }
 
 // ── Data awal form kwitansi: daftar invoice + nomor berikutnya ──────────────

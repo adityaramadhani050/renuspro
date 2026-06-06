@@ -17,7 +17,7 @@
  * Tagihan DPP per WO tidak boleh melebihi nilai kontrak DPP.
  *
  * Sheet Invoice_Main — kolom (1-based):
- *  1 id              No Invoice (mis. 271/RGI-INV/VI/2026)
+ *  1 id              No Invoice (mis. 001/RGI/INV/VI/2026)
  *  2 noWO            No Work Order sumber
  *  3 noPenawaran     No Penawaran referensi
  *  4 tanggal         Tanggal invoice (dd/MM/yyyy)
@@ -63,7 +63,7 @@ function generateNextInvoiceNumber(ss) {
     const ids = sheet.getRange(2, 1, rows - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       const val = ids[i][0] ? ids[i][0].toString() : '';
-      const m = val.match(/^(\d+)\/RGI-INV/);
+      const m = val.match(/^(\d+)\/RGI(?:-INV|\/INV)/);
       if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; }
     }
   }
@@ -72,7 +72,7 @@ function generateNextInvoiceNumber(ss) {
   const mon  = roman[new Date().getMonth()];
   const yr   = new Date().getFullYear();
   const next = String(maxId + 1).padStart(3, '0');
-  return `${next}/RGI-INV/${mon}/${yr}`;
+  return `${next}/RGI/INV/${mon}/${yr}`;
 }
 
 // ── DPP yang sudah ditagih per WO (basis pre-tax) ───────────────────────────

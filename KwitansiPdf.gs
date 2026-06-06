@@ -47,8 +47,9 @@ function exportKwitansiDariTemplate(idKwitansi) {
     SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
 
-    const safe = (s) => (s || '').toString().replace(/[\\/]/g, '-');
-    return { success: true, pdfBase64: pdfBase64, fileName: 'Kwitansi_' + safe(kw.id) + '_' + safe(kw.terimaDari) + '.pdf' };
+    const safe = (s) => (s || '').toString().replace(/\//g, '-');
+    return { success: true, pdfBase64: pdfBase64,
+      fileName: safe(kw.id) + '_' + safe(kw.terimaDari) + '_' + safe(kw.untuk) + '.pdf' };
   } catch (e) {
     Logger.log('exportKwitansiDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export kwitansi: ' + e.toString() };
