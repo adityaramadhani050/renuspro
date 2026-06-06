@@ -112,7 +112,7 @@
     };
 
     // ── Form Buat Invoice ──
-    function bukaModalBuatInvoice() {
+    function bukaModalBuatInvoice(preSelectNoWO) {
       toggleLoader(true, 'Memuat Work Order...');
       google.script.run.withSuccessHandler(function(res) {
         toggleLoader(false);
@@ -148,6 +148,10 @@
         document.getElementById('inv-scope').innerHTML =
           '<p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>';
         onInvoicePOToggle();
+        if (preSelectNoWO) {
+          document.getElementById('inv-wo').value = preSelectNoWO;
+          onInvoiceWOChange();
+        }
         onInvoiceJenisChange();
         hitungInvoice();
 
