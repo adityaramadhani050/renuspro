@@ -181,6 +181,18 @@
           sel.appendChild(grpPen);
         }
 
+        // Init / refresh searchable dropdown
+        if (typeof initSearchableDropdown === 'function') {
+          if (!sel.dataset.sdInit) {
+            initSearchableDropdown('inv-wo', {
+              placeholder: '-- Pilih Work Order / Penawaran --',
+              noSort: true
+            });
+          } else {
+            sdRefresh('inv-wo');
+          }
+        }
+
         // Reset form
         sel.value = '';
         document.getElementById('inv-wo-info').classList.add('hidden');
@@ -198,7 +210,8 @@
           '<p class="text-slate-400 italic">Pilih Work Order atau Penawaran untuk menampilkan scope.</p>';
         onInvoicePOToggle();
         if (preSelectNoWO) {
-          sel.value = 'WO:' + preSelectNoWO;
+          if (typeof sdSetValue === 'function') sdSetValue('inv-wo', 'WO:' + preSelectNoWO);
+          else sel.value = 'WO:' + preSelectNoWO;
           onInvoiceWOChange();
         }
         onInvoiceJenisChange();
