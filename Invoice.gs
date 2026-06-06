@@ -192,12 +192,7 @@ function simpanInvoice(payload) {
     ]);
 
     SpreadsheetApp.flush();
-    return {
-      success: true,
-      message: 'Invoice ' + noInvoice + ' berhasil dibuat!',
-      noInvoice: noInvoice,
-      nextNo: generateNextInvoiceNumber(ss)
-    };
+    return { success: true, message: 'Invoice ' + noInvoice + ' berhasil dibuat!', noInvoice: noInvoice };
   } catch (e) {
     return { success: false, message: 'Gagal menyimpan invoice: ' + e.toString() };
   } finally {
