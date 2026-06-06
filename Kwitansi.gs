@@ -122,6 +122,41 @@ function getKwitansiList() {
   }
 }
 
+function editKwitansi(payload) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Kwitansi_Main');
+    if (!sheet) return { success: false, message: 'Sheet Kwitansi_Main tidak ditemukan.' };
+
+    const data = sheet.getDataRange().getValues();
+    let rowIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === payload.id) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+
+    const jumlah = parseFloat(payload.jumlah) || 0;
+    if (jumlah <= 0) return { success: false, message: 'Jumlah kwitansi harus lebih dari 0.' };
+
+    const r = rowIdx + 1; // 1-based
+    sheet.getRange(r, 4).setValue(payload.tanggal || '');       // Tanggal
+    sheet.getRange(r, 5).setValue(payload.terimaDari || '');    // Terima Dari
+    sheet.getRange(r, 6).setValue(jumlah);                      // Jumlah
+    sheet.getRange(r, 7).setValue(payload.untuk || '');         // Untuk
+    sheet.getRange(r, 8).setValue(payload.metode || 'Transfer');// Metode
+    sheet.getRange(r, 9).setValue(payload.catatan || '');       // Catatan
+
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Kwitansi ' + payload.id + ' berhasil diperbarui!' };
+  } catch (e) {
+    return { success: false, message: 'Gagal memperbarui kwitansi: ' + e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 function hapusKwitansi(idKwitansi) {
   try {
     const sheet = getSpreadsheet().getSheetByName('Kwitansi_Main');

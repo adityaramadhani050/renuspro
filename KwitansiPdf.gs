@@ -109,7 +109,8 @@ function _getKwitansiById(ss, idKwitansi) {
         terimaDari: data[i][4] ? data[i][4].toString() : '',
         jumlah:     parseFloat(data[i][5]) || 0,
         untuk:      data[i][6] ? data[i][6].toString() : '',
-        metode:     data[i][7] ? data[i][7].toString() : ''
+        metode:     data[i][7] ? data[i][7].toString() : '',
+        catatan:    data[i][8] ? data[i][8].toString() : ''
       };
     }
   }

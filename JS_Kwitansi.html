@@ -5,6 +5,7 @@
     let _kwitansiInvoiceList = [];
     let _kwitansiNextNo      = '';
     let _cachedKwitansiData  = [];
+    let _kwitansiEditId      = null;
 
     function _pgRenderKwitansi(data) {
       const tbody = document.getElementById('table-kwitansi');
@@ -30,6 +31,9 @@
           <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.jumlah.toLocaleString('id-ID')}</td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
+              <button onclick='bukaModalEditKwitansi(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Kwitansi">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
               <button onclick='exportKwitansiPDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Kwitansi">
                 <i class="fa-solid fa-file-pdf"></i>
               </button>
@@ -67,21 +71,31 @@
       _pgRender('kwitansi');
     };
 
-    // ── Form ──
+    // ── Isi dropdown invoice (shared buat & edit) ──
+    function _isiDropdownKwitansi(list, selectedId, disabled) {
+      const sel = document.getElementById('kw-invoice');
+      sel.innerHTML = '<option value="">-- Pilih Invoice --</option>';
+      list.forEach(inv => {
+        sel.add(new Option(`${inv.id} — ${inv.namaKlien} (Rp ${inv.total.toLocaleString('id-ID')})`, inv.id));
+      });
+      if (selectedId) sel.value = selectedId;
+      sel.disabled = !!disabled;
+    }
+
+    // ── Form Buat ──
     function bukaModalBuatKwitansi() {
       toggleLoader(true, 'Memuat invoice...');
       google.script.run.withSuccessHandler(function(res) {
         toggleLoader(false);
         if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _kwitansiEditId = null;
         _kwitansiInvoiceList = res.invoiceList || [];
         _kwitansiNextNo = res.nextNo || '';
-        document.getElementById('kw-nomor-preview').innerText = _kwitansiNextNo;
 
-        const sel = document.getElementById('kw-invoice');
-        sel.innerHTML = '<option value="">-- Pilih Invoice --</option>';
-        _kwitansiInvoiceList.forEach(inv => {
-          sel.add(new Option(`${inv.id} — ${inv.namaKlien} (Rp ${inv.total.toLocaleString('id-ID')})`, inv.id));
-        });
+        document.getElementById('kw-modal-title').innerText = 'Buat Kwitansi Baru';
+        document.getElementById('kw-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kwitansi';
+        document.getElementById('kw-nomor-preview').innerText = _kwitansiNextNo;
+        _isiDropdownKwitansi(_kwitansiInvoiceList, '', false);
 
         document.getElementById('kw-tanggal').valueAsDate = new Date();
         document.getElementById('kw-metode').value = 'Transfer';
@@ -97,6 +111,35 @@
         showNotification('Gagal: ' + (err.message || err), 'error');
       }).getKwitansiInitialData();
     }
+
+    // ── Form Edit ──
+    window.bukaModalEditKwitansi = function(item) {
+      toggleLoader(true, 'Memuat data kwitansi...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        _kwitansiEditId = item.id;
+        _kwitansiInvoiceList = res.invoiceList || [];
+
+        document.getElementById('kw-modal-title').innerText = 'Edit Kwitansi';
+        document.getElementById('kw-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Kwitansi';
+        document.getElementById('kw-nomor-preview').innerText = item.id;
+        _isiDropdownKwitansi(_kwitansiInvoiceList, item.noInvoice, true);
+
+        document.getElementById('kw-tanggal').value = _toISO(item.tanggal);
+        document.getElementById('kw-metode').value = item.metode || 'Transfer';
+        document.getElementById('kw-terima').value = item.terimaDari || '';
+        document.getElementById('kw-untuk').value  = item.untuk || '';
+        document.getElementById('kw-jumlah').value = formatNominalRupiah(item.jumlah || 0);
+        document.getElementById('kw-catatan').value = item.catatan || '';
+        onKwitansiJumlahInput();
+
+        document.getElementById('modal-kwitansi').classList.remove('hidden');
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).getKwitansiInitialData();
+    };
 
     function _currentKwitansiInvoice() {
       const id = document.getElementById('kw-invoice').value;
@@ -120,6 +163,7 @@
     }
 
     function submitKwitansi() {
+      const editing = !!_kwitansiEditId;
       const inv = _currentKwitansiInvoice();
       const jumlah = pN(document.getElementById('kw-jumlah').value);
       const terima = document.getElementById('kw-terima').value.trim();
@@ -127,7 +171,7 @@
       if (jumlah <= 0) return showNotification('Jumlah harus lebih dari 0!', 'error');
 
       const payload = {
-        noInvoice:  inv ? inv.id : '',
+        noInvoice:  inv ? inv.id : document.getElementById('kw-invoice').value,
         noWO:       inv ? inv.noWO : '',
         tanggal:    _toDDMMYYYY(document.getElementById('kw-tanggal').value),
         terimaDari: terima,
@@ -137,19 +181,27 @@
         catatan:    document.getElementById('kw-catatan').value.trim(),
         dibuatOleh: (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
       };
+      if (editing) payload.id = _kwitansiEditId;
 
-      toggleLoader(true, 'Menyimpan kwitansi...');
-      google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(true, editing ? 'Memperbarui kwitansi...' : 'Menyimpan kwitansi...');
+      const onSuccess = function(res) {
         toggleLoader(false);
         if (res.success) {
           showNotification(res.message);
           document.getElementById('modal-kwitansi').classList.add('hidden');
           loadKwitansi();
         } else showNotification(res.message, 'error');
-      }).withFailureHandler(function(err) {
+      };
+      const onFail = function(err) {
         toggleLoader(false);
         showNotification('Gagal: ' + (err.message || err), 'error');
-      }).simpanKwitansi(payload);
+      };
+
+      if (editing) {
+        google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFail).editKwitansi(payload);
+      } else {
+        google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFail).simpanKwitansi(payload);
+      }
     }
 
     function exportKwitansiPDF(item) {

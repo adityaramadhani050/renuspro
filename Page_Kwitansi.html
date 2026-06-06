@@ -51,7 +51,7 @@
                 <i class="fa-solid fa-receipt"></i>
               </span>
               <div>
-                <h3 class="text-base font-bold text-slate-800">Buat Kwitansi Baru</h3>
+                <h3 id="kw-modal-title" class="text-base font-bold text-slate-800">Buat Kwitansi Baru</h3>
                 <p class="text-xs text-slate-400">Nomor: <span id="kw-nomor-preview" class="font-bold text-emerald-600">-</span></p>
               </div>
               <button onclick="document.getElementById('modal-kwitansi').classList.add('hidden')"
@@ -107,7 +107,7 @@
             <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100 sticky bottom-0 bg-white">
               <button type="button" onclick="document.getElementById('modal-kwitansi').classList.add('hidden')"
                 class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
-              <button type="button" onclick="submitKwitansi()"
+              <button type="button" id="kw-submit-btn" onclick="submitKwitansi()"
                 class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Kwitansi
               </button>
