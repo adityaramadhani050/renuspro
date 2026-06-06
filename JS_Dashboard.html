@@ -298,8 +298,10 @@ function _dbRenderKPIs(summary, prev, salesList) {
     dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
       (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
   }
+  var winRateCalc = (summary.teamPenawaran > 0)
+    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
   var dealSub = document.getElementById('db-kpi-deal-sub');
-  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(summary.teamWinRate || 0);
+  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc);
 
   // Pipeline
   var pipEl = document.getElementById('db-kpi-pipeline');
@@ -325,7 +327,8 @@ function _dbRenderTargetBar(summary) {
 
 // ── Statistik Konversi ─────────────────────────────────────────
 function _dbRenderKonversi(summary) {
-  var winRate   = summary.teamWinRate || 0;
+  var winRate = (summary.teamPenawaran > 0)
+    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
   var dealCount = summary.teamDealCount || 0;
   var revenue   = summary.teamRevenue || 0;
   var pipeline  = summary.teamPipelineCount || 0;
