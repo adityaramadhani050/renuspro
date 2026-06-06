@@ -13,7 +13,7 @@
         </span>
         <div>
           <h3 class="text-base font-bold text-slate-800">WA Bot Notifikasi</h3>
-          <p class="text-xs text-slate-400">Kirim notifikasi otomatis ke grup WhatsApp via Fonnte</p>
+          <p class="text-xs text-slate-400">Kirim notifikasi otomatis via Meta Cloud API (WhatsApp Business)</p>
         </div>
         <!-- Toggle enable/disable -->
         <label class="ml-auto flex items-center gap-2 cursor-pointer">
@@ -27,14 +27,20 @@
 
       <div class="px-6 py-5 space-y-4">
 
-        <!-- Token -->
+        <!-- Info Meta -->
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 flex gap-2">
+          <i class="fa-brands fa-meta text-base shrink-0 mt-0.5"></i>
+          <span>Gunakan <b>Access Token</b> dari System User di Meta Business Manager.
+            Token dari <em>App Dashboard</em> (temporary) tidak disarankan untuk produksi.</span>
+        </div>
+
+        <!-- Access Token -->
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-            Token Fonnte
-            <a href="https://app.fonnte.com" target="_blank" class="ml-1 text-blue-500 font-normal normal-case hover:underline">(dapatkan di app.fonnte.com)</a>
+            Access Token
           </label>
           <div class="relative">
-            <input type="password" id="wa-token" placeholder="Masukkan token Fonnte..."
+            <input type="password" id="wa-token" placeholder="EAAxxxxxxxx..."
               class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white pr-10">
             <button onclick="toggleWATokenVisibility()" type="button"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -43,13 +49,23 @@
           </div>
         </div>
 
-        <!-- Target Group -->
+        <!-- Phone Number ID -->
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target Grup WhatsApp</label>
-          <input type="text" id="wa-target" placeholder="Nomor grup atau ID grup (contoh: 6281234567890-1234567890@g.us)"
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number ID</label>
+          <input type="text" id="wa-phone-number-id" placeholder="123456789012345"
             class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
           <p class="text-[11px] text-slate-400 mt-1">
-            Untuk nomor grup: buka Fonnte → Devices → pilih device → Contacts, cari nama grup dan salin ID-nya.
+            Meta Developer → App → WhatsApp → API Setup → Phone Number ID (bukan nomor HP-nya).
+          </p>
+        </div>
+
+        <!-- Nomor Tujuan -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nomor Tujuan Notifikasi</label>
+          <input type="text" id="wa-target" placeholder="628123456789"
+            class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+          <p class="text-[11px] text-slate-400 mt-1">
+            Format internasional tanpa tanda + (contoh: <b>628123456789</b>). Notifikasi dikirim ke nomor ini.
           </p>
         </div>
 
@@ -67,6 +83,10 @@
           <div class="flex items-center gap-2 text-xs text-slate-600">
             <i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i>
             <span><b>Work Order Dibuat</b> — saat penawaran ditandai Deal</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i>
+            <span><b>Request Invoice</b> — saat Sales mengajukan request buat invoice</span>
           </div>
         </div>
 

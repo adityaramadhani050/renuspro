@@ -1,20 +1,24 @@
 /**
  * WhatsApp.gs — RenusPro
- * Notifikasi otomatis ke grup WhatsApp via Fonnte API.
+ * Notifikasi otomatis via Meta Cloud API (WhatsApp Business).
  *
  * Konfigurasi disimpan di Script Properties:
- *   WA_ENABLED       : "true" / "false"
- *   WA_TOKEN         : Token Fonnte (dari dashboard.fonnte.com)
- *   WA_GROUP_TARGET  : Nomor grup WA atau ID grup (contoh: 6281234567890-1234567890@g.us)
+ *   WA_ENABLED         : "true" / "false"
+ *   WA_TOKEN           : Access Token (dari Meta Developer → System User)
+ *   WA_PHONE_NUMBER_ID : Phone Number ID (bukan nomor HP, tapi ID di Meta)
+ *   WA_TARGET          : Nomor tujuan dalam format internasional tanpa + (mis. 628123456789)
  */
+
+var _WA_API_VERSION = 'v20.0';
 
 // ── Ambil konfigurasi ────────────────────────────────────────────────────────
 function _getWAConfig() {
   var props = PropertiesService.getScriptProperties();
   return {
-    enabled: props.getProperty('WA_ENABLED') === 'true',
-    token:   props.getProperty('WA_TOKEN')   || '',
-    target:  props.getProperty('WA_GROUP_TARGET') || ''
+    enabled:       props.getProperty('WA_ENABLED') === 'true',
+    token:         props.getProperty('WA_TOKEN')           || '',
+    phoneNumberId: props.getProperty('WA_PHONE_NUMBER_ID') || '',
+    target:        props.getProperty('WA_TARGET')          || ''
   };
 }
 
@@ -22,9 +26,10 @@ function _getWAConfig() {
 function saveWAConfig(payload) {
   try {
     var props = PropertiesService.getScriptProperties();
-    props.setProperty('WA_ENABLED',        payload.enabled ? 'true' : 'false');
-    props.setProperty('WA_TOKEN',          (payload.token  || '').trim());
-    props.setProperty('WA_GROUP_TARGET',   (payload.target || '').trim());
+    props.setProperty('WA_ENABLED',         payload.enabled ? 'true' : 'false');
+    props.setProperty('WA_TOKEN',           (payload.token         || '').trim());
+    props.setProperty('WA_PHONE_NUMBER_ID', (payload.phoneNumberId || '').trim());
+    props.setProperty('WA_TARGET',          (payload.target        || '').trim());
     return { success: true, message: 'Konfigurasi WA Bot berhasil disimpan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -34,18 +39,33 @@ function saveWAConfig(payload) {
 // ── Baca konfigurasi (dipanggil dari frontend) ───────────────────────────────
 function getWAConfig() {
   var c = _getWAConfig();
-  return { success: true, enabled: c.enabled, token: c.token, target: c.target };
+  return {
+    success:       true,
+    enabled:       c.enabled,
+    token:         c.token,
+    phoneNumberId: c.phoneNumberId,
+    target:        c.target
+  };
 }
 
-// ── Kirim notifikasi ─────────────────────────────────────────────────────────
+// ── Kirim pesan via Meta Cloud API ───────────────────────────────────────────
 function sendWANotif(message) {
   var config = _getWAConfig();
-  if (!config.enabled || !config.token || !config.target || !message) return;
+  if (!config.enabled || !config.token || !config.phoneNumberId || !config.target || !message) return;
   try {
-    UrlFetchApp.fetch('https://api.fonnte.com/send', {
-      method:            'post',
-      headers:           { 'Authorization': config.token },
-      payload:           { target: config.target, message: message },
+    var url = 'https://graph.facebook.com/' + _WA_API_VERSION + '/' + config.phoneNumberId + '/messages';
+    UrlFetchApp.fetch(url, {
+      method:             'post',
+      headers: {
+        'Authorization': 'Bearer ' + config.token,
+        'Content-Type':  'application/json'
+      },
+      payload: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to:   config.target,
+        type: 'text',
+        text: { body: message }
+      }),
       muteHttpExceptions: true
     });
   } catch (e) {
@@ -55,22 +75,38 @@ function sendWANotif(message) {
 
 // ── Test kirim pesan ─────────────────────────────────────────────────────────
 function testWANotif(payload) {
-  var props = PropertiesService.getScriptProperties();
-  var token  = (payload.token  || '').trim() || props.getProperty('WA_TOKEN')  || '';
-  var target = (payload.target || '').trim() || props.getProperty('WA_GROUP_TARGET') || '';
-  if (!token || !target) return { success: false, message: 'Token dan Target wajib diisi.' };
+  var props         = PropertiesService.getScriptProperties();
+  var token         = (payload.token         || '').trim() || props.getProperty('WA_TOKEN')           || '';
+  var phoneNumberId = (payload.phoneNumberId || '').trim() || props.getProperty('WA_PHONE_NUMBER_ID') || '';
+  var target        = (payload.target        || '').trim() || props.getProperty('WA_TARGET')          || '';
+
+  if (!token || !phoneNumberId || !target) {
+    return { success: false, message: 'Access Token, Phone Number ID, dan Nomor Tujuan wajib diisi.' };
+  }
+
   try {
-    var resp = UrlFetchApp.fetch('https://api.fonnte.com/send', {
-      method:            'post',
-      headers:           { 'Authorization': token },
-      payload:           { target: target, message: '✅ *Test Notifikasi RenusPro*\nKonfigurasi WA Bot berhasil terhubung!' },
+    var url  = 'https://graph.facebook.com/' + _WA_API_VERSION + '/' + phoneNumberId + '/messages';
+    var resp = UrlFetchApp.fetch(url, {
+      method:  'post',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type':  'application/json'
+      },
+      payload: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to:   target,
+        type: 'text',
+        text: { body: '✅ *Test Notifikasi RenusPro*\nKonfigurasi WA Bot berhasil terhubung!' }
+      }),
       muteHttpExceptions: true
     });
+
     var result = JSON.parse(resp.getContentText());
-    if (result.status === true || result.status === 'true') {
-      return { success: true, message: 'Pesan test berhasil dikirim ke grup!' };
+    if (result.messages && result.messages.length > 0) {
+      return { success: true, message: 'Pesan test berhasil dikirim!' };
     }
-    return { success: false, message: 'Gagal: ' + (result.reason || resp.getContentText()) };
+    var errMsg = (result.error && result.error.message) ? result.error.message : resp.getContentText();
+    return { success: false, message: 'Gagal: ' + errMsg };
   } catch (e) {
     return { success: false, message: e.toString() };
   }
@@ -84,7 +120,7 @@ function _waFmtRp(n) {
 
 function notifInvoiceDibuat(inv) {
   sendWANotif(
-    '*📋 Invoice Baru Diterbitkan*\n' +
+    '📋 *Invoice Baru Diterbitkan*\n' +
     inv.noInvoice + ' • ' + inv.jenis + (inv.persen > 0 ? ' ' + inv.persen + '%' : '') + '\n' +
     'Klien  : ' + inv.namaKlien + '\n' +
     'Project: ' + inv.namaProject + '\n' +
@@ -95,7 +131,7 @@ function notifInvoiceDibuat(inv) {
 
 function notifInvoiceLunas(inv) {
   sendWANotif(
-    '*✅ Invoice Lunas*\n' +
+    '✅ *Invoice Lunas*\n' +
     inv.noInvoice + '\n' +
     'Klien  : ' + inv.namaKlien + '\n' +
     'Project: ' + inv.namaProject + '\n' +
@@ -105,7 +141,7 @@ function notifInvoiceLunas(inv) {
 
 function notifRequestInvoice(data) {
   sendWANotif(
-    '*🔔 Request Buat Invoice*\n' +
+    '🔔 *Request Buat Invoice*\n' +
     'WO-' + data.noWO + '\n' +
     'Klien  : ' + data.namaKlien + '\n' +
     'Project: ' + data.namaProject + '\n' +
@@ -117,7 +153,7 @@ function notifRequestInvoice(data) {
 
 function notifWODibuat(wo) {
   sendWANotif(
-    '*🔨 Work Order Dibuat*\n' +
+    '🔨 *Work Order Dibuat*\n' +
     'WO-' + wo.noWO + ' (dari ' + wo.noPenawaran + ')\n' +
     'Klien  : ' + wo.namaKlien + '\n' +
     'Project: ' + wo.namaProject + '\n' +

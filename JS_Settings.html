@@ -7,9 +7,10 @@ function loadSettings() {
   google.script.run
     .withSuccessHandler(function(r) {
       if (!r || !r.success) return;
-      document.getElementById('wa-enabled').checked = !!r.enabled;
-      document.getElementById('wa-token').value  = r.token  || '';
-      document.getElementById('wa-target').value = r.target || '';
+      document.getElementById('wa-enabled').checked          = !!r.enabled;
+      document.getElementById('wa-token').value              = r.token         || '';
+      document.getElementById('wa-phone-number-id').value    = r.phoneNumberId || '';
+      document.getElementById('wa-target').value             = r.target        || '';
       _updateWAEnabledLabel(!!r.enabled);
     })
     .withFailureHandler(function() {})
@@ -32,8 +33,7 @@ function _updateWAEnabledLabel(enabled) {
 }
 
 function onWAEnabledChange() {
-  var enabled = document.getElementById('wa-enabled').checked;
-  _updateWAEnabledLabel(enabled);
+  _updateWAEnabledLabel(document.getElementById('wa-enabled').checked);
 }
 
 function toggleWATokenVisibility() {
@@ -42,20 +42,21 @@ function toggleWATokenVisibility() {
   if (!input) return;
   if (input.type === 'password') {
     input.type = 'text';
-    if (icon) { icon.className = 'fa-solid fa-eye-slash text-sm'; }
+    if (icon) icon.className = 'fa-solid fa-eye-slash text-sm';
   } else {
     input.type = 'password';
-    if (icon) { icon.className = 'fa-solid fa-eye text-sm'; }
+    if (icon) icon.className = 'fa-solid fa-eye text-sm';
   }
 }
 
 function simpanWAConfig() {
-  var enabled = document.getElementById('wa-enabled').checked;
-  var token   = (document.getElementById('wa-token').value  || '').trim();
-  var target  = (document.getElementById('wa-target').value || '').trim();
+  var enabled       = document.getElementById('wa-enabled').checked;
+  var token         = (document.getElementById('wa-token').value           || '').trim();
+  var phoneNumberId = (document.getElementById('wa-phone-number-id').value || '').trim();
+  var target        = (document.getElementById('wa-target').value          || '').trim();
 
-  if (!token || !target) {
-    showToast('Token dan Target Grup wajib diisi.', 'error');
+  if (!token || !phoneNumberId || !target) {
+    showToast('Access Token, Phone Number ID, dan Nomor Tujuan wajib diisi.', 'error');
     return;
   }
 
@@ -65,25 +66,22 @@ function simpanWAConfig() {
   google.script.run
     .withSuccessHandler(function(r) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
-      if (r && r.success) {
-        showToast('Konfigurasi WA Bot berhasil disimpan.', 'success');
-      } else {
-        showToast((r && r.message) || 'Gagal menyimpan.', 'error');
-      }
+      showToast((r && r.message) || (r && r.success ? 'Tersimpan.' : 'Gagal menyimpan.'), r && r.success ? 'success' : 'error');
     })
     .withFailureHandler(function(e) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .saveWAConfig({ enabled: enabled, token: token, target: target });
+    .saveWAConfig({ enabled: enabled, token: token, phoneNumberId: phoneNumberId, target: target });
 }
 
 function testWAConfig() {
-  var token  = (document.getElementById('wa-token').value  || '').trim();
-  var target = (document.getElementById('wa-target').value || '').trim();
+  var token         = (document.getElementById('wa-token').value           || '').trim();
+  var phoneNumberId = (document.getElementById('wa-phone-number-id').value || '').trim();
+  var target        = (document.getElementById('wa-target').value          || '').trim();
 
-  if (!token || !target) {
-    showToast('Isi Token dan Target Grup terlebih dahulu.', 'error');
+  if (!token || !phoneNumberId || !target) {
+    showToast('Isi Access Token, Phone Number ID, dan Nomor Tujuan terlebih dahulu.', 'error');
     return;
   }
 
@@ -93,16 +91,12 @@ function testWAConfig() {
   google.script.run
     .withSuccessHandler(function(r) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
-      if (r && r.success) {
-        showToast('Pesan test berhasil dikirim ke grup!', 'success');
-      } else {
-        showToast((r && r.message) || 'Gagal mengirim test.', 'error');
-      }
+      showToast((r && r.message) || (r && r.success ? 'Terkirim!' : 'Gagal.'), r && r.success ? 'success' : 'error');
     })
     .withFailureHandler(function(e) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .testWANotif({ token: token, target: target });
+    .testWANotif({ token: token, phoneNumberId: phoneNumberId, target: target });
 }
 </script>
