@@ -42,7 +42,7 @@ function togglePwVisibilityLight(inputId, btn) {
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
   admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users'],
-  finance: ['dashboard','workorder','invoice','kwitansi'],
+  finance: ['workorder','invoice','kwitansi'],
   sales:   ['dashboard','penawaran','workorder','produk','template','customer']
 };
 const _ROLE_BADGE = {
@@ -157,6 +157,12 @@ function doLogin() {
   }
 }
 
+// ── Halaman awal sesuai role ──────────────────────────────────────────────
+function _defaultPage(user) {
+  const allowed = _ROLE_NAV[(user && user.role) || 'sales'] || _ROLE_NAV.sales;
+  return allowed[0] || 'dashboard';
+}
+
 // ── Setelah login berhasil ────────────────────────────────────────────────
 function _onLoginSuccess(user, message) {
   _saveSession(user);
@@ -165,7 +171,7 @@ function _onLoginSuccess(user, message) {
   _renderUserSidebar(user);
   showNotification(message || ('Selamat datang, ' + user.nama + '!'));
   muatSeluruhDataAwal(true);
-  navigate('dashboard');
+  navigate(_defaultPage(user));
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────
@@ -200,7 +206,7 @@ window.onload = function() {
     document.getElementById('login-screen').classList.add('hidden');
     _renderUserSidebar(_currentUser);
     muatSeluruhDataAwal(true);
-    navigate('dashboard');
+    navigate(_defaultPage(_currentUser));
   }
 };
 
