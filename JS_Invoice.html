@@ -140,13 +140,14 @@
 
     // ── Form Buat Invoice ──
     function bukaModalBuatInvoice(preSelectNoWO) {
-      toggleLoader(true, 'Memuat Work Order...');
+      toggleLoader(true, 'Memuat data...');
       google.script.run.withSuccessHandler(function(res) {
         toggleLoader(false);
         if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
         _invoiceEditId = null;
         _invoiceEditDpp = 0;
-        _invoiceWOList = res.woList || [];
+        // Gabung WO dan pre-deal penawaran dalam satu list
+        _invoiceWOList = (res.woList || []).concat(res.penawaranPreDeal || []);
         _invoiceNextNo = res.nextNo || '';
         document.getElementById('inv-modal-title').innerText = 'Buat Invoice Baru';
         document.getElementById('inv-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Invoice';
@@ -154,13 +155,34 @@
 
         const sel = document.getElementById('inv-wo');
         sel.disabled = false;
-        sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
-        _invoiceWOList.forEach(w => {
-          if (w.sisaDpp > 0) sel.add(new Option(`${w.noWO} — ${w.namaKlien} (sisa Rp ${Math.round(w.sisaDpp).toLocaleString('id-ID')})`, w.noWO));
-        });
+        sel.innerHTML = '<option value="">-- Pilih Work Order / Penawaran --</option>';
+
+        // Grup 1: Work Order (Deal)
+        const woItems = (res.woList || []).filter(w => w.sisaDpp > 0);
+        if (woItems.length) {
+          const grpWO = document.createElement('optgroup');
+          grpWO.label = '── Work Order (Deal) ──';
+          woItems.forEach(w => grpWO.appendChild(new Option(
+            `WO ${w.noWO} — ${w.namaKlien} · ${w.namaProject} (sisa Rp ${Math.round(w.sisaDpp).toLocaleString('id-ID')})`,
+            'WO:' + w.noWO
+          )));
+          sel.appendChild(grpWO);
+        }
+
+        // Grup 2: Penawaran Pre-Deal (DP saja)
+        const penItems = (res.penawaranPreDeal || []).filter(p => p.sisaDpp > 0);
+        if (penItems.length) {
+          const grpPen = document.createElement('optgroup');
+          grpPen.label = '── Penawaran (Pre-Deal DP) ──';
+          penItems.forEach(p => grpPen.appendChild(new Option(
+            `[PRE-DEAL] ${p.id} — ${p.namaKlien} · ${p.namaProject} (sisa Rp ${Math.round(p.sisaDpp).toLocaleString('id-ID')})`,
+            'PEN:' + p.id
+          )));
+          sel.appendChild(grpPen);
+        }
 
         // Reset form
-        document.getElementById('inv-wo').value = '';
+        sel.value = '';
         document.getElementById('inv-wo-info').classList.add('hidden');
         document.getElementById('inv-jenis').value = 'DP';
         document.getElementById('inv-persen').value = 30;
@@ -173,10 +195,10 @@
         document.getElementById('inv-bank').value = _BANK_DEFAULT;
         document.getElementById('inv-po-penawaran').innerText = '-';
         document.getElementById('inv-scope').innerHTML =
-          '<p class="text-slate-400 italic">Pilih Work Order untuk menampilkan scope.</p>';
+          '<p class="text-slate-400 italic">Pilih Work Order atau Penawaran untuk menampilkan scope.</p>';
         onInvoicePOToggle();
         if (preSelectNoWO) {
-          document.getElementById('inv-wo').value = preSelectNoWO;
+          sel.value = 'WO:' + preSelectNoWO;
           onInvoiceWOChange();
         }
         onInvoiceJenisChange();
@@ -205,10 +227,10 @@
         // Pastikan WO invoice ada di dropdown meski sisa 0 (karena sedang diedit)
         const sel = document.getElementById('inv-wo');
         sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
-        _invoiceWOList.forEach(w => {
-          sel.add(new Option(`${w.noWO} — ${w.namaKlien}`, w.noWO));
+        _invoiceWOList.filter(w => !w.isPredeal).forEach(w => {
+          sel.add(new Option(`WO ${w.noWO} — ${w.namaKlien}`, 'WO:' + w.noWO));
         });
-        sel.value = item.noWO;
+        sel.value = 'WO:' + item.noWO;
         sel.disabled = true; // WO tidak boleh diubah saat edit
 
         // Muat info & scope WO
@@ -247,8 +269,12 @@
     }
 
     function _currentInvoiceWO() {
-      const id = document.getElementById('inv-wo').value;
-      return _invoiceWOList.find(w => w.noWO === id) || null;
+      const val = document.getElementById('inv-wo').value;
+      if (!val) return null;
+      if (val.startsWith('WO:')) return _invoiceWOList.find(w => !w.isPredeal && w.noWO === val.slice(3)) || null;
+      if (val.startsWith('PEN:')) return _invoiceWOList.find(w => w.isPredeal && w.id === val.slice(4)) || null;
+      // fallback: backward compat (edit mode pakai noWO langsung)
+      return _invoiceWOList.find(w => w.noWO === val) || null;
     }
 
     function onInvoiceWOChange() {
@@ -268,8 +294,20 @@
       document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(_invEffSisa(wo)).toLocaleString('id-ID');
       document.getElementById('inv-po-penawaran').innerText = wo.id || '-';
 
+      // Pre-deal: kunci jenis ke DP, tambah label peringatan
+      const jenisEl = document.getElementById('inv-jenis');
+      const predealNote = document.getElementById('inv-predeal-note');
+      if (wo.isPredeal) {
+        jenisEl.value = 'DP';
+        jenisEl.disabled = true;
+        if (predealNote) predealNote.classList.remove('hidden');
+      } else {
+        jenisEl.disabled = false;
+        if (predealNote) predealNote.classList.add('hidden');
+      }
+
       _renderScopeInvoice(wo);
-      onInvoicePersenInput(); // sinkronkan nominal dari persen default
+      onInvoicePersenInput();
     }
 
     function onInvoiceJenisChange() {
@@ -373,7 +411,8 @@
       if (adaPO && !noPO) return showNotification('No. PO belum diisi.', 'error');
 
       const payload = {
-        noWO:        wo.noWO,
+        noWO:        wo.isPredeal ? '' : wo.noWO,
+        noPenawaran: wo.id,
         tanggal:     _toDDMMYYYY(document.getElementById('inv-tanggal').value),
         jenis:       jenis,
         inputMode:   'nominal',
@@ -383,7 +422,7 @@
         tglPO:       tglPO,
         catatan:     document.getElementById('inv-catatan').value.trim(),
         bankAccount: document.getElementById('inv-bank').value.trim(),
-        dibuatOleh:  (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive')
+        dibuatOleh:  (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Finance')
       };
 
       const editing = !!_invoiceEditId;

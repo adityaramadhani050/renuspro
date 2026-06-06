@@ -331,6 +331,8 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
             noWO = generateNextWONumber(sheet);
             sheet.getRange(i + 1, 18).setValue(Number(noWO));
           }
+          // Link pre-deal invoices (noWO kosong) ke WO baru
+          _linkPredealInvoices(getSpreadsheet(), noPenawaran, noWO);
         } else {
           // Keluar dari Deal → kosongkan No WO
           if (noWO) {
@@ -348,6 +350,25 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
     return { success: false, message: e.toString() };
   } finally {
     try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+// ── Link pre-deal invoices ke WO saat penawaran jadi Deal ────────────────────
+function _linkPredealInvoices(ss, noPenawaran, noWO) {
+  try {
+    const invSheet = ss.getSheetByName('Invoice_Main');
+    if (!invSheet) return;
+    const data = invSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const rowNoPen = data[i][2] ? data[i][2].toString() : '';
+      const rowNoWO  = data[i][1] ? data[i][1].toString() : '';
+      if (rowNoPen === noPenawaran && !rowNoWO) {
+        invSheet.getRange(i + 1, 2).setValue(noWO); // kolom 2 = noWO
+      }
+    }
+    SpreadsheetApp.flush();
+  } catch(e) {
+    Logger.log('_linkPredealInvoices error: ' + e);
   }
 }
 

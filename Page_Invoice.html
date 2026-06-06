@@ -65,12 +65,16 @@
             </div>
 
             <div class="px-6 py-5 space-y-4">
-              <!-- Pilih WO -->
+              <!-- Pilih WO / Penawaran -->
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Work Order (Deal)</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Work Order / Penawaran</label>
                 <select id="inv-wo" onchange="onInvoiceWOChange()" class="input-field text-sm">
-                  <option value="">-- Pilih Work Order --</option>
+                  <option value="">-- Pilih Work Order / Penawaran --</option>
                 </select>
+                <div id="inv-predeal-note" class="hidden mt-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 font-semibold">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                  Invoice Pre-Deal — hanya jenis <b>DP</b>. No WO akan diisi otomatis saat Sales menandai penawaran ini sebagai <b>Deal</b>.
+                </div>
               </div>
 
               <!-- Info WO (otomatis dari penawaran) -->
