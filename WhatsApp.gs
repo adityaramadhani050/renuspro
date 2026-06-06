@@ -101,15 +101,41 @@ function testWANotif(payload) {
       muteHttpExceptions: true
     });
 
-    var result = JSON.parse(resp.getContentText());
-    if (result.messages && result.messages.length > 0) {
+    var httpCode = resp.getResponseCode();
+    var body     = resp.getContentText();
+    var result;
+    try { result = JSON.parse(body); } catch(e) { result = {}; }
+
+    if (httpCode === 200 && result.messages && result.messages.length > 0) {
       return { success: true, message: 'Pesan test berhasil dikirim!' };
     }
-    var errMsg = (result.error && result.error.message) ? result.error.message : resp.getContentText();
-    return { success: false, message: 'Gagal: ' + errMsg };
+
+    // Beri detail error yang jelas
+    var errObj  = result.error || {};
+    var errCode = errObj.code || httpCode;
+    var errMsg  = errObj.message || body;
+    var hint    = _waErrorHint(errCode, errObj.error_subcode);
+    return {
+      success: false,
+      message: '[' + errCode + '] ' + errMsg + (hint ? '\n\nSolusi: ' + hint : '')
+    };
   } catch (e) {
     return { success: false, message: e.toString() };
   }
+}
+
+// ── Petunjuk error umum Meta ─────────────────────────────────────────────────
+function _waErrorHint(code, subcode) {
+  var hints = {
+    100:  'Phone Number ID salah atau tidak ditemukan. Periksa kembali di Meta Developer → WhatsApp → API Setup.',
+    190:  'Access Token tidak valid atau sudah expired. Gunakan Permanent Token dari System User di Meta Business Manager.',
+    200:  'Aplikasi belum mendapat izin kirim pesan. Pastikan permission "whatsapp_business_messaging" sudah disetujui.',
+    131030: 'Nomor tujuan bukan test recipient. Tambahkan nomor di Meta Developer → WhatsApp → API Setup → To (add number). ATAU publikasikan app ke Live Mode.',
+    131047: 'Nomor tujuan belum pernah mengirim pesan ke nomor bisnis Anda dalam 24 jam terakhir (24-hour window). Minta penerima kirim pesan dulu ke nomor WA bisnis, atau gunakan approved template.',
+    131051: 'Tipe pesan tidak didukung untuk nomor ini.',
+    132000: 'Template tidak ditemukan atau belum disetujui.'
+  };
+  return hints[subcode] || hints[code] || '';
 }
 
 // ── Template pesan ───────────────────────────────────────────────────────────
