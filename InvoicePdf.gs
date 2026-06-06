@@ -441,16 +441,26 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
     .setValue('Hormat kami,')
-    .setHorizontalAlignment('center')
+    .setHorizontalAlignment('right')
     .setFontColor('#000000');
   sheet.setRowHeight(row, 20);
   row += 3;
   sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
-    .setValue('PT. RENUS GLOBAL INDONESIA')
-    .setHorizontalAlignment('center')
+    .setValue('Nur Ashri Kurnia F')
+    .setHorizontalAlignment('right')
     .setFontWeight('bold')
-    .setFontColor('#000000');
+    .setFontColor('#000000')
+    .setFontLine('underline');
+  sheet.setRowHeight(row, 20);
+
+  sheet.getRange(row, ttdStart, 1, ttdSpan)
+    .merge()
+    .setValue('Direktur')
+    .setHorizontalAlignment('right')
+    .setFontWeight('normal')
+    .setFontColor('#000000')
+    .setFontStyle('italic');
   sheet.setRowHeight(row, 20);
 }
 
