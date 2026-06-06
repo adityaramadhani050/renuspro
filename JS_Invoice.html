@@ -42,6 +42,10 @@
       return '';
     }
 
+    function _isFinanceOrAdmin() {
+      return _currentUser && (_currentUser.role === 'finance' || _currentUser.role === 'admin');
+    }
+
     // ── List ──
     function _pgRenderInvoice(data) {
       const tbody = document.getElementById('table-invoice');
@@ -81,24 +85,26 @@
           <td class="p-4 text-center"><span class="text-[11px] font-bold px-2 py-1 rounded-lg ${_jenisBadge(i.jenis)}">${i.jenis}${i.persen ? ' '+i.persen+'%' : ''}</span></td>
           <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.total.toLocaleString('id-ID')}</td>
           <td class="p-4 text-center">
-            <select onchange="ubahStatusBayarInvoice('${i.id}', this)"
-              class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${bayarClass}">
-              <option value="Belum Lunas" ${!isLunas?'selected':''}>Belum Lunas</option>
-              <option value="Lunas" ${isLunas?'selected':''}>Lunas</option>
-            </select>
+            ${_isFinanceOrAdmin()
+              ? `<select onchange="ubahStatusBayarInvoice('${i.id}', this)"
+                   class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${bayarClass}">
+                   <option value="Belum Lunas" ${!isLunas?'selected':''}>Belum Lunas</option>
+                   <option value="Lunas" ${isLunas?'selected':''}>Lunas</option>
+                 </select>`
+              : `<span class="text-[11px] font-bold px-2 py-1 rounded-lg ${bayarClass}">${i.statusBayar}</span>`}
           </td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button onclick='bukaModalEditInvoice(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Invoice">
+              ${_isFinanceOrAdmin() ? `<button onclick='bukaModalEditInvoice(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Invoice">
                 <i class="fa-solid fa-pen-to-square"></i>
-              </button>
+              </button>` : ''}
               <button onclick='exportInvoicePDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Invoice">
                 <i class="fa-solid fa-file-pdf"></i>
               </button>
               ${kwBtn}
-              <button onclick="konfirmasiHapus('invoice','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+              ${_isFinanceOrAdmin() ? `<button onclick="konfirmasiHapus('invoice','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
                 <i class="fa-regular fa-trash-can"></i>
-              </button>
+              </button>` : ''}
             </div>
           </td>
         </tr>`;
@@ -106,6 +112,8 @@
     }
 
     window.loadInvoice = function() {
+      const btnBuat = document.querySelector('[onclick="bukaModalBuatInvoice()"]');
+      if (btnBuat) btnBuat.classList.toggle('hidden', !_isFinanceOrAdmin());
       const tbody = document.getElementById('table-invoice');
       if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data invoice...</td></tr>`;
       if (typeof google !== 'undefined') {

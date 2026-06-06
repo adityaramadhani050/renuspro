@@ -196,12 +196,16 @@
         }).join('');
       }
 
-      // Tombol Buat Invoice
+      // Tombol Buat Invoice — hanya untuk finance/admin
       const btnInv = el('wo-btn-invoice');
-      if (item.sisaDpp > 0) {
+      const canCreateInvoice = typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin();
+      if (!canCreateInvoice) {
+        btnInv.classList.add('hidden');
+      } else if (item.sisaDpp > 0) {
         btnInv.classList.remove('hidden', 'opacity-50', 'cursor-not-allowed');
         btnInv.disabled = false;
       } else {
+        btnInv.classList.remove('hidden');
         btnInv.classList.add('opacity-50', 'cursor-not-allowed');
         btnInv.disabled = true;
         btnInv.title = 'Seluruh nilai kontrak sudah ditagih';

@@ -31,15 +31,15 @@
           <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.jumlah.toLocaleString('id-ID')}</td>
           <td class="p-4 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button onclick='bukaModalEditKwitansi(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Kwitansi">
+              ${typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin() ? `<button onclick='bukaModalEditKwitansi(${itemJson})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit Kwitansi">
                 <i class="fa-solid fa-pen-to-square"></i>
-              </button>
+              </button>` : ''}
               <button onclick='exportKwitansiPDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Kwitansi">
                 <i class="fa-solid fa-file-pdf"></i>
               </button>
-              <button onclick="konfirmasiHapus('kwitansi','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
+              ${typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin() ? `<button onclick="konfirmasiHapus('kwitansi','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
                 <i class="fa-regular fa-trash-can"></i>
-              </button>
+              </button>` : ''}
             </div>
           </td>
         </tr>`;
@@ -47,6 +47,8 @@
     }
 
     window.loadKwitansi = function() {
+      const btnBuat = document.querySelector('[onclick="bukaModalBuatKwitansi()"]');
+      if (btnBuat) btnBuat.classList.toggle('hidden', !(typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()));
       const tbody = document.getElementById('table-kwitansi');
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data kwitansi...</td></tr>`;
       if (typeof google !== 'undefined') {
