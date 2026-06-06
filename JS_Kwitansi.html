@@ -108,7 +108,7 @@
       if (!inv) return;
       document.getElementById('kw-terima').value = inv.namaKlien || '';
       document.getElementById('kw-untuk').value  = 'Pembayaran ' + inv.jenis + (inv.persen ? ' ' + inv.persen + '%' : '') +
-        ' - ' + inv.namaProject + ' (Invoice ' + inv.id + ')';
+        ' - ' + inv.namaProject;
       document.getElementById('kw-jumlah').value = formatNominalRupiah(inv.total || 0);
       onKwitansiJumlahInput();
     }

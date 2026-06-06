@@ -38,6 +38,12 @@ function exportKwitansiDariTemplate(idKwitansi) {
     set('kw_untuk',       kw.untuk);
     set('kw_ref_invoice', kw.noInvoice);
 
+    // Isi bank account (B31) dari data invoice terkait
+    if (kw.noInvoice) {
+      const bankAccount = _getBankAccountFromInvoice(ss, kw.noInvoice);
+      if (bankAccount) sheet.getRange('B31').setValue(bankAccount);
+    }
+
     SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
 
@@ -70,6 +76,20 @@ function _formatTanggalKwitansi(tgl) {
   }
   if (isNaN(d) || isNaN(m) || isNaN(y) || m < 0 || m > 11) return 'Surabaya, ' + (tgl || '');
   return 'Surabaya, ' + d + ' ' + bulan[m] + ' ' + y;
+}
+
+function _getBankAccountFromInvoice(ss, noInvoice) {
+  try {
+    const sheet = ss.getSheetByName('Invoice_Main');
+    if (!sheet) return '';
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === noInvoice) {
+        return data[i][19] ? data[i][19].toString() : ''; // kolom 20 = Bank Account
+      }
+    }
+    return '';
+  } catch (e) { return ''; }
 }
 
 function _getKwitansiById(ss, idKwitansi) {
