@@ -303,8 +303,8 @@ function getSalesReportData(params) {
       for (var pid in sd._penawaranInRange)  penawaranMap[pid] = sd._penawaranInRange[pid];
       for (var pid in sd._penawaranPipeline) penawaranMap[pid] = sd._penawaranPipeline[pid];
 
-      // Convert to array and sort: On-Progress first, Deal second, Fail third; within each by grandTotal desc
-      var statusOrder = { 'On-Progress': 0, 'Deal': 1, 'Fail': 2 };
+      // Convert to array and sort: Deal first, On-Progress second, Fail third; within each by grandTotal desc
+      var statusOrder = { 'Deal': 0, 'On-Progress': 1, 'Fail': 2 };
       var penawaranArr = [];
       for (var pid in penawaranMap) penawaranArr.push(penawaranMap[pid]);
       penawaranArr.sort(function(a, b) {
