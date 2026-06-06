@@ -1,0 +1,118 @@
+<section id="page-laporanfinance" class="page-section">
+
+  <!-- Controls bar -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+      <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Pembayaran</h2>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="exportFinanceReportPDF()" title="Export PDF"
+        class="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold
+               px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+        <i class="fa-solid fa-file-pdf text-xs"></i> Export PDF
+      </button>
+      <button onclick="loadFinanceReport()" title="Refresh"
+        class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-blue-100
+               text-slate-400 hover:text-blue-600 transition">
+        <i class="fa-solid fa-rotate-right text-xs"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="fr-loading" class="flex flex-col items-center justify-center py-24 gap-4">
+    <div class="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+    <p class="text-sm text-slate-400 font-medium">Memuat data laporan...</p>
+  </div>
+
+  <!-- Content -->
+  <div id="fr-content" class="hidden space-y-6">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Tagihan</p>
+        <p id="fr-kpi-tagihan" class="text-xl font-extrabold text-slate-800 leading-tight">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">Seluruh invoice diterbitkan</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sudah Terbayar</p>
+        <p id="fr-kpi-terbayar" class="text-xl font-extrabold text-emerald-600 leading-tight">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">Invoice berstatus Lunas</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Outstanding</p>
+        <p id="fr-kpi-outstanding" class="text-xl font-extrabold text-rose-600 leading-tight">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">Belum/sebagian terbayar</p>
+      </div>
+      <!-- Payment progress -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate</p>
+          <span id="fr-kpi-pct" class="text-xs font-extrabold text-blue-600">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-2">
+          <div id="fr-collect-bar"
+            class="h-2.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-700"
+            style="width: 0%"></div>
+        </div>
+        <p class="text-[10px] text-slate-400">% tagihan yang sudah dibayar</p>
+      </div>
+    </div>
+
+    <!-- Aging -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-clock mr-1"></i> Aging Outstanding (Invoice Belum Lunas)
+      </p>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-emerald-50 rounded-xl p-3 text-center">
+          <p class="text-[10px] font-bold text-emerald-600 mb-1">&lt; 30 Hari</p>
+          <p id="fr-aging-0" class="text-sm font-extrabold text-emerald-700">—</p>
+        </div>
+        <div class="bg-amber-50 rounded-xl p-3 text-center">
+          <p class="text-[10px] font-bold text-amber-600 mb-1">30–59 Hari</p>
+          <p id="fr-aging-30" class="text-sm font-extrabold text-amber-700">—</p>
+        </div>
+        <div class="bg-orange-50 rounded-xl p-3 text-center">
+          <p class="text-[10px] font-bold text-orange-600 mb-1">60–89 Hari</p>
+          <p id="fr-aging-60" class="text-sm font-extrabold text-orange-700">—</p>
+        </div>
+        <div class="bg-rose-50 rounded-xl p-3 text-center">
+          <p class="text-[10px] font-bold text-rose-600 mb-1">&ge; 90 Hari</p>
+          <p id="fr-aging-90" class="text-sm font-extrabold text-rose-700">—</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table list WO -->
+    <div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-list-check mr-1"></i> Progress Pembayaran per Work Order
+      </p>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">No WO / Penawaran</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3">Klien / Project</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-right whitespace-nowrap">Nilai Kontrak</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-right whitespace-nowrap">Total Ditagih</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-right whitespace-nowrap">Terbayar</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-right whitespace-nowrap">Outstanding</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-center whitespace-nowrap">Status</th>
+                <th class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-center whitespace-nowrap">Invoice</th>
+              </tr>
+            </thead>
+            <tbody id="fr-table-body" class="divide-y divide-slate-50 text-sm">
+              <tr><td colspan="8" class="text-center py-8 text-slate-400">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#fr-content -->
+
+</section>

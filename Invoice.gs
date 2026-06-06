@@ -505,6 +505,9 @@ function updateStatusBayarInvoice(idInvoice, statusBaru) {
       if (data[i][0].toString() !== idInvoice) continue;
 
       sheet.getRange(i + 1, 17).setValue(statusBaru);
+      if (statusBaru === 'Lunas') {
+        catatTanggalBayar(idInvoice);
+      }
       SpreadsheetApp.flush();
 
       let noKwitansi = '';

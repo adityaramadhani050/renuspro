@@ -58,6 +58,10 @@
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-chart-bar w-6"></i> Laporan Sales
         </button>
+        <button onclick="navigate('laporanfinance')" id="nav-laporanfinance"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-money-bill-trend-up w-6"></i> Laporan Finance
+        </button>
       </nav>
     </div>
 
@@ -129,6 +133,7 @@
       <?!= include('Page_Customer'); ?>
       <?!= include('Page_Users'); ?>
       <?!= include('Page_SalesReport'); ?>
+      <?!= include('Page_FinanceReport'); ?>
 
 
 
@@ -155,5 +160,6 @@
   <?!= include('JS_DashboardFilter'); ?>
   <?!= include('JS_Pagination'); ?>
   <?!= include('JS_SalesReport'); ?>
+  <?!= include('JS_FinanceReport'); ?>
 </body>
 </html>
