@@ -71,11 +71,19 @@ function _frRenderTable(rows) {
         : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i class="fa-solid fa-clock text-[9px]"></i> Outstanding</span>';
 
     var invCount = row.invoices.length;
-    var noRef = row.noWO || ('PEN: ' + row.noPenawaran);
     var isPredeal = row.isPredeal ? ' <span class="text-[9px] font-bold bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full ml-1">Pre-Deal</span>' : '';
 
     html += '<tr class="hover:bg-slate-50 transition">';
-    html += '<td class="px-4 py-3 font-bold text-slate-700 text-xs whitespace-nowrap">' + noRef + isPredeal + '</td>';
+    if (row.noWO) {
+      html += '<td class="px-4 py-3 text-xs whitespace-nowrap">'
+            + '<p class="font-bold text-slate-700">WO-' + row.noWO + '</p>'
+            + '<p class="text-[11px] text-slate-400">' + row.noPenawaran + '</p>'
+            + isPredeal + '</td>';
+    } else {
+      html += '<td class="px-4 py-3 text-xs whitespace-nowrap">'
+            + '<p class="font-bold text-slate-700">' + row.noPenawaran + '</p>'
+            + isPredeal + '</td>';
+    }
     html += '<td class="px-4 py-3"><p class="font-semibold text-slate-800 text-xs leading-tight">' + (row.namaKlien || '—') + '</p>'
           + '<p class="text-[11px] text-slate-400 truncate max-w-[200px]">' + (row.namaProject || '—') + '</p></td>';
     html += '<td class="px-4 py-3 text-right text-xs font-medium text-slate-600 whitespace-nowrap">' + (row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—') + '</td>';
@@ -218,7 +226,7 @@ window.exportFinanceReportPDF = function() {
     var st = row.invoices.length === 0 ? 'Belum Ada Invoice'
            : row.outstanding <= 0 ? 'Lunas' : 'Outstanding';
     return [
-      row.noWO || ('PEN:' + row.noPenawaran),
+      row.noWO ? ('WO-' + row.noWO + '\n' + row.noPenawaran) : row.noPenawaran,
       row.namaKlien || '—',
       row.namaProject || '—',
       row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—',
@@ -258,7 +266,7 @@ window.exportFinanceReportPDF = function() {
     if (!row.invoices.length) return;
     if (y > 250) { doc.addPage(); y = margin; }
 
-    var ref = row.noWO || ('PEN:' + row.noPenawaran);
+    var ref = row.noWO ? ('WO-' + row.noWO + ' | ' + row.noPenawaran) : row.noPenawaran;
     doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
     doc.text('Detail Invoice — ' + ref + ' | ' + (row.namaKlien || '') + ' | ' + (row.namaProject || ''), margin, y);
     y += 3;
