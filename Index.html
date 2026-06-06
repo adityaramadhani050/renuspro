@@ -58,10 +58,6 @@
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-user-shield w-6"></i> Manajemen User
         </button>
-        <button onclick="navigate('laporansales')" id="nav-laporansales"
-          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
-          <i class="fas fa-chart-bar w-6"></i> Laporan Sales
-        </button>
       </nav>
     </div>
 
@@ -132,7 +128,6 @@
       <?!= include('Page_Template'); ?>
       <?!= include('Page_Customer'); ?>
       <?!= include('Page_Users'); ?>
-      <?!= include('Page_SalesReport'); ?>
       <?!= include('Page_FinanceReport'); ?>
 
 
@@ -159,7 +154,6 @@
   <?!= include('JS_SearchableDropdown'); ?>
   <?!= include('JS_DashboardFilter'); ?>
   <?!= include('JS_Pagination'); ?>
-  <?!= include('JS_SalesReport'); ?>
   <?!= include('JS_FinanceReport'); ?>
 </body>
 </html>
