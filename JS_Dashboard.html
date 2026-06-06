@@ -251,7 +251,7 @@ function _dbRenderAll(rawData, salesData) {
   _dbRenderTargetBar(summary);
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
-  _dbRenderDonut(items);
+  _dbRenderDonut(items, ms.fromMs, ms.toMs);
   if (isAdmin) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
@@ -419,11 +419,15 @@ function _dbRenderTrend(items) {
   });
 }
 
-// ── Status Penawaran Donut (all-time) ──────────────────────────
-function _dbRenderDonut(items) {
+// ── Status Penawaran Donut (period-filtered) ───────────────────
+function _dbRenderDonut(items, fromMs, toMs) {
   var counts = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
   items.forEach(function(item) {
-    if (counts[item.status] !== undefined) counts[item.status]++;
+    if (counts[item.status] === undefined) return;
+    var ts = item.tanggal;
+    if (fromMs && ts && ts < fromMs) return;
+    if (toMs   && ts && ts > toMs)   return;
+    counts[item.status]++;
   });
   var onProg = counts['On-Progress'], won = counts['Deal'], fail = counts['Fail'];
   var total  = onProg + won + fail;
