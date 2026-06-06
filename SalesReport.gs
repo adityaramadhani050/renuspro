@@ -214,8 +214,7 @@ function getSalesReportData(params) {
           pipelineValue: 0,
           failCount: 0,
           // penawaran IDs to collect (deduplication via set)
-          _penawaranInRange: {},   // key: noPenawaran, val: penawaran object
-          _penawaranPipeline: {}   // key: noPenawaran, val: penawaran object (on-progress, any date)
+          _penawaranInRange: {}    // key: noPenawaran, val: penawaran object (filtered by creation date)
         };
       }
     }
@@ -277,12 +276,10 @@ function getSalesReportData(params) {
         sd.dealRevenue += grandTotal;
       }
 
-      // Pipeline — all time, On-Progress
+      // Pipeline — all time, On-Progress (untuk KPI pipeline saja, tidak masuk daftar penawaran)
       if (status === 'On-Progress') {
         sd.pipelineCount++;
         sd.pipelineValue += grandTotal;
-        // Also add to penawaran list (on-progress regardless of date)
-        sd._penawaranPipeline[noPenawaran] = pObj;
       }
     }
 
@@ -297,15 +294,12 @@ function getSalesReportData(params) {
       // achievement
       sd.achievement = sd.targetBulanan > 0 ? (sd.dealRevenue / sd.targetBulanan) * 100 : null;
 
-      // Merge penawaran: in-range (creation) + on-progress, deduplicated
-      var penawaranMap = {};
-      for (var pid in sd._penawaranInRange)  penawaranMap[pid] = sd._penawaranInRange[pid];
-      for (var pid in sd._penawaranPipeline) penawaranMap[pid] = sd._penawaranPipeline[pid];
-
-      // Convert to array and sort: Deal first, On-Progress second, Fail third; within each by grandTotal desc
-      var statusOrder = { 'Deal': 0, 'On-Progress': 1, 'Fail': 2 };
+      // Penawaran: hanya yang tanggal pembuatan dalam periode
       var penawaranArr = [];
-      for (var pid in penawaranMap) penawaranArr.push(penawaranMap[pid]);
+      for (var pid in sd._penawaranInRange) penawaranArr.push(sd._penawaranInRange[pid]);
+
+      // Sort: Deal first, On-Progress second, Fail third; within each by grandTotal desc
+      var statusOrder = { 'Deal': 0, 'On-Progress': 1, 'Fail': 2 };
       penawaranArr.sort(function(a, b) {
         var sa = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 9;
         var sb = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 9;
