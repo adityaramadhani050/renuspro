@@ -397,8 +397,13 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   const noteVal = (inv.catatan || '').toString();
   const bankVal = (inv.bankAccount || '').toString();
 
-  // Header Note / Bank Account
+  // Spacer 1 baris antara Grand Total dan Note/Bank Account
   sheet.insertRowsAfter(row - 1, 1);
+  sheet.getRange(row, 1, 1, NCOLS).merge().setBackground('#ffffff');
+  sheet.setRowHeight(row, 10);
+  row++;
+
+  // Header Note / Bank Account
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, 1, 1, leftW).merge()
     .setValue('Note')
