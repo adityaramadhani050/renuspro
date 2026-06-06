@@ -170,6 +170,11 @@
                  <i class="fa-solid fa-receipt"></i> Kwitansi
                </button>`
             : '';
+          const invJsonStr = JSON.stringify(inv).replace(/'/g, "&#39;");
+          const invPdfBtn = `<button onclick='_exportInvDariWODetail(${invJsonStr})'
+               class="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Export PDF Invoice">
+               <i class="fa-solid fa-file-invoice"></i> Invoice
+             </button>`;
           return `<div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-4 py-3 text-xs">
             <div class="flex-1 min-w-0">
               <p class="font-bold text-blue-700">${inv.id}</p>
@@ -177,6 +182,7 @@
             </div>
             <p class="font-extrabold text-slate-700 whitespace-nowrap">Rp ${Math.round(inv.total||0).toLocaleString('id-ID')}</p>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-600'}">${inv.statusBayar}</span>
+            ${invPdfBtn}
             ${kwBtn}
           </div>`;
         }).join('');
@@ -203,8 +209,7 @@
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;
-      tutupModalDetailWO();
-      setTimeout(() => bukaModalCatatanWO(_woDetailCurrent), 100);
+      bukaModalCatatanWO(_woDetailCurrent);
     }
 
     function _pdfDariDetailWO() {
@@ -250,6 +255,31 @@
           })
           .exportKwitansiDariTemplate(kwitansiId);
       }
+    }
+
+    function _exportInvDariWODetail(inv) {
+      document.getElementById('preview-pdf-title').innerText = 'Invoice — ' + inv.id;
+      document.getElementById('preview-pdf-subtitle').innerText = '';
+      document.getElementById('preview-pdf-loading').classList.remove('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+      document.getElementById('modal-preview-pdf').classList.remove('hidden');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) {
+            _activePdfBase64 = res.pdfBase64;
+            _activePdfName   = res.fileName;
+            renderPDFDariBase64(res.pdfBase64);
+          } else {
+            document.getElementById('preview-pdf-loading').innerHTML =
+              '<p class="text-rose-400 text-sm">' + res.message + '</p>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('preview-pdf-loading').innerHTML =
+            '<p class="text-rose-400 text-sm">Error: ' + (err.message || err) + '</p>';
+        })
+        .exportInvoiceDariTemplate(inv.id);
     }
 
     // ================================================================
