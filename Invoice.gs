@@ -104,6 +104,7 @@ function getInvoiceInitialData() {
         noWO:         w.noWO,
         id:           w.id,
         rev:          w.rev,
+        tanggal:      w.tanggal,
         namaProject:  w.namaProject,
         namaKlien:    w.namaKlien,
         klienId:      w.klienId,

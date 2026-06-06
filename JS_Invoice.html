@@ -328,7 +328,7 @@
       // PO: jika ada → pakai input; jika tidak → pakai No. Penawaran sebagai referensi
       const adaPO = document.getElementById('inv-ada-po').checked;
       const noPO  = adaPO ? document.getElementById('inv-nopo').value.trim() : (wo.id || '');
-      const tglPO = adaPO ? _toDDMMYYYY(document.getElementById('inv-tglpo').value) : '';
+      const tglPO = adaPO ? _toDDMMYYYY(document.getElementById('inv-tglpo').value) : (wo.tanggal || '');
       if (adaPO && !noPO) return showNotification('No. PO belum diisi.', 'error');
 
       const payload = {
