@@ -291,9 +291,8 @@ function getSalesReportData(params) {
     for (var sName in salesData) {
       var sd = salesData[sName];
 
-      // winRate
-      var denominator = sd.dealCount + sd.failCount;
-      sd.winRate = denominator > 0 ? (sd.dealCount / denominator) * 100 : 0;
+      // winRate = Deal / Total Penawaran (konsisten dengan dashboard)
+      sd.winRate = sd.totalPenawaran > 0 ? (sd.dealCount / sd.totalPenawaran) * 100 : 0;
 
       // achievement
       sd.achievement = sd.targetBulanan > 0 ? (sd.dealRevenue / sd.targetBulanan) * 100 : null;
