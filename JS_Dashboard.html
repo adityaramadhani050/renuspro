@@ -150,9 +150,10 @@
       const TARGET_PER_SALES_MONTHLY = 3600000000 / 12;
 
       items.forEach(function(item) {
-        const ts      = item.tanggal; // timestamp ms atau null
         const isDeal  = item.status === 'Deal';
         const isFail  = item.status === 'Fail';
+        // Atribusikan revenue ke bulan deal (tanggalDeal), bukan bulan penawaran dibuat
+        const ts      = (isDeal && item.tanggalDeal) ? item.tanggalDeal : item.tanggal;
         const inCur   = inRange(ts);
         const inPrv   = inPrevRange(ts);
 

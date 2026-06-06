@@ -63,7 +63,8 @@ function getPenawaranList() {
           termConditions: data[i][14] ? data[i][14].toString() : '{}',
           items:          data[i][15] ? data[i][15].toString() : '[]',
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
-          noWO:           data[i][17] ? data[i][17].toString() : ''
+          noWO:           data[i][17] ? data[i][17].toString() : '',
+          tanggalDeal:    data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : '')
         };
       }
     }
@@ -323,7 +324,7 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
 
-        // ── Otomasi No WO (Kolom 18) ──
+        // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
         if (statusBaru === 'Deal') {
           // Status menjadi Deal → terbitkan No WO jika belum ada
@@ -331,14 +332,20 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
             noWO = generateNextWONumber(sheet);
             sheet.getRange(i + 1, 18).setValue(Number(noWO));
           }
+          // Catat tanggal deal (hanya isi jika belum ada, agar re-deal tidak reset tanggal)
+          const existingDealDate = data[i][18];
+          if (!existingDealDate) {
+            sheet.getRange(i + 1, 19).setValue(new Date());
+          }
           // Link pre-deal invoices (noWO kosong) ke WO baru
           _linkPredealInvoices(getSpreadsheet(), noPenawaran, noWO);
         } else {
-          // Keluar dari Deal → kosongkan No WO
+          // Keluar dari Deal → kosongkan No WO dan tanggal deal
           if (noWO) {
             sheet.getRange(i + 1, 18).setValue('');
             noWO = '';
           }
+          sheet.getRange(i + 1, 19).setValue('');
         }
 
         SpreadsheetApp.flush();
