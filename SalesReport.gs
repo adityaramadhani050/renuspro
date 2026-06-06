@@ -234,6 +234,8 @@ function getSalesReportData(params) {
       var status        = String(row[16] || '').trim();
       var noWO          = row[17] || '';
       var tanggalDeal   = parseTgl(row[18]);
+      // Fallback: data lama (sebelum fitur tanggalDeal) → gunakan tanggal penawaran
+      var effectiveDealDate = tanggalDeal || tanggal;
 
       var namaKlien = klienMap[klienId] || klienId;
 
@@ -244,7 +246,7 @@ function getSalesReportData(params) {
       var sd = salesData[dibuatOleh];
 
       var creationInRange = inRange(tanggal, rangeFrom, rangeTo);
-      var dealInRange     = (status === 'Deal') && inRange(tanggalDeal, rangeFrom, rangeTo);
+      var dealInRange     = (status === 'Deal') && inRange(effectiveDealDate, rangeFrom, rangeTo);
 
       // Build penawaran object
       var pObj = {
@@ -377,7 +379,7 @@ function getSalesReportData(params) {
       if (status2 !== 'Deal') continue;
       if (!isAdmin && dibuatOleh2 !== namaUser) continue;
 
-      var tanggalDeal2 = parseTgl(row2[18]);
+      var tanggalDeal2 = parseTgl(row2[18]) || parseTgl(row2[2]);
       if (!tanggalDeal2) continue;
       var grandTotal2 = parseFloat(row2[10]) || 0;
       var dealKey = getMonthKey(tanggalDeal2);
@@ -404,7 +406,7 @@ function getSalesReportData(params) {
       if (status3 !== 'Deal') continue;
       if (!isAdmin && dibuatOleh3 !== namaUser) continue;
 
-      var tanggalDeal3 = parseTgl(row3[18]);
+      var tanggalDeal3 = parseTgl(row3[18]) || parseTgl(row3[2]);
       if (!inRange(tanggalDeal3, rangeFrom, rangeTo)) continue;
 
       var klienId3   = String(row3[5] || '').trim();
