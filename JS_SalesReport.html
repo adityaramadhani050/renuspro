@@ -233,7 +233,8 @@ function _srRender(data) {
   _setText('sr-kpi-revenue',   _rp(summary.teamRevenue   || 0));
   _setText('sr-kpi-penawaran', summary.teamPenawaran != null ? summary.teamPenawaran : '—');
   _setText('sr-kpi-deal',      summary.teamDealCount  != null ? summary.teamDealCount  : '—');
-  _setText('sr-kpi-pipeline',  _rp(summary.teamPipelineValue || 0));
+  _setText('sr-kpi-pipeline',  (summary.teamPipelineCount || 0) + ' penawaran');
+  _setText('sr-kpi-pipeline-value', _rp(summary.teamPipelineValue || 0));
 
   // -- Target Progress Bar --
   const rev    = summary.teamRevenue || 0;

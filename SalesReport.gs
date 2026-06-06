@@ -344,14 +344,16 @@ function getSalesReportData(params) {
     var teamDealCount    = 0;
     var teamFailCount    = 0;
     var teamPipelineValue = 0;
+    var teamPipelineCount = 0;
 
     for (var si = 0; si < salesList.length; si++) {
       var s = salesList[si];
-      teamRevenue       += s.dealRevenue;
-      teamPenawaran     += s.totalPenawaran;
-      teamDealCount     += s.dealCount;
-      teamFailCount     += s.failCount;
-      teamPipelineValue += s.pipelineValue;
+      teamRevenue        += s.dealRevenue;
+      teamPenawaran      += s.totalPenawaran;
+      teamDealCount      += s.dealCount;
+      teamFailCount      += s.failCount;
+      teamPipelineValue  += s.pipelineValue;
+      teamPipelineCount  += s.pipelineCount;
     }
 
     // teamTarget = sum of ALL sales users (from Master_User), not just those with data
@@ -436,7 +438,8 @@ function getSalesReportData(params) {
         teamPenawaran:     teamPenawaran,
         teamDealCount:     teamDealCount,
         teamWinRate:       teamWinRate,
-        teamPipelineValue: teamPipelineValue
+        teamPipelineValue: teamPipelineValue,
+        teamPipelineCount: teamPipelineCount
       },
       trend:        trend,
       salesList:    salesList,
