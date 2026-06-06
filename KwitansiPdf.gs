@@ -7,7 +7,7 @@
  *
  * NAMED RANGE yang HARUS ada di sheet Template_Kwitansi:
  *   kw_no, kw_tanggal, kw_terima_dari, kw_jumlah,
- *   kw_terbilang, kw_untuk, kw_ref_invoice
+ *   kw_terbilang, kw_untuk, kw_ref_invoice, kw_bank_account
  */
 
 function exportKwitansiDariTemplate(idKwitansi) {
@@ -38,10 +38,10 @@ function exportKwitansiDariTemplate(idKwitansi) {
     set('kw_untuk',       kw.untuk);
     set('kw_ref_invoice', kw.noInvoice);
 
-    // Isi bank account (B31) dari data invoice terkait
+    // Isi bank account dari data invoice terkait
     if (kw.noInvoice) {
       const bankAccount = _getBankAccountFromInvoice(ss, kw.noInvoice);
-      if (bankAccount) sheet.getRange('B31').setValue(bankAccount);
+      set('kw_bank_account', bankAccount);
     }
 
     SpreadsheetApp.flush();
