@@ -400,7 +400,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   // Spacer 1 baris antara Grand Total dan Note/Bank Account
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, 1, 1, NCOLS).merge().setBackground('#ffffff');
-  sheet.setRowHeight(row, 10);
+  sheet.setRowHeight(row, 22);
   row++;
 
   // Header Note / Bank Account
@@ -444,7 +444,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
     .setHorizontalAlignment('right')
     .setFontColor('#000000');
   sheet.setRowHeight(row, 20);
-  row += 3;
+  row += 2;
   sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
     .setValue('Nur Ashri Kurnia F')
@@ -453,7 +453,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
     .setFontColor('#000000')
     .setFontLine('underline');
   sheet.setRowHeight(row, 20);
-
+  row ++;
   sheet.getRange(row, ttdStart, 1, ttdSpan)
     .merge()
     .setValue('Direktur')
