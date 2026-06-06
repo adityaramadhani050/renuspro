@@ -232,21 +232,38 @@
         if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
         _invoiceEditId  = item.id;
         _invoiceEditDpp = item.dpp || 0;
-        _invoiceWOList  = res.woList || [];
+        _invoiceWOList  = (res.woList || []).concat(res.penawaranPreDeal || []);
         document.getElementById('inv-modal-title').innerText = 'Edit Invoice';
         document.getElementById('inv-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Invoice';
         document.getElementById('inv-nomor-preview').innerText = item.id;
 
-        // Pastikan WO invoice ada di dropdown meski sisa 0 (karena sedang diedit)
+        const isPredeal = !item.noWO;
         const sel = document.getElementById('inv-wo');
-        sel.innerHTML = '<option value="">-- Pilih Work Order --</option>';
-        _invoiceWOList.filter(w => !w.isPredeal).forEach(w => {
-          sel.add(new Option(`WO ${w.noWO} — ${w.namaKlien}`, 'WO:' + w.noWO));
-        });
-        sel.value = 'WO:' + item.noWO;
-        sel.disabled = true; // WO tidak boleh diubah saat edit
+        sel.innerHTML = '<option value="">-- Pilih --</option>';
 
-        // Muat info & scope WO
+        if (isPredeal) {
+          // Pre-deal invoice: tampilkan penawaran pre-deal
+          const grp = document.createElement('optgroup');
+          grp.label = '── Penawaran (Pre-Deal DP) ──';
+          (res.penawaranPreDeal || []).forEach(p => grp.appendChild(new Option(
+            `[PRE-DEAL] ${p.id} — ${p.namaKlien} · ${p.namaProject}`, 'PEN:' + p.id
+          )));
+          sel.appendChild(grp);
+          sel.value = 'PEN:' + item.noPenawaran;
+        } else {
+          // Invoice normal: tampilkan WO
+          const grp = document.createElement('optgroup');
+          grp.label = '── Work Order (Deal) ──';
+          (res.woList || []).forEach(w => grp.appendChild(new Option(
+            `WO ${w.noWO} — ${w.namaKlien} · ${w.namaProject}`, 'WO:' + w.noWO
+          )));
+          sel.appendChild(grp);
+          sel.value = 'WO:' + item.noWO;
+        }
+        sel.disabled = true;
+
+        // Sync SD display lalu muat info & scope
+        if (sel.dataset.sdInit && typeof sdRefresh === 'function') sdRefresh('inv-wo');
         onInvoiceWOChange();
 
         // Pre-fill nilai dari invoice

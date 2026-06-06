@@ -201,10 +201,12 @@
 
     // ── Event listeners ──
     display.addEventListener('click', function() {
+      if (native.disabled) return;
       dropdown.classList.contains('open') ? closeDropdown() : openDropdown();
     });
 
     display.addEventListener('keydown', function(e) {
+      if (native.disabled) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
       if (e.key === 'Escape') closeDropdown();
     });
