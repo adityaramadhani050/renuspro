@@ -39,7 +39,7 @@
         const isLunas = i.statusBayar === 'Lunas';
         const bayarClass = isLunas ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
         const kwBtn = i.kwitansiId
-          ? `<button onclick="exportKwitansiPDFDariInvoice('${i.kwitansiId}',${itemJson})"
+          ? `<button onclick='exportKwitansiPDFDariInvoice("${i.kwitansiId}",${itemJson})'
                class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition"
                title="Export PDF Kwitansi (${i.kwitansiId})">
                <i class="fa-solid fa-receipt"></i>
