@@ -1,0 +1,197 @@
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    body { background: white; }
+    .page-section { padding: 0; }
+    .sr-detail-content { display: block !important; }
+    #sr-content { display: block !important; }
+  }
+</style>
+
+<section id="page-laporansales" class="page-section">
+
+  <!-- ===================== CONTROLS BAR (no-print) ===================== -->
+  <div class="no-print mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <!-- Title + description -->
+      <div>
+        <h2 class="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Laporan Performa Sales</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Ringkasan kinerja tim sales untuk rapat mingguan</p>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Period buttons -->
+        <button id="sr-period-mtd" onclick="_srSetPeriod('mtd')"
+          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap
+                 bg-blue-600 text-white border-blue-600">
+          Bulan Ini (MTD)
+        </button>
+        <button id="sr-period-custom" onclick="_srSetPeriod('custom')"
+          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap
+                 bg-white text-slate-600 border-slate-200 hover:border-blue-400">
+          Custom Range
+        </button>
+
+        <!-- Custom range pickers -->
+        <div id="sr-custom-range" class="hidden flex items-center gap-2 flex-wrap">
+          <input type="date" id="sr-date-from"
+            class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
+          <span class="text-xs text-slate-400 font-bold">s/d</span>
+          <input type="date" id="sr-date-to"
+            class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
+          <button onclick="_srLoad()"
+            class="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">
+            Tampilkan
+          </button>
+        </div>
+
+        <!-- Print button -->
+        <button onclick="window.print()" title="Cetak laporan"
+          class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-blue-100
+                 text-slate-400 hover:text-blue-600 transition flex-shrink-0">
+          <i class="fa-solid fa-print text-xs"></i>
+        </button>
+
+        <!-- Refresh button -->
+        <button onclick="_srLoad()" title="Refresh data"
+          class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-blue-100
+                 text-slate-400 hover:text-blue-600 transition flex-shrink-0">
+          <i class="fa-solid fa-rotate-right text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PRINT TITLE ===================== -->
+  <div class="print-only hidden mb-6">
+    <h1 id="sr-print-title" class="text-2xl font-extrabold text-slate-900">LAPORAN PERFORMA SALES</h1>
+    <p id="sr-print-period" class="text-sm text-slate-500 mt-1"></p>
+  </div>
+
+  <!-- ===================== LOADING STATE ===================== -->
+  <div id="sr-loading" class="flex flex-col items-center justify-center py-24 gap-4">
+    <div class="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+    <p class="text-sm text-slate-400 font-medium">Memuat data laporan...</p>
+  </div>
+
+  <!-- ===================== MAIN CONTENT ===================== -->
+  <div id="sr-content" class="hidden space-y-8">
+
+    <!-- ========== SECTION 1: RINGKASAN TIM ========== -->
+    <div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-users mr-1"></i> Ringkasan Tim
+      </p>
+
+      <!-- KPI Cards row -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <!-- Revenue Deal -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Revenue Deal</p>
+          <p id="sr-kpi-revenue" class="text-xl font-extrabold text-emerald-600 leading-tight">—</p>
+          <p class="text-[10px] text-slate-400 mt-1">Total nilai deal periode ini</p>
+        </div>
+        <!-- Total Penawaran -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Penawaran Dibuat</p>
+          <p id="sr-kpi-penawaran" class="text-xl font-extrabold text-blue-600 leading-tight">—</p>
+          <p class="text-[10px] text-slate-400 mt-1">Jumlah penawaran tim</p>
+        </div>
+        <!-- Deal Count -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Deal</p>
+          <p id="sr-kpi-deal" class="text-xl font-extrabold text-slate-800 leading-tight">—</p>
+          <p class="text-[10px] text-slate-400 mt-1">Jumlah deal berhasil</p>
+        </div>
+        <!-- Pipeline -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pipeline Aktif</p>
+          <p id="sr-kpi-pipeline" class="text-xl font-extrabold text-amber-600 leading-tight">—</p>
+          <p class="text-[10px] text-slate-400 mt-1">Nilai on-progress</p>
+        </div>
+      </div>
+
+      <!-- Revenue Progress Bar + Top Performer -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <!-- Progress Bar Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Capaian Target Tim</p>
+            <span id="sr-kpi-target-pct" class="text-xs font-extrabold text-blue-600">0%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden mb-2">
+            <div id="sr-target-bar"
+              class="h-3 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-700"
+              style="width: 0%"></div>
+          </div>
+          <p id="sr-target-bar-text" class="text-xs text-slate-400">Rp 0 / Rp 0</p>
+        </div>
+
+        <!-- Top Performer Card -->
+        <div id="sr-top-performer" class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+          <!-- Filled by JS -->
+          <div class="flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-crown text-amber-400"></i>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Performer</p>
+          </div>
+          <p class="text-sm text-slate-400">Memuat...</p>
+        </div>
+      </div>
+
+      <!-- 3-Month Trend Chart -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">
+          <i class="fa-solid fa-chart-bar mr-1"></i> Tren Revenue 3 Bulan Terakhir
+        </p>
+        <div class="relative" style="height: 200px;">
+          <canvas id="sr-trend-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SECTION 2: LEADERBOARD ========== -->
+    <div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-trophy mr-1"></i> Leaderboard Sales
+      </p>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Rank</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Nama Sales</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Penawaran</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Nilai Total</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Deal</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Revenue Deal</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Win Rate</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Target</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 whitespace-nowrap">Capaian</th>
+              </tr>
+            </thead>
+            <tbody id="sr-leaderboard-body" class="divide-y divide-slate-50">
+              <tr>
+                <td colspan="9" class="text-center text-xs text-slate-400 py-8">Memuat data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SECTION 3: DETAIL PER SALES ========== -->
+    <div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-user-tie mr-1"></i> Detail Per Sales
+      </p>
+      <div id="sr-sales-detail" class="space-y-3">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+  </div><!-- /#sr-content -->
+
+</section>

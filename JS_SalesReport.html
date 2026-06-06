@@ -1,0 +1,601 @@
+<script>
+// ============================================================
+//  JS_SalesReport.html — RenusPro Sales Management System
+//  Laporan Performa Sales — interactive + print-ready
+// ============================================================
+
+// --- Period state ---
+window._srPeriodMode = 'mtd';
+window._srDateFrom   = '';   // dd/MM/yyyy
+window._srDateTo     = '';   // dd/MM/yyyy
+let _srTrendChart    = null;
+
+// ── Formatting helpers ──────────────────────────────────────
+
+/** Format angka ke "Rp 1.200.000.000" */
+function _rp(n) {
+  if (!n && n !== 0) return 'Rp 0';
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+/** Alias full rupiah — sama dengan _rp */
+function _rpFull(n) {
+  return _rp(n);
+}
+
+/** Format persentase */
+function _pct(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toFixed(1) + '%';
+}
+
+// ── Badge helpers ────────────────────────────────────────────
+
+/** Badge status penawaran */
+function _statusBadge(status) {
+  const map = {
+    'Deal':        'bg-emerald-100 text-emerald-700',
+    'On-Progress': 'bg-blue-100 text-blue-700',
+    'Fail':        'bg-rose-100 text-rose-700',
+  };
+  const cls = map[status] || 'bg-slate-100 text-slate-600';
+  return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} whitespace-nowrap">${status || '—'}</span>`;
+}
+
+/** Badge capaian target */
+function _achieveBadge(achievement) {
+  if (achievement === null || achievement === undefined) {
+    return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">No Target</span>`;
+  }
+  let cls, label;
+  if (achievement >= 100) {
+    cls = 'bg-emerald-100 text-emerald-700';
+    label = '✓ Tercapai';
+  } else if (achievement >= 75) {
+    cls = 'bg-blue-100 text-blue-700';
+    label = _pct(achievement);
+  } else if (achievement >= 50) {
+    cls = 'bg-amber-100 text-amber-700';
+    label = _pct(achievement);
+  } else {
+    cls = 'bg-rose-100 text-rose-700';
+    label = _pct(achievement);
+  }
+  return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} whitespace-nowrap">${label}</span>`;
+}
+
+/** Rank badge leaderboard */
+function _rankBadge(rank) {
+  if (rank === 1) return `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-amber-100 text-amber-700">${rank}</span>`;
+  if (rank === 2) return `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-slate-100 text-slate-600">${rank}</span>`;
+  if (rank === 3) return `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-orange-100 text-orange-700">${rank}</span>`;
+  return `<span class="text-xs font-bold text-slate-400">${rank}</span>`;
+}
+
+// ── MTD helper ───────────────────────────────────────────────
+
+/** Format Date → "dd/MM/yyyy" */
+function _fmtDate(dt) {
+  const d = String(dt.getDate()).padStart(2, '0');
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const y = dt.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+/** "yyyy-MM-dd" → Date (for HTML date input value) */
+function _htmlDateToObj(str) {
+  if (!str) return null;
+  const parts = str.split('-');
+  if (parts.length !== 3) return null;
+  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+}
+
+/** dd/MM/yyyy → "yyyy-MM-dd" (for HTML date input) */
+function _ddmmyyyyToInputVal(s) {
+  if (!s) return '';
+  const p = s.split('/');
+  if (p.length !== 3) return '';
+  return `${p[2]}-${p[1]}-${p[0]}`;
+}
+
+// ── Period toggle ────────────────────────────────────────────
+
+function _srSetPeriod(mode) {
+  window._srPeriodMode = mode;
+  const mtdBtn    = document.getElementById('sr-period-mtd');
+  const custBtn   = document.getElementById('sr-period-custom');
+  const custRange = document.getElementById('sr-custom-range');
+
+  const activeClass   = 'bg-blue-600 text-white border-blue-600';
+  const inactiveClass = 'bg-white text-slate-600 border-slate-200 hover:border-blue-400';
+
+  if (mode === 'mtd') {
+    mtdBtn.className  = `text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${activeClass}`;
+    custBtn.className = `text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${inactiveClass}`;
+    custRange.classList.add('hidden');
+    _srLoad();
+  } else {
+    mtdBtn.className  = `text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${inactiveClass}`;
+    custBtn.className = `text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${activeClass}`;
+    custRange.classList.remove('hidden');
+
+    // Pre-fill date inputs if empty
+    const fromInput = document.getElementById('sr-date-from');
+    const toInput   = document.getElementById('sr-date-to');
+    if (!fromInput.value || !toInput.value) {
+      const today = new Date();
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromInput.value = _ddmmyyyyToInputVal(_fmtDate(firstOfMonth));
+      toInput.value   = _ddmmyyyyToInputVal(_fmtDate(today));
+    }
+  }
+}
+
+// ── Load / fetch ─────────────────────────────────────────────
+
+function _srLoad() {
+  const loading = document.getElementById('sr-loading');
+  const content = document.getElementById('sr-content');
+  loading.classList.remove('hidden');
+  content.classList.add('hidden');
+
+  let params = {};
+
+  if (window._srPeriodMode === 'mtd') {
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    params.dateFrom = _fmtDate(firstOfMonth);
+    params.dateTo   = _fmtDate(today);
+    window._srDateFrom = params.dateFrom;
+    window._srDateTo   = params.dateTo;
+  } else {
+    const fromInput = document.getElementById('sr-date-from');
+    const toInput   = document.getElementById('sr-date-to');
+    const fromObj = _htmlDateToObj(fromInput.value);
+    const toObj   = _htmlDateToObj(toInput.value);
+    if (!fromObj || !toObj) {
+      alert('Pilih tanggal dari dan sampai terlebih dahulu.');
+      loading.classList.add('hidden');
+      return;
+    }
+    params.dateFrom = _fmtDate(fromObj);
+    params.dateTo   = _fmtDate(toObj);
+    window._srDateFrom = params.dateFrom;
+    window._srDateTo   = params.dateTo;
+  }
+
+  // Attach user context if available
+  if (typeof _currentUser !== 'undefined' && _currentUser) {
+    params.isAdmin  = _currentUser.role === 'admin';
+    params.namaUser = _currentUser.nama || '';
+  } else {
+    params.isAdmin  = true;
+    params.namaUser = '';
+  }
+
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        if (data && data.success) {
+          _srRender(data);
+        } else {
+          _srShowError(data ? data.error : 'Gagal memuat data.');
+        }
+      })
+      .withFailureHandler(function(err) {
+        _srShowError(err && err.message ? err.message : 'Terjadi kesalahan saat memuat data.');
+      })
+      .getSalesReportData(params);
+  } else {
+    // Dev/preview fallback — render empty
+    _srRender(_srMockData(params));
+  }
+}
+
+/** Entry point called when page tab becomes active */
+window.loadSalesReport = function() {
+  _srLoad();
+};
+
+// ── Error state ──────────────────────────────────────────────
+
+function _srShowError(msg) {
+  const loading = document.getElementById('sr-loading');
+  loading.innerHTML = `
+    <div class="flex flex-col items-center gap-3 py-24">
+      <i class="fa-solid fa-circle-exclamation text-3xl text-rose-400"></i>
+      <p class="text-sm text-slate-500 font-medium">Gagal memuat laporan</p>
+      <p class="text-xs text-slate-400 max-w-xs text-center">${msg || ''}</p>
+      <button onclick="_srLoad()" class="mt-2 text-xs font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+        Coba Lagi
+      </button>
+    </div>`;
+  loading.classList.remove('hidden');
+}
+
+// ── Main render ──────────────────────────────────────────────
+
+function _srRender(data) {
+  const loading = document.getElementById('sr-loading');
+  const content = document.getElementById('sr-content');
+
+  const summary   = data.summary   || {};
+  const salesList = data.salesList || [];
+  const trend     = data.trend     || { labels: [], values: [] };
+
+  // -- Print period label --
+  const periodEl = document.getElementById('sr-print-period');
+  if (periodEl) {
+    periodEl.textContent = `Periode: ${data.dateFrom || ''} s/d ${data.dateTo || ''}`;
+  }
+
+  // -- KPI Cards --
+  _setText('sr-kpi-revenue',   _rp(summary.teamRevenue   || 0));
+  _setText('sr-kpi-penawaran', summary.teamPenawaran != null ? summary.teamPenawaran : '—');
+  _setText('sr-kpi-deal',      summary.teamDealCount  != null ? summary.teamDealCount  : '—');
+  _setText('sr-kpi-pipeline',  _rp(summary.teamPipelineValue || 0));
+
+  // -- Target Progress Bar --
+  const rev    = summary.teamRevenue || 0;
+  const target = summary.teamTarget  || 0;
+  const pct    = target > 0 ? Math.min((rev / target) * 100, 100) : 0;
+  _setText('sr-kpi-target-pct', _pct(target > 0 ? (rev / target) * 100 : 0));
+  const bar = document.getElementById('sr-target-bar');
+  if (bar) bar.style.width = pct + '%';
+  _setText('sr-target-bar-text', `${_rp(rev)} / ${_rp(target)}`);
+
+  // -- Top Performer --
+  _srRenderTopPerformer(salesList);
+
+  // -- Trend Chart --
+  _srRenderTrend(trend);
+
+  // -- Leaderboard --
+  _srRenderLeaderboard(salesList);
+
+  // -- Detail accordion --
+  _srRenderDetail(salesList);
+
+  // -- Show content --
+  loading.classList.add('hidden');
+  content.classList.remove('hidden');
+}
+
+function _setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ── Top Performer ────────────────────────────────────────────
+
+function _srRenderTopPerformer(salesList) {
+  const el = document.getElementById('sr-top-performer');
+  if (!el) return;
+
+  const top = salesList.length > 0 ? salesList[0] : null;
+
+  let html = `
+    <div class="flex items-center gap-2 mb-3">
+      <i class="fa-solid fa-crown text-amber-400 text-sm"></i>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Performer</p>
+    </div>`;
+
+  if (!top || top.dealCount === 0) {
+    html += `<p class="text-sm text-slate-400 italic">Belum ada deal di periode ini.</p>`;
+  } else {
+    const achBadge = _achieveBadge(top.achievement);
+    html += `
+      <div class="flex flex-col gap-1">
+        <p class="text-lg font-extrabold text-slate-800 leading-tight">${_esc(top.nama)}</p>
+        <div class="flex flex-wrap items-center gap-2 mt-1">
+          <span class="text-xs text-slate-500"><i class="fa-solid fa-handshake mr-1 text-emerald-500"></i>${top.dealCount} deal</span>
+          <span class="text-xs font-bold text-emerald-600">${_rp(top.dealRevenue)}</span>
+          ${achBadge}
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Trend Chart ──────────────────────────────────────────────
+
+function _srRenderTrend(trend) {
+  const canvas = document.getElementById('sr-trend-chart');
+  if (!canvas) return;
+
+  if (_srTrendChart) {
+    _srTrendChart.destroy();
+    _srTrendChart = null;
+  }
+
+  const labels = trend.labels || [];
+  const values = trend.values || [];
+
+  _srTrendChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Revenue Deal (Rp)',
+        data: values,
+        backgroundColor: [
+          'rgba(59,130,246,0.7)',
+          'rgba(16,185,129,0.7)',
+          'rgba(245,158,11,0.7)',
+        ],
+        borderColor: [
+          'rgb(59,130,246)',
+          'rgb(16,185,129)',
+          'rgb(245,158,11)',
+        ],
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ' ' + _rp(ctx.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: { size: 10 },
+            callback: function(val) {
+              if (val >= 1000000000) return 'Rp ' + (val / 1000000000).toFixed(1) + 'M';
+              if (val >= 1000000)    return 'Rp ' + (val / 1000000).toFixed(0) + 'jt';
+              return 'Rp ' + val.toLocaleString('id-ID');
+            }
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' }
+        },
+        x: {
+          ticks: { font: { size: 11, weight: 'bold' } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── Leaderboard ──────────────────────────────────────────────
+
+function _srRenderLeaderboard(salesList) {
+  const tbody = document.getElementById('sr-leaderboard-body');
+  if (!tbody) return;
+
+  if (!salesList || salesList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>`;
+    return;
+  }
+
+  let html = '';
+  salesList.forEach(function(s, idx) {
+    const rank = idx + 1;
+    const achBadge = _achieveBadge(s.achievement);
+    html += `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="px-4 py-3 text-center">${_rankBadge(rank)}</td>
+        <td class="px-4 py-3">
+          <span class="text-sm font-bold text-slate-800">${_esc(s.nama)}</span>
+        </td>
+        <td class="px-4 py-3 text-xs text-slate-600">${s.totalPenawaran}</td>
+        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">${_rp(s.totalNilaiPenawaran)}</td>
+        <td class="px-4 py-3 text-xs font-bold text-emerald-600">${s.dealCount}</td>
+        <td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">${_rp(s.dealRevenue)}</td>
+        <td class="px-4 py-3 text-xs text-slate-600">${_pct(s.winRate)}</td>
+        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">${s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>'}</td>
+        <td class="px-4 py-3">${achBadge}</td>
+      </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ── Detail Accordion ─────────────────────────────────────────
+
+function _srRenderDetail(salesList) {
+  const container = document.getElementById('sr-sales-detail');
+  if (!container) return;
+
+  if (!salesList || salesList.length === 0) {
+    container.innerHTML = `<p class="text-xs text-slate-400 italic">Tidak ada data sales pada periode ini.</p>`;
+    return;
+  }
+
+  let html = '';
+  salesList.forEach(function(s, idx) {
+    const detailId = `sr-detail-${idx}`;
+    const achBadge = _achieveBadge(s.achievement);
+
+    // Build penawaran table rows
+    let tableRows = '';
+    if (s.penawaran && s.penawaran.length > 0) {
+      s.penawaran.forEach(function(p) {
+        tableRows += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">${_esc(p.id)}</td>
+            <td class="px-3 py-2 text-xs text-slate-700">${_esc(p.namaKlien)}</td>
+            <td class="px-3 py-2 text-xs text-slate-700">${_esc(p.namaProject)}</td>
+            <td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">${_rp(p.grandTotal)}</td>
+            <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${p.tanggal || '—'}</td>
+            <td class="px-3 py-2">${_statusBadge(p.status)}</td>
+            <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${p.tanggalDeal || '—'}</td>
+          </tr>`;
+      });
+    } else {
+      tableRows = `<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>`;
+    }
+
+    html += `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+        <!-- Accordion Header -->
+        <button type="button"
+          onclick="_srToggleDetail('${detailId}')"
+          class="w-full flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition focus:outline-none">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-extrabold text-sm">
+              ${idx + 1}
+            </div>
+            <span class="font-bold text-slate-800 text-sm truncate">${_esc(s.nama)}</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold text-emerald-600 whitespace-nowrap">${_rp(s.dealRevenue)}</span>
+            <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">WR ${_pct(s.winRate)}</span>
+            ${achBadge}
+            <i id="${detailId}-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>
+          </div>
+        </button>
+
+        <!-- Accordion Content -->
+        <div id="${detailId}" class="sr-detail-content hidden border-t border-slate-100">
+
+          <!-- KPI Mini Row -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-slate-50">
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Penawaran</p>
+              <p class="text-base font-extrabold text-slate-700">${s.totalPenawaran}</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nilai Penawaran</p>
+              <p class="text-xs font-extrabold text-blue-600 leading-tight">${_rp(s.totalNilaiPenawaran)}</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Deal</p>
+              <p class="text-base font-extrabold text-emerald-600">${s.dealCount}</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Revenue Deal</p>
+              <p class="text-xs font-extrabold text-emerald-600 leading-tight">${_rp(s.dealRevenue)}</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pipeline</p>
+              <p class="text-xs font-extrabold text-amber-600 leading-tight">${_rp(s.pipelineValue)}</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 border border-slate-100">
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Win Rate</p>
+              <p class="text-base font-extrabold text-slate-700">${_pct(s.winRate)}</p>
+            </div>
+          </div>
+
+          <!-- Penawaran Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                ${tableRows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+// ── Accordion toggle ─────────────────────────────────────────
+
+function _srToggleDetail(id) {
+  const el   = document.getElementById(id);
+  const icon = document.getElementById(id + '-icon');
+  if (!el) return;
+
+  const isHidden = el.classList.contains('hidden');
+  el.classList.toggle('hidden', !isHidden);
+  el.classList.toggle('block',  isHidden);
+  if (icon) {
+    icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+  }
+}
+
+// ── Escape helper ────────────────────────────────────────────
+
+function _esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Mock data (dev / no GAS context) ────────────────────────
+
+function _srMockData(params) {
+  return {
+    success:  true,
+    dateFrom: params.dateFrom || '01/06/2026',
+    dateTo:   params.dateTo   || '06/06/2026',
+    summary: {
+      teamRevenue:       1250000000,
+      teamTarget:        2000000000,
+      teamPenawaran:     18,
+      teamDealCount:     5,
+      teamWinRate:       55.6,
+      teamPipelineValue: 3400000000,
+    },
+    trend: {
+      labels: ['Apr', 'Mei', 'Jun'],
+      values: [900000000, 1100000000, 1250000000],
+    },
+    salesList: [
+      {
+        nama: 'Andi Prasetyo',
+        targetBulanan: 1000000000,
+        totalPenawaran: 8,
+        totalNilaiPenawaran: 3200000000,
+        dealCount: 3,
+        dealRevenue: 850000000,
+        pipelineCount: 3,
+        pipelineValue: 2100000000,
+        failCount: 1,
+        winRate: 75.0,
+        achievement: 85.0,
+        penawaran: [
+          { id: 'PNW-2026-001', rev: 0, tanggal: '01/06/2026', tanggalDeal: '03/06/2026', namaProject: 'Proyek Sistem ERP', namaKlien: 'PT Maju Jaya', grandTotal: 450000000, status: 'Deal', noWO: 'WO-001' },
+          { id: 'PNW-2026-002', rev: 1, tanggal: '02/06/2026', tanggalDeal: '',            namaProject: 'Website Profil',    namaKlien: 'CV Berkah',    grandTotal: 120000000, status: 'On-Progress', noWO: '' },
+        ]
+      },
+      {
+        nama: 'Siti Rahayu',
+        targetBulanan: 1000000000,
+        totalPenawaran: 10,
+        totalNilaiPenawaran: 2800000000,
+        dealCount: 2,
+        dealRevenue: 400000000,
+        pipelineCount: 4,
+        pipelineValue: 1300000000,
+        failCount: 2,
+        winRate: 50.0,
+        achievement: 40.0,
+        penawaran: [
+          { id: 'PNW-2026-003', rev: 0, tanggal: '03/06/2026', tanggalDeal: '05/06/2026', namaProject: 'Aplikasi Mobile', namaKlien: 'PT Teknologi Nusa', grandTotal: 250000000, status: 'Deal', noWO: 'WO-002' },
+          { id: 'PNW-2026-004', rev: 0, tanggal: '04/06/2026', tanggalDeal: '',            namaProject: 'Cloud Migration', namaKlien: 'CV Digital Prima', grandTotal: 180000000, status: 'Fail',        noWO: '' },
+        ]
+      },
+    ],
+    recentDeals: [],
+    isAdmin: true,
+  };
+}
+</script>

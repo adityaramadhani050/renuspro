@@ -41,9 +41,9 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users'],
+  admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporansales'],
   finance: ['workorder','invoice','kwitansi'],
-  sales:   ['dashboard','penawaran','workorder','produk','template','customer']
+  sales:   ['dashboard','penawaran','workorder','produk','template','customer','laporansales']
 };
 const _ROLE_BADGE = {
   admin:   'bg-blue-100 text-blue-700',
@@ -71,7 +71,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporansales']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
@@ -324,6 +324,7 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-username').value  = '';
   document.getElementById('modal-user-password').value  = '';
   document.getElementById('modal-user-role').value      = 'sales';
+  document.getElementById('modal-user-target').value    = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
   document.getElementById('modal-user').classList.remove('hidden');
@@ -339,6 +340,7 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-pw-hint').style.display = '';
   document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
   document.getElementById('modal-user-aktif').checked         = u.aktif;
+  document.getElementById('modal-user-target').value          = u.targetBulanan || '';
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -353,6 +355,7 @@ function simpanUserModal() {
   const password = document.getElementById('modal-user-password').value.trim();
   const role     = document.getElementById('modal-user-role').value;
   const aktif    = document.getElementById('modal-user-aktif').checked;
+  const target   = parseFloat(document.getElementById('modal-user-target').value) || 0;
 
   if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
   if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
@@ -363,7 +366,7 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif]
+      ? [id, nama, username, password, role, aktif, target]
       : [nama, username, password, role];
 
     google.script.run
