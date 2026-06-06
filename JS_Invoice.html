@@ -25,6 +25,23 @@
       return map[j] || 'bg-slate-100 text-slate-600';
     }
 
+    // ── Aging helpers (shared across modules) ──
+    function _agingDays(tglStr) {
+      if (!tglStr) return null;
+      const p = tglStr.toString().split('/');
+      if (p.length !== 3) return null;
+      const d = new Date(parseInt(p[2],10), parseInt(p[1],10)-1, parseInt(p[0],10));
+      if (isNaN(d)) return null;
+      return Math.floor((Date.now() - d.getTime()) / 86400000);
+    }
+    function _agingBadge(days) {
+      if (days === null || days < 0) return '';
+      if (days > 90) return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700"><i class="fa-solid fa-circle-exclamation"></i>${days}h &gt;90</span>`;
+      if (days > 60) return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700"><i class="fa-solid fa-triangle-exclamation"></i>${days}h &gt;60</span>`;
+      if (days > 30) return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><i class="fa-solid fa-clock"></i>${days}h &gt;30</span>`;
+      return '';
+    }
+
     // ── List ──
     function _pgRenderInvoice(data) {
       const tbody = document.getElementById('table-invoice');
@@ -38,6 +55,7 @@
         const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
         const isLunas = i.statusBayar === 'Lunas';
         const bayarClass = isLunas ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+        const agingBadge = !isLunas ? _agingBadge(_agingDays(i.tanggal)) : '';
         const kwBtn = i.kwitansiId
           ? `<button onclick='exportKwitansiPDFDariInvoice("${i.kwitansiId}",${itemJson})'
                class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition"
@@ -49,6 +67,7 @@
           <td class="p-4 max-w-[200px]">
             <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}</p>
             <p class="text-[11px] text-slate-400 font-medium">${i.tanggal || ''}</p>
+            ${agingBadge ? `<div class="mt-1">${agingBadge}</div>` : ''}
             ${i.kwitansiId ? `<p class="text-[10px] text-emerald-600 font-semibold mt-0.5"><i class="fa-solid fa-receipt mr-1"></i>${i.kwitansiId}</p>` : ''}
           </td>
           <td class="p-4">
