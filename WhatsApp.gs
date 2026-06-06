@@ -103,6 +103,18 @@ function notifInvoiceLunas(inv) {
   );
 }
 
+function notifRequestInvoice(data) {
+  sendWANotif(
+    '*🔔 Request Buat Invoice*\n' +
+    'WO-' + data.noWO + '\n' +
+    'Klien  : ' + data.namaKlien + '\n' +
+    'Project: ' + data.namaProject + '\n' +
+    'Sales  : ' + data.sales + '\n' +
+    (data.pesan ? 'Pesan  : ' + data.pesan + '\n' : '') +
+    'Waktu  : ' + data.tanggal
+  );
+}
+
 function notifWODibuat(wo) {
   sendWANotif(
     '*🔨 Work Order Dibuat*\n' +

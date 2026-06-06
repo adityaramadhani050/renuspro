@@ -166,10 +166,18 @@
                   <i class="fa-solid fa-file-arrow-down"></i> WO PDF
                 </button>
               </div>
-              <button id="wo-btn-invoice" onclick="_buatInvoiceDariWO()"
-                class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
-                <i class="fa-solid fa-plus"></i> Buat Invoice
-              </button>
+              <div class="flex gap-2">
+                <!-- Sales only: request invoice -->
+                <button id="wo-btn-request-invoice" onclick="_requestInvoiceDariWO()"
+                  class="hidden px-5 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-paper-plane"></i> Request Invoice
+                </button>
+                <!-- Finance/Admin only: buat invoice -->
+                <button id="wo-btn-invoice" onclick="_buatInvoiceDariWO()"
+                  class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-plus"></i> Buat Invoice
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -201,6 +209,45 @@
               <button onclick="tutupModalCatatanWO()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
               <button onclick="kirimCatatanWO()" class="px-5 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Catatan
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Request Invoice (Sales) -->
+        <div id="modal-request-invoice" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <span class="bg-violet-100 text-violet-600 h-8 w-8 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-paper-plane text-sm"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-800">Request Buat Invoice</h3>
+                <p id="req-inv-subtitle" class="text-xs text-slate-400 truncate"></p>
+              </div>
+              <button onclick="tutupModalRequestInvoice()" class="ml-auto w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="p-6 space-y-4">
+              <div class="bg-violet-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-700">
+                <i class="fa-solid fa-circle-info mr-1"></i>
+                Request ini akan dikirim ke tim Finance beserta notifikasi WhatsApp untuk segera diproses.
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pesan / Catatan untuk Finance</label>
+                <textarea id="req-inv-pesan" rows="4"
+                  placeholder="Contoh: Mohon segera dibuatkan invoice DP 50% untuk proyek ini..."
+                  class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none"></textarea>
+                <p class="text-[11px] text-slate-400 mt-1">Opsional — boleh dikosongkan jika tidak ada pesan khusus.</p>
+              </div>
+              <input type="hidden" id="req-inv-nowo">
+            </div>
+            <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button onclick="tutupModalRequestInvoice()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
+              <button onclick="kirimRequestInvoice()" id="req-inv-submit-btn"
+                class="px-5 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i> Kirim Request
               </button>
             </div>
           </div>

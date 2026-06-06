@@ -284,3 +284,47 @@ function simpanCatatanWO(noWO, catatan, namaUser) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
+
+// ── Request Invoice dari Sales ───────────────────────────────────────────────
+// Sheet WO_RequestInvoice: [No WO, Klien, Project, Sales, Pesan, Status, Tanggal]
+function _ensureRequestInvoiceSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('WO_RequestInvoice');
+  if (!sheet) {
+    sheet = ss.insertSheet('WO_RequestInvoice');
+    sheet.appendRow(['No WO', 'Klien', 'Project', 'Sales', 'Pesan', 'Status', 'Tanggal']);
+    sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function requestInvoice(payload) {
+  try {
+    var ss    = getSpreadsheet();
+    var sheet = _ensureRequestInvoiceSheet(ss);
+    var when  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.appendRow([
+      payload.noWO    || '',
+      payload.namaKlien   || '',
+      payload.namaProject || '',
+      payload.sales   || '',
+      payload.pesan   || '',
+      'Pending',
+      when
+    ]);
+    SpreadsheetApp.flush();
+    try {
+      notifRequestInvoice({
+        noWO:        payload.noWO,
+        namaKlien:   payload.namaKlien,
+        namaProject: payload.namaProject,
+        sales:       payload.sales,
+        pesan:       payload.pesan,
+        tanggal:     when
+      });
+    } catch(e) {}
+    return { success: true, message: 'Request invoice berhasil dikirim ke Finance.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}

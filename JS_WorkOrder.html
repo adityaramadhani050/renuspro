@@ -211,6 +211,17 @@
         btnInv.title = 'Seluruh nilai kontrak sudah ditagih';
       }
 
+      // Tombol Request Invoice — hanya untuk Sales
+      const btnReq = el('wo-btn-request-invoice');
+      const isSales = _currentUser && _currentUser.role === 'sales';
+      if (isSales && item.sisaDpp > 0) {
+        btnReq.classList.remove('hidden');
+        btnReq.classList.remove('opacity-50', 'cursor-not-allowed');
+        btnReq.disabled = false;
+      } else {
+        btnReq.classList.add('hidden');
+      }
+
       el('modal-detail-wo').classList.remove('hidden');
     };
 
@@ -481,5 +492,57 @@
         console.error(err);
         showNotification('Gagal membuat PDF Work Order: ' + (err.message || err), 'error');
       }
+    };
+
+    // ================================================================
+    // REQUEST INVOICE (Sales)
+    // ================================================================
+    function _requestInvoiceDariWO() {
+      if (!_woDetailCurrent) return;
+      document.getElementById('req-inv-nowo').value   = _woDetailCurrent.noWO;
+      document.getElementById('req-inv-pesan').value  = '';
+      document.getElementById('req-inv-subtitle').innerText =
+        'WO ' + _woDetailCurrent.noWO + '  ·  ' + _woDetailCurrent.namaProject;
+      document.getElementById('modal-request-invoice').classList.remove('hidden');
+      setTimeout(function() { document.getElementById('req-inv-pesan').focus(); }, 50);
+    }
+
+    window.tutupModalRequestInvoice = function() {
+      document.getElementById('modal-request-invoice').classList.add('hidden');
+    };
+
+    window.kirimRequestInvoice = function() {
+      if (!_woDetailCurrent) return;
+      const pesan  = (document.getElementById('req-inv-pesan').value || '').trim();
+      const sales  = window._getCurrentUserNama ? window._getCurrentUserNama() : (_currentUser && _currentUser.nama) || 'Sales';
+      const btn    = document.getElementById('req-inv-submit-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Request';
+          tutupModalRequestInvoice();
+          tutupModalDetailWO();
+          if (r && r.success) {
+            showNotification('Request invoice berhasil dikirim ke Finance!');
+          } else {
+            showNotification((r && r.message) || 'Gagal mengirim request.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Request';
+          showNotification('Gagal: ' + (err.message || err), 'error');
+        })
+        .requestInvoice({
+          noWO:        _woDetailCurrent.noWO,
+          namaKlien:   _woDetailCurrent.namaKlien,
+          namaProject: _woDetailCurrent.namaProject,
+          sales:       sales,
+          pesan:       pesan
+        });
     };
 </script>
