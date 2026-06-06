@@ -409,8 +409,16 @@
 
         let curY = doc.lastAutoTable.finalY + 5;
         const netSub    = (item.subtotal||0) - (item.diskon||0);
-        const totalHppAll = item.hpp || 0;
-        const profit    = (item.profit != null) ? item.profit : (netSub - totalHppAll);
+        // Fallback: hitung dari items JSON jika kolom hpp belum tersimpan (data lama/migrasi)
+        let totalHppAll = item.hpp || 0;
+        if (!totalHppAll) {
+          try {
+            JSON.parse(item.items || '[]').forEach(function(k) {
+              (k.subItems || []).forEach(function(s) { totalHppAll += (s.qty||0) * (s.hpp||0); });
+            });
+          } catch(e) {}
+        }
+        const profit    = (item.profit != null && item.profit !== 0) ? item.profit : (netSub - totalHppAll);
         const marginAll = (item.marginPersen != null && item.marginPersen !== 0) ? item.marginPersen : (netSub > 0 ? (profit / netSub * 100) : 0);
 
         const sumLines = [];
