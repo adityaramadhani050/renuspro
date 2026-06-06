@@ -1,0 +1,108 @@
+<script>
+// ── Settings Page ────────────────────────────────────────────────────────────
+
+function showToast(msg, type) { showNotification(msg, type || 'success'); }
+
+function loadSettings() {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) return;
+      document.getElementById('wa-enabled').checked = !!r.enabled;
+      document.getElementById('wa-token').value  = r.token  || '';
+      document.getElementById('wa-target').value = r.target || '';
+      _updateWAEnabledLabel(!!r.enabled);
+    })
+    .withFailureHandler(function() {})
+    .getWAConfig();
+}
+
+function _updateWAEnabledLabel(enabled) {
+  var label = document.getElementById('wa-enabled-label');
+  var knob  = document.getElementById('wa-toggle-knob');
+  if (!label) return;
+  if (enabled) {
+    label.textContent = 'Aktif';
+    label.className   = 'text-xs font-bold text-emerald-500';
+    if (knob) knob.style.transform = 'translateX(20px)';
+  } else {
+    label.textContent = 'Nonaktif';
+    label.className   = 'text-xs font-bold text-slate-400';
+    if (knob) knob.style.transform = '';
+  }
+}
+
+function onWAEnabledChange() {
+  var enabled = document.getElementById('wa-enabled').checked;
+  _updateWAEnabledLabel(enabled);
+}
+
+function toggleWATokenVisibility() {
+  var input = document.getElementById('wa-token');
+  var icon  = document.getElementById('wa-token-eye');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) { icon.className = 'fa-solid fa-eye-slash text-sm'; }
+  } else {
+    input.type = 'password';
+    if (icon) { icon.className = 'fa-solid fa-eye text-sm'; }
+  }
+}
+
+function simpanWAConfig() {
+  var enabled = document.getElementById('wa-enabled').checked;
+  var token   = (document.getElementById('wa-token').value  || '').trim();
+  var target  = (document.getElementById('wa-target').value || '').trim();
+
+  if (!token || !target) {
+    showToast('Token dan Target Grup wajib diisi.', 'error');
+    return;
+  }
+
+  var btn = document.querySelector('[onclick="simpanWAConfig()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
+      if (r && r.success) {
+        showToast('Konfigurasi WA Bot berhasil disimpan.', 'success');
+      } else {
+        showToast((r && r.message) || 'Gagal menyimpan.', 'error');
+      }
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .saveWAConfig({ enabled: enabled, token: token, target: target });
+}
+
+function testWAConfig() {
+  var token  = (document.getElementById('wa-token').value  || '').trim();
+  var target = (document.getElementById('wa-target').value || '').trim();
+
+  if (!token || !target) {
+    showToast('Isi Token dan Target Grup terlebih dahulu.', 'error');
+    return;
+  }
+
+  var btn = document.getElementById('wa-test-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> Mengirim...'; }
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
+      if (r && r.success) {
+        showToast('Pesan test berhasil dikirim ke grup!', 'success');
+      } else {
+        showToast((r && r.message) || 'Gagal mengirim test.', 'error');
+      }
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .testWANotif({ token: token, target: target });
+}
+</script>

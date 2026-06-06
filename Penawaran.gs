@@ -349,6 +349,35 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
         }
 
         SpreadsheetApp.flush();
+
+        // Notifikasi WA saat WO baru dibuat (status → Deal)
+        if (statusBaru === 'Deal' && noWO) {
+          try {
+            const namaProject = data[i][4] ? data[i][4].toString() : '';
+            const klienId     = data[i][5] ? data[i][5].toString() : '';
+            const subtotal    = parseFloat(data[i][7]) || 0;
+            const diskon      = parseFloat(data[i][8]) || 0;
+            // Resolve nama klien
+            let namaKlien = klienId;
+            try {
+              const ks = getSpreadsheet().getSheetByName('Master_Klien');
+              if (ks) {
+                const kd = ks.getDataRange().getValues();
+                for (let k = 1; k < kd.length; k++) {
+                  if (kd[k][0] && kd[k][0].toString() === klienId) { namaKlien = kd[k][1].toString(); break; }
+                }
+              }
+            } catch(e) {}
+            notifWODibuat({
+              noWO:        noWO,
+              noPenawaran: noPenawaran,
+              namaKlien:   namaKlien,
+              namaProject: namaProject,
+              nilaiKontrak: Math.max(0, subtotal - diskon)
+            });
+          } catch(e) {}
+        }
+
         return { success: true, message: "Status diperbarui menjadi: " + statusBaru, noWO: noWO };
       }
     }

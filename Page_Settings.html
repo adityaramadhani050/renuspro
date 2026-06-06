@@ -1,0 +1,89 @@
+<section id="page-settings" class="page-section">
+
+  <div class="mb-6">
+    <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Pengaturan</h2>
+  </div>
+
+  <!-- WA Bot Config Card -->
+  <div class="max-w-xl">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+      <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+        <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center">
+          <i class="fa-brands fa-whatsapp text-lg"></i>
+        </span>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">WA Bot Notifikasi</h3>
+          <p class="text-xs text-slate-400">Kirim notifikasi otomatis ke grup WhatsApp via Fonnte</p>
+        </div>
+        <!-- Toggle enable/disable -->
+        <label class="ml-auto flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="wa-enabled" onchange="onWAEnabledChange()" class="sr-only peer">
+          <div class="relative w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full transition-colors">
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200" id="wa-toggle-knob"></div>
+          </div>
+          <span id="wa-enabled-label" class="text-xs font-bold text-slate-400">Nonaktif</span>
+        </label>
+      </div>
+
+      <div class="px-6 py-5 space-y-4">
+
+        <!-- Token -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            Token Fonnte
+            <a href="https://app.fonnte.com" target="_blank" class="ml-1 text-blue-500 font-normal normal-case hover:underline">(dapatkan di app.fonnte.com)</a>
+          </label>
+          <div class="relative">
+            <input type="password" id="wa-token" placeholder="Masukkan token Fonnte..."
+              class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white pr-10">
+            <button onclick="toggleWATokenVisibility()" type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i id="wa-token-eye" class="fa-solid fa-eye text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Target Group -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target Grup WhatsApp</label>
+          <input type="text" id="wa-target" placeholder="Nomor grup atau ID grup (contoh: 6281234567890-1234567890@g.us)"
+            class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+          <p class="text-[11px] text-slate-400 mt-1">
+            Untuk nomor grup: buka Fonnte → Devices → pilih device → Contacts, cari nama grup dan salin ID-nya.
+          </p>
+        </div>
+
+        <!-- Events info -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+          <p class="text-xs font-bold text-slate-600 mb-2">Event yang akan memicu notifikasi:</p>
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i>
+            <span><b>Invoice Dibuat</b> — saat invoice baru diterbitkan</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i>
+            <span><b>Invoice Lunas</b> — saat status invoice diubah ke Lunas</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i>
+            <span><b>Work Order Dibuat</b> — saat penawaran ditandai Deal</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3 pt-1">
+          <button onclick="simpanWAConfig()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan
+          </button>
+          <button onclick="testWAConfig()" id="wa-test-btn"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2">
+            <i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</section>

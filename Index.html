@@ -58,6 +58,10 @@
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-user-shield w-6"></i> Manajemen User
         </button>
+        <button onclick="navigate('settings')" id="nav-settings"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-gear w-6"></i> Pengaturan
+        </button>
       </nav>
     </div>
 
@@ -129,6 +133,7 @@
       <?!= include('Page_Customer'); ?>
       <?!= include('Page_Users'); ?>
       <?!= include('Page_FinanceReport'); ?>
+      <?!= include('Page_Settings'); ?>
 
 
 
@@ -155,5 +160,6 @@
   <?!= include('JS_DashboardFilter'); ?>
   <?!= include('JS_Pagination'); ?>
   <?!= include('JS_FinanceReport'); ?>
+  <?!= include('JS_Settings'); ?>
 </body>
 </html>
