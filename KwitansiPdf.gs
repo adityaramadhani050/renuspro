@@ -49,7 +49,7 @@ function exportKwitansiDariTemplate(idKwitansi) {
 
     const safe = (s) => (s || '').toString().replace(/\//g, '-');
     return { success: true, pdfBase64: pdfBase64,
-      fileName: safe(kw.id) + '_' + safe(kw.terimaDari) + '_' + safe(kw.untuk) + '.pdf' };
+      fileName: safe(kw.id) + '_' + safe(kw.untuk) + '_' + safe(kw.terimaDari) + '.pdf' };
   } catch (e) {
     Logger.log('exportKwitansiDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export kwitansi: ' + e.toString() };
