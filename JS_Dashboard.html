@@ -248,7 +248,7 @@ function _dbRenderAll(rawData, salesData) {
   var prev = (ms.fromMs && ms.toMs) ? _dbPrevKPI(items, ms.fromMs, ms.toMs) : { prevRevenue: 0, prevDeals: 0 };
 
   _dbRenderKPIs(summary, prev, salesList);
-  _dbRenderTargetBar(summary);
+  _dbRenderTargetBar(summary, items);
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
   _dbRenderDonut(items, ms.fromMs, ms.toMs);
@@ -311,7 +311,9 @@ function _dbRenderKPIs(summary, prev, salesList) {
 }
 
 // ── Target progress bar ────────────────────────────────────────
-function _dbRenderTargetBar(summary) {
+var _DB_TARGET_TAHUNAN = 24000000000;
+
+function _dbRenderTargetBar(summary, items) {
   var rev    = summary.teamRevenue || 0;
   var target = summary.teamTarget  || 0;
   var pct    = target > 0 ? Math.min((rev / target) * 100, 100) : 0;
@@ -323,6 +325,27 @@ function _dbRenderTargetBar(summary) {
   if (bar) bar.style.width = pct + '%';
   var txt = document.getElementById('db-target-text');
   if (txt) txt.textContent = _rp(rev) + ' / ' + _rp(target);
+
+  // YTD revenue dari raw cache
+  var now = new Date();
+  var ytdFromMs = new Date(now.getFullYear(), 0, 1).getTime();
+  var ytdToMs   = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+  var ytdRev = 0;
+  (items || []).forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += item.grandTotal;
+  });
+
+  var ytdPct    = _DB_TARGET_TAHUNAN > 0 ? (ytdRev / _DB_TARGET_TAHUNAN * 100) : 0;
+  var ytdBarPct = Math.min(ytdPct, 100);
+
+  var ytdPctEl = document.getElementById('db-ytd-pct');
+  if (ytdPctEl) ytdPctEl.textContent = _pct(ytdPct);
+  var ytdBar = document.getElementById('db-ytd-bar');
+  if (ytdBar) ytdBar.style.width = ytdBarPct + '%';
+  var ytdTxt = document.getElementById('db-ytd-text');
+  if (ytdTxt) ytdTxt.textContent = _rp(ytdRev) + ' / ' + _rp(_DB_TARGET_TAHUNAN);
 }
 
 // ── Statistik Konversi ─────────────────────────────────────────
