@@ -373,7 +373,6 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   ].filter(function(r) { return !r.skip; });
 
   sheet.insertRowsAfter(row - 1, rincian.length);
-  sheet.insertRowsAfter(row - 1, rincian.length);
   rincian.forEach(function(r) {
     sheet.setRowHeight(row, 22);
     sheet.getRange(row, 1, 1, bgWidth).setBackground('#ffffff');
@@ -399,6 +398,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   const bankVal = (inv.bankAccount || '').toString();
 
   // Header Note / Bank Account
+  sheet.insertRowsAfter(row - 1, 1);
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, 1, 1, leftW).merge()
     .setValue('Note')
