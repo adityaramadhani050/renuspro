@@ -27,6 +27,8 @@ function _getOrCreateMasterUser(ss) {
     sheet.appendRow(['U001', 'Administrator', 'admin', 'admin123', 'admin', 'TRUE']);
     // Seed: contoh sales
     sheet.appendRow(['U002', 'Sales Executive', 'sales1', 'sales123', 'sales', 'TRUE']);
+    // Seed: contoh finance
+    sheet.appendRow(['U003', 'Finance Officer', 'finance1', 'finance123', 'finance', 'TRUE']);
   }
   return sheet;
 }
