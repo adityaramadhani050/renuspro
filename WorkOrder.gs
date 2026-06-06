@@ -117,6 +117,114 @@ function buatSheetWorkOrderCatatan(ss) {
   return sheet;
 }
 
+function getWorkOrderDashboard() {
+  try {
+    const ss = getSpreadsheet();
+    const woList = getWorkOrderList();
+    const kwMap  = {};
+
+    // Baca Invoice_Main: group by noWO
+    const invSheet = ss.getSheetByName('Invoice_Main');
+    const invByWO  = {};
+    if (invSheet && invSheet.getLastRow() > 1) {
+      const invData = invSheet.getDataRange().getValues();
+      // Baca kwitansi map (invoice → kwitansi)
+      const kwSheet = ss.getSheetByName('Kwitansi_Main');
+      if (kwSheet && kwSheet.getLastRow() > 1) {
+        const kwData = kwSheet.getRange(2, 1, kwSheet.getLastRow() - 1, 2).getValues();
+        for (let k = 0; k < kwData.length; k++) {
+          const noKw  = kwData[k][0] ? kwData[k][0].toString() : '';
+          const noInv = kwData[k][1] ? kwData[k][1].toString() : '';
+          if (noInv && noKw && !kwMap[noInv]) kwMap[noInv] = noKw;
+        }
+      }
+      for (let i = 1; i < invData.length; i++) {
+        if (!invData[i][0]) continue;
+        const noWO = invData[i][1] ? invData[i][1].toString() : '';
+        if (!noWO) continue;
+        const tglStr = invData[i][3] instanceof Date
+          ? Utilities.formatDate(invData[i][3], Session.getScriptTimeZone(), 'dd/MM/yyyy')
+          : (invData[i][3] || '');
+        const invId  = invData[i][0].toString();
+        if (!invByWO[noWO]) invByWO[noWO] = [];
+        invByWO[noWO].push({
+          id:         invId,
+          tanggal:    tglStr,
+          jenis:      invData[i][4] ? invData[i][4].toString() : 'Penuh',
+          persen:     parseFloat(invData[i][5]) || 0,
+          dpp:        parseFloat(invData[i][11]) || 0,
+          ppnNominal: parseFloat(invData[i][13]) || 0,
+          total:      parseFloat(invData[i][14]) || 0,
+          statusBayar: invData[i][16] ? invData[i][16].toString() : 'Belum Lunas',
+          kwitansiId: kwMap[invId] || ''
+        });
+      }
+    }
+
+    let sumKontrak = 0, sumDitagih = 0, sumLunas = 0;
+
+    const woDashboard = woList.map(function(w) {
+      const nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+      const ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+      const invoices = invByWO[w.noWO] || [];
+
+      let totalDitagihDpp = 0, totalLunasDpp = 0, totalLunasTotal = 0;
+      invoices.forEach(function(inv) {
+        totalDitagihDpp += inv.dpp;
+        if (inv.statusBayar === 'Lunas') {
+          totalLunasDpp   += inv.dpp;
+          totalLunasTotal += inv.total;
+        }
+      });
+
+      const sisaDpp     = Math.max(0, nilaiKontrak - totalDitagihDpp);
+      const pctDitagih  = nilaiKontrak > 0 ? Math.min(100, Math.round(totalDitagihDpp / nilaiKontrak * 100)) : 0;
+      const pctLunas    = nilaiKontrak > 0 ? Math.min(100, Math.round(totalLunasDpp / nilaiKontrak * 100)) : 0;
+
+      let paymentStatus;
+      if (invoices.length === 0) {
+        paymentStatus = 'Belum Ditagih';
+      } else if (pctLunas >= 100 && pctDitagih >= 100) {
+        paymentStatus = 'Lunas';
+      } else if (totalLunasDpp > 0) {
+        paymentStatus = 'Lunas Sebagian';
+      } else {
+        paymentStatus = 'Ditagih';
+      }
+
+      sumKontrak += w.grandTotal || 0;
+      sumDitagih += totalDitagihDpp + Math.round(totalDitagihDpp * ppnRate / 100);
+      sumLunas   += totalLunasTotal;
+
+      return {
+        noWO: w.noWO, id: w.id, rev: w.rev, tanggal: w.tanggal,
+        namaProject: w.namaProject, namaKlien: w.namaKlien, dibuatOleh: w.dibuatOleh,
+        subtotal: w.subtotal, diskon: w.diskon, pajak: w.pajak, grandTotal: w.grandTotal,
+        items: w.items, termConditions: w.termConditions, catatanCustomer: w.catatanCustomer,
+        nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
+        totalDitagihDpp: totalDitagihDpp, totalLunasDpp: totalLunasDpp,
+        totalLunasTotal: totalLunasTotal, sisaDpp: sisaDpp,
+        pctDitagih: pctDitagih, pctLunas: pctLunas,
+        paymentStatus: paymentStatus, invoices: invoices
+      };
+    });
+
+    return {
+      success: true,
+      woList: woDashboard,
+      summary: {
+        totalWO:      woDashboard.length,
+        totalKontrak: sumKontrak,
+        totalDitagih: sumDitagih,
+        totalLunas:   sumLunas
+      }
+    };
+  } catch (e) {
+    Logger.log('getWorkOrderDashboard error: ' + e);
+    return { success: false, woList: [], summary: {}, message: e.toString() };
+  }
+}
+
 function _getCatatanWOMap(ss) {
   ss = ss || getSpreadsheet();
   const map = {};
