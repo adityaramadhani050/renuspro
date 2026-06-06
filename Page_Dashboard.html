@@ -123,12 +123,36 @@
         </div>
         <p id="db-target-text" class="text-xs text-slate-400">Rp 0 / Rp 0</p>
       </div>
-      <div id="db-top-performer" class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
-        <div class="flex items-center gap-2 mb-2">
-          <i class="fa-solid fa-crown text-amber-400"></i>
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Performer</p>
+      <div id="db-konversi-card" class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+          <i class="fa-solid fa-rotate mr-1"></i> Statistik Konversi
+        </p>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="text-center">
+            <p class="text-[10px] text-slate-400 mb-1">Win Rate</p>
+            <p id="db-stat-winrate" class="text-2xl font-extrabold text-blue-600 leading-none">—</p>
+            <p class="text-[10px] text-slate-400 mt-1">deals / penawaran</p>
+          </div>
+          <div class="text-center border-x border-slate-100">
+            <p class="text-[10px] text-slate-400 mb-1">Avg. Nilai Deal</p>
+            <p id="db-stat-avgdeal" class="text-sm font-extrabold text-emerald-600 leading-tight">—</p>
+            <p class="text-[10px] text-slate-400 mt-1">per deal</p>
+          </div>
+          <div class="text-center">
+            <p class="text-[10px] text-slate-400 mb-1">On-Progress</p>
+            <p id="db-stat-pipeline-count" class="text-2xl font-extrabold text-amber-600 leading-none">—</p>
+            <p class="text-[10px] text-slate-400 mt-1">penawaran aktif</p>
+          </div>
         </div>
-        <p class="text-sm text-slate-400">Memuat...</p>
+        <div class="mt-3 pt-3 border-t border-slate-100">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[10px] text-slate-400">Konversi (Deal / Penawaran)</span>
+            <span id="db-stat-winrate-pct" class="text-[10px] font-bold text-blue-600">0%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div id="db-stat-winrate-bar" class="h-1.5 bg-blue-500 rounded-full transition-all duration-700" style="width:0%"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -188,34 +212,6 @@
       <div id="db-sales-detail" class="space-y-3"></div>
     </div>
 
-    <!-- Penawaran Terbaru -->
-    <div>
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          <i class="fa-solid fa-file-lines mr-1"></i> Penawaran Terbaru
-        </p>
-        <button onclick="navigate('penawaran')"
-          class="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1">
-          Lihat Semua <i class="fa-solid fa-arrow-right text-[10px]"></i>
-        </button>
-      </div>
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3">No Penawaran</th>
-                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3">Nama Project</th>
-                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3">Klien</th>
-                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-right">Nilai</th>
-                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody id="db-quot-table" class="divide-y divide-slate-50"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
 
   </div><!-- /#db-main-content -->
 

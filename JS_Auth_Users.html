@@ -43,7 +43,7 @@ function togglePwVisibilityLight(inputId, btn) {
 const _ROLE_NAV = {
   admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance'],
   finance: ['workorder','invoice','kwitansi','laporanfinance'],
-  sales:   ['dashboard','penawaran','workorder','produk','template','customer']
+  sales:   ['penawaran','workorder','produk','template','customer']
 };
 const _ROLE_BADGE = {
   admin:   'bg-blue-100 text-blue-700',
@@ -71,7 +71,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));

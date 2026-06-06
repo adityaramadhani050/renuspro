@@ -249,14 +249,13 @@ function _dbRenderAll(rawData, salesData) {
 
   _dbRenderKPIs(summary, prev, salesList);
   _dbRenderTargetBar(summary);
-  _dbRenderTopPerformer(salesList);
-  _dbRenderTrend(trend);
+  _dbRenderKonversi(summary);
+  _dbRenderTrend(items);
   _dbRenderDonut(items);
   if (isAdmin) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
   }
-  _dbRenderRecentQuotes(items);
 
   document.getElementById('db-loading').classList.add('hidden');
   document.getElementById('db-main-content').classList.remove('hidden');
@@ -324,63 +323,94 @@ function _dbRenderTargetBar(summary) {
   if (txt) txt.textContent = _rp(rev) + ' / ' + _rp(target);
 }
 
-// ── Top Performer ──────────────────────────────────────────────
-function _dbRenderTopPerformer(salesList) {
-  var el = document.getElementById('db-top-performer');
-  if (!el) return;
-  var top = (salesList && salesList.length > 0) ? salesList[0] : null;
-  var html = '<div class="flex items-center gap-2 mb-3">'
-    + '<i class="fa-solid fa-crown text-amber-400 text-sm"></i>'
-    + '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Performer</p>'
-    + '</div>';
-  if (!top || !top.dealCount) {
-    html += '<p class="text-sm text-slate-400 italic">Belum ada deal di periode ini.</p>';
-  } else {
-    html += '<div class="flex flex-col gap-1">'
-      + '<p class="text-lg font-extrabold text-slate-800 leading-tight">' + _esc(top.nama) + '</p>'
-      + '<div class="flex flex-wrap items-center gap-2 mt-1">'
-      + '<span class="text-xs text-slate-500"><i class="fa-solid fa-handshake mr-1 text-emerald-500"></i>' + top.dealCount + ' deal</span>'
-      + '<span class="text-xs font-bold text-emerald-600">' + _rp(top.dealRevenue) + '</span>'
-      + _achieveBadge(top.achievement)
-      + '</div></div>';
-  }
-  el.innerHTML = html;
+// ── Statistik Konversi ─────────────────────────────────────────
+function _dbRenderKonversi(summary) {
+  var winRate   = summary.teamWinRate || 0;
+  var dealCount = summary.teamDealCount || 0;
+  var revenue   = summary.teamRevenue || 0;
+  var pipeline  = summary.teamPipelineCount || 0;
+  var avgDeal   = dealCount > 0 ? Math.round(revenue / dealCount) : 0;
+
+  var wrEl = document.getElementById('db-stat-winrate');
+  if (wrEl) wrEl.textContent = _pct(winRate);
+  var avgEl = document.getElementById('db-stat-avgdeal');
+  if (avgEl) avgEl.textContent = avgDeal > 0 ? _rp(avgDeal) : '—';
+  var pipEl = document.getElementById('db-stat-pipeline-count');
+  if (pipEl) pipEl.textContent = pipeline;
+  var pctEl = document.getElementById('db-stat-winrate-pct');
+  if (pctEl) pctEl.textContent = _pct(winRate);
+  var bar = document.getElementById('db-stat-winrate-bar');
+  if (bar) bar.style.width = Math.min(winRate, 100) + '%';
 }
 
-// ── Trend Chart (bar, 3 bulan) ─────────────────────────────────
-function _dbRenderTrend(trend) {
+// ── Trend Chart (line, 12 bulan dari raw cache) ────────────────
+function _dbRenderTrend(items) {
   var canvas = document.getElementById('db-trend-chart');
   if (!canvas) return;
   if (_dbTrendChart) { _dbTrendChart.destroy(); _dbTrendChart = null; }
+
+  var isAdmin = _currentUser && _currentUser.role === 'admin';
+  var now = new Date();
+  var mon = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  var buckets = [];
+  for (var m = 11; m >= 0; m--) {
+    var mo = now.getMonth() - m, yr = now.getFullYear();
+    if (mo < 0) { mo += 12; yr--; }
+    buckets.push({
+      label: mon[mo],
+      fromMs: new Date(yr, mo, 1).getTime(),
+      toMs:   new Date(yr, mo + 1, 0, 23, 59, 59, 999).getTime(),
+      rev: 0
+    });
+  }
+
+  items.forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (!ts) return;
+    buckets.forEach(function(b) {
+      if (ts >= b.fromMs && ts <= b.toMs) b.rev += item.grandTotal;
+    });
+  });
+
+  var divisor = isAdmin ? 1e9 : 1e6;
+  var unit    = isAdmin ? 'M' : 'Jt';
+  var target  = isAdmin ? 1200000000 : 300000000;
+
   _dbTrendChart = new Chart(canvas, {
-    type: 'bar',
+    type: 'line',
     data: {
-      labels: trend.labels || [],
-      datasets: [{
-        label: 'Revenue Deal',
-        data:  trend.values || [],
-        backgroundColor: ['rgba(59,130,246,0.75)', 'rgba(16,185,129,0.75)', 'rgba(245,158,11,0.75)'],
-        borderColor:     ['rgb(59,130,246)',        'rgb(16,185,129)',        'rgb(245,158,11)'],
-        borderWidth: 2, borderRadius: 6
-      }]
+      labels: buckets.map(function(b) { return b.label; }),
+      datasets: [
+        {
+          label: 'Revenue',
+          data: buckets.map(function(b) { return +(b.rev / divisor).toFixed(2); }),
+          borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.08)',
+          fill: true, tension: 0.4,
+          pointBackgroundColor: '#3B82F6', pointRadius: 3, borderWidth: 2
+        },
+        {
+          label: 'Target',
+          data: buckets.map(function() { return +(target / divisor).toFixed(2); }),
+          borderColor: '#FB923C', borderDash: [5,4], borderWidth: 1.5,
+          pointRadius: 0, fill: false
+        }
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: function(ctx) { return ' ' + _rp(ctx.parsed.y); } } }
+        tooltip: { callbacks: { label: function(ctx) {
+          return ' ' + ctx.dataset.label + ': Rp ' + ctx.parsed.y.toLocaleString('id-ID') + unit;
+        }}}
       },
       scales: {
+        x: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { display: false }, border: { display: false } },
         y: {
-          beginAtZero: true,
-          ticks: { font: { size: 10 }, callback: function(v) {
-            if (v >= 1e9) return 'Rp ' + (v/1e9).toFixed(1) + 'M';
-            if (v >= 1e6) return 'Rp ' + (v/1e6).toFixed(0) + 'jt';
-            return 'Rp ' + v.toLocaleString('id-ID');
-          }},
-          grid: { color: 'rgba(0,0,0,0.04)' }
-        },
-        x: { ticks: { font: { size: 11, weight: 'bold' } }, grid: { display: false } }
+          ticks: { font: { size: 10 }, color: '#94a3b8', callback: function(v) { return 'Rp ' + v.toLocaleString('id-ID') + unit; } },
+          grid: { color: 'rgba(148,163,184,0.15)' }, border: { display: false }
+        }
       }
     }
   });
@@ -540,29 +570,6 @@ function _dbToggleDetail(id) {
   if (icon) icon.style.transform = hidden ? '' : 'rotate(180deg)';
 }
 
-// ── Penawaran Terbaru ──────────────────────────────────────────
-function _dbRenderRecentQuotes(items) {
-  var statusCls = { 'Deal':'bg-emerald-100 text-emerald-800', 'On-Progress':'bg-blue-100 text-blue-700', 'Fail':'bg-rose-100 text-rose-700' };
-  var quotes = items.slice().sort(function(a, b) {
-    var nA = parseInt((a.id.match(/^(\d+)/) || [0,0])[1]);
-    var nB = parseInt((b.id.match(/^(\d+)/) || [0,0])[1]);
-    return nB - nA;
-  }).slice(0, 20);
-
-  var tbody = document.getElementById('db-quot-table');
-  if (!tbody) return;
-  tbody.innerHTML = quotes.length
-    ? quotes.map(function(q, i) {
-        return '<tr class="' + (i % 2 === 1 ? 'bg-slate-50/50' : '') + '">'
-          + '<td class="px-4 py-2.5 text-slate-500 font-mono text-xs">' + _esc(q.id) + '</td>'
-          + '<td class="px-4 py-2.5 font-semibold text-slate-700 max-w-[160px] truncate text-xs">' + _esc(q.namaProject) + '</td>'
-          + '<td class="px-4 py-2.5 text-slate-500 text-xs truncate">' + _esc(q.namaKlien) + '</td>'
-          + '<td class="px-4 py-2.5 text-right font-bold text-slate-800 text-xs whitespace-nowrap">Rp ' + (q.grandTotal || 0).toLocaleString('id-ID') + '</td>'
-          + '<td class="px-4 py-2.5 text-center"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + (statusCls[q.status] || 'bg-slate-100 text-slate-500') + '">' + (q.status || '—') + '</span></td>'
-          + '</tr>';
-      }).join('')
-    : '<tr><td colspan="5" class="py-6 text-center text-slate-400 text-xs">Belum ada data penawaran.</td></tr>';
-}
 
 // ── Mock data ──────────────────────────────────────────────────
 function _dbMockSalesData(params) {
