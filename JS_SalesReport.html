@@ -216,6 +216,7 @@ function _srShowError(msg) {
 // ── Main render ──────────────────────────────────────────────
 
 function _srRender(data) {
+  window._srLastData = data; // cache for PDF export
   const loading = document.getElementById('sr-loading');
   const content = document.getElementById('sr-content');
 
@@ -600,7 +601,214 @@ function _srMockData(params) {
   };
 }
 
-// ── Tooltip untuk info icon ────────────────────────────────────────────────
+// ── Export PDF Laporan Performa Sales ─────────────────────────────────────
+window.exportSalesReportPDF = function() {
+  if (!window._srLastData) { showNotification('Muat data laporan terlebih dahulu.', 'error'); return; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const data = window._srLastData;
+    const s    = data.summary   || {};
+    const list = data.salesList || [];
+
+    const PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
+    const DARK  = [30,  41,  59];
+    const SLATE = [100, 116, 139];
+    const BLUE  = [30,  64,  175];
+    const GREEN = [5,   150, 105];
+    const AMBER = [180, 120, 20];
+    const RED   = [190, 30,  45];
+    const WHITE = [255, 255, 255];
+    const rp = v => 'Rp ' + Math.round(v || 0).toLocaleString('id-ID');
+    const pct = v => v != null ? Number(v).toFixed(1) + '%' : '-';
+
+    // ── HEADER ──
+    doc.setFillColor(...DARK);
+    doc.rect(0, 0, PW, 24, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text('LAPORAN PERFORMA SALES', ML, 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    doc.setTextColor(190, 200, 220);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.setTextColor(170, 195, 255);
+    doc.text('Periode:', PW - MR, 10, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...WHITE);
+    doc.text((data.dateFrom || '') + ' s/d ' + (data.dateTo || ''), PW - MR, 15, { align: 'right' });
+    doc.setFontSize(7); doc.setTextColor(190, 200, 220);
+    doc.text('Dicetak: ' + _fmtDate(new Date()), PW - MR, 20, { align: 'right' });
+
+    let y = 30;
+
+    // ── RINGKASAN TIM ──
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.setTextColor(...BLUE);
+    doc.text('RINGKASAN TIM', ML, y); y += 5;
+
+    const kpiData = [
+      { label: 'Revenue Deal',     value: rp(s.teamRevenue),           color: GREEN },
+      { label: 'Penawaran Dibuat', value: String(s.teamPenawaran || 0), color: BLUE  },
+      { label: 'Total Deal',       value: String(s.teamDealCount || 0), color: DARK  },
+      { label: 'Win Rate Tim',     value: pct(s.teamWinRate),           color: DARK  },
+      { label: 'Pipeline Aktif',   value: rp(s.teamPipelineValue),      color: AMBER },
+      { label: 'Target Tim',       value: rp(s.teamTarget),             color: SLATE },
+    ];
+    const boxW = (CW - 5) / 3, boxH = 14, gap = 2.5;
+    kpiData.forEach(function(k, i) {
+      const col = i % 3, row = Math.floor(i / 3);
+      const bx = ML + col * (boxW + gap), by = y + row * (boxH + gap);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+      doc.setTextColor(...SLATE);
+      doc.text(k.label.toUpperCase(), bx + 3, by + 4.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.setTextColor(...k.color);
+      doc.text(k.value, bx + 3, by + 10.5);
+    });
+    y += 2 * (boxH + gap) + 4;
+
+    // Capaian target bar
+    const pctVal = s.teamTarget > 0 ? Math.min((s.teamRevenue / s.teamTarget) * 100, 100) : 0;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+    doc.text('Capaian Target Tim: ' + pct(s.teamTarget > 0 ? (s.teamRevenue / s.teamTarget * 100) : 0), ML, y);
+    y += 3;
+    doc.setFillColor(226, 232, 240); doc.roundedRect(ML, y, CW, 4, 1, 1, 'F');
+    if (pctVal > 0) {
+      doc.setFillColor(...GREEN);
+      doc.roundedRect(ML, y, CW * pctVal / 100, 4, 1, 1, 'F');
+    }
+    y += 8;
+
+    // ── LEADERBOARD ──
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.setTextColor(...BLUE);
+    doc.text('LEADERBOARD SALES', ML, y); y += 3;
+
+    doc.autoTable({
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['#', 'Nama Sales', 'Penawaran', 'Nilai Total', 'Deal', 'Revenue Deal', 'Win Rate', 'Target', 'Capaian']],
+      body: list.map(function(s, i) {
+        return [
+          i + 1,
+          s.nama,
+          s.totalPenawaran,
+          rp(s.totalNilaiPenawaran),
+          s.dealCount,
+          rp(s.dealRevenue),
+          pct(s.winRate),
+          s.targetBulanan > 0 ? rp(s.targetBulanan) : '-',
+          s.achievement != null ? pct(s.achievement) : 'No Target'
+        ];
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: BLUE, textColor: WHITE, fontStyle: 'bold', fontSize: 7, halign: 'center' },
+      bodyStyles: { fontSize: 7, textColor: DARK },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 8 },
+        1: { fontStyle: 'bold', cellWidth: 32 },
+        2: { halign: 'center', cellWidth: 18 },
+        3: { halign: 'right', cellWidth: 28 },
+        4: { halign: 'center', cellWidth: 12 },
+        5: { halign: 'right', fontStyle: 'bold', cellWidth: 28 },
+        6: { halign: 'center', cellWidth: 16 },
+        7: { halign: 'right', cellWidth: 24 },
+        8: { halign: 'center', cellWidth: 18 }
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didParseCell: function(data) {
+        if (data.section === 'body' && data.column.index === 8 && data.row.index < list.length) {
+          const ach = list[data.row.index].achievement;
+          if (ach >= 100) data.cell.styles.textColor = GREEN;
+          else if (ach >= 50) data.cell.styles.textColor = BLUE;
+          else if (ach != null) data.cell.styles.textColor = RED;
+        }
+        if (data.section === 'body' && data.column.index === 5) data.cell.styles.textColor = GREEN;
+      }
+    });
+    y = doc.lastAutoTable.finalY + 6;
+
+    // ── DETAIL PER SALES ──
+    list.forEach(function(sales) {
+      // Check if need new page
+      if (y > 250) { doc.addPage(); y = 14; }
+
+      // Sales header bar
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(ML, y, CW, 10, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.setTextColor(...DARK);
+      doc.text(sales.nama, ML + 3, y + 6.5);
+      // Right side: revenue + win rate + achievement
+      const rightText = rp(sales.dealRevenue) + '   WR ' + pct(sales.winRate) +
+        (sales.achievement != null ? '   Capaian ' + pct(sales.achievement) : '');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      doc.setTextColor(...SLATE);
+      doc.text(rightText, ML + CW - 2, y + 6.5, { align: 'right' });
+      y += 12;
+
+      if (!sales.penawaran || sales.penawaran.length === 0) {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+        doc.setTextColor(...SLATE);
+        doc.text('Tidak ada penawaran dalam periode ini.', ML + 3, y);
+        y += 6;
+        return;
+      }
+
+      doc.autoTable({
+        startY: y,
+        margin: { left: ML, right: MR },
+        head: [['No Penawaran', 'Klien', 'Project', 'Nilai', 'Tanggal', 'Status', 'Tgl Deal']],
+        body: sales.penawaran.map(function(p) {
+          return [p.id, p.namaKlien || '-', p.namaProject || '-', rp(p.grandTotal), p.tanggal || '-', p.status, p.tanggalDeal || '-'];
+        }),
+        theme: 'grid',
+        headStyles: { fillColor: [51, 65, 85], textColor: WHITE, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
+        bodyStyles: { fontSize: 6.5, textColor: DARK },
+        columnStyles: {
+          0: { cellWidth: 32 },
+          1: { cellWidth: 22 },
+          2: { cellWidth: 48 },
+          3: { halign: 'right', cellWidth: 26 },
+          4: { halign: 'center', cellWidth: 18 },
+          5: { halign: 'center', cellWidth: 18 },
+          6: { halign: 'center', cellWidth: 18 }
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index === 5) {
+            const st = data.cell.raw;
+            if (st === 'Deal')        data.cell.styles.textColor = GREEN;
+            else if (st === 'Fail')   data.cell.styles.textColor = RED;
+            else                      data.cell.styles.textColor = BLUE;
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    });
+
+    // ── PAGE NUMBERS ──
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+      doc.setTextColor(...SLATE);
+      doc.text('Halaman ' + i + ' / ' + totalPages, PW / 2, 292, { align: 'center' });
+      doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
+    }
+
+    const fname = 'LaporanSales_' + (data.dateFrom || '').replace(/\//g, '') + '-' + (data.dateTo || '').replace(/\//g, '') + '.pdf';
+    doc.save(fname);
+    showNotification('PDF berhasil diunduh!');
+  } catch(e) {
+    showNotification('Gagal export PDF: ' + e.message, 'error');
+  }
+};
 document.addEventListener('mouseover', function(e) {
   const trigger = e.target.closest('.sr-tooltip-trigger');
   const tip = document.getElementById('sr-tooltip');
