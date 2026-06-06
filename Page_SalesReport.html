@@ -88,31 +88,58 @@
       <!-- KPI Cards row -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <!-- Revenue Deal -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Revenue Deal</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative group">
+          <div class="flex items-center gap-1 mb-1">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Revenue Deal</p>
+            <span class="sr-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+              data-tip="Total nilai rupiah dari penawaran yang berhasil Deal dalam periode ini. Uang yang sudah pasti masuk (berdasarkan tanggal deal).">
+              <i class="fa-solid fa-circle-info text-[10px]"></i>
+            </span>
+          </div>
           <p id="sr-kpi-revenue" class="text-xl font-extrabold text-emerald-600 leading-tight">—</p>
-          <p class="text-[10px] text-slate-400 mt-1">Total nilai deal periode ini</p>
+          <p class="text-[10px] text-slate-400 mt-1">Nilai deal berhasil periode ini</p>
         </div>
         <!-- Total Penawaran -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Penawaran Dibuat</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative group">
+          <div class="flex items-center gap-1 mb-1">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penawaran Dibuat</p>
+            <span class="sr-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+              data-tip="Jumlah penawaran (quotation) yang dibuat dalam periode ini, termasuk yang Deal, On-Progress, maupun Fail.">
+              <i class="fa-solid fa-circle-info text-[10px]"></i>
+            </span>
+          </div>
           <p id="sr-kpi-penawaran" class="text-xl font-extrabold text-blue-600 leading-tight">—</p>
-          <p class="text-[10px] text-slate-400 mt-1">Jumlah penawaran tim</p>
+          <p class="text-[10px] text-slate-400 mt-1">Termasuk semua status</p>
         </div>
         <!-- Deal Count -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Deal</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative group">
+          <div class="flex items-center gap-1 mb-1">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Deal</p>
+            <span class="sr-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+              data-tip="Jumlah penawaran yang berhasil ditandai Deal dalam periode ini. Win Rate = Deal ÷ (Deal + Fail) × 100%.">
+              <i class="fa-solid fa-circle-info text-[10px]"></i>
+            </span>
+          </div>
           <p id="sr-kpi-deal" class="text-xl font-extrabold text-slate-800 leading-tight">—</p>
-          <p class="text-[10px] text-slate-400 mt-1">Jumlah deal berhasil</p>
+          <p class="text-[10px] text-slate-400 mt-1">Penawaran berhasil ditutup</p>
         </div>
         <!-- Pipeline -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pipeline Aktif</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative group">
+          <div class="flex items-center gap-1 mb-1">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pipeline Aktif</p>
+            <span class="sr-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+              data-tip="Total potensi nilai dari semua penawaran yang masih On-Progress (belum Deal / Fail), tanpa batasan periode. Ini adalah uang yang masih bisa dikejar.">
+              <i class="fa-solid fa-circle-info text-[10px]"></i>
+            </span>
+          </div>
           <p id="sr-kpi-pipeline" class="text-xl font-extrabold text-amber-600 leading-tight">—</p>
           <p id="sr-kpi-pipeline-value" class="text-xs font-bold text-slate-500 mt-0.5">—</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Penawaran sedang berjalan</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Potensi yang masih bisa dikejar</p>
         </div>
       </div>
+
+      <!-- Tooltip popup (shared, positioned by JS) -->
+      <div id="sr-tooltip" class="hidden fixed z-[500] max-w-xs bg-slate-800 text-white text-xs rounded-xl px-3 py-2 shadow-xl leading-relaxed pointer-events-none"></div>
 
       <!-- Revenue Progress Bar + Top Performer -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

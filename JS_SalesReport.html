@@ -599,4 +599,26 @@ function _srMockData(params) {
     isAdmin: true,
   };
 }
+
+// ── Tooltip untuk info icon ────────────────────────────────────────────────
+document.addEventListener('mouseover', function(e) {
+  const trigger = e.target.closest('.sr-tooltip-trigger');
+  const tip = document.getElementById('sr-tooltip');
+  if (!trigger || !tip) return;
+  tip.innerText = trigger.dataset.tip || '';
+  tip.classList.remove('hidden');
+});
+document.addEventListener('mousemove', function(e) {
+  const tip = document.getElementById('sr-tooltip');
+  if (!tip || tip.classList.contains('hidden')) return;
+  const x = e.clientX + 12, y = e.clientY + 12;
+  const overflowX = x + 260 > window.innerWidth;
+  tip.style.left = (overflowX ? e.clientX - 270 : x) + 'px';
+  tip.style.top  = y + 'px';
+});
+document.addEventListener('mouseout', function(e) {
+  const trigger = e.target.closest('.sr-tooltip-trigger');
+  const tip = document.getElementById('sr-tooltip');
+  if (trigger && tip) tip.classList.add('hidden');
+});
 </script>
