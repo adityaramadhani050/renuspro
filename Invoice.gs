@@ -286,6 +286,7 @@ function getInvoiceList() {
     const sheet = ss.getSheetByName('Invoice_Main');
     if (!sheet) return [];
     const data = sheet.getDataRange().getValues();
+    const kwMap = _getKwitansiInvoiceMap(ss);
     const list = [];
 
     for (let i = 1; i < data.length; i++) {
@@ -317,7 +318,8 @@ function getInvoiceList() {
         statusBayar: data[i][16] ? data[i][16].toString() : 'Belum Lunas',
         catatan:     data[i][17] ? data[i][17].toString() : '',
         dibuatOleh:  data[i][18] ? data[i][18].toString() : '',
-        bankAccount: data[i][19] ? data[i][19].toString() : ''
+        bankAccount: data[i][19] ? data[i][19].toString() : '',
+        kwitansiId:  kwMap[data[i][0].toString()] || ''
       });
     }
 
@@ -329,21 +331,74 @@ function getInvoiceList() {
   }
 }
 
-// ── Update status bayar invoice ─────────────────────────────────────────────
+// ── Map invoice ID → no kwitansi (ambil kwitansi pertama per invoice) ────────
+function _getKwitansiInvoiceMap(ss) {
+  const map = {};
+  const sheet = ss.getSheetByName('Kwitansi_Main');
+  if (!sheet || sheet.getLastRow() < 2) return map;
+  const d = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  for (let i = 0; i < d.length; i++) {
+    const noKw  = d[i][0] ? d[i][0].toString() : '';
+    const noInv = d[i][1] ? d[i][1].toString() : '';
+    if (noInv && noKw && !map[noInv]) map[noInv] = noKw;
+  }
+  return map;
+}
+
+// ── Update status bayar invoice + auto-generate kwitansi saat Lunas ──────────
 function updateStatusBayarInvoice(idInvoice, statusBaru) {
+  const lock = LockService.getScriptLock();
   try {
-    const sheet = getSpreadsheet().getSheetByName('Invoice_Main');
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Invoice_Main');
     if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0].toString() === idInvoice) {
-        sheet.getRange(i + 1, 17).setValue(statusBaru); // kolom 17 = Status Bayar
-        SpreadsheetApp.flush();
-        return { success: true, message: 'Status bayar diperbarui: ' + statusBaru };
+      if (data[i][0].toString() !== idInvoice) continue;
+
+      sheet.getRange(i + 1, 17).setValue(statusBaru);
+      SpreadsheetApp.flush();
+
+      let noKwitansi = '';
+      let kwitansiBaru = false;
+
+      if (statusBaru === 'Lunas') {
+        const kwMap = _getKwitansiInvoiceMap(ss);
+        if (kwMap[idInvoice]) {
+          noKwitansi = kwMap[idInvoice];
+        } else {
+          const jenis   = data[i][4] ? data[i][4].toString() : 'Penuh';
+          const persen  = parseFloat(data[i][5]) || 0;
+          const payload = {
+            noInvoice:  idInvoice,
+            noWO:       data[i][1] ? data[i][1].toString() : '',
+            tanggal:    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy'),
+            terimaDari: data[i][9] ? data[i][9].toString() : '',
+            jumlah:     parseFloat(data[i][14]) || 0,
+            untuk:      'Pembayaran ' + jenis + (persen > 0 ? ' ' + persen + '%' : '') +
+                        ' - ' + (data[i][10] ? data[i][10].toString() : ''),
+            metode:     'Transfer',
+            catatan:    '',
+            dibuatOleh: 'Sistem'
+          };
+          noKwitansi = _appendKwitansiRow(ss, payload);
+          kwitansiBaru = true;
+        }
       }
+
+      const msg = statusBaru === 'Lunas'
+        ? (kwitansiBaru
+            ? 'Invoice dilunasi. Kwitansi ' + noKwitansi + ' otomatis dibuat.'
+            : 'Status diperbarui: Lunas. Kwitansi ' + noKwitansi + ' sudah ada.')
+        : 'Status bayar diperbarui: ' + statusBaru;
+
+      return { success: true, message: msg, statusBaru: statusBaru, noKwitansi: noKwitansi };
     }
     return { success: false, message: 'Invoice tidak ditemukan.' };
   } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
 // ── Hapus invoice ───────────────────────────────────────────────────────────

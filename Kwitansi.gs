@@ -60,6 +60,22 @@ function getKwitansiInitialData() {
   }
 }
 
+// ── Helper internal (tanpa lock) — dipanggil dari Invoice.gs ────────────────
+function _appendKwitansiRow(ss, payload) {
+  const sheet = ss.getSheetByName('Kwitansi_Main') || buatSheetKwitansiDefault(ss);
+  const jumlah = parseFloat(payload.jumlah) || 0;
+  if (jumlah <= 0) return '';
+  const noKwitansi = generateNextKwitansiNumber(ss);
+  sheet.appendRow([
+    noKwitansi, payload.noInvoice || '', payload.noWO || '', payload.tanggal,
+    payload.terimaDari || '', jumlah, payload.untuk || '',
+    payload.metode || 'Transfer', payload.catatan || '',
+    payload.dibuatOleh || 'Sistem'
+  ]);
+  SpreadsheetApp.flush();
+  return noKwitansi;
+}
+
 function simpanKwitansi(payload) {
   const lock = LockService.getScriptLock();
   try {

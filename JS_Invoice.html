@@ -36,11 +36,20 @@
       }
       tbody.innerHTML = data.map(i => {
         const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
-        const bayarClass = i.statusBayar === 'Lunas' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
-        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+        const isLunas = i.statusBayar === 'Lunas';
+        const bayarClass = isLunas ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+        const kwBtn = i.kwitansiId
+          ? `<button onclick="exportKwitansiPDFDariInvoice('${i.kwitansiId}',${itemJson})"
+               class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition"
+               title="Export PDF Kwitansi (${i.kwitansiId})">
+               <i class="fa-solid fa-receipt"></i>
+             </button>`
+          : '';
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm ${isLunas ? 'bg-emerald-50/30' : ''}">
           <td class="p-4 max-w-[200px]">
             <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}</p>
             <p class="text-[11px] text-slate-400 font-medium">${i.tanggal || ''}</p>
+            ${i.kwitansiId ? `<p class="text-[10px] text-emerald-600 font-semibold mt-0.5"><i class="fa-solid fa-receipt mr-1"></i>${i.kwitansiId}</p>` : ''}
           </td>
           <td class="p-4">
             <p class="font-semibold text-emerald-700 text-xs whitespace-nowrap"><i class="fa-solid fa-clipboard-check text-[10px]"></i> ${i.noWO}</p>
@@ -55,8 +64,8 @@
           <td class="p-4 text-center">
             <select onchange="ubahStatusBayarInvoice('${i.id}', this)"
               class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${bayarClass}">
-              <option value="Belum Lunas" ${i.statusBayar==='Belum Lunas'?'selected':''}>Belum Lunas</option>
-              <option value="Lunas" ${i.statusBayar==='Lunas'?'selected':''}>Lunas</option>
+              <option value="Belum Lunas" ${!isLunas?'selected':''}>Belum Lunas</option>
+              <option value="Lunas" ${isLunas?'selected':''}>Lunas</option>
             </select>
           </td>
           <td class="p-4 text-center">
@@ -67,6 +76,7 @@
               <button onclick='exportInvoicePDF(${itemJson})' class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF Invoice">
                 <i class="fa-solid fa-file-pdf"></i>
               </button>
+              ${kwBtn}
               <button onclick="konfirmasiHapus('invoice','${i.id}','${i.id}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
@@ -370,12 +380,47 @@
     }
 
     function ubahStatusBayarInvoice(id, sel) {
+      const statusBaru = sel.value;
+      sel.disabled = true;
+      toggleLoader(true, statusBaru === 'Lunas' ? 'Melunasi & membuat kwitansi...' : 'Memperbarui status...');
       google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        sel.disabled = false;
         showNotification(res.message, res.success ? 'success' : 'error');
         loadInvoice();
       }).withFailureHandler(function(err) {
-        showNotification(err.message || err, 'error'); loadInvoice();
-      }).updateStatusBayarInvoice(id, sel.value);
+        toggleLoader(false);
+        sel.disabled = false;
+        showNotification(err.message || err, 'error');
+        loadInvoice();
+      }).updateStatusBayarInvoice(id, statusBaru);
+    }
+
+    // ── Export kwitansi PDF langsung dari halaman invoice ──
+    function exportKwitansiPDFDariInvoice(kwitansiId, item) {
+      document.getElementById('preview-pdf-title').innerText = 'Kwitansi — ' + kwitansiId;
+      document.getElementById('preview-pdf-subtitle').innerText = (item.namaKlien || '') + ' · ' + (item.namaProject || '');
+      document.getElementById('preview-pdf-loading').classList.remove('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+      document.getElementById('modal-preview-pdf').classList.remove('hidden');
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (res.success) {
+          _activePdfBase64 = res.pdfBase64;
+          _activePdfName   = res.fileName;
+          renderPDFDariBase64(res.pdfBase64);
+        } else {
+          document.getElementById('preview-pdf-loading').innerHTML = `
+            <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
+            <button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
+        }
+      }).withFailureHandler(function(err) {
+        document.getElementById('preview-pdf-loading').innerHTML = `
+          <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
+          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
+      }).exportKwitansiDariTemplate(kwitansiId);
     }
 
     // ── Export PDF Invoice (reuse modal preview PDF) ──
