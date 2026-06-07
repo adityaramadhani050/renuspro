@@ -7,7 +7,54 @@
     let _cachedInvoiceData = [];
     let _invoiceEditId   = null;   // null = mode buat, isi = mode edit
     let _invoiceEditDpp  = 0;      // dpp lama (untuk koreksi sisa saat edit)
-    const _BANK_DEFAULT  = 'Bank BSI 7336418717\nA/N. PT. Renus Global Indonesia';
+    var _bankAccounts    = [];
+    var _bankDropLoaded  = false;
+
+    function _loadBankDropdown(selectedDetail) {
+      var sel = document.getElementById('inv-bank');
+      if (!sel) return;
+      if (_bankDropLoaded && _bankAccounts.length > 0) {
+        _fillBankDropdown(sel, selectedDetail);
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function(r) {
+          _bankAccounts   = (r && r.accounts) || [];
+          _bankDropLoaded = true;
+          _fillBankDropdown(sel, selectedDetail);
+        })
+        .withFailureHandler(function() {})
+        .getBankAccounts();
+    }
+
+    function _fillBankDropdown(sel, selectedDetail) {
+      sel.innerHTML = '';
+      _bankAccounts.forEach(function(acc) {
+        var opt = document.createElement('option');
+        opt.value       = acc.detail;
+        opt.textContent = acc.label;
+        sel.appendChild(opt);
+      });
+      if (_bankAccounts.length === 0) {
+        var opt = document.createElement('option');
+        opt.value = ''; opt.textContent = '-- Belum ada bank account --';
+        sel.appendChild(opt);
+      }
+      if (selectedDetail) {
+        // Coba cocokkan dengan detail yang tersimpan
+        var found = false;
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === selectedDetail) { sel.selectedIndex = i; found = true; break; }
+        }
+        if (!found && selectedDetail) {
+          // Tambahkan sebagai opsi orphan agar data lama tidak hilang
+          var opt = document.createElement('option');
+          opt.value = selectedDetail; opt.textContent = selectedDetail.split('\n')[0];
+          sel.insertBefore(opt, sel.firstChild);
+          sel.selectedIndex = 0;
+        }
+      }
+    }
 
     // ── Helper tanggal yyyy-mm-dd → dd/MM/yyyy ──
     function _toDDMMYYYY(str) {
@@ -204,7 +251,7 @@
         document.getElementById('inv-tanggal').valueAsDate = new Date();
         document.getElementById('inv-tglpo').value = '';
         document.getElementById('inv-catatan').value = '';
-        document.getElementById('inv-bank').value = _BANK_DEFAULT;
+        _loadBankDropdown(null);
         document.getElementById('inv-po-penawaran').innerText = '-';
         document.getElementById('inv-scope').innerHTML =
           '<p class="text-slate-400 italic">Pilih Work Order atau Penawaran untuk menampilkan scope.</p>';
@@ -270,7 +317,7 @@
         document.getElementById('inv-jenis').value = item.jenis || 'DP';
         document.getElementById('inv-tanggal').value = _toISO(item.tanggal);
         document.getElementById('inv-catatan').value = item.catatan || '';
-        document.getElementById('inv-bank').value = item.bankAccount || _BANK_DEFAULT;
+        _loadBankDropdown(item.bankAccount || null);
 
         // PO: jika noPO != noPenawaran → ada PO
         const adaPO = item.noPO && item.noPO !== item.noPenawaran;

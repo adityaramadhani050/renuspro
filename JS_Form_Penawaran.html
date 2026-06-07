@@ -28,18 +28,9 @@
   // Isi Syarat & Ketentuan dari JSON
   try {
     const tc = JSON.parse(item.termConditions || '{}');
-    const setOpt = (id, val) => {
-      if (val && document.getElementById(id)) document.getElementById(id).value = val;
-    };
-    setOpt('tc_material',      tc.material_status);
-    setOpt('tc_dp',            tc.dp_status);
-    setOpt('tc_term',          tc.term_pay);
-    setOpt('tc_final',         tc.final_pay);
-    setOpt('tc_delivery_time', tc.delivery_time);
-    setOpt('tc_delivery_cond', tc.delivery_cond);
-    setOpt('tc_warranty',      tc.warranty);
-    setOpt('tc_bonus',         tc.bonus);
     if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
+    _tcDropdownsLoaded = false;
+    _loadTCDropdowns(tc);
   } catch(e) {}
 
   // Diskon & pajak
@@ -419,7 +410,43 @@
       } else {
         vForm.classList.remove('hidden');
         vTabel.classList.add('hidden');
+        _loadTCDropdowns();
       }
+    }
+
+    var _tcDropdownsLoaded = false;
+    function _loadTCDropdowns(selectedTC) {
+      if (_tcDropdownsLoaded && !selectedTC) return;
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (!r || !r.success) return;
+          _tcDropdownsLoaded = true;
+          var map = {
+            material_status: 'tc_material',
+            dp_status:       'tc_dp',
+            term_pay:        'tc_term',
+            final_pay:       'tc_final',
+            delivery_time:   'tc_delivery_time',
+            delivery_cond:   'tc_delivery_cond',
+            warranty:        'tc_warranty',
+            bonus:           'tc_bonus'
+          };
+          Object.keys(map).forEach(function(key) {
+            var sel = document.getElementById(map[key]);
+            if (!sel) return;
+            var opts   = r.options[key] || ['-'];
+            var curVal = (selectedTC && selectedTC[key]) || sel.value || opts[0];
+            sel.innerHTML = '';
+            opts.forEach(function(o) {
+              var el = document.createElement('option');
+              el.value = el.textContent = o;
+              sel.appendChild(el);
+            });
+            if (curVal) sel.value = curVal;
+          });
+        })
+        .withFailureHandler(function() {})
+        .getTCOptions();
     }
 
     function submitTambahProduk(e) {
@@ -799,16 +826,9 @@
       // Isi Syarat & Ketentuan dari JSON
       try {
         const tc = JSON.parse(item.termConditions || '{}');
-        const setOpt = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
-        setOpt('tc_material',      tc.material_status);
-        setOpt('tc_dp',            tc.dp_status);
-        setOpt('tc_term',          tc.term_pay);
-        setOpt('tc_final',         tc.final_pay);
-        setOpt('tc_delivery_time', tc.delivery_time);
-        setOpt('tc_delivery_cond', tc.delivery_cond);
-        setOpt('tc_warranty',      tc.warranty);
-        setOpt('tc_bonus',         tc.bonus);
         if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
+        _tcDropdownsLoaded = false;
+        _loadTCDropdowns(tc);
       } catch(e) {}
 
       // Bangun ulang kelompok item

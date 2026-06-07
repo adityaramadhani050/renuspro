@@ -3,7 +3,20 @@
 
 function showToast(msg, type) { showNotification(msg, type || 'success'); }
 
+var _tcData    = {};   // { field_key: [option, ...] }
+var _bankData  = [];   // [ { id, label, detail }, ... ]
+
 function loadSettings() {
+  _loadWAConfig();
+  _loadTCOptions();
+  _loadBankAccounts();
+}
+
+// ═══════════════════════════════════════════════════════
+// WA BOT
+// ═══════════════════════════════════════════════════════
+
+function _loadWAConfig() {
   google.script.run
     .withSuccessHandler(function(r) {
       if (!r || !r.success) return;
@@ -39,15 +52,9 @@ function simpanWAConfig() {
   var enabled  = document.getElementById('wa-enabled').checked;
   var endpoint = (document.getElementById('wa-endpoint').value || '').trim();
   var target   = (document.getElementById('wa-target').value   || '').trim();
-
-  if (!endpoint || !target) {
-    showToast('Server URL dan Group JID wajib diisi.', 'error');
-    return;
-  }
-
+  if (!endpoint || !target) { showToast('Server URL dan Group JID wajib diisi.', 'error'); return; }
   var btn = document.querySelector('[onclick="simpanWAConfig()"]');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
-
   google.script.run
     .withSuccessHandler(function(r) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
@@ -63,15 +70,9 @@ function simpanWAConfig() {
 function testWAConfig() {
   var endpoint = (document.getElementById('wa-endpoint').value || '').trim();
   var target   = (document.getElementById('wa-target').value   || '').trim();
-
-  if (!endpoint || !target) {
-    showToast('Isi Server URL dan Group JID terlebih dahulu.', 'error');
-    return;
-  }
-
+  if (!endpoint || !target) { showToast('Isi Server URL dan Group JID terlebih dahulu.', 'error'); return; }
   var btn = document.getElementById('wa-test-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> Mengirim...'; }
-
   google.script.run
     .withSuccessHandler(function(r) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
@@ -82,5 +83,211 @@ function testWAConfig() {
       showToast('Error: ' + e.message, 'error');
     })
     .testWANotif({ endpoint: endpoint, target: target });
+}
+
+// ═══════════════════════════════════════════════════════
+// SYARAT & KETENTUAN
+// ═══════════════════════════════════════════════════════
+
+function _loadTCOptions() {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) return;
+      _tcData = r.options;
+      _renderTCFields(r.fields, r.options);
+    })
+    .withFailureHandler(function() {})
+    .getTCOptions();
+}
+
+function _renderTCFields(fields, options) {
+  var container = document.getElementById('tc-fields-container');
+  if (!container) return;
+  container.innerHTML = '';
+  fields.forEach(function(f) {
+    var opts = options[f.key] || [];
+    var html = '<div class="border border-slate-200 rounded-xl overflow-hidden">' +
+      '<div class="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">' +
+        '<span class="text-xs font-bold text-slate-600 uppercase tracking-wide">' + f.label + '</span>' +
+        '<button onclick="addTCOption(\'' + f.key + '\')" class="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center gap-1">' +
+          '<i class="fa-solid fa-plus text-[10px]"></i> Tambah</button>' +
+      '</div>' +
+      '<div class="divide-y divide-slate-100" id="tc-list-' + f.key + '">';
+    opts.forEach(function(opt, idx) {
+      html += _tcOptionRow(f.key, idx, opt);
+    });
+    if (opts.length === 0) {
+      html += '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+    }
+    html += '</div></div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function _tcOptionRow(key, idx, val) {
+  return '<div class="flex items-center gap-2 px-4 py-2" id="tc-row-' + key + '-' + idx + '">' +
+    '<input type="text" value="' + _escHtml(val) + '" onchange="_tcUpdateValue(\'' + key + '\',' + idx + ',this.value)" ' +
+      'class="flex-1 px-2 py-1 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white">' +
+    '<button onclick="deleteTCOption(\'' + key + '\',' + idx + ')" class="text-red-400 hover:text-red-600 shrink-0">' +
+      '<i class="fa-solid fa-trash-can text-xs"></i></button>' +
+  '</div>';
+}
+
+function _escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _tcUpdateValue(key, idx, val) {
+  if (!_tcData[key]) return;
+  _tcData[key][idx] = val;
+}
+
+function addTCOption(key) {
+  if (!_tcData[key]) _tcData[key] = [];
+  var idx  = _tcData[key].length;
+  _tcData[key].push('');
+  var list = document.getElementById('tc-list-' + key);
+  if (!list) return;
+  // Remove "belum ada opsi" placeholder if exists
+  var empty = list.querySelector('.italic');
+  if (empty) empty.parentNode.removeChild(empty);
+  list.insertAdjacentHTML('beforeend', _tcOptionRow(key, idx, ''));
+  var newInput = document.getElementById('tc-row-' + key + '-' + idx);
+  if (newInput) newInput.querySelector('input').focus();
+}
+
+function deleteTCOption(key, idx) {
+  if (!_tcData[key]) return;
+  _tcData[key].splice(idx, 1);
+  // Re-render hanya section ini
+  var list = document.getElementById('tc-list-' + key);
+  if (!list) return;
+  var opts = _tcData[key];
+  list.innerHTML = '';
+  opts.forEach(function(opt, i) { list.insertAdjacentHTML('beforeend', _tcOptionRow(key, i, opt)); });
+  if (opts.length === 0) list.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+}
+
+function simpanTCOptions() {
+  // Sync nilai input ke _tcData sebelum simpan
+  Object.keys(_tcData).forEach(function(key) {
+    (_tcData[key] || []).forEach(function(_, idx) {
+      var row = document.getElementById('tc-row-' + key + '-' + idx);
+      if (row) {
+        var inp = row.querySelector('input');
+        if (inp) _tcData[key][idx] = inp.value;
+      }
+    });
+  });
+  var btn = document.querySelector('[onclick="simpanTCOptions()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Syarat & Ketentuan'; }
+      showToast((r && r.message) || 'Tersimpan.', r && r.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Syarat & Ketentuan'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .saveTCOptions(_tcData);
+}
+
+// ═══════════════════════════════════════════════════════
+// BANK ACCOUNT
+// ═══════════════════════════════════════════════════════
+
+function _loadBankAccounts() {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) return;
+      _bankData = r.accounts || [];
+      _renderBankList();
+    })
+    .withFailureHandler(function() {})
+    .getBankAccounts();
+}
+
+function _renderBankList() {
+  var container = document.getElementById('bank-list-container');
+  if (!container) return;
+  if (_bankData.length === 0) {
+    container.innerHTML = '<div class="text-xs text-slate-400 italic">Belum ada bank account. Klik Tambah untuk menambahkan.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  _bankData.forEach(function(acc, idx) {
+    var html = '<div class="flex items-start gap-3 p-3 border border-slate-200 rounded-xl">' +
+      '<div class="bg-violet-50 text-violet-600 h-8 w-8 rounded-lg flex items-center justify-center shrink-0">' +
+        '<i class="fa-solid fa-building-columns text-sm"></i></div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<p class="text-sm font-bold text-slate-700">' + _escHtml(acc.label) + '</p>' +
+        '<p class="text-xs text-slate-400 whitespace-pre-line mt-0.5">' + _escHtml(acc.detail) + '</p>' +
+      '</div>' +
+      '<div class="flex gap-1 shrink-0">' +
+        '<button onclick="showEditBankModal(' + idx + ')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition">' +
+          '<i class="fa-solid fa-pen text-xs"></i></button>' +
+        '<button onclick="deleteBankAccount(' + idx + ')" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">' +
+          '<i class="fa-solid fa-trash-can text-xs"></i></button>' +
+      '</div>' +
+    '</div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function showAddBankModal() {
+  document.getElementById('bank-modal-title').textContent = 'Tambah Bank Account';
+  document.getElementById('bank-edit-id').value = '';
+  document.getElementById('bank-label').value  = '';
+  document.getElementById('bank-detail').value = '';
+  document.getElementById('modal-bank').classList.remove('hidden');
+  document.getElementById('bank-label').focus();
+}
+
+function showEditBankModal(idx) {
+  var acc = _bankData[idx];
+  if (!acc) return;
+  document.getElementById('bank-modal-title').textContent = 'Edit Bank Account';
+  document.getElementById('bank-edit-id').value  = String(idx);
+  document.getElementById('bank-label').value    = acc.label  || '';
+  document.getElementById('bank-detail').value   = acc.detail || '';
+  document.getElementById('modal-bank').classList.remove('hidden');
+  document.getElementById('bank-label').focus();
+}
+
+function closeBankModal() {
+  document.getElementById('modal-bank').classList.add('hidden');
+}
+
+function saveBankAccount() {
+  var label  = (document.getElementById('bank-label').value  || '').trim();
+  var detail = (document.getElementById('bank-detail').value || '').trim();
+  if (!label || !detail) { showToast('Nama bank dan detail rekening wajib diisi.', 'error'); return; }
+  var editId = document.getElementById('bank-edit-id').value;
+  if (editId !== '') {
+    _bankData[parseInt(editId)] = { id: _bankData[parseInt(editId)].id, label: label, detail: detail };
+  } else {
+    _bankData.push({ id: Date.now().toString(), label: label, detail: detail });
+  }
+  _persistBankAccounts();
+}
+
+function deleteBankAccount(idx) {
+  if (!confirm('Hapus bank account "' + (_bankData[idx] && _bankData[idx].label) + '"?')) return;
+  _bankData.splice(idx, 1);
+  _persistBankAccounts();
+}
+
+function _persistBankAccounts() {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      closeBankModal();
+      _renderBankList();
+      showToast((r && r.message) || 'Tersimpan.', r && r.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      showToast('Error: ' + e.message, 'error');
+    })
+    .saveBankAccounts(_bankData);
 }
 </script>
