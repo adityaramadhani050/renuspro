@@ -105,6 +105,64 @@ function auditPenawaranWO() {
   }
 
   // ════════════════════════════════════════════════════════
+  // [C] No WO DIPAKAI LEBIH DARI SATU PENAWARAN (double)
+  //     Periksa dari SEMUA baris (bukan hanya revisi terbaru)
+  //     karena revisi lama yang masih punya noWO terisi bisa
+  //     menyebabkan WO terhitung ganda.
+  // ════════════════════════════════════════════════════════
+  var woUsageMap = {}; // noWO → [{noPenawaran, rev, status, namaKlien, namaProject, grandTotal, dibuatOleh}]
+  for (var ci = 1; ci < pData.length; ci++) {
+    var cNoPen = (pData[ci][0] || '').toString().trim();
+    if (!cNoPen) continue;
+    var cNoWO  = (pData[ci][17] || '').toString().trim();
+    if (!cNoWO) continue;
+    var cRev   = parseInt(pData[ci][1]) || 0;
+    var cStatus = (pData[ci][16] || '').toString().trim() || 'On-Progress';
+    var cKlienId = (pData[ci][5] || '').toString().trim();
+    if (!woUsageMap[cNoWO]) woUsageMap[cNoWO] = [];
+    woUsageMap[cNoWO].push({
+      noPenawaran: cNoPen,
+      rev:         cRev,
+      status:      cStatus,
+      namaKlien:   klienMap[cKlienId] || cKlienId,
+      namaProject: (pData[ci][4] || '').toString().trim(),
+      grandTotal:  parseFloat(pData[ci][10]) || 0,
+      dibuatOleh:  (pData[ci][6] || '').toString().trim()
+    });
+  }
+
+  var issueC = []; // [{noWO, entries:[...]}]
+  for (var wo in woUsageMap) {
+    var entries = woUsageMap[wo];
+    // Duplikat: lebih dari 1 baris ATAU 1 noPenawaran dengan lebih dari 1 revisi yang punya noWO terisi
+    var uniquePenawaran = {};
+    entries.forEach(function(e) { uniquePenawaran[e.noPenawaran] = true; });
+    if (Object.keys(uniquePenawaran).length > 1 || entries.length > 1) {
+      issueC.push({ noWO: wo, entries: entries });
+    }
+  }
+  issueC.sort(function(a, b) { return a.noWO.localeCompare(b.noWO, undefined, { numeric: true }); });
+
+  Logger.log('\n[C] No WO DIPAKAI LEBIH DARI SATU PENAWARAN / REVISI: ' + issueC.length + ' No WO bermasalah');
+  if (issueC.length > 0) {
+    Logger.log('    No WO   | No Penawaran          | Rev | Status         | Klien                        | Project                          | Nilai         | Sales');
+    Logger.log('    ' + '-'.repeat(150));
+    issueC.forEach(function(g) {
+      g.entries.forEach(function(e) {
+        Logger.log('    ' + _auPad(g.noWO,8)
+          + ' | ' + _auPad(e.noPenawaran,22)
+          + ' | ' + _auPad(e.rev.toString(),3)
+          + ' | ' + _auPad(e.status,14)
+          + ' | ' + _auPad(e.namaKlien,28)
+          + ' | ' + _auPad(e.namaProject,32)
+          + ' | ' + _auPadL(_auRp(e.grandTotal),13)
+          + ' | ' + e.dibuatOleh);
+      });
+      Logger.log('    ' + '-'.repeat(150));
+    });
+  }
+
+  // ════════════════════════════════════════════════════════
   // [B] Penawaran BUKAN Deal tapi No WO TERISI
   // ════════════════════════════════════════════════════════
   var issueB = penawaranList.filter(function(p) { return p.status !== 'Deal' && p.noWO; });
@@ -137,27 +195,30 @@ function auditPenawaranWO() {
   Logger.log('');
   Logger.log('  [A] Deal tanpa No WO            : ' + issueA.length + ' item = ' + _auRp(issueANilai));
   Logger.log('  [B] Bukan Deal tapi punya No WO : ' + issueB.length + ' item = ' + _auRp(issueBNilai));
+  Logger.log('  [C] No WO double (multi-baris)  : ' + issueC.length + ' No WO');
 
-  if (issueA.length === 0 && issueB.length === 0) {
+  if (issueA.length === 0 && issueB.length === 0 && issueC.length === 0) {
     Logger.log('\n✅ Tidak ditemukan inkonsistensi data.');
   } else {
-    Logger.log('\n⚠️  Total ' + (issueA.length + issueB.length) + ' item bermasalah ditemukan.');
-    Logger.log('   Penawaran [A] menyebabkan nilai Dashboard > nilai Work Order.');
-    Logger.log('   Penawaran [B] menyebabkan nilai Work Order > nilai Dashboard.');
+    Logger.log('\n⚠️  Inkonsistensi ditemukan:');
+    if (issueA.length) Logger.log('   [A] Penawaran Deal tanpa No WO → nilai Dashboard > Work Order.');
+    if (issueB.length) Logger.log('   [B] Bukan Deal tapi punya No WO → nilai Work Order > Dashboard.');
+    if (issueC.length) Logger.log('   [C] No WO double → Work Order menghitung revisi lama, jumlah & nilai jadi lebih besar.');
   }
   Logger.log('═══════════════════════════════════════════════════════');
 
   // ── Tulis hasil ke sheet Audit_Result ────────────────────────────────────
-  _auWriteSheet(ss, issueA, issueB, {
+  _auWriteSheet(ss, issueA, issueB, issueC, {
     totalDeal: totalDeal, totalDealNilai: totalDealNilai,
     totalDenganWO: totalDenganWO, totalDenganWONilai: totalDenganWONilai,
-    issueANilai: issueANilai, issueBNilai: issueBNilai
+    issueANilai: issueANilai, issueBNilai: issueBNilai,
+    issueCCount: issueC.length
   });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _auWriteSheet(ss, issueA, issueB, summary) {
+function _auWriteSheet(ss, issueA, issueB, issueC, summary) {
   var sheetName = 'Audit_Result';
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) sheet.clearContents();
@@ -173,6 +234,7 @@ function _auWriteSheet(ss, issueA, issueB, summary) {
   rows.push(['Selisih nilai',                   '',                     '',     Math.abs(summary.totalDealNilai - summary.totalDenganWONilai)]);
   rows.push(['[A] Deal tanpa No WO',            issueA.length,          'item', summary.issueANilai]);
   rows.push(['[B] Bukan Deal tapi punya No WO', issueB.length,          'item', summary.issueBNilai]);
+  rows.push(['[C] No WO double (multi-baris)',  summary.issueCCount,    'No WO', '']);
   rows.push([]);
 
   // [A]
@@ -191,6 +253,18 @@ function _auWriteSheet(ss, issueA, issueB, summary) {
     rows.push([p.noPenawaran, p.status, p.noWO, p.namaKlien, p.namaProject, p.grandTotal, p.dibuatOleh]);
   });
   if (!issueB.length) rows.push(['(tidak ada masalah)']);
+  rows.push([]);
+
+  // [C]
+  rows.push(['[C] NO WO DOUBLE / DIPAKAI LEBIH DARI SATU PENAWARAN (' + issueC.length + ' No WO)']);
+  rows.push(['No WO','No Penawaran','Rev','Status','Klien','Project','Nilai']);
+  issueC.forEach(function(g) {
+    g.entries.forEach(function(e) {
+      rows.push([g.noWO, e.noPenawaran, e.rev, e.status, e.namaKlien, e.namaProject, e.grandTotal]);
+    });
+    rows.push(['---','---','','','','','']);
+  });
+  if (!issueC.length) rows.push(['(tidak ada masalah)']);
 
   // Pad semua baris ke 7 kolom agar setValues tidak error
   var COLS = 7;
