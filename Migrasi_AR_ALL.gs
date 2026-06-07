@@ -205,17 +205,19 @@ function _buildPenawaranIndex(ss, sheetName) {
 
   var data = sheet.getDataRange().getValues();
   // Penawaran_Main: [0]noPenawaran [1]rev [2]tgl [3]validUntil [4]namaProject [5]klienId
+  // Kolom R = index 17 = noWO
   for (var r = 1; r < data.length; r++) {
     var noPen = (data[r][0] || '').toString().trim();
     if (!noPen) continue;
-    var klienId   = (data[r][5] || '').toString().trim();
+    var klienId   = (data[r][5]  || '').toString().trim();
     var namaKlien = klienMap[klienId] || klienId;
+    var noWO      = (data[r][17] || '').toString().trim() || woMap[noPen] || '';
     index.push({
       noPenawaran: noPen,
       namaProject: (data[r][4] || '').toString().trim(),
       klienId:     klienId,
       namaKlien:   namaKlien,
-      noWO:        woMap[noPen] || ''
+      noWO:        noWO
     });
   }
   return index;
