@@ -57,8 +57,19 @@ function getWorkOrderList() {
     const data = sheet.getDataRange().getValues();
     const list = [];
 
+    // Deduplikasi: ambil revisi tertinggi per noPenawaran
+    const latestRevMap = {};
     for (let i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
+      const noPen = data[i][0].toString().trim();
+      const rev   = parseInt(data[i][1]) || 0;
+      if (!latestRevMap[noPen] || rev > latestRevMap[noPen].rev) {
+        latestRevMap[noPen] = { rev, rowIdx: i };
+      }
+    }
+
+    for (const noPen in latestRevMap) {
+      const i      = latestRevMap[noPen].rowIdx;
       const status = data[i][16] ? data[i][16].toString() : '';
       const noWO   = (data[i][17] !== '' && data[i][17] != null) ? data[i][17].toString() : '';
       if (status !== 'Deal' || !noWO) continue;
@@ -73,8 +84,8 @@ function getWorkOrderList() {
 
       list.push({
         noWO:           noWO,
-        id:             data[i][0].toString(),
-        rev:            (parseInt(data[i][1]) || 0).toString(),
+        id:             noPen,
+        rev:            latestRevMap[noPen].rev.toString(),
         tanggal:        tglStr,
         validUntil:     validStr,
         namaProject:    data[i][4].toString(),
