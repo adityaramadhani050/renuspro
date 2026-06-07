@@ -6,17 +6,20 @@
  * Nama Klien + Nama Project dengan data di Penawaran_Main.
  *
  * CARA PAKAI:
- *  1. Buka Google Apps Script project RenusPro
- *  2. Jalankan fungsi  migrasiARAll()  secara manual
- *  3. Pertama kali jalankan dengan  DRY_RUN = true  untuk preview di Log
- *  4. Jika hasil preview sudah benar, ubah  DRY_RUN = false  lalu jalankan lagi
+ *  1. Buka spreadsheet RenusPro
+ *  2. Copy sheet "AR ALL" dari spreadsheet sumber ke spreadsheet RenusPro
+ *     (klik kanan tab sheet → "Copy to" → pilih spreadsheet RenusPro)
+ *  3. Pastikan nama sheet persis sama: "AR ALL"
+ *  4. Buka Google Apps Script project RenusPro
+ *  5. Jalankan fungsi  migrasiARAll()  secara manual
+ *  6. Pertama kali jalankan dengan  DRY_RUN = true  untuk preview di Log
+ *  7. Jika hasil preview sudah benar, ubah  DRY_RUN = false  lalu jalankan lagi
  *
  * KONFIGURASI — sesuaikan sebelum menjalankan:
  */
 
 var MIGRASI_CONFIG = {
-  SOURCE_SPREADSHEET_ID: '13Ao79ds4tt-F1RH9JdOR0k2-it1ge_RP',
-  SOURCE_SHEET_NAME:     'AR ALL',
+  SOURCE_SHEET_NAME:     'AR ALL',       // nama sheet yang sudah di-copy ke spreadsheet RenusPro
   TARGET_SHEET_NAME:     'Invoice_Main',
   PENAWARAN_SHEET_NAME:  'Penawaran_Main',
   DRY_RUN:               true,   // true = preview log saja, false = tulis sungguhan
@@ -36,23 +39,18 @@ function migrasiARAll() {
   Logger.log('Mode: ' + (cfg.DRY_RUN ? 'DRY RUN (tidak ada yang ditulis)' : 'LIVE (data akan ditulis)'));
   Logger.log('═══════════════════════════════════════════════════════');
 
-  // ── Buka source spreadsheet ──────────────────────────────────────────────
-  var srcSS;
-  try {
-    srcSS = SpreadsheetApp.openById(cfg.SOURCE_SPREADSHEET_ID);
-  } catch(e) {
-    Logger.log('ERROR: Tidak bisa buka spreadsheet source. Pastikan script punya akses.\n' + e);
-    return;
-  }
+  // ── Buka spreadsheet RenusPro (satu spreadsheet untuk source & target) ───
+  var tgtSS = getSpreadsheet();
 
-  var srcSheet = srcSS.getSheetByName(cfg.SOURCE_SHEET_NAME);
+  var srcSheet = tgtSS.getSheetByName(cfg.SOURCE_SHEET_NAME);
   if (!srcSheet) {
-    Logger.log('ERROR: Sheet "' + cfg.SOURCE_SHEET_NAME + '" tidak ditemukan.');
+    Logger.log('ERROR: Sheet "' + cfg.SOURCE_SHEET_NAME + '" tidak ditemukan di spreadsheet RenusPro.');
+    Logger.log('Pastikan Anda sudah meng-copy sheet "AR ALL" ke spreadsheet RenusPro terlebih dahulu.');
+    Logger.log('Cara: buka spreadsheet AR ALL → klik kanan tab "AR ALL" → Copy to → pilih spreadsheet RenusPro.');
     return;
   }
 
-  // ── Buka target & penawaran sheet ────────────────────────────────────────
-  var tgtSS    = getSpreadsheet();
+  // ── Buka target sheet Invoice_Main ───────────────────────────────────────
   var tgtSheet = tgtSS.getSheetByName(cfg.TARGET_SHEET_NAME);
   if (!tgtSheet) { Logger.log('ERROR: Sheet "' + cfg.TARGET_SHEET_NAME + '" tidak ditemukan.'); return; }
 
