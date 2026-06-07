@@ -7,7 +7,7 @@
  *
  * NAMED RANGE yang HARUS ada di sheet Template_Kwitansi:
  *   kw_no, kw_tanggal, kw_terima_dari, kw_jumlah,
- *   kw_terbilang, kw_untuk, kw_ref_invoice
+ *   kw_terbilang, kw_untuk, kw_ref_invoice, kw_bank_account
  */
 
 function exportKwitansiDariTemplate(idKwitansi) {
@@ -38,11 +38,18 @@ function exportKwitansiDariTemplate(idKwitansi) {
     set('kw_untuk',       kw.untuk);
     set('kw_ref_invoice', kw.noInvoice);
 
+    // Isi bank account dari data invoice terkait
+    if (kw.noInvoice) {
+      const bankAccount = _getBankAccountFromInvoice(ss, kw.noInvoice);
+      set('kw_bank_account', bankAccount);
+    }
+
     SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
 
-    const safe = (s) => (s || '').toString().replace(/[\\/]/g, '-');
-    return { success: true, pdfBase64: pdfBase64, fileName: 'Kwitansi_' + safe(kw.id) + '_' + safe(kw.terimaDari) + '.pdf' };
+    const safe = (s) => (s || '').toString().replace(/\//g, '-');
+    return { success: true, pdfBase64: pdfBase64,
+      fileName: safe(kw.id) + '_' + safe(kw.untuk) + '_' + safe(kw.terimaDari) + '.pdf' };
   } catch (e) {
     Logger.log('exportKwitansiDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export kwitansi: ' + e.toString() };
@@ -72,6 +79,20 @@ function _formatTanggalKwitansi(tgl) {
   return 'Surabaya, ' + d + ' ' + bulan[m] + ' ' + y;
 }
 
+function _getBankAccountFromInvoice(ss, noInvoice) {
+  try {
+    const sheet = ss.getSheetByName('Invoice_Main');
+    if (!sheet) return '';
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === noInvoice) {
+        return data[i][19] ? data[i][19].toString() : ''; // kolom 20 = Bank Account
+      }
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+
 function _getKwitansiById(ss, idKwitansi) {
   const sheet = ss.getSheetByName('Kwitansi_Main');
   if (!sheet) return null;
@@ -89,7 +110,8 @@ function _getKwitansiById(ss, idKwitansi) {
         terimaDari: data[i][4] ? data[i][4].toString() : '',
         jumlah:     parseFloat(data[i][5]) || 0,
         untuk:      data[i][6] ? data[i][6].toString() : '',
-        metode:     data[i][7] ? data[i][7].toString() : ''
+        metode:     data[i][7] ? data[i][7].toString() : '',
+        catatan:    data[i][8] ? data[i][8].toString() : ''
       };
     }
   }

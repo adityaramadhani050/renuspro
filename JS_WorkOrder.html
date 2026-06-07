@@ -1,12 +1,23 @@
 <script>
     // ================================================================
-    // FITUR WORK ORDER
-    // Menampung seluruh penawaran berstatus Deal (punya No WO).
-    // No WO = ID utama, akan dipakai fitur Invoice & Kwitansi.
+    // FITUR WORK ORDER — Dashboard terintegrasi dengan Invoice
     // ================================================================
 
     let _cachedWorkOrderData = [];
+    let _woDetailCurrent     = null;
 
+    // ── Status badge helper ──
+    function _woBadge(status) {
+      const map = {
+        'Belum Ditagih': 'bg-slate-100 text-slate-500',
+        'Ditagih':       'bg-blue-100 text-blue-700',
+        'Lunas Sebagian':'bg-amber-100 text-amber-700',
+        'Lunas':         'bg-emerald-100 text-emerald-800'
+      };
+      return map[status] || 'bg-slate-100 text-slate-500';
+    }
+
+    // ── Render tabel ──
     function _pgRenderWorkOrder(data) {
       const tbody = document.getElementById('table-workorder');
       if (!data || data.length === 0) {
@@ -17,72 +28,326 @@
       }
       tbody.innerHTML = data.map(i => {
         const itemJson = JSON.stringify(i).replace(/'/g, "&#39;");
-        return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+        const rp = v => Math.round(v || 0).toLocaleString('id-ID');
+        const ditagihFmt = i.totalDitagihDpp > 0
+          ? `<span class="text-blue-600">Rp ${rp(i.totalDitagihDpp)}</span>`
+          : `<span class="text-slate-300">—</span>`;
+        // Aging: cari invoice belum lunas dengan aging terlama
+        const maxAging = (i.invoices || []).filter(inv => inv.statusBayar !== 'Lunas')
+          .reduce((m, inv) => { const d = typeof _agingDays === 'function' ? _agingDays(inv.tanggal) : null; return d !== null && d > m ? d : m; }, -1);
+        const agingBadgeWO = maxAging > 0 && typeof _agingBadge === 'function' ? _agingBadge(maxAging) : '';
+
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-sm cursor-pointer"
+                    onclick='bukaDetailWO(${itemJson})'>
           <td class="p-4 whitespace-nowrap">
-            <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-100">
-              <i class="fa-solid fa-clipboard-check text-[11px]"></i>${i.noWO}
-            </span>
+            <span class="inline-flex items-center bg-emerald-50 text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-100 text-sm"><i class="fa-solid fa-clipboard-check mr-1.5 text-xs"></i>${i.noWO}</span>
+            <p class="text-[11px] text-blue-600 font-semibold mt-1">${i.id} <span class="text-slate-400 font-normal">Rev${i.rev}</span></p>
+            <p class="text-[10px] text-slate-400">${i.tanggal || ''}</p>
           </td>
           <td class="p-4 max-w-[200px]">
-            <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}<span class="text-slate-400 font-normal text-[10px] ml-1">Rev${i.rev}</span></p>
-            <p class="text-[11px] text-slate-400 font-medium truncate leading-tight">${i.tanggal}</p>
+            <p class="text-[11px] text-slate-400 truncate">${i.namaKlien}</p>
+            <p class="font-semibold text-slate-700 truncate">${i.namaProject}</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">${i.dibuatOleh || ''}</p>
           </td>
-          <td class="p-4 max-w-[240px]">
-            <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.namaKlien}</p>
-            <p class="font-semibold text-slate-700 truncate leading-snug">${i.namaProject}</p>
+          <td class="p-4 text-right whitespace-nowrap">
+            <p class="font-bold text-slate-800">Rp ${rp(i.grandTotal)}</p>
+            <p class="text-[10px] text-slate-400">DPP Rp ${rp(i.nilaiKontrak)}</p>
           </td>
-          <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
-          <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
+          <td class="p-4">
+            <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+              <span>${i.invoices.length} invoice</span>
+              <span>${i.pctLunas}% lunas</span>
+            </div>
+            <div class="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+              <div class="absolute inset-y-0 left-0 bg-blue-200 rounded-full" style="width:${i.pctDitagih}%"></div>
+              <div class="absolute inset-y-0 left-0 bg-emerald-500 rounded-full" style="width:${i.pctLunas}%"></div>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">${ditagihFmt} ditagih</p>
+          </td>
           <td class="p-4 text-center">
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${_woBadge(i.paymentStatus)}">${i.paymentStatus}</span>
+            ${agingBadgeWO ? `<div class="mt-1">${agingBadgeWO}</div>` : ''}
+          </td>
+          <td class="p-4 text-center" onclick="event.stopPropagation()">
             <div class="flex items-center justify-center gap-1">
+              <button onclick='bukaDetailWO(${itemJson})'
+                class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail & Invoice">
+                <i class="fa-solid fa-magnifying-glass-chart text-xs"></i>
+              </button>
+              <button onclick='bukaModalCatatanWO(${itemJson})'
+                class="relative ${i.catatanCustomer ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="Catatan Customer">
+                <i class="fa-solid fa-comment-dots"></i>
+                ${i.catatanCustomer ? '<span class="absolute top-0.5 right-0.5 w-2 h-2 bg-amber-500 rounded-full"></span>' : ''}
+              </button>
               <button onclick='exportWorkOrderPDF(${itemJson})'
-                class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Export PDF Work Order (Internal — dengan HPP)">
+                class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Export PDF WO Internal">
                 <i class="fa-solid fa-file-arrow-down"></i>
               </button>
-              <span class="text-slate-300 p-1.5 cursor-not-allowed" title="Invoice & Kwitansi — segera hadir">
-                <i class="fa-solid fa-file-invoice text-xs"></i>
-              </span>
             </div>
           </td>
         </tr>`;
       }).join('');
     }
 
+    // ── Update summary cards ──
+    function _updateWOSummary(summary) {
+      const rp = v => 'Rp ' + Math.round(v || 0).toLocaleString('id-ID');
+      const el = id => document.getElementById(id);
+      if (!summary) return;
+      el('wo-sum-count').innerText    = summary.totalWO || 0;
+      el('wo-sum-kontrak').innerText  = rp(summary.totalKontrak);
+      el('wo-sum-ditagih').innerText  = rp(summary.totalDitagih);
+      el('wo-sum-lunas').innerText    = rp(summary.totalLunas);
+    }
+
+    // ── Load ──
     window.loadWorkOrder = function() {
       const tbody = document.getElementById('table-workorder');
-      if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500">
-          <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...
-        </td></tr>`;
-      }
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...</td></tr>`;
       if (typeof google !== 'undefined') {
-        google.script.run.withSuccessHandler(function(data) {
-          _cachedWorkOrderData = data || [];
+        google.script.run.withSuccessHandler(function(res) {
+          const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
+          _cachedWorkOrderData = data;
+          if (res && res.summary) _updateWOSummary(res.summary);
           const search = document.getElementById('search-workorder');
           if (search) search.value = '';
+          const filterEl = document.getElementById('filter-wo-status');
+          if (filterEl) filterEl.value = '';
           _pgState.workorder.data = _cachedWorkOrderData;
           _pgState.workorder.page = 1;
           _injectPgBar('workorder', '#table-workorder');
           _pgRender('workorder');
-        }).getWorkOrderList();
+        }).getWorkOrderDashboard();
       }
     };
 
     window.filterWorkOrder = function() {
-      const q = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
+      const q       = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
+      const status  = (document.getElementById('filter-wo-status') || {}).value || '';
       _pgState.workorder.data = _cachedWorkOrderData.filter(d => {
-        if (!q) return true;
-        const hay = (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase();
-        return hay.includes(q);
+        const matchQ = !q || (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase().includes(q);
+        const matchS = !status || d.paymentStatus === status;
+        return matchQ && matchS;
       });
       _pgState.workorder.page = 1;
       _pgRender('workorder');
     };
 
+    // ── Modal Detail WO ──
+    window.bukaDetailWO = function(item) {
+      _woDetailCurrent = item;
+      const rp = v => 'Rp ' + Math.round(v || 0).toLocaleString('id-ID');
+      const el = id => document.getElementById(id);
+
+      el('wo-detail-nowo').innerText    = 'WO ' + item.noWO;
+      el('wo-detail-subtitle').innerText = item.namaProject + '  ·  ' + item.namaKlien;
+      el('wo-detail-id').innerText      = item.id + ' (Rev' + item.rev + ')';
+      el('wo-detail-klien').innerText   = item.namaKlien;
+      el('wo-detail-sales').innerText   = item.dibuatOleh || '-';
+
+      const badge = el('wo-detail-status-badge');
+      badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full ' + _woBadge(item.paymentStatus);
+      badge.innerText = item.paymentStatus;
+
+      // Keuangan
+      const ditagihTotal = item.totalDitagihDpp + Math.round(item.totalDitagihDpp * (item.ppnRate || 0) / 100);
+      el('wo-fin-kontrak').innerText = rp(item.grandTotal);
+      el('wo-fin-ditagih').innerText = rp(ditagihTotal);
+      el('wo-fin-lunas').innerText   = rp(item.totalLunasTotal);
+      el('wo-fin-sisa').innerText    = rp(item.sisaDpp > 0 ? item.sisaDpp + Math.round(item.sisaDpp * (item.ppnRate||0)/100) : 0);
+      el('wo-fin-pct').innerText     = item.pctLunas + '% lunas · ' + item.pctDitagih + '% ditagih';
+      el('wo-bar-ditagih').style.width = item.pctDitagih + '%';
+      el('wo-bar-lunas').style.width   = item.pctLunas + '%';
+
+      // Invoice list
+      const invCont = el('wo-invoice-list');
+      if (!item.invoices || item.invoices.length === 0) {
+        invCont.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-xl">
+          <i class="fa-solid fa-file-invoice text-2xl mb-2 opacity-30 block"></i>
+          Belum ada invoice untuk WO ini.
+        </div>`;
+      } else {
+        invCont.innerHTML = item.invoices.map(inv => {
+          const isPaid = inv.statusBayar === 'Lunas';
+          const kwBtn  = inv.kwitansiId
+            ? `<button onclick="_exportKwDariWODetail('${inv.kwitansiId}')"
+                 class="text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="${inv.kwitansiId}">
+                 <i class="fa-solid fa-receipt"></i> Kwitansi
+               </button>`
+            : '';
+          const invJsonStr = JSON.stringify(inv).replace(/'/g, "&#39;");
+          const invPdfBtn = `<button onclick='_exportInvDariWODetail(${invJsonStr})'
+               class="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Export PDF Invoice">
+               <i class="fa-solid fa-file-invoice"></i> Invoice
+             </button>`;
+          const agingDays  = !isPaid && typeof _agingDays === 'function' ? _agingDays(inv.tanggal) : null;
+          const agingLabel = agingDays !== null && agingDays >= 0 ? (typeof _agingBadge === 'function' ? _agingBadge(agingDays) : '') : '';
+          return `<div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-4 py-3 text-xs">
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-blue-700">${inv.id}</p>
+              <p class="text-slate-400">${inv.tanggal} · ${inv.jenis}${inv.persen > 0 ? ' ' + inv.persen + '%' : ''}</p>
+              ${agingLabel ? `<div class="mt-1">${agingLabel}</div>` : ''}
+            </div>
+            <p class="font-extrabold text-slate-700 whitespace-nowrap">Rp ${Math.round(inv.total||0).toLocaleString('id-ID')}</p>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-600'}">${inv.statusBayar}</span>
+            ${invPdfBtn}
+            ${kwBtn}
+          </div>`;
+        }).join('');
+      }
+
+      // Tombol Buat Invoice — hanya untuk finance/admin
+      const btnInv = el('wo-btn-invoice');
+      const canCreateInvoice = typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin();
+      if (!canCreateInvoice) {
+        btnInv.classList.add('hidden');
+      } else if (item.sisaDpp > 0) {
+        btnInv.classList.remove('hidden', 'opacity-50', 'cursor-not-allowed');
+        btnInv.disabled = false;
+      } else {
+        btnInv.classList.remove('hidden');
+        btnInv.classList.add('opacity-50', 'cursor-not-allowed');
+        btnInv.disabled = true;
+        btnInv.title = 'Seluruh nilai kontrak sudah ditagih';
+      }
+
+      // Tombol Request Invoice — hanya untuk Sales
+      const btnReq = el('wo-btn-request-invoice');
+      const isSales = _currentUser && _currentUser.role === 'sales';
+      if (isSales && item.sisaDpp > 0) {
+        btnReq.classList.remove('hidden');
+        btnReq.classList.remove('opacity-50', 'cursor-not-allowed');
+        btnReq.disabled = false;
+      } else {
+        btnReq.classList.add('hidden');
+      }
+
+      el('modal-detail-wo').classList.remove('hidden');
+    };
+
+    window.tutupModalDetailWO = function() {
+      document.getElementById('modal-detail-wo').classList.add('hidden');
+      _woDetailCurrent = null;
+    };
+
+    function _catatanDariDetailWO() {
+      if (!_woDetailCurrent) return;
+      bukaModalCatatanWO(_woDetailCurrent);
+    }
+
+    function _pdfDariDetailWO() {
+      if (!_woDetailCurrent) return;
+      exportWorkOrderPDF(_woDetailCurrent);
+    }
+
+    function _buatInvoiceDariWO() {
+      if (!_woDetailCurrent) return;
+      const noWO = _woDetailCurrent.noWO;
+      tutupModalDetailWO();
+      navigate('invoice');
+      setTimeout(function() {
+        if (typeof bukaModalBuatInvoice === 'function') {
+          bukaModalBuatInvoice(noWO);
+        }
+      }, 300);
+    }
+
+    function _exportKwDariWODetail(kwitansiId) {
+      if (typeof exportKwitansiDariTemplate === 'undefined') {
+        // Panggil via google.script.run langsung
+        document.getElementById('preview-pdf-title').innerText = 'Kwitansi — ' + kwitansiId;
+        document.getElementById('preview-pdf-subtitle').innerText = '';
+        document.getElementById('preview-pdf-loading').classList.remove('hidden');
+        document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+        document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+        document.getElementById('modal-preview-pdf').classList.remove('hidden');
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              _activePdfBase64 = res.pdfBase64;
+              _activePdfName   = res.fileName;
+              renderPDFDariBase64(res.pdfBase64);
+            } else {
+              document.getElementById('preview-pdf-loading').innerHTML =
+                '<p class="text-rose-400 text-sm">' + res.message + '</p>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('preview-pdf-loading').innerHTML =
+              '<p class="text-rose-400 text-sm">Error: ' + (err.message || err) + '</p>';
+          })
+          .exportKwitansiDariTemplate(kwitansiId);
+      }
+    }
+
+    function _exportInvDariWODetail(inv) {
+      document.getElementById('preview-pdf-title').innerText = 'Invoice — ' + inv.id;
+      document.getElementById('preview-pdf-subtitle').innerText = '';
+      document.getElementById('preview-pdf-loading').classList.remove('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+      document.getElementById('modal-preview-pdf').classList.remove('hidden');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) {
+            _activePdfBase64 = res.pdfBase64;
+            _activePdfName   = res.fileName;
+            renderPDFDariBase64(res.pdfBase64);
+          } else {
+            document.getElementById('preview-pdf-loading').innerHTML =
+              '<p class="text-rose-400 text-sm">' + res.message + '</p>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('preview-pdf-loading').innerHTML =
+            '<p class="text-rose-400 text-sm">Error: ' + (err.message || err) + '</p>';
+        })
+        .exportInvoiceDariTemplate(inv.id);
+    }
+
     // ================================================================
-    // EXPORT PDF WORK ORDER (INTERNAL)
-    // Acuan pelaksanaan project untuk tim — memuat HPP, total HPP,
-    // dan margin per item. BUKAN dokumen untuk pelanggan.
+    // CATATAN CUSTOMER PER WORK ORDER
+    // ================================================================
+    window.bukaModalCatatanWO = function(item) {
+      document.getElementById('catatan-wo-id').value       = item.noWO;
+      document.getElementById('catatan-wo-nomor').innerText = 'WO ' + item.noWO;
+      document.getElementById('catatan-wo-project').innerText = '  ·  ' + (item.namaProject || '');
+      document.getElementById('catatan-wo-text').value     = item.catatanCustomer || '';
+      document.getElementById('modal-catatan-wo').classList.remove('hidden');
+      setTimeout(() => document.getElementById('catatan-wo-text').focus(), 50);
+    };
+
+    window.tutupModalCatatanWO = function() {
+      document.getElementById('modal-catatan-wo').classList.add('hidden');
+    };
+
+    window.kirimCatatanWO = function() {
+      const noWO    = document.getElementById('catatan-wo-id').value;
+      const catatan = document.getElementById('catatan-wo-text').value.trim();
+      const namaUser = (window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive');
+      toggleLoader(true, 'Menyimpan catatan...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res && res.success) {
+          showNotification('Catatan customer tersimpan.');
+          tutupModalCatatanWO();
+          const wo = _cachedWorkOrderData.find(w => String(w.noWO) === String(noWO));
+          if (wo) wo.catatanCustomer = catatan;
+          if (_woDetailCurrent && String(_woDetailCurrent.noWO) === String(noWO)) {
+            _woDetailCurrent.catatanCustomer = catatan;
+          }
+          _pgRender('workorder');
+        } else {
+          showNotification((res && res.message) || 'Gagal menyimpan catatan.', 'error');
+        }
+      }).withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification('Gagal: ' + (err.message || err), 'error');
+      }).simpanCatatanWO(noWO, catatan, namaUser);
+    };
+
+    // ================================================================
+    // EXPORT PDF WORK ORDER (INTERNAL — jsPDF)
     // ================================================================
     window.exportWorkOrderPDF = function(item) {
       try {
@@ -100,7 +365,6 @@
         let tc = {};            try { tc = JSON.parse(item.termConditions || '{}'); } catch (e) {}
         let kelompokList = [];  try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
 
-        // ── Header band ──
         doc.setFillColor(DARK[0], DARK[1], DARK[2]);
         doc.rect(0, 0, PW, 22, 'F');
         doc.setTextColor(255, 255, 255);
@@ -109,163 +373,176 @@
         doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
         doc.setTextColor(190, 200, 220);
         doc.text('DOKUMEN INTERNAL — ACUAN PELAKSANAAN PROJECT (RAHASIA)', ML, 17);
-
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
         doc.setTextColor(170, 195, 255);
         doc.text('NO. WORK ORDER', PW - MR, 9, { align: 'right' });
         doc.setFontSize(18); doc.setTextColor(255, 255, 255);
         doc.text(String(item.noWO), PW - MR, 17, { align: 'right' });
 
-        // ── Info dua kolom ──
         let y = 30;
-        const infoLeft = [
-          ['No Penawaran', item.id + '  (Rev ' + item.rev + ')'],
-          ['Tanggal',      item.tanggal || '-'],
-          ['Sales / PIC',  item.dibuatOleh || '-'],
-        ];
-        const infoRight = [
-          ['Klien',   item.namaKlien || '-'],
-          ['Project', item.namaProject || '-'],
-          ['Status',  item.status || 'Deal'],
-        ];
+        const infoLeft  = [['No Penawaran', item.id + '  (Rev ' + item.rev + ')'], ['Tanggal', item.tanggal || '-'], ['Sales / PIC', item.dibuatOleh || '-']];
+        const infoRight = [['Klien', item.namaKlien || '-'], ['Project', item.namaProject || '-'], ['Status', item.status || 'Deal']];
         doc.setFontSize(8);
-        infoLeft.forEach((r, i) => {
-          const yy = y + i * 5;
-          doc.setFont('helvetica', 'bold');   doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], ML, yy);
-          doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);    doc.text(': ' + r[1], ML + 26, yy);
-        });
-        infoRight.forEach((r, i) => {
-          const yy = y + i * 5;
-          doc.setFont('helvetica', 'bold');   doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], PW / 2, yy);
-          doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);    doc.text(': ' + r[1], PW / 2 + 26, yy);
-        });
+        infoLeft.forEach((r, i) => { const yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.text(r[0], ML, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0],DARK[1],DARK[2]); doc.text(': ' + r[1], ML + 26, yy); });
+        infoRight.forEach((r, i) => { const yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.text(r[0], PW / 2, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0],DARK[1],DARK[2]); doc.text(': ' + r[1], PW / 2 + 26, yy); });
         y += 18;
 
-        // ── Body tabel: header kelompok + item ──
         const body = [];
         kelompokList.forEach((k, ki) => {
           const letter = k.kelompok || String.fromCharCode(65 + ki);
-          body.push([{
-            content: letter + '. ' + (k.namaKelompok || '').toUpperCase(),
-            colSpan: 9,
-            styles: { fillColor: [226, 232, 240], textColor: DARK, fontStyle: 'bold', halign: 'left' }
-          }]);
+          body.push([{ content: letter + '. ' + (k.namaKelompok || '').toUpperCase(), colSpan: 9, styles: { fillColor: [226, 232, 240], textColor: DARK, fontStyle: 'bold', halign: 'left' } }]);
           (k.subItems || []).forEach((s, si) => {
-            const qty       = s.qty   || 0;
-            const harga     = s.harga || 0;
-            const hpp       = s.hpp   || 0;
+            const qty = s.qty||0, harga = s.harga||0, hpp = s.hpp||0;
             const totalJual = (s.total != null) ? s.total : qty * harga;
             const totalHpp  = qty * hpp;
             const margin    = totalJual > 0 ? ((totalJual - totalHpp) / totalJual * 100) : 0;
             const mColor    = margin >= 25 ? GREEN : RED;
-            body.push([
-              String(si + 1),
-              s.deskripsi || '',
-              String(qty),
-              s.unit || '',
-              rp(harga),
-              rp(hpp),
-              rp(totalJual),
-              rp(totalHpp),
-              { content: margin.toFixed(1) + '%', styles: { textColor: mColor, fontStyle: 'bold', halign: 'center' } },
-            ]);
+            body.push([String(si+1), s.deskripsi||'', String(qty), s.unit||'', rp(harga), rp(hpp), rp(totalJual), rp(totalHpp), { content: margin.toFixed(1)+'%', styles: { textColor: mColor, fontStyle: 'bold', halign: 'center' } }]);
           });
         });
 
         doc.autoTable({
           startY: y,
           head: [['No', 'Deskripsi Produk / Jasa', 'Qty', 'Unit', 'Harga Jual', 'HPP Satuan', 'Total Jual', 'Total HPP', 'Margin']],
-          body: body,
-          theme: 'grid',
+          body: body, theme: 'grid',
           margin: { left: ML, right: MR },
-          headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
-          bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
-          columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 'auto' },
-            2: { cellWidth: 14, halign: 'center' },
-            3: { cellWidth: 16, halign: 'center' },
-            4: { cellWidth: 28, halign: 'right' },
-            5: { cellWidth: 28, halign: 'right' },
-            6: { cellWidth: 30, halign: 'right' },
-            7: { cellWidth: 30, halign: 'right' },
-            8: { cellWidth: 18, halign: 'center' },
-          },
+          headStyles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 7.5, textColor: [40,40,40], lineColor: [210,215,225], lineWidth: 0.15, cellPadding: 1.6 },
+          columnStyles: { 0:{cellWidth:10,halign:'center'}, 1:{cellWidth:'auto'}, 2:{cellWidth:14,halign:'center'}, 3:{cellWidth:16,halign:'center'}, 4:{cellWidth:28,halign:'right'}, 5:{cellWidth:28,halign:'right'}, 6:{cellWidth:30,halign:'right'}, 7:{cellWidth:30,halign:'right'}, 8:{cellWidth:18,halign:'center'} },
           styles: { overflow: 'linebreak' },
+          didParseCell: function(data) {
+            if (data.column.index === 5 || data.column.index === 7) {
+              if (data.section === 'head') { data.cell.styles.fillColor = [153,27,27]; data.cell.styles.textColor = [255,255,255]; }
+              else if (data.section === 'body') { data.cell.styles.fillColor = [254,235,235]; data.cell.styles.textColor = [190,30,30]; data.cell.styles.fontStyle = 'bold'; }
+            }
+          },
         });
 
         let curY = doc.lastAutoTable.finalY + 5;
-
-        // ── Ringkasan finansial (kanan) ──
-        const netSub      = (item.subtotal || 0) - (item.diskon || 0);
-        const totalHppAll = item.hpp || 0;
-        const profit      = (item.profit != null) ? item.profit : (netSub - totalHppAll);
-        const marginAll   = (item.marginPersen != null && item.marginPersen !== 0)
-          ? item.marginPersen
-          : (netSub > 0 ? (profit / netSub * 100) : 0);
+        const netSub    = (item.subtotal||0) - (item.diskon||0);
+        // Fallback: hitung dari items JSON jika kolom hpp belum tersimpan (data lama/migrasi)
+        let totalHppAll = item.hpp || 0;
+        if (!totalHppAll) {
+          try {
+            JSON.parse(item.items || '[]').forEach(function(k) {
+              (k.subItems || []).forEach(function(s) { totalHppAll += (s.qty||0) * (s.hpp||0); });
+            });
+          } catch(e) {}
+        }
+        const profit    = (item.profit != null && item.profit !== 0) ? item.profit : (netSub - totalHppAll);
+        const marginAll = (item.marginPersen != null && item.marginPersen !== 0) ? item.marginPersen : (netSub > 0 ? (profit / netSub * 100) : 0);
 
         const sumLines = [];
-        sumLines.push(['Subtotal (Jual)', 'Rp ' + rp(item.subtotal || 0), false, DARK]);
-        if ((item.diskon || 0) > 0) sumLines.push(['Diskon', '- Rp ' + rp(item.diskon), false, RED]);
-        if ((item.pajak || 0) > 0) {
-          const pct = netSub > 0 ? Math.round(item.pajak / netSub * 100) : 11;
-          sumLines.push(['PPN ' + pct + '%', 'Rp ' + rp(item.pajak), false, DARK]);
-        }
-        sumLines.push(['GRAND TOTAL',     'Rp ' + rp(item.grandTotal || 0), true,  BLUE]);
-        sumLines.push(['Total HPP',       'Rp ' + rp(totalHppAll),          false, RED]);
-        sumLines.push(['Estimasi Profit', 'Rp ' + rp(profit),               true,  GREEN]);
-        sumLines.push(['Margin',          Number(marginAll).toFixed(1) + '%', true, GREEN]);
+        sumLines.push(['Subtotal (Jual)', 'Rp ' + rp(item.subtotal||0), false, DARK]);
+        if ((item.diskon||0) > 0) sumLines.push(['Diskon', '- Rp ' + rp(item.diskon), false, RED]);
+        if ((item.pajak||0) > 0) { const pct = netSub > 0 ? Math.round(item.pajak/netSub*100) : 11; sumLines.push(['PPN ' + pct + '%', 'Rp ' + rp(item.pajak), false, DARK]); }
+        sumLines.push(['GRAND TOTAL', 'Rp ' + rp(item.grandTotal||0), true, BLUE]);
+        sumLines.push(['Total HPP', 'Rp ' + rp(totalHppAll), false, RED]);
+        sumLines.push(['Estimasi Profit', 'Rp ' + rp(profit), true, GREEN]);
+        sumLines.push(['Margin', Number(marginAll).toFixed(1) + '%', true, GREEN]);
 
         const boxW = 90, boxX = PW - MR - boxW, rowH = 6;
         if (curY + sumLines.length * rowH > PH - 14) { doc.addPage(); curY = 20; }
-
-        doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2);
+        doc.setDrawColor(210,215,230); doc.setLineWidth(0.2);
         doc.rect(boxX, curY, boxW, sumLines.length * rowH);
         sumLines.forEach((r, i) => {
           const ry = curY + i * rowH;
-          if (r[2]) { doc.setFillColor(245, 247, 250); doc.rect(boxX, ry, boxW, rowH, 'F'); }
-          doc.setFontSize(8);
-          doc.setFont('helvetica', r[2] ? 'bold' : 'normal');
-          doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
-          doc.text(r[0], boxX + 3, ry + 4);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(r[3][0], r[3][1], r[3][2]);
+          if (r[2]) { doc.setFillColor(245,247,250); doc.rect(boxX, ry, boxW, rowH, 'F'); }
+          doc.setFontSize(8); doc.setFont('helvetica', r[2] ? 'bold' : 'normal');
+          doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.text(r[0], boxX + 3, ry + 4);
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(r[3][0],r[3][1],r[3][2]);
           doc.text(r[1], boxX + boxW - 3, ry + 4, { align: 'right' });
         });
 
-        // ── Catatan project (kiri) — info pelaksanaan untuk tim ──
-        const tcPairs = [
-          ['Material',       tc.material_status],
-          ['Delivery Time',  tc.delivery_time],
-          ['Delivery Cond.', tc.delivery_cond],
-          ['Warranty',       tc.warranty],
-          ['Bonus',          tc.bonus],
-        ].filter(p => p[1]);
+        const tcPairs = [['Material', tc.material_status], ['Delivery Time', tc.delivery_time], ['Delivery Cond.', tc.delivery_cond], ['Warranty', tc.warranty], ['Bonus', tc.bonus]].filter(p => p[1]);
         const catatan = tc.catatan || '';
-
         let ly = curY;
         if (tcPairs.length || catatan) {
-          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0],DARK[1],DARK[2]);
           doc.text('Catatan Project:', ML, ly + 4); ly += 9;
-          doc.setFont('helvetica', 'normal'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'normal'); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.setFontSize(7.5);
           tcPairs.forEach(p => { doc.text('• ' + p[0] + ': ' + p[1], ML, ly); ly += 4.5; });
-          if (catatan) {
-            const lines = doc.splitTextToSize(catatan, boxX - ML - 6);
-            doc.text(lines, ML, ly);
-          }
+          if (catatan) { const lines = doc.splitTextToSize(catatan, boxX - ML - 6); doc.text(lines, ML, ly); ly += lines.length * 4.5; }
         }
 
-        // ── Footer ──
-        doc.setFontSize(7); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+        const catatanCust = (item.catatanCustomer || '').trim();
+        if (catatanCust) {
+          const AMBER_BG = [255,247,224], AMBER_LINE = [217,119,6];
+          const boxCW = boxX - ML - 4;
+          const custLines = doc.splitTextToSize(catatanCust, boxCW - 8);
+          const headH = 6, bodyH = custLines.length * 4.2 + 4;
+          let cy = ly + 4;
+          if (cy + headH + bodyH > PH - 12) { doc.addPage(); cy = 20; }
+          doc.setFillColor(AMBER_BG[0],AMBER_BG[1],AMBER_BG[2]); doc.setDrawColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.setLineWidth(0.3);
+          doc.rect(ML, cy, boxCW, headH + bodyH, 'FD');
+          doc.setFillColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.rect(ML, cy, 1.5, headH + bodyH, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(146,64,14);
+          doc.text('CATATAN DARI CUSTOMER', ML + 5, cy + 4.2);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(60,50,40);
+          doc.text(custLines, ML + 5, cy + headH + 2);
+        }
+
+        doc.setFontSize(7); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
         doc.text('Dokumen internal PT. Renus Global Indonesia — dilarang diberikan ke pelanggan.', ML, PH - 8);
 
-        const fname = 'WO_' + String(item.noWO) + '_' +
-          (item.namaProject || '').replace(/[\\/]/g, '-') + '.pdf';
+        const fname = 'WO_' + String(item.noWO) + '_' + (item.namaProject || '').replace(/[\\/]/g, '-') + '.pdf';
         doc.save(fname);
         showNotification('PDF Work Order diunduh: ' + fname);
       } catch (err) {
         console.error(err);
         showNotification('Gagal membuat PDF Work Order: ' + (err.message || err), 'error');
       }
+    };
+
+    // ================================================================
+    // REQUEST INVOICE (Sales)
+    // ================================================================
+    function _requestInvoiceDariWO() {
+      if (!_woDetailCurrent) return;
+      document.getElementById('req-inv-nowo').value   = _woDetailCurrent.noWO;
+      document.getElementById('req-inv-pesan').value  = '';
+      document.getElementById('req-inv-subtitle').innerText =
+        'WO ' + _woDetailCurrent.noWO + '  ·  ' + _woDetailCurrent.namaProject;
+      document.getElementById('modal-request-invoice').classList.remove('hidden');
+      setTimeout(function() { document.getElementById('req-inv-pesan').focus(); }, 50);
+    }
+
+    window.tutupModalRequestInvoice = function() {
+      document.getElementById('modal-request-invoice').classList.add('hidden');
+    };
+
+    window.kirimRequestInvoice = function() {
+      if (!_woDetailCurrent) return;
+      const pesan  = (document.getElementById('req-inv-pesan').value || '').trim();
+      const sales  = window._getCurrentUserNama ? window._getCurrentUserNama() : (_currentUser && _currentUser.nama) || 'Sales';
+      const btn    = document.getElementById('req-inv-submit-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Request';
+          tutupModalRequestInvoice();
+          tutupModalDetailWO();
+          if (r && r.success) {
+            showNotification('Request invoice berhasil dikirim ke Finance!');
+          } else {
+            showNotification((r && r.message) || 'Gagal mengirim request.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Request';
+          showNotification('Gagal: ' + (err.message || err), 'error');
+        })
+        .requestInvoice({
+          noWO:        _woDetailCurrent.noWO,
+          namaKlien:   _woDetailCurrent.namaKlien,
+          namaProject: _woDetailCurrent.namaProject,
+          sales:       sales,
+          pesan:       pesan
+        });
     };
 </script>

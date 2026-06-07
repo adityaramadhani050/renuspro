@@ -39,6 +39,19 @@ function togglePwVisibilityLight(inputId, btn) {
   togglePwVisibility(inputId, btn);
 }
 
+// ── Role config: nav items yang boleh dilihat per role ───────────────────
+const _ROLE_NAV = {
+  admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings'],
+  finance: ['workorder','invoice','kwitansi','laporanfinance'],
+  sales:   ['penawaran','workorder','produk','template','customer']
+};
+const _ROLE_BADGE = {
+  admin:   'bg-blue-100 text-blue-700',
+  finance: 'bg-violet-100 text-violet-700',
+  sales:   'bg-emerald-100 text-emerald-700'
+};
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES' };
+
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
   const nameEl   = document.getElementById('active-user-name');
@@ -49,17 +62,20 @@ function _renderUserSidebar(user) {
   nameEl.innerText   = user.nama;
   avatarEl.innerText = user.nama.charAt(0).toUpperCase();
 
-  const isAdmin = user.role === 'admin';
+  const role = (user.role || 'sales').toLowerCase();
+  const badgeCls = _ROLE_BADGE[role] || _ROLE_BADGE.sales;
+  const badgeLabel = _ROLE_LABEL[role] || role.toUpperCase();
   roleEl.innerHTML = `
     <span class="h-1.5 w-1.5 inline-block rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
-    <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md
-      ${isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
-      ${isAdmin ? 'ADMIN' : 'SALES'}
-    </span>`;
+    <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${badgeCls}">${badgeLabel}</span>`;
 
-  // Tampilkan/sembunyikan nav Users sesuai role
-  const navUsers = document.getElementById('nav-users');
-  if (navUsers) navUsers.classList.toggle('hidden', !isAdmin);
+  // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
+  const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings']
+    .forEach(function(page) {
+      const el = document.getElementById('nav-' + page);
+      if (el) el.classList.toggle('hidden', !allowed.includes(page));
+    });
 }
 
 // ── doLogin ───────────────────────────────────────────────────────────────
@@ -129,11 +145,22 @@ function doLogin() {
         { id:'U002', nama:'Sales Executive', username:'sales1', role:'sales' },
         'Login berhasil (dev mode)'
       );
+    } else if (username === 'finance1' && password === 'finance123') {
+      _onLoginSuccess(
+        { id:'U003', nama:'Finance Officer', username:'finance1', role:'finance' },
+        'Login berhasil (dev mode)'
+      );
     } else {
       errMsg.innerText = 'Username atau password salah.';
       errBox.classList.add('show');
     }
   }
+}
+
+// ── Halaman awal sesuai role ──────────────────────────────────────────────
+function _defaultPage(user) {
+  const allowed = _ROLE_NAV[(user && user.role) || 'sales'] || _ROLE_NAV.sales;
+  return allowed[0] || 'dashboard';
 }
 
 // ── Setelah login berhasil ────────────────────────────────────────────────
@@ -144,7 +171,7 @@ function _onLoginSuccess(user, message) {
   _renderUserSidebar(user);
   showNotification(message || ('Selamat datang, ' + user.nama + '!'));
   muatSeluruhDataAwal(true);
-  navigate('dashboard');
+  navigate(_defaultPage(user));
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────
@@ -179,7 +206,7 @@ window.onload = function() {
     document.getElementById('login-screen').classList.add('hidden');
     _renderUserSidebar(_currentUser);
     muatSeluruhDataAwal(true);
-    navigate('dashboard');
+    navigate(_defaultPage(_currentUser));
   }
 };
 
@@ -256,8 +283,8 @@ function _renderTabelUsers(data) {
       <td class="p-4 font-mono text-slate-600 text-sm">${u.username}</td>
       <td class="p-4 text-center">
         <span class="text-xs font-extrabold px-2 py-1 rounded-lg
-          ${u.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
-          ${u.role.toUpperCase()}
+          ${(_ROLE_BADGE[u.role] || _ROLE_BADGE.sales)}">
+          ${(_ROLE_LABEL[u.role] || u.role.toUpperCase())}
         </span>
       </td>
       <td class="p-4 text-center">
@@ -297,6 +324,7 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-username').value  = '';
   document.getElementById('modal-user-password').value  = '';
   document.getElementById('modal-user-role').value      = 'sales';
+  document.getElementById('modal-user-target').value    = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
   document.getElementById('modal-user').classList.remove('hidden');
@@ -312,6 +340,7 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-pw-hint').style.display = '';
   document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
   document.getElementById('modal-user-aktif').checked         = u.aktif;
+  document.getElementById('modal-user-target').value          = u.targetBulanan || '';
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -326,6 +355,7 @@ function simpanUserModal() {
   const password = document.getElementById('modal-user-password').value.trim();
   const role     = document.getElementById('modal-user-role').value;
   const aktif    = document.getElementById('modal-user-aktif').checked;
+  const target   = parseFloat(document.getElementById('modal-user-target').value) || 0;
 
   if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
   if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
@@ -336,7 +366,7 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif]
+      ? [id, nama, username, password, role, aktif, target]
       : [nama, username, password, role];
 
     google.script.run

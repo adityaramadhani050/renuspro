@@ -1,31 +1,59 @@
       <section id="page-workorder" class="page-section">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+
+        <!-- ── Header ── -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
           <div>
             <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Work Order</h2>
-            <p class="text-sm text-slate-400 font-medium mt-0.5">
-              Seluruh penawaran berstatus <span class="font-bold text-emerald-600">Deal</span> beserta nomor WO-nya.
-            </p>
           </div>
-          <div class="relative flex-1 sm:flex-none sm:w-64 w-full">
-            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-            <input type="text" id="search-workorder" oninput="filterWorkOrder()"
-              placeholder="Cari No WO, penawaran, klien..."
-              class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
-                    focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-60">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-workorder" oninput="filterWorkOrder()"
+                placeholder="Cari No WO, penawaran, klien..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+            </div>
+            <select id="filter-wo-status" onchange="filterWorkOrder()"
+              class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+              <option value="">Semua Status</option>
+              <option value="Belum Ditagih">Belum Ditagih</option>
+              <option value="Ditagih">Ditagih</option>
+              <option value="Lunas Sebagian">Lunas Sebagian</option>
+              <option value="Lunas">Lunas</option>
+            </select>
           </div>
         </div>
 
-        <!-- Tabel Work Order -->
+        <!-- ── Summary Cards ── -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Total WO Aktif</p>
+            <p id="wo-sum-count" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Total Nilai Kontrak</p>
+            <p id="wo-sum-kontrak" class="text-lg font-extrabold text-slate-800 leading-tight">—</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 bg-blue-50/40">
+            <p class="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Total Ditagih</p>
+            <p id="wo-sum-ditagih" class="text-lg font-extrabold text-blue-700 leading-tight">—</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm p-4 bg-emerald-50/40">
+            <p class="text-xs text-emerald-600 font-semibold uppercase tracking-wider mb-1">Total Lunas</p>
+            <p id="wo-sum-lunas" class="text-lg font-extrabold text-emerald-700 leading-tight">—</p>
+          </div>
+        </div>
+
+        <!-- ── Tabel Work Order ── -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th class="p-4">No WO</th>
-                  <th class="p-4">No Penawaran</th>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-widerr">
+                  <th class="p-4">No WO / Penawaran</th>
                   <th class="p-4">Klien / Project</th>
-                  <th class="p-4">Sales</th>
-                  <th class="p-4 text-right">Grand Total</th>
+                  <th class="p-4 text-right">Nilai Kontrak</th>
+                  <th class="p-4" style="min-width:180px">Progress Pembayaran</th>
+                  <th class="p-4 text-center">Status</th>
                   <th class="p-4 text-center">Aksi</th>
                 </tr>
               </thead>
@@ -37,4 +65,192 @@
             </table>
           </div>
         </div>
+
+        <!-- ── Modal Detail WO ── -->
+        <div id="modal-detail-wo" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
+
+            <!-- Header modal -->
+            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <div class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                <i class="fa-solid fa-clipboard-check"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 id="wo-detail-nowo" class="text-base font-extrabold text-slate-800"></h3>
+                  <span id="wo-detail-status-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-full"></span>
+                </div>
+                <p id="wo-detail-subtitle" class="text-xs text-slate-400 mt-0.5 truncate"></p>
+              </div>
+              <button onclick="tutupModalDetailWO()" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body modal -->
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+              <!-- Info WO -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">No Penawaran</p>
+                  <p id="wo-detail-id" class="font-bold text-blue-700"></p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Klien</p>
+                  <p id="wo-detail-klien" class="font-bold text-slate-700"></p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Sales / PIC</p>
+                  <p id="wo-detail-sales" class="font-bold text-slate-700"></p>
+                </div>
+              </div>
+
+              <!-- Ringkasan Keuangan -->
+              <div>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ringkasan Keuangan</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div class="bg-slate-50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-slate-400 uppercase font-semibold mb-1">Nilai Kontrak</p>
+                    <p id="wo-fin-kontrak" class="text-sm font-extrabold text-slate-800"></p>
+                  </div>
+                  <div class="bg-blue-50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-blue-500 uppercase font-semibold mb-1">Ditagih</p>
+                    <p id="wo-fin-ditagih" class="text-sm font-extrabold text-blue-700"></p>
+                  </div>
+                  <div class="bg-emerald-50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-emerald-600 uppercase font-semibold mb-1">Lunas</p>
+                    <p id="wo-fin-lunas" class="text-sm font-extrabold text-emerald-700"></p>
+                  </div>
+                  <div class="bg-amber-50 rounded-xl p-3 text-center">
+                    <p class="text-[10px] text-amber-600 uppercase font-semibold mb-1">Sisa Tagih</p>
+                    <p id="wo-fin-sisa" class="text-sm font-extrabold text-amber-700"></p>
+                  </div>
+                </div>
+                <!-- Progress bar -->
+                <div class="mt-3">
+                  <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                    <span>Progress Penagihan</span>
+                    <span id="wo-fin-pct"></span>
+                  </div>
+                  <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full relative">
+                      <div id="wo-bar-ditagih" class="absolute inset-y-0 left-0 bg-blue-300 rounded-full transition-all duration-500"></div>
+                      <div id="wo-bar-lunas" class="absolute inset-y-0 left-0 bg-emerald-500 rounded-full transition-all duration-500"></div>
+                    </div>
+                  </div>
+                  <div class="flex gap-4 mt-1.5 text-[10px] text-slate-400">
+                    <span><span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>Lunas</span>
+                    <span><span class="inline-block w-2 h-2 rounded-full bg-blue-300 mr-1"></span>Ditagih</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Daftar Invoice -->
+              <div>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Daftar Invoice</p>
+                <div id="wo-invoice-list" class="space-y-2"></div>
+              </div>
+
+            </div>
+
+            <!-- Footer modal -->
+            <div class="flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <div class="flex gap-2">
+                <button id="wo-btn-catatan" onclick="_catatanDariDetailWO()"
+                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-comment-dots"></i> Catatan
+                </button>
+                <button id="wo-btn-pdf" onclick="_pdfDariDetailWO()"
+                  class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-file-arrow-down"></i> WO PDF
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <!-- Sales only: request invoice -->
+                <button id="wo-btn-request-invoice" onclick="_requestInvoiceDariWO()"
+                  class="hidden px-5 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-paper-plane"></i> Request Invoice
+                </button>
+                <!-- Finance/Admin only: buat invoice -->
+                <button id="wo-btn-invoice" onclick="_buatInvoiceDariWO()"
+                  class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-plus"></i> Buat Invoice
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Catatan Customer (existing) -->
+        <div id="modal-catatan-wo" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-comment-dots text-amber-500"></i>
+                <h3 class="text-lg font-extrabold text-slate-800">Catatan Customer</h3>
+              </div>
+              <button onclick="tutupModalCatatanWO()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="p-6">
+              <div class="mb-3 text-sm">
+                <span class="font-bold text-emerald-700" id="catatan-wo-nomor"></span>
+                <span class="text-slate-400" id="catatan-wo-project"></span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2">Catatan / request / komunikasi dari customer untuk tim project.</p>
+              <textarea id="catatan-wo-text" rows="6"
+                placeholder="Contoh: Customer meminta panel dipasang menghadap timur..."
+                class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 resize-none"></textarea>
+              <input type="hidden" id="catatan-wo-id">
+            </div>
+            <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button onclick="tutupModalCatatanWO()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
+              <button onclick="kirimCatatanWO()" class="px-5 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Catatan
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Request Invoice (Sales) -->
+        <div id="modal-request-invoice" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <span class="bg-violet-100 text-violet-600 h-8 w-8 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-paper-plane text-sm"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-800">Request Buat Invoice</h3>
+                <p id="req-inv-subtitle" class="text-xs text-slate-400 truncate"></p>
+              </div>
+              <button onclick="tutupModalRequestInvoice()" class="ml-auto w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="p-6 space-y-4">
+              <div class="bg-violet-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-700">
+                <i class="fa-solid fa-circle-info mr-1"></i>
+                Request ini akan dikirim ke tim Finance beserta notifikasi WhatsApp untuk segera diproses.
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pesan / Catatan untuk Finance</label>
+                <textarea id="req-inv-pesan" rows="4"
+                  placeholder="Contoh: Mohon segera dibuatkan invoice DP 50% untuk proyek ini..."
+                  class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none"></textarea>
+                <p class="text-[11px] text-slate-400 mt-1">Opsional — boleh dikosongkan jika tidak ada pesan khusus.</p>
+              </div>
+              <input type="hidden" id="req-inv-nowo">
+            </div>
+            <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button onclick="tutupModalRequestInvoice()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
+              <button onclick="kirimRequestInvoice()" id="req-inv-submit-btn"
+                class="px-5 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i> Kirim Request
+              </button>
+            </div>
+          </div>
+        </div>
+
       </section>

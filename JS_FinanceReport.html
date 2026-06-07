@@ -1,0 +1,314 @@
+<script>
+// ================================================================
+//  LAPORAN FINANCE — JavaScript
+// ================================================================
+
+var _frData = null;
+
+window.loadFinanceReport = function() {
+  document.getElementById('fr-loading').classList.remove('hidden');
+  document.getElementById('fr-content').classList.add('hidden');
+  google.script.run
+    .withSuccessHandler(_frRender)
+    .withFailureHandler(function(e) {
+      document.getElementById('fr-loading').classList.add('hidden');
+      showNotification('Gagal memuat data laporan: ' + e.message, 'error');
+    })
+    .getFinanceReportData();
+};
+
+function _frFmt(n) {
+  if (!n) return 'Rp 0';
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+
+function _frRender(data) {
+  document.getElementById('fr-loading').classList.add('hidden');
+  if (!data || !data.success) {
+    showNotification('Gagal memuat laporan keuangan.', 'error');
+    return;
+  }
+  _frData = data;
+
+  var s = data.summary;
+  var pct = s.totalTagihan > 0 ? Math.round(s.totalTerbayar / s.totalTagihan * 100) : 0;
+
+  // KPI
+  document.getElementById('fr-kpi-tagihan').textContent     = _frFmt(s.totalTagihan);
+  document.getElementById('fr-kpi-terbayar').textContent    = _frFmt(s.totalTerbayar);
+  document.getElementById('fr-kpi-outstanding').textContent = _frFmt(s.totalOutstanding);
+  document.getElementById('fr-kpi-pct').textContent         = pct + '%';
+  document.getElementById('fr-collect-bar').style.width     = Math.min(pct, 100) + '%';
+
+  // Aging
+  var ag = s.aging || {};
+  document.getElementById('fr-aging-0').textContent  = _frFmt(ag.current || 0);
+  document.getElementById('fr-aging-30').textContent = _frFmt(ag.gte30 || 0);
+  document.getElementById('fr-aging-60').textContent = _frFmt(ag.gte60 || 0);
+  document.getElementById('fr-aging-90').textContent = _frFmt(ag.gte90 || 0);
+
+  // Table
+  _frRenderTable(data.rows || []);
+
+  document.getElementById('fr-content').classList.remove('hidden');
+}
+
+function _frRenderTable(rows) {
+  var tbody = document.getElementById('fr-table-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada data Work Order Deal.</td></tr>';
+    return;
+  }
+
+  var html = '';
+  rows.forEach(function(row, idx) {
+    var lunasSemua = row.tagihan > 0 && row.outstanding <= 0;
+    var belumAda   = row.invoices.length === 0;
+    var statusHtml = belumAda
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Belum Ada Invoice</span>'
+      : lunasSemua
+        ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check text-[9px]"></i> Lunas</span>'
+        : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i class="fa-solid fa-clock text-[9px]"></i> Outstanding</span>';
+
+    var invCount = row.invoices.length;
+    var isPredeal = row.isPredeal ? ' <span class="text-[9px] font-bold bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full ml-1">Pre-Deal</span>' : '';
+
+    html += '<tr class="hover:bg-slate-50 transition">';
+    if (row.noWO) {
+      html += '<td class="px-4 py-3 text-xs whitespace-nowrap">'
+            + '<p class="font-bold text-slate-700">WO-' + row.noWO + '</p>'
+            + '<p class="text-[11px] text-slate-400">' + row.noPenawaran + '</p>'
+            + isPredeal + '</td>';
+    } else {
+      html += '<td class="px-4 py-3 text-xs whitespace-nowrap">'
+            + '<p class="font-bold text-slate-700">' + row.noPenawaran + '</p>'
+            + isPredeal + '</td>';
+    }
+    html += '<td class="px-4 py-3"><p class="font-semibold text-slate-800 text-xs leading-tight">' + (row.namaKlien || '—') + '</p>'
+          + '<p class="text-[11px] text-slate-400 truncate max-w-[200px]">' + (row.namaProject || '—') + '</p></td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-medium text-slate-600 whitespace-nowrap">' + (row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—') + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-bold text-slate-700 whitespace-nowrap">' + (row.tagihan ? _frFmt(row.tagihan) : '—') + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-bold text-emerald-600 whitespace-nowrap">' + (row.terbayar ? _frFmt(row.terbayar) : '—') + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-bold whitespace-nowrap ' + (row.outstanding > 0 ? 'text-rose-600' : 'text-slate-400') + '">'
+          + (row.outstanding > 0 ? _frFmt(row.outstanding) : '—') + '</td>';
+    html += '<td class="px-4 py-3 text-center">' + statusHtml + '</td>';
+    html += '<td class="px-4 py-3 text-center">';
+    if (invCount > 0) {
+      html += '<button onclick="_frToggleInv(' + idx + ')" id="fr-inv-btn-' + idx + '"'
+            + ' class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 mx-auto">'
+            + '<i id="fr-inv-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[9px] transition-transform duration-200"></i>'
+            + ' ' + invCount + ' invoice</button>';
+    } else {
+      html += '<span class="text-[11px] text-slate-300">—</span>';
+    }
+    html += '</td></tr>';
+
+    // Sub-rows: detail invoice (hidden by default)
+    if (invCount > 0) {
+      html += '<tr id="fr-inv-detail-' + idx + '" class="hidden">';
+      html += '<td colspan="8" class="px-4 pb-3 pt-0 bg-slate-50/70">';
+      html += '<div class="rounded-xl border border-slate-200 overflow-hidden mt-1">';
+      html += '<table class="w-full text-left text-[11px]">';
+      html += '<thead class="bg-slate-100 border-b border-slate-200"><tr>'
+            + '<th class="px-3 py-2 font-bold text-slate-500">No Invoice</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500">Tgl Invoice</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500">Jenis</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500 text-right">DPP</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500 text-right">PPN</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500 text-right">Total</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500 text-center">Status</th>'
+            + '<th class="px-3 py-2 font-bold text-slate-500 text-center">Tgl Bayar</th>'
+            + '</tr></thead><tbody class="divide-y divide-slate-100">';
+
+      row.invoices.forEach(function(inv) {
+        var stBadge = inv.status === 'Lunas'
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">Lunas</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">Belum Lunas</span>';
+        html += '<tr class="hover:bg-white transition">'
+              + '<td class="px-3 py-2 font-bold text-slate-700">' + inv.noInv + '</td>'
+              + '<td class="px-3 py-2 text-slate-500">' + (inv.tgl || '—') + '</td>'
+              + '<td class="px-3 py-2 text-slate-600">' + (inv.jenis || '—') + '</td>'
+              + '<td class="px-3 py-2 text-right text-slate-700">' + _frFmt(inv.dpp) + '</td>'
+              + '<td class="px-3 py-2 text-right text-slate-500">' + (inv.ppnPct ? inv.ppnPct + '%' : '—') + '</td>'
+              + '<td class="px-3 py-2 text-right font-bold text-slate-800">' + _frFmt(inv.total) + '</td>'
+              + '<td class="px-3 py-2 text-center">' + stBadge + '</td>'
+              + '<td class="px-3 py-2 text-center text-slate-500">' + (inv.tglBayar || '—') + '</td>'
+              + '</tr>';
+      });
+
+      html += '</tbody></table></div></td></tr>';
+    }
+  });
+
+  tbody.innerHTML = html;
+}
+
+function _frToggleInv(idx) {
+  var detail = document.getElementById('fr-inv-detail-' + idx);
+  var chevron = document.getElementById('fr-inv-chevron-' + idx);
+  if (!detail) return;
+  var hidden = detail.classList.toggle('hidden');
+  if (chevron) chevron.style.transform = hidden ? '' : 'rotate(180deg)';
+}
+
+// ── Export PDF ───────────────────────────────────────────────────────────────
+window.exportFinanceReportPDF = function() {
+  if (!_frData) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
+  var data = _frData;
+  var s = data.summary;
+  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  var W = doc.internal.pageSize.getWidth();
+  var margin = 14;
+  var y = margin;
+
+  // Header
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.text('LAPORAN PROGRESS PEMBAYARAN', margin, y);
+  y += 6;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+  doc.text('PT. RENUS GLOBAL INDONESIA', margin, y);
+  y += 4;
+  var tglCetak = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  doc.text('Dicetak: ' + tglCetak, margin, y);
+  doc.setTextColor(0);
+  y += 6;
+
+  // KPI summary box
+  doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, W - 2 * margin, 22, 2, 2);
+  var colW = (W - 2 * margin) / 3;
+  var kpiItems = [
+    { label: 'Total Tagihan', val: _frFmt(s.totalTagihan) },
+    { label: 'Terbayar', val: _frFmt(s.totalTerbayar) },
+    { label: 'Outstanding', val: _frFmt(s.totalOutstanding) }
+  ];
+  kpiItems.forEach(function(k, i) {
+    var cx = margin + i * colW + colW / 2;
+    doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
+    doc.text(k.label.toUpperCase(), cx, y + 6, { align: 'center' });
+    doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30);
+    doc.text(k.val, cx, y + 13, { align: 'center' });
+  });
+  y += 28;
+
+  // Aging
+  doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
+  doc.text('AGING OUTSTANDING (INVOICE BELUM LUNAS)', margin, y);
+  y += 4;
+  var ag = s.aging || {};
+  var agingData = [
+    ['< 30 Hari', _frFmt(ag.current || 0)],
+    ['30–59 Hari', _frFmt(ag.gte30 || 0)],
+    ['60–89 Hari', _frFmt(ag.gte60 || 0)],
+    ['≥ 90 Hari', _frFmt(ag.gte90 || 0)]
+  ];
+  doc.autoTable({
+    startY: y,
+    head: [['Bucket', 'Nilai Outstanding']],
+    body: agingData,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'right' } },
+    margin: { left: margin, right: margin },
+    tableWidth: 80
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // Per-WO table
+  doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
+  doc.text('PROGRESS PEMBAYARAN PER WORK ORDER', margin, y);
+  y += 3;
+
+  var woHead = [['No WO / Ref', 'Klien', 'Project', 'Nilai Kontrak', 'Total Ditagih', 'Terbayar', 'Outstanding', 'Status']];
+  var woBody = (data.rows || []).map(function(row) {
+    var st = row.invoices.length === 0 ? 'Belum Ada Invoice'
+           : row.outstanding <= 0 ? 'Lunas' : 'Outstanding';
+    return [
+      row.noWO ? ('WO-' + row.noWO + '\n' + row.noPenawaran) : row.noPenawaran,
+      row.namaKlien || '—',
+      row.namaProject || '—',
+      row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—',
+      row.tagihan ? _frFmt(row.tagihan) : '—',
+      row.terbayar ? _frFmt(row.terbayar) : '—',
+      row.outstanding > 0 ? _frFmt(row.outstanding) : '—',
+      st
+    ];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: woHead,
+    body: woBody,
+    theme: 'striped',
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      3: { halign: 'right' }, 4: { halign: 'right' },
+      5: { halign: 'right' }, 6: { halign: 'right' },
+      7: { halign: 'center' }
+    },
+    margin: { left: margin, right: margin },
+    didParseCell: function(data) {
+      if (data.section === 'body' && data.column.index === 7) {
+        var val = data.cell.raw;
+        if (val === 'Lunas') data.cell.styles.textColor = [5, 150, 105];
+        else if (val === 'Outstanding') data.cell.styles.textColor = [220, 38, 38];
+        else data.cell.styles.textColor = [100, 116, 139];
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // Per-WO invoice detail
+  (data.rows || []).forEach(function(row) {
+    if (!row.invoices.length) return;
+    if (y > 250) { doc.addPage(); y = margin; }
+
+    var ref = row.noWO ? ('WO-' + row.noWO + ' | ' + row.noPenawaran) : row.noPenawaran;
+    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
+    doc.text('Detail Invoice — ' + ref + ' | ' + (row.namaKlien || '') + ' | ' + (row.namaProject || ''), margin, y);
+    y += 3;
+
+    var invHead = [['No Invoice', 'Tgl Invoice', 'Jenis', 'DPP', 'PPN', 'Total', 'Status', 'Tgl Bayar']];
+    var invBody = row.invoices.map(function(inv) {
+      return [
+        inv.noInv, inv.tgl || '—', inv.jenis || '—',
+        _frFmt(inv.dpp), inv.ppnPct ? inv.ppnPct + '%' : '—',
+        _frFmt(inv.total), inv.status || '—', inv.tglBayar || '—'
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: invHead,
+      body: invBody,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+      columnStyles: {
+        3: { halign: 'right' }, 5: { halign: 'right' },
+        6: { halign: 'center' }, 7: { halign: 'center' }
+      },
+      margin: { left: margin, right: margin },
+      didParseCell: function(data) {
+        if (data.section === 'body' && data.column.index === 6) {
+          data.cell.styles.textColor = data.cell.raw === 'Lunas' ? [5, 150, 105] : [217, 119, 6];
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  });
+
+  // Page numbers
+  var pageCount = doc.internal.getNumberOfPages();
+  for (var p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setFont(undefined, 'normal'); doc.setTextColor(160);
+    doc.text('Halaman ' + p + ' / ' + pageCount, W / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+  }
+
+  doc.save('Laporan_Pembayaran_RGI.pdf');
+};
+</script>

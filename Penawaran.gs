@@ -63,7 +63,8 @@ function getPenawaranList() {
           termConditions: data[i][14] ? data[i][14].toString() : '{}',
           items:          data[i][15] ? data[i][15].toString() : '[]',
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
-          noWO:           data[i][17] ? data[i][17].toString() : ''
+          noWO:           data[i][17] ? data[i][17].toString() : '',
+          tanggalDeal:    data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : '')
         };
       }
     }
@@ -323,7 +324,7 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
 
-        // ── Otomasi No WO (Kolom 18) ──
+        // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
         if (statusBaru === 'Deal') {
           // Status menjadi Deal → terbitkan No WO jika belum ada
@@ -331,15 +332,52 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
             noWO = generateNextWONumber(sheet);
             sheet.getRange(i + 1, 18).setValue(Number(noWO));
           }
+          // Catat tanggal deal (hanya isi jika belum ada, agar re-deal tidak reset tanggal)
+          const existingDealDate = data[i][18];
+          if (!existingDealDate) {
+            sheet.getRange(i + 1, 19).setValue(new Date());
+          }
+          // Link pre-deal invoices (noWO kosong) ke WO baru
+          _linkPredealInvoices(getSpreadsheet(), noPenawaran, noWO);
         } else {
-          // Keluar dari Deal → kosongkan No WO
+          // Keluar dari Deal → kosongkan No WO dan tanggal deal
           if (noWO) {
             sheet.getRange(i + 1, 18).setValue('');
             noWO = '';
           }
+          sheet.getRange(i + 1, 19).setValue('');
         }
 
         SpreadsheetApp.flush();
+
+        // Notifikasi WA saat WO baru dibuat (status → Deal)
+        if (statusBaru === 'Deal' && noWO) {
+          try {
+            const namaProject = data[i][4] ? data[i][4].toString() : '';
+            const klienId     = data[i][5] ? data[i][5].toString() : '';
+            const subtotal    = parseFloat(data[i][7]) || 0;
+            const diskon      = parseFloat(data[i][8]) || 0;
+            // Resolve nama klien
+            let namaKlien = klienId;
+            try {
+              const ks = getSpreadsheet().getSheetByName('Master_Klien');
+              if (ks) {
+                const kd = ks.getDataRange().getValues();
+                for (let k = 1; k < kd.length; k++) {
+                  if (kd[k][0] && kd[k][0].toString() === klienId) { namaKlien = kd[k][1].toString(); break; }
+                }
+              }
+            } catch(e) {}
+            notifWODibuat({
+              noWO:        noWO,
+              noPenawaran: noPenawaran,
+              namaKlien:   namaKlien,
+              namaProject: namaProject,
+              nilaiKontrak: Math.max(0, subtotal - diskon)
+            });
+          } catch(e) {}
+        }
+
         return { success: true, message: "Status diperbarui menjadi: " + statusBaru, noWO: noWO };
       }
     }
@@ -348,6 +386,25 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
     return { success: false, message: e.toString() };
   } finally {
     try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+// ── Link pre-deal invoices ke WO saat penawaran jadi Deal ────────────────────
+function _linkPredealInvoices(ss, noPenawaran, noWO) {
+  try {
+    const invSheet = ss.getSheetByName('Invoice_Main');
+    if (!invSheet) return;
+    const data = invSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const rowNoPen = data[i][2] ? data[i][2].toString() : '';
+      const rowNoWO  = data[i][1] ? data[i][1].toString() : '';
+      if (rowNoPen === noPenawaran && !rowNoWO) {
+        invSheet.getRange(i + 1, 2).setValue(noWO); // kolom 2 = noWO
+      }
+    }
+    SpreadsheetApp.flush();
+  } catch(e) {
+    Logger.log('_linkPredealInvoices error: ' + e);
   }
 }
 

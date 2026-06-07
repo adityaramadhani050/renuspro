@@ -2,7 +2,7 @@
  * RenusPro - PT. RENUS GLOBAL INDONESIA
  * Modul Kwitansi: tanda terima pembayaran (umumnya atas sebuah Invoice).
  *
- * No Kwitansi otomatis & terkunci, format: NNN/RGI-KW/[bulan romawi]/[tahun].
+ * No Kwitansi otomatis & terkunci, format: NNN/RGI/KWT/[bulan romawi]/[tahun].
  *
  * Sheet Kwitansi_Main — kolom (1-based):
  *  1 id          No Kwitansi
@@ -38,7 +38,7 @@ function generateNextKwitansiNumber(ss) {
     const ids = sheet.getRange(2, 1, rows - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       const val = ids[i][0] ? ids[i][0].toString() : '';
-      const m = val.match(/^(\d+)\/RGI-KW/);
+      const m = val.match(/^(\d+)\/RGI(?:-KW|\/KWT)/);
       if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; }
     }
   }
@@ -47,7 +47,7 @@ function generateNextKwitansiNumber(ss) {
   const mon  = roman[new Date().getMonth()];
   const yr   = new Date().getFullYear();
   const next = String(maxId + 1).padStart(3, '0');
-  return `${next}/RGI-KW/${mon}/${yr}`;
+  return `${next}/RGI/KWT/${mon}/${yr}`;
 }
 
 // ── Data awal form kwitansi: daftar invoice + nomor berikutnya ──────────────
@@ -58,6 +58,22 @@ function getKwitansiInitialData() {
   } catch (e) {
     return { success: false, error: e.toString(), invoiceList: [], nextNo: '' };
   }
+}
+
+// ── Helper internal (tanpa lock) — dipanggil dari Invoice.gs ────────────────
+function _appendKwitansiRow(ss, payload) {
+  const sheet = ss.getSheetByName('Kwitansi_Main') || buatSheetKwitansiDefault(ss);
+  const jumlah = parseFloat(payload.jumlah) || 0;
+  if (jumlah <= 0) return '';
+  const noKwitansi = generateNextKwitansiNumber(ss);
+  sheet.appendRow([
+    noKwitansi, payload.noInvoice || '', payload.noWO || '', payload.tanggal,
+    payload.terimaDari || '', jumlah, payload.untuk || '',
+    payload.metode || 'Transfer', payload.catatan || '',
+    payload.dibuatOleh || 'Sistem'
+  ]);
+  SpreadsheetApp.flush();
+  return noKwitansi;
 }
 
 function simpanKwitansi(payload) {
@@ -119,6 +135,41 @@ function getKwitansiList() {
   } catch (e) {
     Logger.log('getKwitansiList error: ' + e);
     return [];
+  }
+}
+
+function editKwitansi(payload) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName('Kwitansi_Main');
+    if (!sheet) return { success: false, message: 'Sheet Kwitansi_Main tidak ditemukan.' };
+
+    const data = sheet.getDataRange().getValues();
+    let rowIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === payload.id) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+
+    const jumlah = parseFloat(payload.jumlah) || 0;
+    if (jumlah <= 0) return { success: false, message: 'Jumlah kwitansi harus lebih dari 0.' };
+
+    const r = rowIdx + 1; // 1-based
+    sheet.getRange(r, 4).setValue(payload.tanggal || '');       // Tanggal
+    sheet.getRange(r, 5).setValue(payload.terimaDari || '');    // Terima Dari
+    sheet.getRange(r, 6).setValue(jumlah);                      // Jumlah
+    sheet.getRange(r, 7).setValue(payload.untuk || '');         // Untuk
+    sheet.getRange(r, 8).setValue(payload.metode || 'Transfer');// Metode
+    sheet.getRange(r, 9).setValue(payload.catatan || '');       // Catatan
+
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Kwitansi ' + payload.id + ' berhasil diperbarui!' };
+  } catch (e) {
+    return { success: false, message: 'Gagal memperbarui kwitansi: ' + e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
   }
 }
 

@@ -23,9 +23,9 @@ Agar export berfungsi, sheet **Template_Invoice** wajib punya named range beriku
 | `inv_klien_perusahaan` | sel di sebelah **Perusahaan :** | Perusahaan klien |
 | `inv_klien_alamat` | sel di sebelah **Alamat :** | Alamat klien |
 | `inv_klien_kontak` | sel di sebelah **No.Telp :** | Kontak klien |
-| `inv_item_zone_start` | **baris jangkar** di tabel item (1 baris kosong tepat di bawah header tabel `No / Description / Qty / Unit / Price / Amount`) | Titik mulai penyisipan baris item |
+| `inv_item_zona_start` | **baris jangkar** di tabel item (1 baris kosong tepat di bawah header tabel `No / Description / Qty / Unit / Price / Amount`) | Titik mulai penyisipan baris item |
 
-### Penting soal `inv_item_zone_start`
+### Penting soal `inv_item_zona_start`
 - Tunjuk ke **satu baris** (boleh 1 sel saja, mis. `A14`) yang berada **tepat di bawah baris header tabel**.
 - Semua baris di **bawah** baris jangkar ini akan **dihapus & ditulis ulang** setiap export. Jadi jangan taruh konten tetap (footer/ttd) di sheet — footer dibuat otomatis oleh sistem.
 - Format baris jangkar (border, font, alignment) akan **dicontoh** untuk seluruh baris item.
@@ -40,8 +40,16 @@ Agar export berfungsi, sheet **Template_Invoice** wajib punya named range beriku
 | G | Price (IDR) |
 | H | Amount (IDR) |
 
-> Footer (Subtotal/DPP, PPN, TOTAL, Terbilang, Catatan, Tanda tangan) **digenerate
-> otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
+> Footer (TOTAL, PPN, GRAND TOTAL, blok **Note | Bank Account**, Tanda tangan)
+> **digenerate otomatis** di bawah baris item — tidak perlu dibuat manual di sheet.
+> Bank Account diambil dari input di form pembuatan/edit invoice.
+
+### Isi otomatis zona item (layout baru)
+Sistem mengisi zona item dengan satu **baris tagihan utama** lalu **scope read-only**:
+- **Baris A**: `A | <Nama Project> | Qty=1 | Unit=Ls | Price=DPP | Amount=DPP`
+- Baris keterangan pembayaran: mis. *"DP 30% dari total kontrak Rp 119.000.000"*
+- Label **"Deskripsi:"** lalu rincian scope dari penawaran (kelompok + item:
+  deskripsi, qty, unit — **tanpa harga**).
 
 ## Daftar named range Template_Kwitansi
 

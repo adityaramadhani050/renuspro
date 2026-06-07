@@ -40,17 +40,20 @@ function getDashboardRawData(namaUser, isAdmin) {
       const no  = dataMain[i][0].toString();
       const rev = parseInt(dataMain[i][1]) || 0;
       if (!(no in latestRevMap) || rev > latestRevMap[no].rev) {
-        const tgl = parseTanggal(dataMain[i][2]);
+        const tgl      = parseTanggal(dataMain[i][2]);
+        const tglDeal  = parseTanggal(dataMain[i][18]);
+        const status   = dataMain[i][16] ? dataMain[i][16].toString() : 'On-Progress';
         latestRevMap[no] = {
           id:          no,
           rev:         rev,
-          tanggal:     tgl ? tgl.getTime() : null, // kirim sebagai timestamp ms
+          tanggal:     tgl ? tgl.getTime() : null,
+          tanggalDeal: tglDeal ? tglDeal.getTime() : null, // tanggal saat status jadi Deal
           namaProject: dataMain[i][4].toString(),
           klienId:     dataMain[i][5].toString(),
           namaKlien:   klienMap[dataMain[i][5].toString()] || dataMain[i][5].toString(),
           dibuatOleh:  dataMain[i][6].toString(),
           grandTotal:  parseFloat(dataMain[i][10]) || 0,
-          status:      dataMain[i][16] ? dataMain[i][16].toString() : 'On-Progress'
+          status:      status
         };
       }
     }

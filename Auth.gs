@@ -14,7 +14,7 @@ function _getOrCreateMasterUser(ss) {
   if (!sheet) {
     sheet = ss.insertSheet('Master_User');
     // Header
-    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif']);
+    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif', 'Target Bulanan']);
     // Format header
     sheet.getRange(1, 1, 1, 6)
       .setBackground('#1e3a8a')
@@ -27,6 +27,8 @@ function _getOrCreateMasterUser(ss) {
     sheet.appendRow(['U001', 'Administrator', 'admin', 'admin123', 'admin', 'TRUE']);
     // Seed: contoh sales
     sheet.appendRow(['U002', 'Sales Executive', 'sales1', 'sales123', 'sales', 'TRUE']);
+    // Seed: contoh finance
+    sheet.appendRow(['U003', 'Finance Officer', 'finance1', 'finance123', 'finance', 'TRUE']);
   }
   return sheet;
 }
@@ -84,12 +86,13 @@ function getUserList() {
     for (let i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
       list.push({
-        id:       data[i][0].toString(),
-        nama:     data[i][1].toString(),
-        username: data[i][2].toString(),
+        id:            data[i][0].toString(),
+        nama:          data[i][1].toString(),
+        username:      data[i][2].toString(),
         // Password sengaja tidak dikirim ke client
-        role:     data[i][4].toString(),
-        aktif:    data[i][5].toString().toUpperCase() !== 'FALSE'
+        role:          data[i][4].toString(),
+        aktif:         data[i][5].toString().toUpperCase() !== 'FALSE',
+        targetBulanan: parseFloat(data[i][6]) || 0
       });
     }
     return list;
@@ -121,7 +124,7 @@ function simpanUser(nama, username, password, role) {
     }
     const nextId = 'U' + String(maxNum + 1).padStart(3, '0');
 
-    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE']);
+    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0]);
     return { success: true, message: 'User ' + nextId + ' (' + nama + ') berhasil ditambahkan!' };
   } catch(e) {
     return { success: false, message: e.toString() };
@@ -129,7 +132,7 @@ function simpanUser(nama, username, password, role) {
 }
 
 // ── Edit user (admin only) ────────────────────────────────────────────────
-function editUser(id, nama, username, password, role, aktif) {
+function editUser(id, nama, username, password, role, aktif, targetBulanan) {
   try {
     if (!id || !nama || !username || !role) {
       return { success: false, message: 'Data tidak lengkap.' };
@@ -147,9 +150,10 @@ function editUser(id, nama, username, password, role, aktif) {
           }
         }
         const newPass = (password && password.trim()) ? password.trim() : data[i][3].toString();
-        sheet.getRange(i + 1, 2, 1, 5).setValues([[
+        sheet.getRange(i + 1, 2, 1, 6).setValues([[
           nama, username.trim().toLowerCase(), newPass,
-          role.toLowerCase(), aktif ? 'TRUE' : 'FALSE'
+          role.toLowerCase(), aktif ? 'TRUE' : 'FALSE',
+          parseFloat(targetBulanan) || 0
         ]]);
         return { success: true, message: 'User ' + id + ' berhasil diperbarui!' };
       }

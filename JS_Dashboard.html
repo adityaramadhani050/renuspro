@@ -1,520 +1,769 @@
 <script>
-    // --- FETCH DATA DASHBOARD ---
-    let _dbTrendChart = null;
+// ================================================================
+//  JS_Dashboard.html — RenusPro (Merged Dashboard + Sales Report)
+// ================================================================
 
-    // ── Cache raw data dashboard ──────────────────────────────────
-    let _dbRawCache    = null;  // hasil dari getDashboardRawData
-    let _dbCacheLoading = false;
+// ── State ──────────────────────────────────────────────────────
+var _dbRawCache   = null;  // getDashboardRawData result (cached)
+var _dbPeriodMode = 'mtd';
+var _dbTrendChart = null;
+var _dbDonutChart = null;
 
-    function loadDashboard(forceRefresh) {
-      if (typeof google === 'undefined') {
-        renderDashboard(getMockDashboardData());
-        return;
-      }
+// ── Formatting helpers ─────────────────────────────────────────
+function _rp(n) {
+  if (!n && n !== 0) return 'Rp 0';
+  return 'Rp ' + Math.round(Number(n)).toLocaleString('id-ID');
+}
+function _pct(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toFixed(1) + '%';
+}
+function _fmtDate(dt) {
+  var d = String(dt.getDate()).padStart(2, '0');
+  var m = String(dt.getMonth() + 1).padStart(2, '0');
+  return d + '/' + m + '/' + dt.getFullYear();
+}
+function _htmlDateToObj(str) {
+  if (!str) return null;
+  var p = str.split('-');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+}
+function _ddmmToInputVal(s) {
+  if (!s) return '';
+  var p = s.split('/');
+  if (p.length !== 3) return '';
+  return p[2] + '-' + p[1] + '-' + p[0];
+}
+function _esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-      // Jika cache sudah ada dan tidak diminta refresh → langsung kalkulasi
-      if (_dbRawCache && !forceRefresh) {
-        const kalkulasi = _hitungDashboardDariCache(_dbRawCache);
-        renderDashboard(kalkulasi);
-        return;
-      }
+// ── Badge helpers ──────────────────────────────────────────────
+function _statusBadge(status) {
+  var map = { 'Deal':'bg-emerald-100 text-emerald-700', 'On-Progress':'bg-blue-100 text-blue-700', 'Fail':'bg-rose-100 text-rose-700' };
+  var cls = map[status] || 'bg-slate-100 text-slate-600';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap">' + (status || '—') + '</span>';
+}
+function _achieveBadge(achievement) {
+  if (achievement === null || achievement === undefined) {
+    return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">No Target</span>';
+  }
+  var cls, label;
+  if (achievement >= 100)      { cls = 'bg-emerald-100 text-emerald-700'; label = '✓ Tercapai'; }
+  else if (achievement >= 75)  { cls = 'bg-blue-100 text-blue-700';       label = _pct(achievement); }
+  else if (achievement >= 50)  { cls = 'bg-amber-100 text-amber-700';     label = _pct(achievement); }
+  else                         { cls = 'bg-rose-100 text-rose-700';       label = _pct(achievement); }
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap">' + label + '</span>';
+}
+function _rankBadge(rank) {
+  if (rank === 1) return '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-amber-100 text-amber-700">' + rank + '</span>';
+  if (rank === 2) return '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-slate-100 text-slate-600">' + rank + '</span>';
+  if (rank === 3) return '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-extrabold bg-orange-100 text-orange-700">' + rank + '</span>';
+  return '<span class="text-xs font-bold text-slate-400">' + rank + '</span>';
+}
 
-      // Belum ada cache → fetch dari server dengan animasi loading
-      if (_dbCacheLoading) return; // hindari double fetch
-      _dbCacheLoading = true;
+// ── Period helpers ─────────────────────────────────────────────
+function _dbGetPeriodParams() {
+  var today = new Date();
+  var from, to;
+  if (_dbPeriodMode === 'mtd') {
+    from = new Date(today.getFullYear(), today.getMonth(), 1);
+    to   = today;
+  } else if (_dbPeriodMode === 'lastmonth') {
+    from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    to   = new Date(today.getFullYear(), today.getMonth(), 0);
+  } else if (_dbPeriodMode === 'ytd') {
+    from = new Date(today.getFullYear(), 0, 1);
+    to   = today;
+  } else {
+    from = _htmlDateToObj(document.getElementById('db-date-from').value);
+    to   = _htmlDateToObj(document.getElementById('db-date-to').value);
+    if (!from || !to) return null;
+  }
+  var isAdmin = _currentUser && _currentUser.role === 'admin';
+  return {
+    dateFrom: _fmtDate(from),
+    dateTo:   _fmtDate(to),
+    isAdmin:  isAdmin,
+    namaUser: _currentUser ? _currentUser.nama : ''
+  };
+}
 
-      _showDashboardSkeleton();
+function _dbPeriodToMs(params) {
+  var p = params.dateFrom.split('/');
+  var fromMs = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0])).getTime();
+  var q = params.dateTo.split('/');
+  var toMs   = new Date(parseInt(q[2]), parseInt(q[1])-1, parseInt(q[0]), 23, 59, 59, 999).getTime();
+  return { fromMs: fromMs, toMs: toMs };
+}
 
-      const isAdmin = _currentUser && _currentUser.role === 'admin';
-
-      google.script.run
-        .withSuccessHandler(function(raw) {
-          _dbCacheLoading = false;
-          if (raw && raw.success) {
-            _dbRawCache = raw;
-          } else {
-            _dbRawCache = { success: false, items: [], totalProducts: 0, totalCustomers: 0, isAdmin: isAdmin, namaUser: '' };
-          }
-          const kalkulasi = _hitungDashboardDariCache(_dbRawCache);
-          renderDashboard(kalkulasi);
-        })
-        .withFailureHandler(function() {
-          _dbCacheLoading = false;
-          renderDashboard(getMockDashboardData());
-        })
-        .getDashboardRawData(
-          _currentUser ? _currentUser.nama : 'Sales Executive',
-          isAdmin
-        );
+// Compute prev period KPIs from raw cache
+function _dbPrevKPI(items, fromMs, toMs) {
+  var duration  = toMs - fromMs;
+  var prevToMs  = fromMs - 1;
+  var prevFromMs = prevToMs - duration;
+  var prevRevenue = 0, prevDeals = 0;
+  items.forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = (item.tanggalDeal) ? item.tanggalDeal : item.tanggal;
+    if (ts && ts >= prevFromMs && ts <= prevToMs) {
+      prevRevenue += item.grandTotal;
+      prevDeals++;
     }
+  });
+  return { prevRevenue: prevRevenue, prevDeals: prevDeals };
+}
 
-    // ── Skeleton loading saat fetch pertama ───────────────────────
-    function _showDashboardSkeleton() {
-      // KPI cards skeleton
-      ['kpi-revenue','kpi-target-val','kpi-deals','kpi-winrate'].forEach(function(id) {
-        const el = document.getElementById(id);
-        if (el) {
-          el.innerHTML = '<span class="inline-block w-24 h-6 bg-slate-200 rounded-lg animate-pulse"></span>';
-        }
-      });
-      ['kpi-revenue-sub','kpi-target-sub','kpi-deals-sub','kpi-winrate-sub'].forEach(function(id) {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = '<span class="inline-block w-20 h-3 bg-slate-100 rounded animate-pulse mt-1"></span>';
-      });
-      // Tabel recent quotes skeleton
-      const tbody = document.getElementById('db-quot-table');
-      if (tbody) {
-        tbody.innerHTML = Array(5).fill(0).map(function() {
-          return `<tr class="border-b border-slate-50">
-            ${Array(5).fill(0).map(function() {
-              return '<td class="py-2 pr-3"><span class="inline-block w-full h-3 bg-slate-100 rounded animate-pulse"></span></td>';
-            }).join('')}
-          </tr>`;
-        }).join('');
-      }
-    }
+// ── Period toggle ──────────────────────────────────────────────
+function _dbSetPeriod(mode) {
+  _dbPeriodMode = mode;
+  var active   = 'bg-blue-600 text-white border-blue-600';
+  var inactive = 'bg-white text-slate-600 border-slate-200 hover:border-blue-400';
+  var base     = 'text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ';
+  ['mtd','lastmonth','ytd','custom'].forEach(function(m) {
+    var btn = document.getElementById('db-period-' + m);
+    if (btn) btn.className = base + (m === mode ? active : inactive);
+  });
+  var customRange = document.getElementById('db-custom-range');
+  if (mode === 'custom') {
+    customRange.classList.remove('hidden');
+    var today = new Date();
+    var fi = document.getElementById('db-date-from');
+    var ti = document.getElementById('db-date-to');
+    if (!fi.value) fi.value = _ddmmToInputVal(_fmtDate(new Date(today.getFullYear(), today.getMonth(), 1)));
+    if (!ti.value) ti.value = _ddmmToInputVal(_fmtDate(today));
+  } else {
+    customRange.classList.add('hidden');
+    _dbLoad();
+  }
+}
 
-    // ── Kalkulasi semua KPI dari raw cache + filter tanggal ───────
-    function _hitungDashboardDariCache(raw) {
-      const items    = raw.items || [];
-      const isAdmin  = raw.isAdmin || (_currentUser && _currentUser.role === 'admin');
-      const _f       = window._dbFilter || {};
-      const fFrom    = _f.from || null;
-      const fTo      = _f.to   || null;
+// ── Entry point ────────────────────────────────────────────────
+window.loadDashboard = function(forceRefresh) {
+  if (forceRefresh) _dbRawCache = null;
+  _dbLoad();
+};
 
-      // Buat filter timestamp
-      const fromMs = fFrom ? fFrom.getTime() : null;
-      const toMs   = fTo   ? (new Date(fTo.getFullYear(), fTo.getMonth(), fTo.getDate(), 23, 59, 59, 999)).getTime() : null;
+function _dbLoad() {
+  // Show loading
+  document.getElementById('db-loading').classList.remove('hidden');
+  document.getElementById('db-main-content').classList.add('hidden');
 
-      // Periode sebelumnya untuk perbandingan
-      let prevFromMs = null, prevToMs = null;
-      if (fromMs && toMs) {
-        const rangeMs = toMs - fromMs;
-        prevToMs   = fromMs - 1;
-        prevFromMs = prevToMs - rangeMs;
-      }
+  var params = _dbGetPeriodParams();
+  if (!params) {
+    document.getElementById('db-loading').classList.add('hidden');
+    return;
+  }
 
-      const inRange = function(ts) {
-        if (!ts) return false;
-        if (fromMs && ts < fromMs) return false;
-        if (toMs   && ts > toMs)   return false;
-        return true;
-      };
-      const inPrevRange = function(ts) {
-        if (!ts || !prevFromMs) return false;
-        return ts >= prevFromMs && ts <= prevToMs;
-      };
+  // Attach user context
+  if (typeof _currentUser !== 'undefined' && _currentUser) {
+    params.isAdmin  = _currentUser.role === 'admin';
+    params.namaUser = _currentUser.nama || '';
+  } else {
+    params.isAdmin  = true;
+    params.namaUser = '';
+  }
 
-      // KPI periode ini
-      let revThis = 0, wonThis = 0, decidedThis = 0;
-      let revPrev = 0, wonPrev = 0, decidedPrev = 0;
-      let totalRevAllTime = 0;
+  if (typeof google === 'undefined') {
+    _dbRenderAll({ success: true, items: [], isAdmin: params.isAdmin }, _dbMockSalesData(params));
+    return;
+  }
 
-      // Chart: 6 bulan terakhir berdasarkan filter (untuk mode non-custom ikuti bulan)
-      // Jika custom range → bagi range jadi 6 segmen
-      const now      = new Date();
-      const curMonth = now.getMonth();
-      const curYear  = now.getFullYear();
-      const romanMonths = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  if (_dbRawCache) {
+    // Raw cached — only re-fetch sales report
+    google.script.run
+      .withSuccessHandler(function(sales) { _dbRenderAll(_dbRawCache, sales); })
+      .withFailureHandler(function(e) { _dbShowError(e.message || 'Error'); })
+      .getSalesReportData(params);
+  } else {
+    // Fetch both concurrently
+    var pending = 2, rawR = null, salesR = null;
+    var tryRender = function() {
+      if (--pending === 0) _dbRenderAll(rawR, salesR);
+    };
+    google.script.run
+      .withSuccessHandler(function(raw) {
+        _dbRawCache = (raw && raw.success) ? raw : { success: false, items: [], isAdmin: params.isAdmin };
+        rawR = _dbRawCache;
+        tryRender();
+      })
+      .withFailureHandler(function() {
+        _dbRawCache = { success: false, items: [], isAdmin: params.isAdmin };
+        rawR = _dbRawCache;
+        tryRender();
+      })
+      .getDashboardRawData(params.namaUser, params.isAdmin);
 
-      // Siapkan 6 bucket chart
-      const chartBuckets = [];
-      if (_f.mode === 'custom' && fromMs && toMs) {
-        const segMs = (toMs - fromMs) / 6;
-        for (let i = 0; i < 6; i++) {
-          const bFrom = fromMs + i * segMs;
-          const bTo   = fromMs + (i + 1) * segMs - 1;
-          const d     = new Date(bFrom + segMs / 2);
-          chartBuckets.push({
-            label: d.getDate() + '/' + (d.getMonth()+1),
-            fromMs: bFrom, toMs: bTo
-          });
-        }
-      } else {
-        for (let m = 5; m >= 0; m--) {
-          let mo = curMonth - m, yr = curYear;
-          if (mo < 0) { mo += 12; yr--; }
-          const bFrom = new Date(yr, mo, 1).getTime();
-          const bTo   = new Date(yr, mo + 1, 0, 23, 59, 59, 999).getTime();
-          chartBuckets.push({ label: romanMonths[mo], fromMs: bFrom, toMs: bTo });
-        }
-      }
+    google.script.run
+      .withSuccessHandler(function(sales) { salesR = sales; tryRender(); })
+      .withFailureHandler(function(e) { salesR = { success: false, error: e.message }; tryRender(); })
+      .getSalesReportData(params);
+  }
+}
 
-      const chartRevenue = new Array(6).fill(0);
+function _dbShowError(msg) {
+  var el = document.getElementById('db-loading');
+  el.innerHTML = '<div class="flex flex-col items-center gap-3 py-24">'
+    + '<i class="fa-solid fa-circle-exclamation text-3xl text-rose-400"></i>'
+    + '<p class="text-sm text-slate-500 font-medium">Gagal memuat dashboard</p>'
+    + '<p class="text-xs text-slate-400 max-w-xs text-center">' + (msg || '') + '</p>'
+    + '<button onclick="_dbLoad()" class="mt-2 text-xs font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Coba Lagi</button>'
+    + '</div>';
+  el.classList.remove('hidden');
+}
 
-      // Pipeline bulan ini
-      const pipeline = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
+// ── Main render ────────────────────────────────────────────────
+function _dbRenderAll(rawData, salesData) {
+  var isAdmin = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin');
 
-      // Leaderboard
-      const salesMap = {};
-      const TARGET_PER_SALES_MONTHLY = 3600000000 / 12;
+  // Dashboard title
+  var titleEl = document.getElementById('dashboard-title');
+  if (titleEl) {
+    titleEl.textContent = isAdmin
+      ? 'Ringkasan Performa Tim Sales'
+      : 'Ringkasan Performa ' + (_currentUser ? _currentUser.nama : '');
+  }
 
-      items.forEach(function(item) {
-        const ts      = item.tanggal; // timestamp ms atau null
-        const isDeal  = item.status === 'Deal';
-        const isFail  = item.status === 'Fail';
-        const inCur   = inRange(ts);
-        const inPrv   = inPrevRange(ts);
+  // Export button (admin only)
+  var expBtn = document.getElementById('db-export-btn');
+  if (expBtn) {
+    expBtn.classList.toggle('hidden', !isAdmin);
+    expBtn.classList.toggle('flex', isAdmin);
+  }
 
-        // All-time revenue untuk chart (bukan difilter periode)
-        if (isDeal) totalRevAllTime += item.grandTotal;
+  // Admin-only sections
+  document.getElementById('db-leaderboard-section').classList.toggle('hidden', !isAdmin);
+  document.getElementById('db-detail-section').classList.toggle('hidden', !isAdmin);
 
-        // KPI periode ini
-        if (inCur) {
-          decidedThis++;
-          if (isDeal) { revThis += item.grandTotal; wonThis++; }
-          // Pipeline
-          pipeline[item.status] = (pipeline[item.status] || 0) + 1;
-          // Leaderboard
-          const nama = item.dibuatOleh || 'Unknown';
-          if (!salesMap[nama]) salesMap[nama] = { name: nama, rev: 0, deals: 0 };
-          if (isDeal) { salesMap[nama].rev += item.grandTotal; salesMap[nama].deals++; }
-        }
+  var items   = (rawData && rawData.items) ? rawData.items : [];
+  var summary = (salesData && salesData.summary) ? salesData.summary : {};
+  var salesList = (salesData && salesData.salesList) ? salesData.salesList : [];
+  var trend   = (salesData && salesData.trend) ? salesData.trend : { labels: [], values: [] };
 
-        // KPI periode lalu
-        if (inPrv) {
-          decidedPrev++;
-          if (isDeal) { revPrev += item.grandTotal; wonPrev++; }
-        }
+  // Compute period timestamps for prev comparison
+  var params = _dbGetPeriodParams();
+  var ms = params ? _dbPeriodToMs(params) : { fromMs: null, toMs: null };
+  var prev = (ms.fromMs && ms.toMs) ? _dbPrevKPI(items, ms.fromMs, ms.toMs) : { prevRevenue: 0, prevDeals: 0 };
 
-        // Chart buckets
-        if (isDeal && ts) {
-          chartBuckets.forEach(function(b, idx) {
-            if (ts >= b.fromMs && ts <= b.toMs) {
-              chartRevenue[idx] += item.grandTotal;
-            }
-          });
-        }
-      });
+  _dbRenderKPIs(summary, prev, salesList);
+  _dbRenderTargetBar(summary, items);
+  _dbRenderKonversi(summary);
+  _dbRenderTrend(items);
+  _dbRenderDonut(items, ms.fromMs, ms.toMs);
+  if (isAdmin) {
+    _dbRenderLeaderboard(salesList);
+    _dbRenderDetailAccordion(salesList);
+  }
 
-      const winRate     = decidedThis > 0 ? Math.round((wonThis / decidedThis) * 100) : 0;
-      const prevWinRate = decidedPrev > 0 ? Math.round((wonPrev / decidedPrev) * 100) : 0;
-      const revChangePct = revPrev > 0
-        ? +((revThis - revPrev) / revPrev * 100).toFixed(2)
-        : (revThis > 0 ? 100 : 0);
+  document.getElementById('db-loading').classList.add('hidden');
+  document.getElementById('db-main-content').classList.remove('hidden');
 
-      const TARGET_MONTHLY = isAdmin ? 1200000000 : 300000000;
+  // Cache for PDF
+  window._dbLastSalesData = salesData;
+}
 
-      const divisor = isAdmin ? 1e9 : 1e6;
-      const monthlyRevenue  = chartRevenue.map(v => +(v / divisor).toFixed(2));
-      const monthlyTarget   = new Array(6).fill(+(TARGET_MONTHLY / divisor).toFixed(2));
-      const monthlyLabels   = chartBuckets.map(function(b) { return b.label; });
+// ── KPI Cards ──────────────────────────────────────────────────
+function _dbRenderKPIs(summary, prev, salesList) {
+  var curRevenue = summary.teamRevenue || 0;
+  var curDeals   = summary.teamDealCount || 0;
+  var prevRevenue = prev.prevRevenue || 0;
+  var prevDeals   = prev.prevDeals || 0;
 
-      const pipelineArr = ['On-Progress','Deal','Fail']
-        .filter(function(s) { return pipeline[s] > 0; })
-        .map(function(s)    { return { stage: s, count: pipeline[s] }; });
+  // Revenue
+  var revChangePct = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue * 100) : (curRevenue > 0 ? 100 : 0);
+  var el = document.getElementById('db-kpi-revenue');
+  if (el) el.textContent = _rp(curRevenue);
+  var revBadge = document.getElementById('db-kpi-revenue-badge');
+  if (revBadge) {
+    revBadge.textContent = (revChangePct >= 0 ? '▲ ' : '▼ ') + Math.abs(revChangePct).toFixed(1) + '%';
+    revBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
+      (revChangePct >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
+  }
+  var revSub = document.getElementById('db-kpi-revenue-sub');
+  if (revSub) revSub.textContent = 'Periode lalu: ' + _rp(prevRevenue);
 
-      const leaderboard = Object.values(salesMap)
-        .sort(function(a,b) { return b.rev - a.rev; })
-        .slice(0, 6)
-        .map(function(s) { return {
-          ...s,
-          target:    +(TARGET_PER_SALES_MONTHLY / 1e6).toFixed(2),
-          pctTarget: TARGET_PER_SALES_MONTHLY > 0 ? Math.round((s.rev / TARGET_PER_SALES_MONTHLY) * 100) : 0
-        }; });
+  // Penawaran
+  var penEl = document.getElementById('db-kpi-penawaran');
+  if (penEl) penEl.textContent = summary.teamPenawaran != null ? summary.teamPenawaran : '—';
 
-      // Recent quotes: 20 terbaru dari SEMUA data (tidak difilter periode)
-      const recentQuotes = [...items]
-        .sort(function(a,b) {
-          const nA = parseInt((a.id.match(/^(\d+)/) || [0,0])[1]);
-          const nB = parseInt((b.id.match(/^(\d+)/) || [0,0])[1]);
-          return nB - nA;
-        })
-        .slice(0, 20)
-        .map(function(q) { return {
-          id: q.id, namaProject: q.namaProject,
-          namaKlien: q.namaKlien, grandTotal: q.grandTotal, status: q.status
-        }; });
+  // Deals
+  var dealEl = document.getElementById('db-kpi-deal');
+  if (dealEl) dealEl.textContent = curDeals != null ? curDeals : '—';
+  var dealBadge = document.getElementById('db-kpi-deal-badge');
+  var dealDiff  = curDeals - prevDeals;
+  if (dealBadge) {
+    dealBadge.textContent = (dealDiff >= 0 ? '▲ ' : '▼ ') + Math.abs(dealDiff) + ' vs lalu';
+    dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
+      (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
+  }
+  var winRateCalc = (summary.teamPenawaran > 0)
+    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
+  var dealSub = document.getElementById('db-kpi-deal-sub');
+  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc);
 
-      return {
-        revenue:          'Rp ' + revThis.toLocaleString('id-ID'),
-        revenuePrevMonth: 'Rp ' + revPrev.toLocaleString('id-ID'),
-        revenueChangePct: revChangePct,
-        targetAmount:     TARGET_MONTHLY,
-        actualAmount:     revThis,
-        activeQuotes:     wonThis,
-        prevMonthQuotes:  wonPrev,
-        winRate:          winRate,
-        prevWinRate:      prevWinRate,
-        totalProducts:    raw.totalProducts || 0,
-        totalCustomers:   raw.totalCustomers || 0,
-        monthlyLabels:    monthlyLabels,
-        monthlyRevenue:   monthlyRevenue,
-        monthlyTarget:    monthlyTarget,
-        pipeline:         pipelineArr,
-        leaderboard:      leaderboard,
-        recentQuotes:     recentQuotes,
-        isAdmin:          isAdmin,
-        namaUser:         raw.namaUser || ''
-      };
-    }
+  // Pipeline
+  var pipEl = document.getElementById('db-kpi-pipeline');
+  if (pipEl) pipEl.textContent = _rp(summary.teamPipelineValue || 0);
+  var pipSub = document.getElementById('db-kpi-pipeline-sub');
+  if (pipSub) pipSub.textContent = (summary.teamPipelineCount || 0) + ' penawaran';
+}
 
-    // Data contoh saat tidak terhubung ke Google Apps Script
-    function getMockDashboardData() {
-      return {
-        revenue: 'Rp 4.200.000.000',
-        revenuePrevMonth: 'Rp 3.700.000.000',
-        revenueChangePct: 12.4,
-        targetAmount: 5000000000,
-        actualAmount: 4200000000,
-        activeQuotes: 18,
-        prevMonthQuotes: 15,
-        winRate: 62,
-        prevWinRate: 64,
-        totalProducts: 11,
-        totalCustomers: 2,
-        monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
-        monthlyRevenue: [1.8, 2.4, 2.1, 3.1, 3.8, 4.2],
-        monthlyTarget: [5, 5, 5, 5, 5, 5],
-        pipeline: [
-          { stage: 'On-Progress', count: 5 },
-          { stage: 'Deal',        count: 3 },
-          { stage: 'Fail',        count: 2 },
-        ],
-        leaderboard: [
-          { name: 'Adi Nugroho',   rev: 1.42, deals: 6 },
-          { name: 'Sari Dewi',     rev: 1.18, deals: 5 },
-          { name: 'Budi Santoso',  rev: 0.87, deals: 4 },
-          { name: 'Mega Pratiwi',  rev: 0.73, deals: 3 },
-        ],
-        recentQuotes: []
-      };
-    }
+// ── Target progress bar ────────────────────────────────────────
+var _DB_TARGET_TAHUNAN = 24000000000;
 
-    function renderDashboard(data) {
-      
-      let _isAdmin = false;
-      if (_currentUser && _currentUser.role === 'admin') { _isAdmin = true; }
+function _dbRenderTargetBar(summary, items) {
+  var rev    = summary.teamRevenue || 0;
+  var target = summary.teamTarget  || 0;
+  var pct    = target > 0 ? Math.min((rev / target) * 100, 100) : 0;
+  var rawPct = target > 0 ? (rev / target) * 100 : 0;
 
-      // ── Update judul dengan nama user ──────────────────────────────
-      const _namaUser  = _currentUser ? _currentUser.nama : '';
-      const _titleEl   = document.getElementById('dashboard-title');
-      if (_titleEl) {
-        _titleEl.innerText = _isAdmin
-          ? 'Ringkasan Performa Tim Sales '
-          : 'Ringkasan Performa ' + _namaUser;
-      }
+  var pctEl = document.getElementById('db-target-pct');
+  if (pctEl) pctEl.textContent = _pct(rawPct);
+  var bar = document.getElementById('db-target-bar');
+  if (bar) bar.style.width = pct + '%';
+  var txt = document.getElementById('db-target-text');
+  if (txt) txt.textContent = _rp(rev) + ' / ' + _rp(target);
 
-      // ── Tampilkan/sembunyikan card Top Performers sesuai role ──────
-      const _cardLb = document.getElementById('card-leaderboard');
-      const _rowBot = document.getElementById('row-dashboard-bottom');
-      if (_cardLb && _rowBot) {
-        if (_isAdmin) {
-          _cardLb.classList.remove('hidden');
-          _rowBot.className = _rowBot.className.replace('lg:grid-cols-2', 'lg:grid-cols-3');
-          if (!_rowBot.className.includes('lg:grid-cols-3')) {
-            _rowBot.classList.add('lg:grid-cols-3');
-          }
-        } else {
-          _cardLb.classList.add('hidden');
-          _rowBot.className = _rowBot.className.replace('lg:grid-cols-3', 'lg:grid-cols-2');
-        }
-      }
+  // YTD revenue dari raw cache
+  var now = new Date();
+  var ytdFromMs = new Date(now.getFullYear(), 0, 1).getTime();
+  var ytdToMs   = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+  var ytdRev = 0;
+  (items || []).forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += item.grandTotal;
+  });
 
-      // ── KPI Cards ──────────────────────────────────────────────
-      const revPct = data.revenueChangePct || 0;
-      document.getElementById('kpi-revenue').innerText = data.revenue || '-';
-      document.getElementById('kpi-revenue-badge').innerText =
-        (revPct >= 0 ? '▲ ' : '▼ ') + Math.abs(revPct).toFixed(1) + '%';
-      document.getElementById('kpi-revenue-badge').className =
-        'text-[10px] font-bold px-2 py-0.5 rounded-full ' +
-        (revPct >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
-      document.getElementById('kpi-revenue-sub').innerText =
-        'Bulan lalu: ' + (data.revenuePrevMonth || '-');
+  var ytdPct    = _DB_TARGET_TAHUNAN > 0 ? (ytdRev / _DB_TARGET_TAHUNAN * 100) : 0;
+  var ytdBarPct = Math.min(ytdPct, 100);
 
-      const achPct = data.targetAmount > 0
-        ? Math.round((data.actualAmount / data.targetAmount) * 100) : 0;
-      document.getElementById('kpi-target-val').innerText = achPct + '%';
-      document.getElementById('kpi-target-badge').innerText = 'Pencapaian';
-      document.getElementById('kpi-target-bar').style.width = Math.min(achPct, 100) + '%';
-      document.getElementById('kpi-target-sub').innerText =
-        'Target: ' + (data.targetAmount ? _isAdmin ? 'Rp ' + (data.targetAmount / 1e9).toFixed(1) + 'M' : 'Rp ' + (data.targetAmount / 1e6).toFixed(0) + 'Jt' : '-');
+  var ytdPctEl = document.getElementById('db-ytd-pct');
+  if (ytdPctEl) ytdPctEl.textContent = _pct(ytdPct);
+  var ytdBar = document.getElementById('db-ytd-bar');
+  if (ytdBar) ytdBar.style.width = ytdBarPct + '%';
+  var ytdTxt = document.getElementById('db-ytd-text');
+  if (ytdTxt) ytdTxt.textContent = _rp(ytdRev) + ' / ' + _rp(_DB_TARGET_TAHUNAN);
+}
 
-      const dealsChange = (data.activeQuotes || 0) - (data.prevMonthQuotes || 0);
-      document.getElementById('kpi-deals').innerText = data.activeQuotes || '-';
-      document.getElementById('kpi-deals-sub').innerText =
-        (dealsChange >= 0 ? '▲ ' : '▼ ') + Math.abs(dealsChange) + ' dari bulan lalu';
+// ── Statistik Konversi ─────────────────────────────────────────
+function _dbRenderKonversi(summary) {
+  var winRate = (summary.teamPenawaran > 0)
+    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
+  var dealCount = summary.teamDealCount || 0;
+  var revenue   = summary.teamRevenue || 0;
+  var pipeline  = summary.teamPipelineCount || 0;
+  var avgDeal   = dealCount > 0 ? Math.round(revenue / dealCount) : 0;
 
-      const wr = data.winRate || 0;
-      const wrDiff = wr - (data.prevWinRate || wr);
-      document.getElementById('kpi-winrate').innerText = wr + '%';
-      document.getElementById('kpi-winrate-bar').style.width = wr + '%';
-      document.getElementById('kpi-winrate-badge').innerText =
-        (wrDiff >= 0 ? '▲ ' : '▼ ') + Math.abs(wrDiff).toFixed(1) + '%';
-      document.getElementById('kpi-winrate-badge').className =
-        'text-[10px] font-bold px-2 py-0.5 rounded-full ' +
-        (wrDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
-      document.getElementById('kpi-winrate-sub').innerText = 'Bulan lalu: ' + (data.prevWinRate || '-') + '%';
+  var wrEl = document.getElementById('db-stat-winrate');
+  if (wrEl) wrEl.textContent = _pct(winRate);
+  var avgEl = document.getElementById('db-stat-avgdeal');
+  if (avgEl) avgEl.textContent = avgDeal > 0 ? _rp(avgDeal) : '—';
+  var pipEl = document.getElementById('db-stat-pipeline-count');
+  if (pipEl) pipEl.textContent = pipeline;
+  var pctEl = document.getElementById('db-stat-winrate-pct');
+  if (pctEl) pctEl.textContent = _pct(winRate);
+  var bar = document.getElementById('db-stat-winrate-bar');
+  if (bar) bar.style.width = Math.min(winRate, 100) + '%';
+}
 
-      // ── Donut chart status penawaran ───────────────────────────
-      if (window.Chart) {
-        const pipeline = data.pipeline || [];
+// ── Trend Chart (line, 12 bulan dari raw cache) ────────────────
+function _dbRenderTrend(items) {
+  var canvas = document.getElementById('db-trend-chart');
+  if (!canvas) return;
+  if (_dbTrendChart) { _dbTrendChart.destroy(); _dbTrendChart = null; }
 
-        // Hitung jumlah per status dari pipeline
-        const stageMap = {};
-        pipeline.forEach(p => { stageMap[p.stage] = p.count; });
+  var isAdmin = _currentUser && _currentUser.role === 'admin';
+  var now = new Date();
+  var mon = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  var buckets = [];
+  for (var m = 11; m >= 0; m--) {
+    var mo = now.getMonth() - m, yr = now.getFullYear();
+    if (mo < 0) { mo += 12; yr--; }
+    buckets.push({
+      label: mon[mo],
+      fromMs: new Date(yr, mo, 1).getTime(),
+      toMs:   new Date(yr, mo + 1, 0, 23, 59, 59, 999).getTime(),
+      rev: 0
+    });
+  }
 
-        const onProg  = stageMap['On-Progress'] || 0;
-        const won     = stageMap['Deal'] || 0;
-        const fail    = stageMap['Fail'] || 0;
-        const total   = onProg + won + fail;
+  items.forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (!ts) return;
+    buckets.forEach(function(b) {
+      if (ts >= b.fromMs && ts <= b.toMs) b.rev += item.grandTotal;
+    });
+  });
 
-        const pct = v => total > 0 ? Math.round((v / total) * 100) : 0;
+  var divisor = isAdmin ? 1e9 : 1e6;
+  var unit    = isAdmin ? 'M' : 'Jt';
+  var target  = isAdmin ? 1200000000 : 300000000;
 
-        const donutCtx = document.getElementById('db-donut-chart');
-        if (donutCtx) {
-          if (window._dbDonutChart) window._dbDonutChart.destroy();
-          window._dbDonutChart = new Chart(donutCtx, {
-            type: 'doughnut',
-            data: {
-              labels: ['On-Progress', 'Deal', 'Fail'],
-              datasets: [{
-                data: [onProg, won, fail],
-                backgroundColor: ['#3B82F6', '#10B981', '#EF4444'],
-                borderColor:     ['#3B82F6', '#10B981', '#EF4444'],
-                borderWidth: 0,
-                hoverOffset: 4,
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              cutout: '68%',
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: ctx => ` ${ctx.label}: ${ctx.raw} (${pct(ctx.raw)}%)`
-                  }
-                }
-              }
-            }
-          });
-        }
-
-        // Legend manual
-        const legendData = [
-          { label: 'On-Progress', count: onProg, color: '#3B82F6', bg: 'bg-blue-100',    text: 'text-blue-700'   },
-          { label: 'Deal',        count: won,    color: '#10B981', bg: 'bg-emerald-100',  text: 'text-emerald-800'},
-          { label: 'Fail',        count: fail,   color: '#EF4444', bg: 'bg-rose-100',     text: 'text-rose-700'   },
-        ];
-        document.getElementById('db-donut-legend').innerHTML = legendData.map(l => `
-          <div class="flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${l.color}"></span>
-              <span class="text-slate-600">${l.label}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-800">${l.count}</span>
-              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ${l.bg} ${l.text}">${pct(l.count)}%</span>
-            </div>
-          </div>`).join('');
-      }
-
-      // ── Trend Chart ────────────────────────────────────────────
-      const ctx = document.getElementById('db-trend-chart');
-      if (_dbTrendChart) { _dbTrendChart.destroy(); }
-      _dbTrendChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: data.monthlyLabels || [],
-          datasets: [
-            {
-              label: 'Revenue',
-              data: data.monthlyRevenue || [],
-              borderColor: '#3B82F6',
-              backgroundColor: 'rgba(59,130,246,0.08)',
-              fill: true,
-              tension: 0.4,
-              pointBackgroundColor: '#3B82F6',
-              pointRadius: 3,
-              borderWidth: 2,
-            },
-            {
-              label: 'Target',
-              data: data.monthlyTarget || [],
-              borderColor: '#FB923C',
-              borderDash: [5, 4],
-              borderWidth: 1.5,
-              pointRadius: 0,
-              fill: false,
-            }
-          ]
+  _dbTrendChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: buckets.map(function(b) { return b.label; }),
+      datasets: [
+        {
+          label: 'Revenue',
+          data: buckets.map(function(b) { return +(b.rev / divisor).toFixed(2); }),
+          borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.08)',
+          fill: true, tension: 0.4,
+          pointBackgroundColor: '#3B82F6', pointRadius: 3, borderWidth: 2
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { display: false }, border: { display: false } },
-            y: {
-              ticks: { font: { size: 10 }, color: '#94a3b8', callback: v => _isAdmin ? 'Rp ' + v.toLocaleString('id-ID') + 'M' : 'Rp ' + v.toLocaleString('id-ID') + 'Jt'},
-              grid: { color: 'rgba(148,163,184,0.15)' },
-              border: { display: false }
-            }
+        {
+          label: 'Target',
+          data: buckets.map(function() { return +(target / divisor).toFixed(2); }),
+          borderColor: '#FB923C', borderDash: [5,4], borderWidth: 1.5,
+          pointRadius: 0, fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) {
+          return ' ' + ctx.dataset.label + ': Rp ' + ctx.parsed.y.toLocaleString('id-ID') + unit;
+        }}}
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { display: false }, border: { display: false } },
+        y: {
+          ticks: { font: { size: 10 }, color: '#94a3b8', callback: function(v) { return 'Rp ' + v.toLocaleString('id-ID') + unit; } },
+          grid: { color: 'rgba(148,163,184,0.15)' }, border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── Status Penawaran Donut (period-filtered) ───────────────────
+function _dbRenderDonut(items, fromMs, toMs) {
+  var counts = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
+  items.forEach(function(item) {
+    if (counts[item.status] === undefined) return;
+    var ts = item.tanggal;
+    if (fromMs && ts && ts < fromMs) return;
+    if (toMs   && ts && ts > toMs)   return;
+    counts[item.status]++;
+  });
+  var onProg = counts['On-Progress'], won = counts['Deal'], fail = counts['Fail'];
+  var total  = onProg + won + fail;
+  var pct    = function(v) { return total > 0 ? Math.round(v / total * 100) : 0; };
+
+  var canvas = document.getElementById('db-donut-chart');
+  if (canvas) {
+    if (_dbDonutChart) _dbDonutChart.destroy();
+    _dbDonutChart = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['On-Progress', 'Deal', 'Fail'],
+        datasets: [{ data: [onProg, won, fail],
+          backgroundColor: ['#3B82F6','#10B981','#EF4444'],
+          borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.label + ': ' + ctx.raw + ' (' + pct(ctx.raw) + '%)'; } } }
+        }
+      }
+    });
+  }
+
+  var legendData = [
+    { label: 'On-Progress', count: onProg, color: '#3B82F6', bg: 'bg-blue-100',    text: 'text-blue-700'    },
+    { label: 'Deal',        count: won,    color: '#10B981', bg: 'bg-emerald-100',  text: 'text-emerald-800' },
+    { label: 'Fail',        count: fail,   color: '#EF4444', bg: 'bg-rose-100',     text: 'text-rose-700'    },
+  ];
+  var legendEl = document.getElementById('db-donut-legend');
+  if (legendEl) {
+    legendEl.innerHTML = legendData.map(function(l) {
+      return '<div class="flex items-center justify-between text-xs">'
+        + '<div class="flex items-center gap-2">'
+        + '<span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:' + l.color + '"></span>'
+        + '<span class="text-slate-600">' + l.label + '</span></div>'
+        + '<div class="flex items-center gap-2">'
+        + '<span class="font-bold text-slate-800">' + l.count + '</span>'
+        + '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ' + l.bg + ' ' + l.text + '">' + pct(l.count) + '%</span>'
+        + '</div></div>';
+    }).join('');
+  }
+}
+
+// ── Leaderboard table ──────────────────────────────────────────
+function _dbRenderLeaderboard(salesList) {
+  var tbody = document.getElementById('db-leaderboard-body');
+  if (!tbody) return;
+  if (!salesList || !salesList.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = salesList.map(function(s, idx) {
+    return '<tr class="hover:bg-slate-50 transition">'
+      + '<td class="px-4 py-3 text-center">' + _rankBadge(idx + 1) + '</td>'
+      + '<td class="px-4 py-3"><span class="text-sm font-bold text-slate-800">' + _esc(s.nama) + '</span></td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600">' + s.totalPenawaran + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + _rp(s.totalNilaiPenawaran) + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
+      + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+// ── Per-sales detail accordion ─────────────────────────────────
+function _dbRenderDetailAccordion(salesList) {
+  var container = document.getElementById('db-sales-detail');
+  if (!container) return;
+  if (!salesList || !salesList.length) {
+    container.innerHTML = '<p class="text-xs text-slate-400 italic">Tidak ada data sales.</p>';
+    return;
+  }
+  container.innerHTML = salesList.map(function(s, idx) {
+    var detailId = 'db-detail-' + idx;
+    var tableRows = '';
+    if (s.penawaran && s.penawaran.length) {
+      tableRows = s.penawaran.map(function(p) {
+        return '<tr class="hover:bg-slate-50 transition">'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">' + _esc(p.id) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.grandTotal) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggal || '—') + '</td>'
+          + '<td class="px-3 py-2">' + _statusBadge(p.status) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
+          + '</tr>';
+      }).join('');
+    } else {
+      tableRows = '<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
+    }
+
+    return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
+      + '<button type="button" onclick="_dbToggleDetail(\'' + detailId + '\')"'
+      + ' class="w-full flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition focus:outline-none">'
+      + '<div class="flex items-center gap-3 min-w-0">'
+      + '<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-extrabold text-sm">' + (idx + 1) + '</div>'
+      + '<span class="font-bold text-slate-800 text-sm truncate">' + _esc(s.nama) + '</span>'
+      + '</div>'
+      + '<div class="flex flex-wrap items-center gap-2">'
+      + '<span class="text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</span>'
+      + '<span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">WR ' + _pct(s.winRate) + '</span>'
+      + _achieveBadge(s.achievement)
+      + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
+      + '</div></button>'
+      + '<div id="' + detailId + '" class="hidden border-t border-slate-100">'
+      + '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-slate-50">'
+      + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
+      + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
+      + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
+      + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
+      + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
+      + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
+      + '</div>'
+      + '<div class="overflow-x-auto">'
+      + '<table class="w-full text-left border-collapse">'
+      + '<thead class="bg-slate-50 border-b border-slate-100"><tr>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal</th>'
+      + '</tr></thead>'
+      + '<tbody class="divide-y divide-slate-50">' + tableRows + '</tbody>'
+      + '</table></div></div></div>';
+  }).join('');
+}
+
+function _dbMiniKPI(label, val, cls) {
+  return '<div class="bg-white rounded-xl p-3 border border-slate-100">'
+    + '<p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">' + label + '</p>'
+    + '<p class="text-base font-extrabold ' + cls + '">' + val + '</p>'
+    + '</div>';
+}
+
+function _dbToggleDetail(id) {
+  var el   = document.getElementById(id);
+  var icon = document.getElementById(id + '-icon');
+  if (!el) return;
+  var hidden = el.classList.toggle('hidden');
+  if (icon) icon.style.transform = hidden ? '' : 'rotate(180deg)';
+}
+
+
+// ── Mock data ──────────────────────────────────────────────────
+function _dbMockSalesData(params) {
+  return {
+    success: true, dateFrom: params.dateFrom, dateTo: params.dateTo,
+    summary: { teamRevenue: 1250000000, teamTarget: 2000000000, teamPenawaran: 18, teamDealCount: 5, teamWinRate: 27.8, teamPipelineValue: 3400000000, teamPipelineCount: 12 },
+    trend: { labels: ['Apr','Mei','Jun'], values: [900000000, 1100000000, 1250000000] },
+    salesList: [], isAdmin: params.isAdmin
+  };
+}
+
+// ── Export PDF ─────────────────────────────────────────────────
+window.exportDashboardPDF = function() {
+  var data = window._dbLastSalesData;
+  if (!data) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
+  try {
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var s = data.summary || {}, list = data.salesList || [];
+    var PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
+    var DARK  = [30,41,59], SLATE = [100,116,139], BLUE = [30,64,175];
+    var GREEN = [5,150,105], AMBER = [180,120,20], RED = [190,30,45], WHITE = [255,255,255];
+    var rp = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
+    var pct= function(v) { return v != null ? Number(v).toFixed(1)+'%' : '-'; };
+
+    // Header
+    doc.setFillColor(30,41,59); doc.rect(0,0,PW,24,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('LAPORAN PERFORMA SALES', ML, 11);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(190,200,220);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(170,195,255);
+    doc.text('Periode:', PW-MR, 10, { align:'right' });
+    doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255);
+    doc.text((data.dateFrom||'') + ' s/d ' + (data.dateTo||''), PW-MR, 15, { align:'right' });
+    doc.setFontSize(7); doc.setTextColor(190,200,220);
+    doc.text('Dicetak: ' + _fmtDate(new Date()), PW-MR, 20, { align:'right' });
+
+    var y = 30;
+
+    // KPI Summary
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+    doc.text('RINGKASAN TIM', ML, y); y += 5;
+    var kpiData = [
+      { label:'Revenue Deal',     value:rp(s.teamRevenue),           color:GREEN },
+      { label:'Penawaran Dibuat', value:String(s.teamPenawaran||0),  color:BLUE  },
+      { label:'Total Deal',       value:String(s.teamDealCount||0),  color:DARK  },
+      { label:'Win Rate Tim',     value:pct(s.teamWinRate),          color:DARK  },
+      { label:'Pipeline Aktif',   value:rp(s.teamPipelineValue),     color:AMBER },
+      { label:'Target Tim',       value:rp(s.teamTarget),            color:SLATE },
+    ];
+    var boxW = (CW-5)/3, boxH = 14, gap = 2.5;
+    kpiData.forEach(function(k, i) {
+      var col = i%3, row = Math.floor(i/3);
+      var bx = ML + col*(boxW+gap), by = y + row*(boxH+gap);
+      doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+      doc.roundedRect(bx,by,boxW,boxH,2,2,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...SLATE);
+      doc.text(k.label.toUpperCase(), bx+3, by+4.5);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...k.color);
+      doc.text(k.value, bx+3, by+10.5);
+    });
+    y += 2*(boxH+gap)+4;
+
+    // Target bar
+    var pctVal = s.teamTarget > 0 ? Math.min((s.teamRevenue/s.teamTarget)*100, 100) : 0;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+    doc.text('Capaian Target Tim: ' + pct(s.teamTarget>0?(s.teamRevenue/s.teamTarget*100):0), ML, y);
+    y += 3;
+    doc.setFillColor(226,232,240); doc.roundedRect(ML,y,CW,4,1,1,'F');
+    if (pctVal > 0) { doc.setFillColor(...GREEN); doc.roundedRect(ML,y,CW*pctVal/100,4,1,1,'F'); }
+    y += 8;
+
+    // Leaderboard
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+    doc.text('LEADERBOARD SALES', ML, y); y += 3;
+    doc.autoTable({
+      startY: y, margin: { left:ML, right:MR },
+      head: [['#','Nama Sales','Penawaran','Nilai Total','Deal','Revenue Deal','Win Rate','Target','Capaian']],
+      body: list.map(function(s, i) {
+        return [i+1, s.nama, s.totalPenawaran, rp(s.totalNilaiPenawaran), s.dealCount, rp(s.dealRevenue), pct(s.winRate), s.targetBulanan>0?rp(s.targetBulanan):'-', s.achievement!=null?pct(s.achievement):'No Target'];
+      }),
+      theme:'grid',
+      headStyles: { fillColor:BLUE, textColor:WHITE, fontStyle:'bold', fontSize:7, halign:'center' },
+      bodyStyles: { fontSize:7, textColor:DARK },
+      columnStyles: { 0:{halign:'center',cellWidth:8}, 1:{fontStyle:'bold',cellWidth:32}, 2:{halign:'center',cellWidth:18}, 3:{halign:'right',cellWidth:28}, 4:{halign:'center',cellWidth:12}, 5:{halign:'right',fontStyle:'bold',cellWidth:28}, 6:{halign:'center',cellWidth:16}, 7:{halign:'right',cellWidth:24}, 8:{halign:'center',cellWidth:18} },
+      alternateRowStyles: { fillColor:[248,250,252] },
+      didParseCell: function(d) {
+        if (d.section==='body' && d.column.index===8 && d.row.index<list.length) {
+          var ach = list[d.row.index].achievement;
+          if (ach>=100) d.cell.styles.textColor=GREEN; else if (ach>=50) d.cell.styles.textColor=BLUE; else if (ach!=null) d.cell.styles.textColor=RED;
+        }
+        if (d.section==='body' && d.column.index===5) d.cell.styles.textColor=GREEN;
+      }
+    });
+    y = doc.lastAutoTable.finalY + 6;
+
+    // Per-sales detail
+    list.forEach(function(sales) {
+      if (y > 250) { doc.addPage(); y = 14; }
+      doc.setFillColor(241,245,249); doc.setDrawColor(226,232,240);
+      doc.roundedRect(ML,y,CW,10,2,2,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+      doc.text(sales.nama, ML+3, y+6.5);
+      var rt = rp(sales.dealRevenue) + '   WR ' + pct(sales.winRate) + (sales.achievement!=null? '   Capaian ' + pct(sales.achievement) : '');
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...SLATE);
+      doc.text(rt, ML+CW-2, y+6.5, { align:'right' }); y += 12;
+
+      if (!sales.penawaran || !sales.penawaran.length) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(...SLATE);
+        doc.text('Tidak ada penawaran dalam periode ini.', ML+3, y); y += 6; return;
+      }
+      doc.autoTable({
+        startY: y, margin: { left:ML, right:MR },
+        head: [['No Penawaran','Klien','Project','Nilai','Tanggal','Status','Tgl Deal']],
+        body: sales.penawaran.map(function(p) { return [p.id, p.namaKlien||'-', p.namaProject||'-', rp(p.grandTotal), p.tanggal||'-', p.status, p.tanggalDeal||'-']; }),
+        theme:'grid',
+        headStyles: { fillColor:[51,65,85], textColor:WHITE, fontStyle:'bold', fontSize:6.5, halign:'center' },
+        bodyStyles: { fontSize:6.5, textColor:DARK },
+        columnStyles: { 0:{cellWidth:32}, 1:{cellWidth:22}, 2:{cellWidth:48}, 3:{halign:'right',cellWidth:26}, 4:{halign:'center',cellWidth:18}, 5:{halign:'center',cellWidth:18}, 6:{halign:'center',cellWidth:18} },
+        alternateRowStyles: { fillColor:[248,250,252] },
+        didParseCell: function(d) {
+          if (d.section==='body' && d.column.index===5) {
+            var st = d.cell.raw;
+            d.cell.styles.textColor = st==='Deal'?GREEN : st==='Fail'?RED : BLUE;
+            d.cell.styles.fontStyle = 'bold';
           }
         }
       });
+      y = doc.lastAutoTable.finalY + 5;
+    });
 
-      // ── Leaderboard ────────────────────────────────────────────
-      const lb = data.leaderboard || [];
-      const rankColors  = ['#F59E0B', '#94A3B8', '#CD7C3A'];
-      const rankIcons   = ['🥇', '🥈', '🥉'];
-
-      document.getElementById('db-leaderboard').innerHTML = lb.length
-        ? lb.map((p, i) => {
-            const pct     = Math.min(p.pctTarget ?? Math.round((p.rev / (p.target || 1)) * 100), 100);
-            const rawPct  = p.pctTarget ?? Math.round((p.rev / (p.target || 1)) * 100);
-            const barColor = rawPct >= 100 ? '#10B981'
-                          : rawPct >= 70  ? '#3B82F6'
-                          : rawPct >= 40  ? '#F59E0B'
-                          : '#EF4444';
-            const pctLabel = rawPct >= 100
-              ? `<span class="text-emerald-600 font-extrabold">${rawPct}% ✅</span>`
-              : `<span style="color:${barColor}" class="font-extrabold">${rawPct}%</span>`;
-
-            return `
-              <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-base leading-none">${rankIcons[i] || (i+1)}</span>
-                  <span class="text-xs font-bold text-slate-700 flex-1 truncate">${p.name}</span>
-                  <span class="text-[10px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md">${p.deals} deal</span>
-                </div>
-                <div class="flex justify-between items-center mb-1.5">
-                  <span class="text-[10px] text-slate-400">Actual: <b class="text-slate-700">Rp ${(p.rev / 1e6).toFixed(1)}Jt</b></span>
-                  <span class="text-[10px] text-slate-400">Target: <b class="text-slate-600">Rp ${p.target}Jt</b></span>
-                </div>
-                <div class="bg-slate-200 rounded-full h-2 overflow-hidden mb-1">
-                  <div class="h-full rounded-full transition-all duration-700"
-                    style="width:${pct}%; background:${barColor}"></div>
-                </div>
-                <div class="flex justify-end">
-                  <span class="text-[10px]">${pctLabel} dari target</span>
-                </div>
-              </div>`;
-          }).join('')
-        : '<p class="text-xs text-slate-400 text-center py-4">Belum ada data deals.</p>';
-
-      // ── Recent Quotations ──────────────────────────────────────
-      const statusCls = {
-        'Deal':        'bg-emerald-100 text-emerald-800',
-        'On-Progress': 'bg-blue-100 text-blue-700',
-        'Fail':        'bg-rose-100 text-rose-700',
-      };
-      const quotes = (data.recentQuotes || []).slice(0, 20);
-      document.getElementById('db-quot-table').innerHTML = quotes.length
-        ? quotes.map((q, i) => `
-            <tr class="border-b border-slate-50 ${i % 2 === 1 ? 'bg-slate-50/50' : ''}">
-              <td class="py-2 pr-3 text-slate-500 font-mono">${q.id}</td>
-              <td class="py-2 pr-3 font-semibold text-slate-700 max-w-[140px] truncate">${q.namaProject}</td>
-              <td class="py-2 pr-3 text-slate-500 truncate">${q.namaKlien}</td>
-              <td class="py-2 pr-3 text-right font-bold text-slate-800">Rp ${q.grandTotal.toLocaleString('id-ID')}
-              </td>
-              <td class="py-2 text-center">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCls[q.status] || 'bg-slate-100 text-slate-500'}">${q.status}</span>
-              </td>
-            </tr>`)
-          .join('')
-        : '<tr><td colspan="5" class="py-6 text-center text-slate-400 text-xs">Belum ada data penawaran.</td></tr>';
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...SLATE);
+      doc.text('Halaman ' + i + ' / ' + totalPages, PW/2, 292, { align:'center' });
+      doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
     }
+    var fname = 'Dashboard_Sales_' + (data.dateFrom||'').replace(/\//g,'') + '-' + (data.dateTo||'').replace(/\//g,'') + '.pdf';
+    doc.save(fname);
+    showNotification('PDF berhasil diunduh!');
+  } catch(e) {
+    showNotification('Gagal export PDF: ' + e.message, 'error');
+  }
+};
+
+// ── Tooltip for KPI info icons ─────────────────────────────────
+document.addEventListener('mouseover', function(e) {
+  var trigger = e.target.closest('.db-tooltip-trigger');
+  var tip = document.getElementById('db-tooltip');
+  if (!trigger || !tip) return;
+  tip.innerText = trigger.dataset.tip || '';
+  tip.classList.remove('hidden');
+});
+document.addEventListener('mousemove', function(e) {
+  var tip = document.getElementById('db-tooltip');
+  if (!tip || tip.classList.contains('hidden')) return;
+  var x = e.clientX + 12, y = e.clientY + 12;
+  tip.style.left = (x + 260 > window.innerWidth ? e.clientX - 270 : x) + 'px';
+  tip.style.top  = y + 'px';
+});
+document.addEventListener('mouseout', function(e) {
+  var trigger = e.target.closest('.db-tooltip-trigger');
+  var tip = document.getElementById('db-tooltip');
+  if (trigger && tip) tip.classList.add('hidden');
+});
 </script>

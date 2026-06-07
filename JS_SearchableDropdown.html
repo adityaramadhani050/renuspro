@@ -72,16 +72,44 @@
 
       const q = (filter || '').toLowerCase().trim();
 
-      // Kumpulkan semua option (kecuali value='')
-      let options = Array.from(native.options).filter(o => o.value !== '');
+      // Kumpulkan semua option (kecuali value=''), dengan info optgroup
+      let entries = []; // { type:'group'|'option', label, opt }
+      Array.from(native.children).forEach(function(child) {
+        if (child.tagName === 'OPTGROUP') {
+          const groupOpts = Array.from(child.options || child.children)
+            .filter(o => o.value !== '');
+          if (groupOpts.length) {
+            entries.push({ type: 'group', label: child.label });
+            groupOpts.forEach(o => entries.push({ type: 'option', opt: o }));
+          }
+        } else if (child.tagName === 'OPTION' && child.value !== '') {
+          entries.push({ type: 'option', opt: child });
+        }
+      });
 
-      // Sort by text
-      options.sort((a, b) => a.text.localeCompare(b.text, 'id'));
+      // Sort by text only if noSort not set and no optgroups
+      const hasGroups = entries.some(e => e.type === 'group');
+      if (!opts.noSort && !hasGroups) {
+        entries.sort((a, b) => {
+          if (a.type !== 'option' || b.type !== 'option') return 0;
+          return a.opt.text.localeCompare(b.opt.text, 'id');
+        });
+      }
 
-      // Filter
-      if (q) options = options.filter(o => o.text.toLowerCase().includes(q));
+      // Filter by query
+      if (q) {
+        // Remove group headers if all options in that group are filtered out
+        const filteredOpts = new Set(
+          entries.filter(e => e.type === 'option' && e.opt.text.toLowerCase().includes(q)).map(e => e.opt)
+        );
+        entries = entries.filter(e => e.type === 'option'
+          ? filteredOpts.has(e.opt)
+          : entries.slice(entries.indexOf(e) + 1).some(n => n.type === 'option' && filteredOpts.has(n.opt))
+        );
+      }
 
-      if (options.length === 0) {
+      const visibleOpts = entries.filter(e => e.type === 'option');
+      if (visibleOpts.length === 0) {
         const noResult = document.createElement('div');
         noResult.className  = 'sd-option no-result';
         noResult.innerText  = 'Tidak ditemukan';
@@ -89,7 +117,17 @@
         return;
       }
 
-      options.forEach((o, idx) => {
+      let optIdx = 0;
+      entries.forEach(function(entry) {
+        if (entry.type === 'group') {
+          const hdr = document.createElement('div');
+          hdr.className = 'sd-group-header';
+          hdr.innerText = entry.label;
+          list.appendChild(hdr);
+          return;
+        }
+        const o   = entry.opt;
+        const idx = optIdx++;
         const item = document.createElement('div');
         item.className     = 'sd-option' + (o.value === native.value ? ' selected' : '');
         item.innerText     = o.text;
@@ -163,10 +201,12 @@
 
     // ── Event listeners ──
     display.addEventListener('click', function() {
+      if (native.disabled) return;
       dropdown.classList.contains('open') ? closeDropdown() : openDropdown();
     });
 
     display.addEventListener('keydown', function(e) {
+      if (native.disabled) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
       if (e.key === 'Escape') closeDropdown();
     });
