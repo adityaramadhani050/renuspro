@@ -533,8 +533,11 @@ function _dbRenderDetailAccordion(salesList) {
     var tableRows = '';
     if (s.penawaran && s.penawaran.length) {
       tableRows = s.penawaran.map(function(p) {
-        return '<tr class="hover:bg-slate-50 transition">'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">' + _esc(p.id) + '</td>'
+        var dealBadge = p.dealInPeriod
+          ? '<span class="ml-1 inline-block text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">Deal periode ini</span>'
+          : '';
+        return '<tr class="hover:bg-slate-50 transition' + (p.dealInPeriod ? ' bg-emerald-50/30' : '') + '">'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">' + _esc(p.id) + dealBadge + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.grandTotal) + '</td>'

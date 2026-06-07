@@ -257,7 +257,8 @@ function getSalesReportData(params) {
         namaKlien:    namaKlien,
         grandTotal:   grandTotal,
         status:       status,
-        noWO:         noWO
+        noWO:         noWO,
+        dealInPeriod: dealInRange && !creationInRange  // penawaran dibuat di luar periode tapi deal dalam periode
       };
 
       // Creation-date-based metrics
@@ -265,9 +266,13 @@ function getSalesReportData(params) {
         sd.totalPenawaran++;
         sd.totalNilaiPenawaran += grandTotal;
         if (status === 'Fail') sd.failCount++;
+      }
 
-        // Add to penawaran list (in-range by creation)
-        sd._penawaranInRange[noPenawaran] = pObj;
+      // Masuk daftar penawaran jika dibuat dalam periode ATAU deal dalam periode
+      if (creationInRange || dealInRange) {
+        if (!sd._penawaranInRange[noPenawaran]) {
+          sd._penawaranInRange[noPenawaran] = pObj;
+        }
       }
 
       // Deal-date-based metrics
