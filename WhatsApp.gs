@@ -47,7 +47,7 @@ function sendWANotif(message) {
   var config = _getWAConfig();
   if (!config.enabled || !config.endpoint || !config.target || !message) return;
   try {
-    UrlFetchApp.fetch(config.endpoint + '/messages/send', {
+    UrlFetchApp.fetch(config.endpoint + '/api/messages/send', {
       method:  'post',
       headers: { 'Content-Type': 'application/json' },
       payload: JSON.stringify({ phone: config.target, message: message }),
@@ -69,7 +69,7 @@ function testWANotif(payload) {
   }
 
   try {
-    var resp = UrlFetchApp.fetch(endpoint + '/messages/send', {
+    var resp = UrlFetchApp.fetch(endpoint + '/api/messages/send', {
       method:  'post',
       headers: { 'Content-Type': 'application/json' },
       payload: JSON.stringify({
