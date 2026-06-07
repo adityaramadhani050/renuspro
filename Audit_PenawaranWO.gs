@@ -192,7 +192,14 @@ function _auWriteSheet(ss, issueA, issueB, summary) {
   });
   if (!issueB.length) rows.push(['(tidak ada masalah)']);
 
-  sheet.getRange(1, 1, rows.length, 7).setValues(rows);
+  // Pad semua baris ke 7 kolom agar setValues tidak error
+  var COLS = 7;
+  rows = rows.map(function(r) {
+    while (r.length < COLS) r.push('');
+    return r.slice(0, COLS);
+  });
+
+  sheet.getRange(1, 1, rows.length, COLS).setValues(rows);
   sheet.getRange(1, 1).setFontWeight('bold').setFontSize(12);
   sheet.getRange(4, 1).setFontWeight('bold');
   sheet.getRange(11, 1).setFontWeight('bold');
