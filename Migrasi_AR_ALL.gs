@@ -110,34 +110,35 @@ function migrasiARAll() {
     }
 
     try {
-      var namaKlien   = _str(row, col.nama_klien).trim();
-      var namaProject = _str(row, col.nama_project).trim();
+      var namaKlienSrc   = _str(row, col.nama_klien).trim();
+      var namaProjectSrc = _str(row, col.nama_project).trim();
 
       // ── Cari noPenawaran & noWO yang cocok ─────────────────────────────
-      var matchResult = _findPenawaran(namaKlien, namaProject, penawaranIndex, cfg.MATCH_THRESHOLD);
+      var matchResult = _findPenawaran(namaKlienSrc, namaProjectSrc, penawaranIndex, cfg.MATCH_THRESHOLD);
       var noPenawaran = matchResult ? matchResult.noPenawaran : '';
-      var noWO        = matchResult ? (matchResult.noWO || '') : '';
+      var noWO        = matchResult ? (matchResult.noWO || '')  : '';
+
+      // Jika match ditemukan → pakai nama canonical dari Penawaran_Main & Master_Klien
+      // Jika tidak match → fallback ke data dari AR ALL
+      var namaKlienFinal   = matchResult ? matchResult.namaKlien   : namaKlienSrc;
+      var namaProjectFinal = matchResult ? matchResult.namaProject  : namaProjectSrc;
+      var klienIdFinal     = matchResult ? matchResult.klienId      : '';
 
       // Jika di source sudah ada no_penawaran / no_wo → prioritaskan source
-      if (col.no_penawaran !== -1) {
-        var srcPen = _str(row, col.no_penawaran).trim();
-        if (srcPen) noPenawaran = srcPen;
-      }
-      if (col.no_wo !== -1) {
-        var srcWO = _str(row, col.no_wo).trim();
-        if (srcWO) noWO = srcWO;
-      }
+      if (col.no_penawaran !== -1) { var sp = _str(row, col.no_penawaran).trim(); if (sp) noPenawaran = sp; }
+      if (col.no_wo !== -1)        { var sw = _str(row, col.no_wo).trim();        if (sw) noWO = sw; }
 
       var matchLabel = matchResult
-        ? ('✓ ' + matchResult.noPenawaran + ' (skor:' + matchResult.score.toFixed(2) + ')')
-        : '? tidak ditemukan';
+        ? ('✓ ' + matchResult.noPenawaran + ' (skor:' + matchResult.score.toFixed(2) + ')'
+           + ' → klien:"' + namaKlienFinal + '" project:"' + namaProjectFinal + '"')
+        : '? tidak ditemukan (pakai data AR ALL)';
 
       if (matchResult) matched++; else unmatched++;
 
-      var mapped = _mapRow(row, col, cfg, noPenawaran, noWO);
+      var mapped = _mapRow(row, col, cfg, noPenawaran, noWO, namaKlienFinal, namaProjectFinal, klienIdFinal);
       rows.push(mapped);
 
-      Logger.log('[' + r + '] ' + noInvoice + ' | ' + namaKlien + ' | Penawaran: ' + matchLabel
+      Logger.log('[' + r + '] ' + noInvoice + ' | Penawaran: ' + matchLabel
         + ' | ' + mapped[4] + ' | ' + _fmtRp(mapped[14]));
     } catch(e) {
       Logger.log('ERROR baris ' + (r+1) + ' (' + noInvoice + '): ' + e);
@@ -258,7 +259,14 @@ function _findPenawaran(namaKlien, namaProject, index, threshold) {
   }
 
   if (best && bestScore >= threshold) {
-    return { noPenawaran: best.noPenawaran, noWO: best.noWO, score: bestScore };
+    return {
+      noPenawaran: best.noPenawaran,
+      noWO:        best.noWO,
+      score:       bestScore,
+      namaKlien:   best.namaKlien,   // dari Master_Klien (canonical)
+      klienId:     best.klienId,
+      namaProject: best.namaProject  // dari Penawaran_Main (canonical)
+    };
   }
   return null;
 }
@@ -301,11 +309,13 @@ function _jaccardSimilarity(a, b) {
 // MAPPING ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _mapRow(row, col, cfg, noPenawaran, noWO) {
+function _mapRow(row, col, cfg, noPenawaran, noWO, namaKlien, namaProject, klienId) {
   var noInvoice   = _str(row, col.no_invoice).trim();
-  var namaKlien   = _str(row, col.nama_klien).trim();
+  // namaKlien & namaProject sudah di-resolve di luar (canonical dari Penawaran_Main jika match)
+  namaKlien   = namaKlien   || _str(row, col.nama_klien).trim();
+  namaProject = namaProject || _str(row, col.nama_project).trim();
+  klienId     = klienId     || '';
   var tglInvoice  = _parseDate(row[col.tgl_invoice]);
-  var namaProject = _str(row, col.nama_project).trim();
   var dpp         = _num(row, col.dpp);
   var grandTotal  = _num(row, col.grand_total);
   var paid        = col.paid !== -1        ? _num(row, col.paid)        : 0;
@@ -340,7 +350,7 @@ function _mapRow(row, col, cfg, noPenawaran, noWO) {
     0,                         //  6 persen
     noPO,                      //  7 noPO
     tglPO,                     //  8 tglPO
-    '',                        //  9 klienId
+    klienId,                   //  9 klienId
     namaKlien,                 // 10 namaKlien
     namaProject,               // 11 namaProject
     dpp,                       // 12 dpp
