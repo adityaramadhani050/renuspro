@@ -305,69 +305,36 @@ function _frToggleInv(idx) {
 window.exportFinanceReportPDF = function() {
   if (!_frData) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
   var data = _frData;
-  var s = data.summary;
+  var s    = data.summary;
+  var allRows = data.rows || [];
 
-  // Terapkan filter aging yang sedang aktif di tabel
-  var exportRows = (data.rows || []);
-  if (_frAgingFilter) {
-    exportRows = exportRows.filter(function(row) {
-      return row.invoices.some(function(inv) {
-        return inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === _frAgingFilter;
-      });
-    });
-  }
-
-  // Hitung ulang summary sesuai data yang ditampilkan
-  var exportSummary = { totalTagihan: 0, totalTerbayar: 0, totalOutstanding: 0 };
-  exportRows.forEach(function(row) {
-    exportSummary.totalTagihan    += row.tagihan    || 0;
-    exportSummary.totalTerbayar   += row.terbayar   || 0;
-    exportSummary.totalOutstanding += row.outstanding || 0;
-  });
-
-  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  var W = doc.internal.pageSize.getWidth();
+  var doc    = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var W      = doc.internal.pageSize.getWidth();
   var margin = 14;
-  var y = margin;
+  var y      = margin;
 
-  // Header
+  // ── Header ────────────────────────────────────────────────────
   doc.setFontSize(14); doc.setFont(undefined, 'bold');
-  doc.text('LAPORAN PROGRESS PEMBAYARAN', margin, y);
-  y += 6;
+  doc.text('LAPORAN PROGRESS PEMBAYARAN', margin, y); y += 6;
   doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
-  doc.text('PT. RENUS GLOBAL INDONESIA', margin, y);
-  y += 4;
+  doc.text('PT. RENUS GLOBAL INDONESIA', margin, y); y += 4;
   var tglCetak = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-  doc.text('Dicetak: ' + tglCetak, margin, y);
-  y += 4;
-  // Keterangan periode filter
+  doc.text('Dicetak: ' + tglCetak, margin, y); y += 4;
   var periodLabel = document.getElementById('fr-period-label');
   if (periodLabel && periodLabel.textContent) {
-    doc.text('Periode: ' + periodLabel.textContent, margin, y);
-    y += 4;
+    doc.text('Periode: ' + periodLabel.textContent, margin, y); y += 4;
   }
-  // Keterangan aging filter
-  if (_frAgingFilter && _frAgingMeta[_frAgingFilter]) {
-    doc.text('Filter Aging: ' + _frAgingMeta[_frAgingFilter].label, margin, y);
-    y += 4;
-  }
-  doc.setTextColor(0);
-  y += 2;
+  doc.setTextColor(0); y += 2;
 
-  // Gunakan exportSummary untuk KPI di PDF
-  s = exportSummary;
-
-  // KPI summary box
+  // ── KPI summary ───────────────────────────────────────────────
   doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.3);
   doc.roundedRect(margin, y, W - 2 * margin, 22, 2, 2);
   var colW = (W - 2 * margin) / 3;
-  var kpiItems = [
-    { label: 'Total Tagihan', val: _frFmt(s.totalTagihan) },
-    { label: 'Terbayar', val: _frFmt(s.totalTerbayar) },
-    { label: 'Outstanding', val: _frFmt(s.totalOutstanding) }
-  ];
-  kpiItems.forEach(function(k, i) {
+  [
+    { label: 'Total Tagihan',  val: _frFmt(s.totalTagihan)    },
+    { label: 'Terbayar',       val: _frFmt(s.totalTerbayar)   },
+    { label: 'Outstanding',    val: _frFmt(s.totalOutstanding) }
+  ].forEach(function(k, i) {
     var cx = margin + i * colW + colW / 2;
     doc.setFontSize(7.5); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
     doc.text(k.label.toUpperCase(), cx, y + 6, { align: 'center' });
@@ -376,21 +343,19 @@ window.exportFinanceReportPDF = function() {
   });
   y += 28;
 
-  // Aging
+  // ── Aging summary ─────────────────────────────────────────────
   doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
-  doc.text('AGING OUTSTANDING (INVOICE BELUM LUNAS)', margin, y);
-  y += 4;
+  doc.text('AGING OUTSTANDING (INVOICE BELUM LUNAS)', margin, y); y += 4;
   var ag = s.aging || {};
-  var agingData = [
-    ['< 30 Hari', _frFmt(ag.current || 0)],
-    ['30–59 Hari', _frFmt(ag.gte30 || 0)],
-    ['60–89 Hari', _frFmt(ag.gte60 || 0)],
-    ['≥ 90 Hari', _frFmt(ag.gte90 || 0)]
-  ];
   doc.autoTable({
     startY: y,
     head: [['Bucket', 'Nilai Outstanding']],
-    body: agingData,
+    body: [
+      ['< 30 Hari',  _frFmt(ag.current || 0)],
+      ['30–59 Hari', _frFmt(ag.gte30   || 0)],
+      ['60–89 Hari', _frFmt(ag.gte60   || 0)],
+      ['≥ 90 Hari',  _frFmt(ag.gte90   || 0)]
+    ],
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2.5 },
     headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
@@ -398,94 +363,74 @@ window.exportFinanceReportPDF = function() {
     margin: { left: margin, right: margin },
     tableWidth: 80
   });
-  y = doc.lastAutoTable.finalY + 8;
+  y = doc.lastAutoTable.finalY + 10;
 
-  // Per-WO table
-  doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
-  doc.text('PROGRESS PEMBAYARAN PER WORK ORDER', margin, y);
-  y += 3;
+  // ── Helper: render tabel WO untuk satu bucket ─────────────────
+  var agingBuckets = [
+    { key: 'current', label: '< 30 HARI',  headFill: [209, 250, 229], headText: [6, 95, 70]   },
+    { key: 'gte30',   label: '30–59 HARI', headFill: [254, 243, 199], headText: [120, 53, 15]  },
+    { key: 'gte60',   label: '60–89 HARI', headFill: [255, 237, 213], headText: [124, 45, 18]  },
+    { key: 'gte90',   label: '≥ 90 HARI',  headFill: [254, 226, 226], headText: [153, 27, 27]  }
+  ];
 
-  var woHead = [['No WO / Ref', 'Klien', 'Project', 'Nilai Kontrak', 'Total Ditagih', 'Terbayar', 'Outstanding', 'Status']];
-  var woBody = exportRows.map(function(row) {
-    var st = row.invoices.length === 0 ? 'Belum Ada Invoice'
-           : row.outstanding <= 0 ? 'Lunas' : 'Outstanding';
-    return [
-      row.noWO ? ('WO-' + row.noWO + '\n' + row.noPenawaran) : row.noPenawaran,
-      row.namaKlien || '—',
-      row.namaProject || '—',
-      row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—',
-      row.tagihan ? _frFmt(row.tagihan) : '—',
-      row.terbayar ? _frFmt(row.terbayar) : '—',
-      row.outstanding > 0 ? _frFmt(row.outstanding) : '—',
-      st
-    ];
-  });
+  var woHead = [['No WO / Ref', 'Klien / Project', 'Nilai Kontrak', 'Ditagih', 'Terbayar', 'Outstanding']];
 
-  doc.autoTable({
-    startY: y,
-    head: woHead,
-    body: woBody,
-    theme: 'striped',
-    styles: { fontSize: 7, cellPadding: 2 },
-    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      3: { halign: 'right' }, 4: { halign: 'right' },
-      5: { halign: 'right' }, 6: { halign: 'right' },
-      7: { halign: 'center' }
-    },
-    margin: { left: margin, right: margin },
-    didParseCell: function(data) {
-      if (data.section === 'body' && data.column.index === 7) {
-        var val = data.cell.raw;
-        if (val === 'Lunas') data.cell.styles.textColor = [5, 150, 105];
-        else if (val === 'Outstanding') data.cell.styles.textColor = [220, 38, 38];
-        else data.cell.styles.textColor = [100, 116, 139];
-      }
-    }
-  });
-  y = doc.lastAutoTable.finalY + 8;
+  agingBuckets.forEach(function(bucket) {
+    // Kumpulkan WO yang memiliki setidaknya 1 invoice belum lunas di bucket ini
+    var bucketRows = allRows.filter(function(row) {
+      return row.invoices.some(function(inv) {
+        return inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === bucket.key;
+      });
+    });
 
-  // Per-WO invoice detail
-  exportRows.forEach(function(row) {
-    if (!row.invoices.length) return;
-    if (y > 250) { doc.addPage(); y = margin; }
+    if (y > 240) { doc.addPage(); y = margin; }
 
-    var ref = row.noWO ? ('WO-' + row.noWO + ' | ' + row.noPenawaran) : row.noPenawaran;
     doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(60);
-    doc.text('Detail Invoice — ' + ref + ' | ' + (row.namaKlien || '') + ' | ' + (row.namaProject || ''), margin, y);
+    doc.text('OUTSTANDING AGING ' + bucket.label + ' (' + bucketRows.length + ' WO)', margin, y);
     y += 3;
 
-    var invHead = [['No Invoice', 'Tgl Invoice', 'Jenis', 'DPP', 'PPN', 'Total', 'Status', 'Tgl Bayar']];
-    var invBody = row.invoices.map(function(inv) {
+    if (!bucketRows.length) {
+      doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(150);
+      doc.text('Tidak ada data.', margin + 2, y + 5);
+      y += 12;
+      return;
+    }
+
+    var woBody = bucketRows.map(function(row) {
+      // Hitung hanya invoice belum lunas di bucket ini
+      var outstandingBucket = 0;
+      row.invoices.forEach(function(inv) {
+        if (inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === bucket.key) {
+          outstandingBucket += inv.total || 0;
+        }
+      });
       return [
-        inv.noInv, inv.tgl || '—', inv.jenis || '—',
-        _frFmt(inv.dpp), inv.ppnPct ? inv.ppnPct + '%' : '—',
-        _frFmt(inv.total), inv.status || '—', inv.tglBayar || '—'
+        row.noWO ? ('WO-' + row.noWO + '\n' + row.noPenawaran) : row.noPenawaran,
+        (row.namaKlien || '—') + '\n' + (row.namaProject || ''),
+        row.nilaiKontrak ? _frFmt(row.nilaiKontrak) : '—',
+        row.tagihan      ? _frFmt(row.tagihan)      : '—',
+        row.terbayar     ? _frFmt(row.terbayar)     : '—',
+        outstandingBucket > 0 ? _frFmt(outstandingBucket) : '—'
       ];
     });
 
     doc.autoTable({
       startY: y,
-      head: invHead,
-      body: invBody,
-      theme: 'grid',
+      head: woHead,
+      body: woBody,
+      theme: 'striped',
       styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+      headStyles: { fillColor: bucket.headFill, textColor: bucket.headText, fontStyle: 'bold' },
       columnStyles: {
-        3: { halign: 'right' }, 5: { halign: 'right' },
-        6: { halign: 'center' }, 7: { halign: 'center' }
+        2: { halign: 'right' }, 3: { halign: 'right' },
+        4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' }
       },
-      margin: { left: margin, right: margin },
-      didParseCell: function(data) {
-        if (data.section === 'body' && data.column.index === 6) {
-          data.cell.styles.textColor = data.cell.raw === 'Lunas' ? [5, 150, 105] : [217, 119, 6];
-        }
-      }
+      margin: { left: margin, right: margin }
     });
-    y = doc.lastAutoTable.finalY + 6;
+    y = doc.lastAutoTable.finalY + 10;
   });
 
-  // Page numbers
+  // ── Page numbers ──────────────────────────────────────────────
   var pageCount = doc.internal.getNumberOfPages();
   for (var p = 1; p <= pageCount; p++) {
     doc.setPage(p);
