@@ -82,6 +82,13 @@ function _frBuildFilterParam() {
 
 // ── Load ─────────────────────────────────────────────────────────
 window.loadFinanceReport = function() {
+  _frAgingFilter = null;
+  ['current','gte30','gte60','gte90'].forEach(function(k) {
+    var c = document.getElementById('fr-aging-card-' + k);
+    if (c) c.classList.remove('border-emerald-400','border-amber-400','border-orange-400','border-rose-400');
+  });
+  var bar = document.getElementById('fr-aging-filter-bar');
+  if (bar) { bar.classList.add('hidden'); bar.style.display = ''; }
   document.getElementById('fr-loading').classList.remove('hidden');
   document.getElementById('fr-content').classList.add('hidden');
   var param = _frBuildFilterParam();
@@ -131,15 +138,80 @@ function _frRender(data) {
   document.getElementById('fr-content').classList.remove('hidden');
 }
 
+// ── Aging filter ─────────────────────────────────────────────────
+var _frAgingFilter = null; // null | 'current' | 'gte30' | 'gte60' | 'gte90'
+
+var _frAgingMeta = {
+  current: { label: '< 30 Hari',  labelClass: 'bg-emerald-100 text-emerald-700', borderClass: 'border-emerald-400' },
+  gte30:   { label: '30–59 Hari', labelClass: 'bg-amber-100 text-amber-700',     borderClass: 'border-amber-400'   },
+  gte60:   { label: '60–89 Hari', labelClass: 'bg-orange-100 text-orange-700',   borderClass: 'border-orange-400'  },
+  gte90:   { label: '≥ 90 Hari',  labelClass: 'bg-rose-100 text-rose-700',       borderClass: 'border-rose-400'    }
+};
+
+window.frFilterAging = function(bucket) {
+  _frAgingFilter = bucket;
+
+  // Update card styles
+  ['current','gte30','gte60','gte90'].forEach(function(k) {
+    var card = document.getElementById('fr-aging-card-' + k);
+    if (!card) return;
+    card.classList.remove('border-emerald-400','border-amber-400','border-orange-400','border-rose-400','ring-2');
+    if (k === bucket) {
+      card.classList.add(_frAgingMeta[k].borderClass);
+    }
+  });
+
+  // Update filter bar
+  var bar   = document.getElementById('fr-aging-filter-bar');
+  var lbl   = document.getElementById('fr-aging-filter-label');
+  if (!bucket) {
+    bar.classList.add('hidden'); bar.style.display = '';
+    lbl.textContent = ''; lbl.className = 'text-xs font-semibold px-2.5 py-1 rounded-full';
+  } else {
+    bar.classList.remove('hidden'); bar.style.display = 'flex';
+    var meta = _frAgingMeta[bucket];
+    lbl.textContent = 'Filter: ' + meta.label;
+    lbl.className = 'text-xs font-semibold px-2.5 py-1 rounded-full ' + meta.labelClass;
+  }
+
+  if (_frData) _frRenderTable(_frData.rows || []);
+};
+
+function _frGetInvAgingBucket(tglStr) {
+  if (!tglStr) return null;
+  var parts = tglStr.split('/');
+  if (parts.length !== 3) return null;
+  var d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  if (isNaN(d.getTime())) return null;
+  var days = Math.floor((new Date() - d) / 86400000);
+  if (days >= 90) return 'gte90';
+  if (days >= 60) return 'gte60';
+  if (days >= 30) return 'gte30';
+  return 'current';
+}
+
 function _frRenderTable(rows) {
   var tbody = document.getElementById('fr-table-body');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada data Work Order Deal.</td></tr>';
+
+  // Terapkan filter aging jika aktif
+  var displayRows = rows;
+  if (_frAgingFilter) {
+    displayRows = rows.filter(function(row) {
+      return row.invoices.some(function(inv) {
+        return inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === _frAgingFilter;
+      });
+    });
+  }
+
+  if (!displayRows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">'
+      + (_frAgingFilter ? 'Tidak ada invoice di bucket aging ini.' : 'Tidak ada data Work Order Deal.')
+      + '</td></tr>';
     return;
   }
 
   var html = '';
-  rows.forEach(function(row, idx) {
+  displayRows.forEach(function(row, idx) {
     var lunasSemua = row.tagihan > 0 && row.outstanding <= 0;
     var belumAda   = row.invoices.length === 0;
     var statusHtml = belumAda

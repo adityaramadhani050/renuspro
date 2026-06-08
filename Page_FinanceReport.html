@@ -110,30 +110,47 @@
         <i class="fa-solid fa-clock mr-1"></i> Aging Outstanding (Invoice Belum Lunas)
       </p>
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="bg-emerald-50 rounded-xl p-3 text-center">
+        <div onclick="frFilterAging('current')" id="fr-aging-card-current"
+          class="fr-aging-card bg-emerald-50 hover:bg-emerald-100 rounded-xl p-3 text-center cursor-pointer transition border-2 border-transparent">
           <p class="text-[10px] font-bold text-emerald-600 mb-1">&lt; 30 Hari</p>
           <p id="fr-aging-0" class="text-sm font-extrabold text-emerald-700">—</p>
+          <p class="text-[9px] text-emerald-500 mt-1 font-medium">Klik untuk filter</p>
         </div>
-        <div class="bg-amber-50 rounded-xl p-3 text-center">
+        <div onclick="frFilterAging('gte30')" id="fr-aging-card-gte30"
+          class="fr-aging-card bg-amber-50 hover:bg-amber-100 rounded-xl p-3 text-center cursor-pointer transition border-2 border-transparent">
           <p class="text-[10px] font-bold text-amber-600 mb-1">30–59 Hari</p>
           <p id="fr-aging-30" class="text-sm font-extrabold text-amber-700">—</p>
+          <p class="text-[9px] text-amber-500 mt-1 font-medium">Klik untuk filter</p>
         </div>
-        <div class="bg-orange-50 rounded-xl p-3 text-center">
+        <div onclick="frFilterAging('gte60')" id="fr-aging-card-gte60"
+          class="fr-aging-card bg-orange-50 hover:bg-orange-100 rounded-xl p-3 text-center cursor-pointer transition border-2 border-transparent">
           <p class="text-[10px] font-bold text-orange-600 mb-1">60–89 Hari</p>
           <p id="fr-aging-60" class="text-sm font-extrabold text-orange-700">—</p>
+          <p class="text-[9px] text-orange-500 mt-1 font-medium">Klik untuk filter</p>
         </div>
-        <div class="bg-rose-50 rounded-xl p-3 text-center">
+        <div onclick="frFilterAging('gte90')" id="fr-aging-card-gte90"
+          class="fr-aging-card bg-rose-50 hover:bg-rose-100 rounded-xl p-3 text-center cursor-pointer transition border-2 border-transparent">
           <p class="text-[10px] font-bold text-rose-600 mb-1">&ge; 90 Hari</p>
           <p id="fr-aging-90" class="text-sm font-extrabold text-rose-700">—</p>
+          <p class="text-[9px] text-rose-500 mt-1 font-medium">Klik untuk filter</p>
         </div>
       </div>
     </div>
 
     <!-- Table list WO -->
     <div>
-      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-        <i class="fa-solid fa-list-check mr-1"></i> Progress Pembayaran per Work Order
-      </p>
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <i class="fa-solid fa-list-check mr-1"></i> Progress Pembayaran per Work Order
+        </p>
+        <div id="fr-aging-filter-bar" class="hidden items-center gap-2">
+          <span id="fr-aging-filter-label" class="text-xs font-semibold px-2.5 py-1 rounded-full"></span>
+          <button onclick="frFilterAging(null)"
+            class="text-[11px] font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1 transition">
+            <i class="fa-solid fa-xmark text-xs"></i> Hapus Filter
+          </button>
+        </div>
+      </div>
       <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse">
