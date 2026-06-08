@@ -44,11 +44,24 @@ function _agingBucket(tglStr) {
   return days;
 }
 
+// ── Helper: parse "YYYY-MM-DD" → Date ───────────────────────────────────────
+function _frParseDate(s) {
+  if (!s) return null;
+  var p = s.split('-');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+}
+
 // ── Data utama laporan finance ───────────────────────────────────────────────
-function getFinanceReportData() {
+function getFinanceReportData(filter) {
   try {
     var ss = getSpreadsheet();
     _ensureTanggalBayarCol(ss);
+
+    // Parse rentang tanggal dari filter (opsional)
+    var dateFrom = filter && filter.from ? _frParseDate(filter.from) : null;
+    var dateTo   = filter && filter.to   ? _frParseDate(filter.to)   : null;
+    if (dateTo) dateTo.setHours(23, 59, 59);
 
     // ── 1. Baca semua Work Order (hanya Deal) ──
     var woList = getWorkOrderList(); // sudah ada — hanya WO yang Deal
@@ -82,6 +95,19 @@ function getFinanceReportData() {
         tglBayar = invData[i][20] instanceof Date
           ? Utilities.formatDate(invData[i][20], Session.getScriptTimeZone(), 'dd/MM/yyyy')
           : invData[i][20].toString();
+      }
+
+      // Filter periode: periksa tanggal invoice
+      if (dateFrom || dateTo) {
+        var invDate = invData[i][3] instanceof Date ? invData[i][3] : _frParseDate(
+          (invData[i][3] || '').toString().split('/').reverse().join('-')
+        );
+        if (invDate) {
+          if (dateFrom && invDate < dateFrom) continue;
+          if (dateTo   && invDate > dateTo)   continue;
+        } else {
+          continue; // tanggal tidak bisa di-parse, lewati
+        }
       }
 
       var inv = { noInv: noInv, noWO: noWO, noPen: noPen, tgl: tgl, jenis: jenis,

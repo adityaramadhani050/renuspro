@@ -1,7 +1,7 @@
 <section id="page-laporanfinance" class="page-section">
 
   <!-- Controls bar -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
     <div>
       <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Pembayaran</h2>
     </div>
@@ -17,6 +17,55 @@
         <i class="fa-solid fa-rotate-right text-xs"></i>
       </button>
     </div>
+  </div>
+
+  <!-- Filter Periode -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-150 px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+      <i class="fa-solid fa-calendar-days mr-1 text-blue-500"></i> Periode
+    </span>
+    <!-- Preset buttons -->
+    <div class="flex gap-1.5 flex-wrap">
+      <button id="fr-preset-thisMonth" onclick="setFRPreset('thisMonth')"
+        class="fr-preset-btn active px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-blue-600 text-white border-blue-600">
+        Bulan Ini
+      </button>
+      <button id="fr-preset-lastMonth" onclick="setFRPreset('lastMonth')"
+        class="fr-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Bulan Lalu
+      </button>
+      <button id="fr-preset-thisYear" onclick="setFRPreset('thisYear')"
+        class="fr-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Tahun Ini
+      </button>
+      <button id="fr-preset-all" onclick="setFRPreset('all')"
+        class="fr-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Semua
+      </button>
+      <button id="fr-preset-custom" onclick="setFRPreset('custom')"
+        class="fr-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Custom
+      </button>
+    </div>
+    <!-- Custom range -->
+    <div id="fr-custom-range" class="hidden items-center gap-2 flex-wrap">
+      <input type="date" id="fr-date-from"
+        class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <span class="text-xs text-slate-400">—</span>
+      <input type="date" id="fr-date-to"
+        class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <button onclick="applyFRCustomFilter()"
+        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition">
+        Terapkan
+      </button>
+    </div>
+    <!-- Period label -->
+    <span id="fr-period-label" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full ml-auto whitespace-nowrap"></span>
   </div>
 
   <!-- Loading -->

@@ -3,18 +3,95 @@
 //  LAPORAN FINANCE — JavaScript
 // ================================================================
 
-var _frData = null;
+var _frData   = null;
+var _frFilter = { mode: 'thisMonth', from: null, to: null };
 
+// ── Filter preset ────────────────────────────────────────────────
+window.setFRPreset = function(mode) {
+  _frFilter.mode = mode;
+  document.querySelectorAll('.fr-preset-btn').forEach(function(b) {
+    b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+    b.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+  });
+  var active = document.getElementById('fr-preset-' + mode);
+  if (active) {
+    active.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+    active.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
+  }
+  var customRange = document.getElementById('fr-custom-range');
+  if (mode === 'custom') {
+    customRange.classList.remove('hidden');
+    customRange.style.display = 'flex';
+    return;
+  }
+  customRange.classList.add('hidden');
+
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  if (mode === 'thisMonth') {
+    _frFilter.from = new Date(y, m, 1);
+    _frFilter.to   = new Date(y, m + 1, 0);
+  } else if (mode === 'lastMonth') {
+    var lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y;
+    _frFilter.from = new Date(ly, lm, 1);
+    _frFilter.to   = new Date(ly, lm + 1, 0);
+  } else if (mode === 'thisYear') {
+    _frFilter.from = new Date(y, 0, 1);
+    _frFilter.to   = new Date(y, 11, 31);
+  } else { // all
+    _frFilter.from = null;
+    _frFilter.to   = null;
+  }
+  _frUpdatePeriodLabel();
+  loadFinanceReport();
+};
+
+window.applyFRCustomFilter = function() {
+  var fromVal = document.getElementById('fr-date-from').value;
+  var toVal   = document.getElementById('fr-date-to').value;
+  if (!fromVal || !toVal) { showNotification('Pilih tanggal mulai dan akhir.', 'error'); return; }
+  _frFilter.from = new Date(fromVal);
+  _frFilter.to   = new Date(toVal);
+  _frFilter.to.setHours(23, 59, 59);
+  _frUpdatePeriodLabel();
+  loadFinanceReport();
+};
+
+function _frUpdatePeriodLabel() {
+  var el = document.getElementById('fr-period-label');
+  if (!el) return;
+  var f = _frFilter;
+  if (!f.from && !f.to) { el.textContent = 'Semua Periode'; return; }
+  var opts = { day: '2-digit', month: 'short', year: 'numeric' };
+  var from = f.from ? f.from.toLocaleDateString('id-ID', opts) : '';
+  var to   = f.to   ? f.to.toLocaleDateString('id-ID', opts)   : '';
+  el.textContent = from + (to && to !== from ? ' – ' + to : '');
+}
+
+function _frBuildFilterParam() {
+  if (!_frFilter.from && !_frFilter.to) return null;
+  var fmt = function(d) {
+    return d.getFullYear() + '-'
+      + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
+      + ('0' + d.getDate()).slice(-2);
+  };
+  return {
+    from: _frFilter.from ? fmt(_frFilter.from) : null,
+    to:   _frFilter.to   ? fmt(_frFilter.to)   : null
+  };
+}
+
+// ── Load ─────────────────────────────────────────────────────────
 window.loadFinanceReport = function() {
   document.getElementById('fr-loading').classList.remove('hidden');
   document.getElementById('fr-content').classList.add('hidden');
+  var param = _frBuildFilterParam();
   google.script.run
     .withSuccessHandler(_frRender)
     .withFailureHandler(function(e) {
       document.getElementById('fr-loading').classList.add('hidden');
       showNotification('Gagal memuat data laporan: ' + e.message, 'error');
     })
-    .getFinanceReportData();
+    .getFinanceReportData(param);
 };
 
 function _frFmt(n) {
@@ -29,6 +106,7 @@ function _frRender(data) {
     return;
   }
   _frData = data;
+  _frUpdatePeriodLabel();
 
   var s = data.summary;
   var pct = s.totalTagihan > 0 ? Math.round(s.totalTerbayar / s.totalTagihan * 100) : 0;
