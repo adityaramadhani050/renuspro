@@ -79,30 +79,23 @@
   };
 
   // ── Label periode aktif ──────────────────────────────────────
-  function _updatePeriodLabel() {
-    const el = document.getElementById('db-active-period');
+  window._updatePeriodLabel = function() {
+    var el = document.getElementById('db-period-label');
     if (!el) return;
-    const f = window._dbFilter;
-    const fmt = function(d) {
-      if (!d) return '';
-      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    var params = (typeof _dbGetPeriodParams === 'function') ? _dbGetPeriodParams() : null;
+    if (!params) { el.textContent = ''; return; }
+    // Parse dd/MM/yyyy
+    var parseLabel = function(s) {
+      if (!s) return '';
+      var p = s.split('/');
+      if (p.length !== 3) return s;
+      var d = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+      return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     };
-    el.innerText = fmt(f.from) + ' – ' + fmt(f.to);
-    el.classList.remove('hidden');
-    el.style.display = '';
-  }
+    el.textContent = parseLabel(params.dateFrom) + ' – ' + parseLabel(params.dateTo);
+  };
 
-  // ── Init saat load ───────────────────────────────────────────
-  // Set default thisMonth
-  const now = new Date();
-  window._dbFilter.from = new Date(now.getFullYear(), now.getMonth(), 1);
-  window._dbFilter.to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  // Jalankan _updatePeriodLabel setelah DOM siap
-  document.addEventListener('DOMContentLoaded', function() {
-    _updatePeriodLabel();
-  });
-  setTimeout(_updatePeriodLabel, 300);
+  // Label diupdate oleh _dbLoad() setiap kali data dimuat
 
 })();
 

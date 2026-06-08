@@ -119,16 +119,16 @@ function _dbPrevKPI(items, fromMs, toMs) {
 // ── Period toggle ──────────────────────────────────────────────
 function _dbSetPeriod(mode) {
   _dbPeriodMode = mode;
-  var active   = 'bg-blue-600 text-white border-blue-600';
-  var inactive = 'bg-white text-slate-600 border-slate-200 hover:border-blue-400';
-  var base     = 'text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ';
+  var active   = 'db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition bg-blue-600 text-white border-blue-600';
+  var inactive = 'db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600';
   ['mtd','lastmonth','ytd','custom'].forEach(function(m) {
     var btn = document.getElementById('db-period-' + m);
-    if (btn) btn.className = base + (m === mode ? active : inactive);
+    if (btn) btn.className = m === mode ? active : inactive;
   });
   var customRange = document.getElementById('db-custom-range');
   if (mode === 'custom') {
     customRange.classList.remove('hidden');
+    customRange.style.display = 'flex';
     var today = new Date();
     var fi = document.getElementById('db-date-from');
     var ti = document.getElementById('db-date-to');
@@ -150,6 +150,7 @@ function _dbLoad() {
   // Show loading
   document.getElementById('db-loading').classList.remove('hidden');
   document.getElementById('db-main-content').classList.add('hidden');
+  if (typeof _updatePeriodLabel === 'function') _updatePeriodLabel();
 
   var params = _dbGetPeriodParams();
   if (!params) {

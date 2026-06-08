@@ -1,39 +1,10 @@
 <section id="page-dashboard" class="page-section active">
 
   <!-- Controls bar -->
-  <div class="mb-6">
-    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-      <div>
-        <h2 id="dashboard-title" class="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Dashboard</h2>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <button id="db-period-mtd" onclick="_dbSetPeriod('mtd')"
-          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap bg-blue-600 text-white border-blue-600">
-          Bulan Ini
-        </button>
-        <button id="db-period-lastmonth" onclick="_dbSetPeriod('lastmonth')"
-          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap bg-white text-slate-600 border-slate-200 hover:border-blue-400">
-          Bulan Lalu
-        </button>
-        <button id="db-period-ytd" onclick="_dbSetPeriod('ytd')"
-          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap bg-white text-slate-600 border-slate-200 hover:border-blue-400">
-          Tahun Ini
-        </button>
-        <button id="db-period-custom" onclick="_dbSetPeriod('custom')"
-          class="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap bg-white text-slate-600 border-slate-200 hover:border-blue-400">
-          Custom
-        </button>
-        <div id="db-custom-range" class="hidden flex items-center gap-2 flex-wrap">
-          <input type="date" id="db-date-from"
-            class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
-          <span class="text-xs text-slate-400 font-bold">s/d</span>
-          <input type="date" id="db-date-to"
-            class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 bg-white">
-          <button onclick="_dbLoad()"
-            class="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">
-            Tampilkan
-          </button>
-        </div>
+  <div class="mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <h2 id="dashboard-title" class="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Dashboard</h2>
+      <div class="flex items-center gap-2">
         <button id="db-export-btn" onclick="exportDashboardPDF()" title="Export PDF"
           class="hidden items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition whitespace-nowrap">
           <i class="fa-solid fa-file-pdf text-xs"></i> Export PDF
@@ -44,6 +15,47 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Filter Periode -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-150 px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+      <i class="fa-solid fa-calendar-days mr-1 text-blue-500"></i> Periode
+    </span>
+    <div class="flex gap-1.5 flex-wrap">
+      <button id="db-period-mtd" onclick="_dbSetPeriod('mtd')"
+        class="db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-blue-600 text-white border-blue-600">
+        Bulan Ini
+      </button>
+      <button id="db-period-lastmonth" onclick="_dbSetPeriod('lastmonth')"
+        class="db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Bulan Lalu
+      </button>
+      <button id="db-period-ytd" onclick="_dbSetPeriod('ytd')"
+        class="db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Tahun Ini
+      </button>
+      <button id="db-period-custom" onclick="_dbSetPeriod('custom')"
+        class="db-period-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
+               bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
+        Custom
+      </button>
+    </div>
+    <div id="db-custom-range" class="hidden items-center gap-2 flex-wrap">
+      <input type="date" id="db-date-from"
+        class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <span class="text-xs text-slate-400">—</span>
+      <input type="date" id="db-date-to"
+        class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <button onclick="_dbLoad()"
+        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition">
+        Terapkan
+      </button>
+    </div>
+    <span id="db-period-label" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full ml-auto whitespace-nowrap"></span>
   </div>
 
   <!-- Loading -->
