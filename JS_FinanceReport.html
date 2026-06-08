@@ -306,6 +306,25 @@ window.exportFinanceReportPDF = function() {
   if (!_frData) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
   var data = _frData;
   var s = data.summary;
+
+  // Terapkan filter aging yang sedang aktif di tabel
+  var exportRows = (data.rows || []);
+  if (_frAgingFilter) {
+    exportRows = exportRows.filter(function(row) {
+      return row.invoices.some(function(inv) {
+        return inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === _frAgingFilter;
+      });
+    });
+  }
+
+  // Hitung ulang summary sesuai data yang ditampilkan
+  var exportSummary = { totalTagihan: 0, totalTerbayar: 0, totalOutstanding: 0 };
+  exportRows.forEach(function(row) {
+    exportSummary.totalTagihan    += row.tagihan    || 0;
+    exportSummary.totalTerbayar   += row.terbayar   || 0;
+    exportSummary.totalOutstanding += row.outstanding || 0;
+  });
+
   var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   var W = doc.internal.pageSize.getWidth();
@@ -321,8 +340,23 @@ window.exportFinanceReportPDF = function() {
   y += 4;
   var tglCetak = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
   doc.text('Dicetak: ' + tglCetak, margin, y);
+  y += 4;
+  // Keterangan periode filter
+  var periodLabel = document.getElementById('fr-period-label');
+  if (periodLabel && periodLabel.textContent) {
+    doc.text('Periode: ' + periodLabel.textContent, margin, y);
+    y += 4;
+  }
+  // Keterangan aging filter
+  if (_frAgingFilter && _frAgingMeta[_frAgingFilter]) {
+    doc.text('Filter Aging: ' + _frAgingMeta[_frAgingFilter].label, margin, y);
+    y += 4;
+  }
   doc.setTextColor(0);
-  y += 6;
+  y += 2;
+
+  // Gunakan exportSummary untuk KPI di PDF
+  s = exportSummary;
 
   // KPI summary box
   doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.3);
@@ -372,7 +406,7 @@ window.exportFinanceReportPDF = function() {
   y += 3;
 
   var woHead = [['No WO / Ref', 'Klien', 'Project', 'Nilai Kontrak', 'Total Ditagih', 'Terbayar', 'Outstanding', 'Status']];
-  var woBody = (data.rows || []).map(function(row) {
+  var woBody = exportRows.map(function(row) {
     var st = row.invoices.length === 0 ? 'Belum Ada Invoice'
            : row.outstanding <= 0 ? 'Lunas' : 'Outstanding';
     return [
@@ -412,7 +446,7 @@ window.exportFinanceReportPDF = function() {
   y = doc.lastAutoTable.finalY + 8;
 
   // Per-WO invoice detail
-  (data.rows || []).forEach(function(row) {
+  exportRows.forEach(function(row) {
     if (!row.invoices.length) return;
     if (y > 250) { doc.addPage(); y = margin; }
 
