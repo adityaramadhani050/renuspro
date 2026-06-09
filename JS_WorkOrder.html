@@ -94,10 +94,12 @@
       const rp = v => 'Rp ' + Math.round(v || 0).toLocaleString('id-ID');
       const el = id => document.getElementById(id);
       if (!summary) return;
-      el('wo-sum-count').innerText    = summary.totalWO || 0;
-      el('wo-sum-kontrak').innerText  = rp(summary.totalKontrak);
-      el('wo-sum-ditagih').innerText  = rp(summary.totalDitagih);
-      el('wo-sum-lunas').innerText    = rp(summary.totalLunas);
+      el('wo-sum-count').innerText       = summary.totalWO || 0;
+      el('wo-sum-kontrak').innerText     = rp(summary.totalKontrak);
+      el('wo-sum-ditagih').innerText     = rp(summary.totalDitagih);
+      el('wo-sum-lunas').innerText       = rp(summary.totalLunas);
+      var outstandingEl = el('wo-sum-outstanding');
+      if (outstandingEl) outstandingEl.innerText = rp((summary.totalDitagih || 0) - (summary.totalLunas || 0));
     }
 
     // ── Load ──
