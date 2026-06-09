@@ -383,7 +383,7 @@ window.exportFinanceReportPDF = function() {
     { key:'gte60',   label:'60-89 HARI', headFill:[124,45,18] },
     { key:'gte90',   label:'> 90 HARI',  headFill:[159,18,57] }
   ];
-  var woHead = [['No WO / Penawaran','Klien / Project','Nilai Kontrak','Ditagih','Terbayar','Outstanding']];
+  var woHead = [['No WO / Penawaran','Klien / Project','Nilai Kontrak','Ditagih','Terbayar','Outstanding','Aging (Hari)']];
 
   agingBuckets.forEach(function(bucket) {
     var bucketRows = allRows.filter(function(row) {
@@ -408,8 +408,17 @@ window.exportFinanceReportPDF = function() {
 
     var woBody = bucketRows.map(function(row) {
       var outstandingBucket = 0;
+      var maxDays = 0;
       row.invoices.forEach(function(inv) {
-        if (inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === bucket.key) outstandingBucket += inv.total || 0;
+        if (inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === bucket.key) {
+          outstandingBucket += inv.total || 0;
+          var p = (inv.tgl || '').split('/');
+          if (p.length === 3) {
+            var d = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+            var days = isNaN(d.getTime()) ? 0 : Math.floor((new Date() - d) / 86400000);
+            if (days > maxDays) maxDays = days;
+          }
+        }
       });
       return [
         (row.noWO ? 'WO-' + row.noWO + '\n' : '') + row.noPenawaran,
@@ -417,7 +426,8 @@ window.exportFinanceReportPDF = function() {
         row.nilaiKontrak ? rp(row.nilaiKontrak) : '-',
         row.tagihan      ? rp(row.tagihan)      : '-',
         row.terbayar     ? rp(row.terbayar)     : '-',
-        outstandingBucket > 0 ? rp(outstandingBucket) : '-'
+        outstandingBucket > 0 ? rp(outstandingBucket) : '-',
+        maxDays > 0 ? maxDays + ' hari' : '-'
       ];
     });
 
@@ -427,77 +437,17 @@ window.exportFinanceReportPDF = function() {
       styles: { fontSize: 7, cellPadding: 2, font:'helvetica', textColor: DARK },
       headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 32 }, 1: { cellWidth: 48 },
-        2: { halign:'right', cellWidth: 26 }, 3: { halign:'right', cellWidth: 22 },
-        4: { halign:'right', cellWidth: 22 }, 5: { halign:'right', fontStyle:'bold', cellWidth: 26 }
+        0: { cellWidth: 30 }, 1: { cellWidth: 44 },
+        2: { halign:'right', cellWidth: 24 }, 3: { halign:'right', cellWidth: 22 },
+        4: { halign:'right', cellWidth: 22 }, 5: { halign:'right', fontStyle:'bold', cellWidth: 24 },
+        6: { halign:'center', cellWidth: 16 }
       },
       alternateRowStyles: { fillColor: [248,250,252] },
       didParseCell: function(d) {
         if (d.section === 'body' && d.column.index === 5) d.cell.styles.textColor = RED;
       }
     });
-    y = doc.lastAutoTable.finalY + 4;
-
-    // Detail invoice per WO untuk bucket ini
-    bucketRows.forEach(function(row) {
-      var invBucket = row.invoices.filter(function(inv) {
-        return inv.status !== 'Lunas' && _frGetInvAgingBucket(inv.tgl) === bucket.key;
-      });
-      if (!invBucket.length) return;
-      if (y > 245) { doc.addPage(); y = 14; }
-
-      var ref = (row.noWO ? 'WO-' + row.noWO + '  ' : '') + row.noPenawaran
-              + '  |  ' + (row.namaKlien || '') + '  —  ' + (row.namaProject || '');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...DARK);
-      doc.text(ref, ML + 2, y + 3);
-      y += 5;
-
-      var totalOutBucket = 0;
-      invBucket.forEach(function(inv) { totalOutBucket += inv.total || 0; });
-
-      var invHead = [['No Invoice','Tgl Invoice','Jenis','DPP','PPN','Total','Tgl Jatuh Tempo / Hari']];
-      var invBody = invBucket.map(function(inv) {
-        var days = (function() {
-          var p = (inv.tgl||'').split('/');
-          if (p.length !== 3) return '-';
-          var d = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
-          return isNaN(d.getTime()) ? '-' : (Math.floor((new Date()-d)/86400000) + ' hari');
-        })();
-        return [
-          inv.noInv      || '-',
-          inv.tgl        || '-',
-          inv.jenis      || '-',
-          rp(inv.dpp),
-          inv.ppnPct ? inv.ppnPct + '%' : '-',
-          rp(inv.total),
-          days
-        ];
-      });
-      // Baris total
-      invBody.push(['', '', '', '', 'TOTAL AGING ' + bucket.label, rp(totalOutBucket), '']);
-
-      doc.autoTable({
-        startY: y, margin: { left: ML + 4, right: MR },
-        head: invHead, body: invBody, theme: 'grid',
-        styles: { fontSize: 6.5, cellPadding: 1.8, font:'helvetica', textColor: DARK },
-        headStyles: { fillColor: [71,85,105], textColor: WHITE, fontStyle:'bold', fontSize: 6.5 },
-        columnStyles: {
-          3: { halign:'right' }, 5: { halign:'right', fontStyle:'bold' },
-          6: { halign:'center' }
-        },
-        alternateRowStyles: { fillColor: [250,250,252] },
-        didParseCell: function(d) {
-          var lastRow = invBody.length - 1;
-          if (d.section === 'body' && d.row.index === lastRow) {
-            d.cell.styles.fontStyle = 'bold';
-            d.cell.styles.fillColor = [241,245,249];
-            if (d.column.index === 5) d.cell.styles.textColor = RED;
-          }
-        }
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    });
-    y += 4;
+    y = doc.lastAutoTable.finalY + 8;
   });
 
   // ── Page numbers ──────────────────────────────────────────────
