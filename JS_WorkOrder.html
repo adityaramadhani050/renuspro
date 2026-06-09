@@ -99,7 +99,7 @@
       el('wo-sum-ditagih').innerText     = rp(summary.totalDitagih);
       el('wo-sum-lunas').innerText       = rp(summary.totalLunas);
       var outstandingEl = el('wo-sum-outstanding');
-      if (outstandingEl) outstandingEl.innerText = rp((summary.totalDitagih || 0) - (summary.totalLunas || 0));
+      if (outstandingEl) outstandingEl.innerText = rp((summary.totalKontrak || 0) - (summary.totalLunas || 0));
     }
 
     // ── Load ──
