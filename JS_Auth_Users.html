@@ -41,16 +41,18 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:   ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings'],
-  finance: ['workorder','invoice','kwitansi','laporanfinance'],
-  sales:   ['penawaran','workorder','produk','template','customer']
+  admin:     ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings'],
+  finance:   ['workorder','invoice','kwitansi','laporanfinance'],
+  sales:     ['penawaran','workorder','produk','template','customer'],
+  leadsales: ['dashboard','penawaran','workorder','produk','template','customer']
 };
 const _ROLE_BADGE = {
-  admin:   'bg-blue-100 text-blue-700',
-  finance: 'bg-violet-100 text-violet-700',
-  sales:   'bg-emerald-100 text-emerald-700'
+  admin:     'bg-blue-100 text-blue-700',
+  finance:   'bg-violet-100 text-violet-700',
+  sales:     'bg-emerald-100 text-emerald-700',
+  leadsales: 'bg-orange-100 text-orange-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
