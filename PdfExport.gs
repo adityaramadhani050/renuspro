@@ -442,7 +442,7 @@ function _isiHeaderTemplate(namedRangeCache, item, klien, tc) {
   set('tpl_valid_until',      item.validUntil       || '');
   set('tpl_rev',              item.rev    || '0');
   set('tpl_dibuat_oleh',      item.dibuatOleh       || '');
-  set('tpl_nama_project',     item.namaProject      || '');
+  set('tpl_nama_project',     '');
   set('tpl_klien_nama',       klien.nama            || item.namaKlien || '');
   set('tpl_klien_perusahaan', klien.perusahaan      || '');
   set('tpl_klien_alamat',     klien.alamat          || '');
