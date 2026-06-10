@@ -14,14 +14,14 @@ function _getOrCreateMasterUser(ss) {
   if (!sheet) {
     sheet = ss.insertSheet('Master_User');
     // Header
-    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif', 'Target Bulanan']);
+    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif', 'Target Bulanan', 'Lead_ID']);
     // Format header
-    sheet.getRange(1, 1, 1, 6)
+    sheet.getRange(1, 1, 1, 8)
       .setBackground('#1e3a8a')
       .setFontColor('#ffffff')
       .setFontWeight('bold');
     sheet.setFrozenRows(1);
-    sheet.setColumnWidths(1, 6, [60, 160, 120, 120, 80, 60]);
+    sheet.setColumnWidths(1, 8, [60, 160, 120, 120, 80, 60, 100, 80]);
 
     // Seed: 1 admin default
     sheet.appendRow(['U001', 'Administrator', 'admin', 'admin123', 'admin', 'TRUE']);
@@ -56,6 +56,7 @@ function loginUser(username, password) {
       const rowPass  = data[i][3] ? data[i][3].toString().trim() : '';
       const rowRole  = data[i][4] ? data[i][4].toString().trim().toLowerCase() : 'sales';
       const rowAktif = data[i][5] ? data[i][5].toString().trim().toUpperCase() : 'TRUE';
+      const rowLeadId = data[i][7] ? data[i][7].toString().trim() : '';
 
       if (rowUser === uname && rowPass === pass) {
         if (rowAktif === 'FALSE') {
@@ -63,7 +64,7 @@ function loginUser(username, password) {
         }
         return {
           success: true,
-          user: { id: rowId, nama: rowNama, username: rowUser, role: rowRole },
+          user: { id: rowId, nama: rowNama, username: rowUser, role: rowRole, leadId: rowLeadId },
           message: 'Selamat datang, ' + rowNama + '!'
         };
       }
@@ -92,7 +93,8 @@ function getUserList() {
         // Password sengaja tidak dikirim ke client
         role:          data[i][4].toString(),
         aktif:         data[i][5].toString().toUpperCase() !== 'FALSE',
-        targetBulanan: parseFloat(data[i][6]) || 0
+        targetBulanan: parseFloat(data[i][6]) || 0,
+        leadId:        data[i][7] ? data[i][7].toString().trim() : ''
       });
     }
     return list;
@@ -100,7 +102,7 @@ function getUserList() {
 }
 
 // ── Tambah user baru (admin only) ─────────────────────────────────────────
-function simpanUser(nama, username, password, role) {
+function simpanUser(nama, username, password, role, leadId) {
   try {
     if (!nama || !username || !password || !role) {
       return { success: false, message: 'Semua field wajib diisi.' };
@@ -124,7 +126,7 @@ function simpanUser(nama, username, password, role) {
     }
     const nextId = 'U' + String(maxNum + 1).padStart(3, '0');
 
-    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0]);
+    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || '')]);
     return { success: true, message: 'User ' + nextId + ' (' + nama + ') berhasil ditambahkan!' };
   } catch(e) {
     return { success: false, message: e.toString() };
@@ -132,7 +134,7 @@ function simpanUser(nama, username, password, role) {
 }
 
 // ── Edit user (admin only) ────────────────────────────────────────────────
-function editUser(id, nama, username, password, role, aktif, targetBulanan) {
+function editUser(id, nama, username, password, role, aktif, targetBulanan, leadId) {
   try {
     if (!id || !nama || !username || !role) {
       return { success: false, message: 'Data tidak lengkap.' };
@@ -150,10 +152,10 @@ function editUser(id, nama, username, password, role, aktif, targetBulanan) {
           }
         }
         const newPass = (password && password.trim()) ? password.trim() : data[i][3].toString();
-        sheet.getRange(i + 1, 2, 1, 6).setValues([[
+        sheet.getRange(i + 1, 2, 1, 7).setValues([[
           nama, username.trim().toLowerCase(), newPass,
           role.toLowerCase(), aktif ? 'TRUE' : 'FALSE',
-          parseFloat(targetBulanan) || 0
+          parseFloat(targetBulanan) || 0, (leadId || '')
         ]]);
         return { success: true, message: 'User ' + id + ' berhasil diperbarui!' };
       }
@@ -175,6 +177,24 @@ function hapusUser(id) {
     }
     return { success: false, message: 'User tidak ditemukan.' };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ── Get team members for a Lead Sales ─────────────────────────────────────
+function getLeadSalesTeam(leadId) {
+  try {
+    var sheet = _getOrCreateMasterUser();
+    var data = sheet.getDataRange().getValues();
+    var names = [];
+    for (var i = 1; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      var rowLeadId = data[i][7] ? data[i][7].toString().trim() : '';
+      var rowAktif  = data[i][5] ? data[i][5].toString().toUpperCase() : 'TRUE';
+      if (rowLeadId === leadId && rowAktif !== 'FALSE') {
+        names.push(data[i][1].toString().trim()); // Nama Lengkap
+      }
+    }
+    return { success: true, names: names };
+  } catch(e) { return { success: false, names: [] }; }
 }
 
 // ── Ganti password (self-service) ─────────────────────────────────────────

@@ -3,7 +3,7 @@
  * Dashboard: data mentah untuk kalkulasi KPI di sisi klien.
  */
 
-function getDashboardRawData(namaUser, isAdmin) {
+function getDashboardRawData(namaUser, isAdmin, role, userId) {
   try {
     const ss = getSpreadsheet();
     const sheetMain   = ss.getSheetByName('Penawaran_Main') || buatSheetPenawaranDefault(ss);
@@ -11,6 +11,27 @@ function getDashboardRawData(namaUser, isAdmin) {
     const sheetKlien  = ss.getSheetByName('Master_Klien')   || buatSheetKlienDefault(ss);
 
     const dataMain = sheetMain.getDataRange().getValues();
+
+    // For leadsales: get team member names from Master_User
+    var teamNames = null; // null = all, array = filter to these names
+    if (role === 'leadsales' && userId) {
+      try {
+        var userSheet = ss.getSheetByName('Master_User');
+        if (userSheet) {
+          var uData = userSheet.getDataRange().getValues();
+          teamNames = [];
+          for (var ti = 1; ti < uData.length; ti++) {
+            if (!uData[ti][0]) continue;
+            var tLeadId = uData[ti][7] ? uData[ti][7].toString().trim() : '';
+            var tAktif  = uData[ti][5] ? uData[ti][5].toString().toUpperCase() : 'TRUE';
+            if (tLeadId === userId && tAktif !== 'FALSE') {
+              teamNames.push(uData[ti][1].toString().trim());
+            }
+          }
+        }
+      } catch(e) {}
+    }
+
     const klienMap = {};
     const kdArr    = sheetKlien.getDataRange().getValues();
     for (let i = 1; i < kdArr.length; i++) {
@@ -33,9 +54,16 @@ function getDashboardRawData(namaUser, isAdmin) {
     const latestRevMap = {};
     for (let i = 1; i < dataMain.length; i++) {
       if (!dataMain[i][0]) continue;
-      if (!isAdmin && namaUser) {
+      if (!isAdmin && role !== 'leadsales') {
+        // Regular sales: only own data
+        if (namaUser) {
+          const pembuat = dataMain[i][6] ? dataMain[i][6].toString().trim() : '';
+          if (pembuat !== namaUser.trim()) continue;
+        }
+      } else if (role === 'leadsales' && teamNames !== null) {
+        // Lead sales: only team members
         const pembuat = dataMain[i][6] ? dataMain[i][6].toString().trim() : '';
-        if (pembuat !== namaUser.trim()) continue;
+        if (!teamNames.includes(pembuat)) continue;
       }
       const no  = dataMain[i][0].toString();
       const rev = parseInt(dataMain[i][1]) || 0;
@@ -66,7 +94,9 @@ function getDashboardRawData(namaUser, isAdmin) {
       totalProducts:  Math.max(0, sheetProduk.getLastRow() - 1),
       totalCustomers: Math.max(0, sheetKlien.getLastRow()  - 1),
       isAdmin:        !!isAdmin,
-      namaUser:       namaUser || ''
+      namaUser:       namaUser || '',
+      isLeadSales:    role === 'leadsales',
+      teamNames:      teamNames || []
     };
   } catch(e) {
     return { success: false, items: [], totalProducts: 0, totalCustomers: 0, isAdmin: false, namaUser: '' };

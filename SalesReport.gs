@@ -238,8 +238,11 @@ function getSalesReportData(params) {
 
       var namaKlien = klienMap[klienId] || klienId;
 
-      // Access control: non-admin sees only own data
-      if (!isAdmin && dibuatOleh !== namaUser) continue;
+      // Access control
+      if (!isAdmin && params.role !== 'leadsales' && dibuatOleh !== namaUser) continue;
+      if (params.role === 'leadsales' && Array.isArray(params.teamNames) && params.teamNames.length > 0) {
+        if (!params.teamNames.includes(dibuatOleh)) continue;
+      }
 
       ensureSales(dibuatOleh);
       var sd = salesData[dibuatOleh];

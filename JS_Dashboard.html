@@ -161,10 +161,14 @@ function _dbLoad() {
   // Attach user context
   if (typeof _currentUser !== 'undefined' && _currentUser) {
     params.isAdmin  = _currentUser.role === 'admin';
-    params.namaUser = _currentUser.nama || '';
+    params.namaUser = _currentUser.nama  || '';
+    params.role     = _currentUser.role  || 'sales';
+    params.userId   = _currentUser.id    || '';
   } else {
     params.isAdmin  = true;
     params.namaUser = '';
+    params.role     = 'admin';
+    params.userId   = '';
   }
 
   if (typeof google === 'undefined') {
@@ -195,7 +199,7 @@ function _dbLoad() {
         rawR = _dbRawCache;
         tryRender();
       })
-      .getDashboardRawData(params.namaUser, params.isAdmin);
+      .getDashboardRawData(params.namaUser, params.isAdmin, params.role, params.userId);
 
     google.script.run
       .withSuccessHandler(function(sales) { salesR = sales; tryRender(); })
@@ -218,25 +222,28 @@ function _dbShowError(msg) {
 // ── Main render ────────────────────────────────────────────────
 function _dbRenderAll(rawData, salesData) {
   var isAdmin = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin');
+  var isLeadSales = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'leadsales');
 
   // Dashboard title
   var titleEl = document.getElementById('dashboard-title');
   if (titleEl) {
     titleEl.textContent = isAdmin
       ? 'Ringkasan Performa Tim Sales'
-      : 'Ringkasan Performa ' + (_currentUser ? _currentUser.nama : '');
+      : isLeadSales
+        ? 'Dashboard Tim – ' + (_currentUser ? _currentUser.nama : '')
+        : 'Ringkasan Performa ' + (_currentUser ? _currentUser.nama : '');
   }
 
-  // Export button (admin only)
+  // Export button (admin or leadsales)
   var expBtn = document.getElementById('db-export-btn');
   if (expBtn) {
-    expBtn.classList.toggle('hidden', !isAdmin);
-    expBtn.classList.toggle('flex', isAdmin);
+    expBtn.classList.toggle('hidden', !(isAdmin || isLeadSales));
+    expBtn.classList.toggle('flex', isAdmin || isLeadSales);
   }
 
-  // Admin-only sections
-  document.getElementById('db-leaderboard-section').classList.toggle('hidden', !isAdmin);
-  document.getElementById('db-detail-section').classList.toggle('hidden', !isAdmin);
+  // Admin/leadsales sections
+  document.getElementById('db-leaderboard-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
+  document.getElementById('db-detail-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
 
   var items   = (rawData && rawData.items) ? rawData.items : [];
   var summary = (salesData && salesData.summary) ? salesData.summary : {};
@@ -253,7 +260,7 @@ function _dbRenderAll(rawData, salesData) {
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
   _dbRenderDonut(items, ms.fromMs, ms.toMs);
-  if (isAdmin) {
+  if (isAdmin || isLeadSales) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
   }
