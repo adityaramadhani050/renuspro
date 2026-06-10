@@ -67,13 +67,21 @@ function _insertDocSign(sheet, anchorRow, anchorCol, noDoc, totalCols) {
     .setFontStyle('italic').setHorizontalAlignment('right').setFontColor('#000000');
   sheet.setRowHeight(anchorRow + 5, 18);
 
+  // ── Hapus gambar lama di area footer (agar tidak dobel) ──────────────────
+  try {
+    var existingImgs = sheet.getImages();
+    for (var i = 0; i < existingImgs.length; i++) {
+      var ac = existingImgs[i].getAnchorCell();
+      if (ac && ac.getRow() >= anchorRow - 6) existingImgs[i].remove();
+    }
+  } catch (e) { Logger.log('Remove old images error: ' + e); }
+
   // ── Sisipkan gambar tanda tangan (jika ada) ───────────────────────────────
   if (cfg.sigBase64) {
     try {
       var sigBytes = Utilities.base64Decode(cfg.sigBase64);
       var sigBlob  = Utilities.newBlob(sigBytes, 'image/png', 'signature.png');
-      // Ukuran tetap gambar TTD
-      var SIG_W = 160, SIG_H = 90;
+      var SIG_W = 150;
       // Hitung total lebar area agar gambar rata kanan
       var totalWidthPx = 0;
       for (var c = anchorCol; c < anchorCol + totalCols; c++) {
@@ -81,7 +89,7 @@ function _insertDocSign(sheet, anchorRow, anchorCol, noDoc, totalCols) {
       }
       var offsetX = Math.max(0, totalWidthPx - SIG_W);
       var img = sheet.insertImage(sigBlob, anchorCol, anchorRow + 1, offsetX, 4);
-      img.setWidth(SIG_W).setHeight(SIG_H);
+      img.setWidth(SIG_W); // hanya set lebar, tinggi menyesuaikan proporsi asli
     } catch (e) {
       Logger.log('Insert signature error: ' + e);
     }
