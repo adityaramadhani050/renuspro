@@ -72,12 +72,16 @@ function _insertDocSign(sheet, anchorRow, anchorCol, noDoc, totalCols) {
     try {
       var sigBytes = Utilities.base64Decode(cfg.sigBase64);
       var sigBlob  = Utilities.newBlob(sigBytes, 'image/png', 'signature.png');
-      // Hitung offset X agar gambar rata kanan
+      // Ukuran tetap gambar TTD
+      var SIG_W = 160, SIG_H = 90;
+      // Hitung total lebar area agar gambar rata kanan
       var totalWidthPx = 0;
-      for (var c = anchorCol; c < anchorCol + totalCols; c++) totalWidthPx += sheet.getColumnWidth(c);
-      var sigW = Math.min(160, totalWidthPx);
-      var offsetX = totalWidthPx - sigW;
-      sheet.insertImage(sigBlob, anchorCol, anchorRow + 1, offsetX, 4);
+      for (var c = anchorCol; c < anchorCol + totalCols; c++) {
+        totalWidthPx += sheet.getColumnWidth(c);
+      }
+      var offsetX = Math.max(0, totalWidthPx - SIG_W);
+      var img = sheet.insertImage(sigBlob, anchorCol, anchorRow + 1, offsetX, 4);
+      img.setWidth(SIG_W).setHeight(SIG_H);
     } catch (e) {
       Logger.log('Insert signature error: ' + e);
     }
