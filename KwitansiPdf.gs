@@ -39,10 +39,24 @@ function exportKwitansiDariTemplate(idKwitansi) {
     set('kw_ref_invoice', kw.noInvoice);
 
     SpreadsheetApp.flush();
+
+    // Sisipkan tanda tangan + QR di bawah konten kwitansi
+    const lastRow = sheet.getLastRow() + 2;
+    const lastCol = sheet.getLastColumn() || 6;
+    _insertDocSign(sheet, lastRow, 1, kw.id, lastCol);
+
+    SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
 
+    // Bersihkan baris ttd yang disisipkan agar template tidak berubah permanen
+    try {
+      const newLast = sheet.getLastRow();
+      if (newLast > lastRow - 1) sheet.deleteRows(lastRow - 1, newLast - lastRow + 2);
+    } catch(e) {}
+
     const safe = (s) => (s || '').toString().replace(/[\\/]/g, '-');
-    return { success: true, pdfBase64: pdfBase64, fileName: 'Kwitansi_' + safe(kw.id) + '_' + safe(kw.terimaDari) + '.pdf' };
+    return { success: true, pdfBase64: pdfBase64,
+      fileName: safe(kw.id) + '_' + safe(kw.untuk) + '_' + safe(kw.terimaDari) + '.pdf' };
   } catch (e) {
     Logger.log('exportKwitansiDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export kwitansi: ' + e.toString() };

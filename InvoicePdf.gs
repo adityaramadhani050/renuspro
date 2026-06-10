@@ -256,23 +256,8 @@ function _sisipkanFooterInvoice(sheet, startRow, inv) {
   sheet.getRange(row, 1, 1, NCOLS).merge().setBackground('#ffffff');
   row++;
 
-  // Tanda tangan (kanan)
-  sheet.insertRowsAfter(row - 1, 4);
-  sheet.getRange(row, 6, 1, 3)
-    .merge()
-    .setValue('Hormat kami,')
-    .setHorizontalAlignment('center')
-    .setFontColor('#000000');
-  sheet.setRowHeight(row, 20);
-  const ttdRow = row;
-  row += 3;
-  sheet.getRange(row, 6, 1, 3)
-    .merge()
-    .setValue('PT. RENUS GLOBAL INDONESIA')
-    .setHorizontalAlignment('center')
-    .setFontWeight('bold')
-    .setFontColor('#000000');
-  sheet.setRowHeight(row, 20);
+  // Tanda tangan + QR verifikasi
+  row = _insertDocSign(sheet, row, 1, inv.id, NCOLS);
 }
 
 function _capitalize(s) {
