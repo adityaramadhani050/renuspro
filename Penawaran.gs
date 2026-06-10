@@ -63,8 +63,9 @@ function getPenawaranList() {
           termConditions: data[i][14] ? data[i][14].toString() : '{}',
           items:          data[i][15] ? data[i][15].toString() : '[]',
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
-          noWO:           data[i][17] ? data[i][17].toString() : '',
-          tanggalDeal:    data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : '')
+          noWO:              data[i][17] ? data[i][17].toString() : '',
+          tanggalDeal:       data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : ''),
+          channelMarketing:  data[i][19] ? data[i][19].toString() : ''
         };
       }
     }
@@ -129,8 +130,9 @@ function getRiwayatRevisi(noPenawaran) {
         marginPersen:  parseFloat(data[i][13]) || 0,
         termConditions: data[i][14] ? data[i][14].toString() : '{}',
         items:          data[i][15] ? data[i][15].toString() : '[]',
-        status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
-        noWO:           data[i][17] ? data[i][17].toString() : ''
+        status:            data[i][16] ? data[i][16].toString() : 'On-Progress',
+        noWO:              data[i][17] ? data[i][17].toString() : '',
+        channelMarketing:  data[i][19] ? data[i][19].toString() : ''
       });
     }
 
@@ -301,10 +303,11 @@ function simpanPenawaranKeSheet(payload) {
     delete cleanTermConditions.pajakNominal;
 
     sheetMain.appendRow([
-      payload.noPenawaran, latestRev, payload.tanggal, payload.validUntil, payload.namaProject,           
-      payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,            
-      totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTermConditions), 
-      JSON.stringify(payload.items), "On-Progress"                        
+      payload.noPenawaran, latestRev, payload.tanggal, payload.validUntil, payload.namaProject,
+      payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,
+      totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTermConditions),
+      JSON.stringify(payload.items), "On-Progress", '', '',
+      payload.channelMarketing || ''
     ]);
 
     const nextNo = generateNextQuotationNumber(ss);
@@ -476,7 +479,8 @@ function editPenawaran(payload) {
       payload.noPenawaran, newRev, payload.tanggal, payload.validUntil, payload.namaProject,
       payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,
       totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTC),
-      JSON.stringify(payload.items), payload.status || "On-Progress"
+      JSON.stringify(payload.items), payload.status || "On-Progress", '', '',
+      payload.channelMarketing || ''
     ]);
 
     const nextNo = generateNextQuotationNumber(ss);

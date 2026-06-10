@@ -306,6 +306,7 @@
       document.getElementById('klienSelect').value  = '';
       sdReset('klienSelect');
       document.getElementById('catatanTambahan').value = '';
+      document.getElementById('channelMarketing').value = '';
 
       // Reset tanggal
       document.getElementById('tglPenawaran').valueAsDate = new Date();
@@ -334,6 +335,7 @@
       const payload = {
         noPenawaran: document.getElementById('noPenawaran').value, tanggal: document.getElementById('tglPenawaran').value, validUntil: document.getElementById('validUntil').value,
         namaProject: document.getElementById('namaProject').value, klienId: document.getElementById('klienSelect').value, namaUser: '', catatan: document.getElementById('catatanTambahan').value,
+        channelMarketing: document.getElementById('channelMarketing').value || '',
         subtotal: kalkulasiGlobalState.subtotalSemua, grandTotal: kalkulasiGlobalState.grandTotal,
         termConditions: {
           material_status: document.getElementById('tc_material').value, dp_status: document.getElementById('tc_dp').value, term_pay: document.getElementById('tc_term').value,
@@ -808,6 +810,7 @@
       // Isi field dasar
       document.getElementById('noPenawaran').value  = item.id;
       document.getElementById('namaProject').value  = item.namaProject;
+      document.getElementById('channelMarketing').value = item.channelMarketing || '';
 
       // Konversi tanggal dd/MM/yyyy → yyyy-MM-dd
       const toInputDate = str => {

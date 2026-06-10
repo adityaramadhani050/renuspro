@@ -61,6 +61,7 @@
               <td class="p-4 max-w-[220px]">
                 <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.namaKlien}</p>
                 <p class="font-semibold text-slate-700 truncate leading-snug">${i.namaProject}</p>
+                ${i.channelMarketing ? `<span class="inline-flex items-center mt-1 bg-indigo-50 text-indigo-700 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-indigo-100"><i class="fa-solid fa-bullhorn mr-1 text-[9px]"></i>${i.channelMarketing}</span>` : ''}
               </td>
               <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
               <td class="p-4 text-right font-bold text-slate-800">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
