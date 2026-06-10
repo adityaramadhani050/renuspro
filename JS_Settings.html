@@ -10,6 +10,7 @@ function loadSettings() {
   _loadWAConfig();
   _loadTCOptions();
   _loadBankAccounts();
+  _loadDocSign();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -290,4 +291,80 @@ function _persistBankAccounts() {
     })
     .saveBankAccounts(_bankData);
 }
+
+// ── Tanda Tangan Digital ──────────────────────────────────────────────────────
+var _signBase64Pending = null; // base64 baru yang belum disimpan
+
+function _loadDocSign() {
+  google.script.run
+    .withSuccessHandler(function(cfg) {
+      var enableEl = document.getElementById('sign-enabled');
+      var urlEl    = document.getElementById('sign-verify-url');
+      if (enableEl) enableEl.checked = cfg.sigEnabled !== false;
+      if (urlEl)    urlEl.value = cfg.verifyUrl || '';
+      if (cfg.sigBase64) {
+        _showSignPreview('data:image/png;base64,' + cfg.sigBase64);
+      }
+    })
+    .withFailureHandler(function(e) { showToast('Gagal load konfigurasi tanda tangan: ' + e.message, 'error'); })
+    .getDocSignConfig();
+}
+
+function _showSignPreview(dataUrl) {
+  var wrap = document.getElementById('sign-preview-wrap');
+  var img  = document.getElementById('sign-preview');
+  var clrBtn = document.getElementById('sign-clear-btn');
+  if (wrap) { wrap.classList.remove('hidden'); wrap.style.display = 'flex'; }
+  if (img)  img.src = dataUrl;
+  if (clrBtn) { clrBtn.classList.remove('hidden'); clrBtn.style.display = 'flex'; }
+}
+
+window.onSignFileChange = function(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _signBase64Pending = e.target.result; // data:image/...;base64,...
+    _showSignPreview(_signBase64Pending);
+  };
+  reader.readAsDataURL(file);
+};
+
+window.clearSignature = function() {
+  if (!confirm('Hapus gambar tanda tangan?')) return;
+  _signBase64Pending = null;
+  var wrap   = document.getElementById('sign-preview-wrap');
+  var img    = document.getElementById('sign-preview');
+  var clrBtn = document.getElementById('sign-clear-btn');
+  if (wrap)   { wrap.classList.add('hidden'); wrap.style.display = ''; }
+  if (img)    img.src = '';
+  if (clrBtn) { clrBtn.classList.add('hidden'); clrBtn.style.display = ''; }
+  document.getElementById('sign-file-input').value = '';
+  google.script.run
+    .withSuccessHandler(function() { showToast('Tanda tangan dihapus.', 'success'); })
+    .clearSignatureImage();
+};
+
+window.simpanDocSign = function() {
+  var enabled = document.getElementById('sign-enabled').checked;
+  var url     = (document.getElementById('sign-verify-url').value || '').trim();
+
+  var payload = { sigEnabled: enabled, verifyUrl: url };
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (_signBase64Pending) {
+        google.script.run
+          .withSuccessHandler(function() {
+            _signBase64Pending = null;
+            showToast('Pengaturan tanda tangan disimpan.', 'success');
+          })
+          .withFailureHandler(function(e) { showToast('Gagal simpan gambar: ' + e.message, 'error'); })
+          .saveSignatureImage(_signBase64Pending);
+      } else {
+        showToast('Pengaturan tanda tangan disimpan.', 'success');
+      }
+    })
+    .withFailureHandler(function(e) { showToast('Error: ' + e.message, 'error'); })
+    .saveDocSignConfig(payload);
+};
 </script>

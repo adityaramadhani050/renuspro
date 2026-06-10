@@ -437,32 +437,8 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   sheet.getRange(row, 1, 1, NCOLS).merge().setBackground('#ffffff');
   row++;
 
-  // Tanda tangan (kanan)
-  sheet.insertRowsAfter(row - 1, 4);
-  sheet.getRange(row, ttdStart, 1, ttdSpan)
-    .merge()
-    .setValue('Hormat kami,')
-    .setHorizontalAlignment('right')
-    .setFontColor('#000000');
-  sheet.setRowHeight(row, 20);
-  row += 2;
-  sheet.getRange(row, ttdStart, 1, ttdSpan)
-    .merge()
-    .setValue('Nur Ashri Kurnia F')
-    .setHorizontalAlignment('right')
-    .setFontWeight('bold')
-    .setFontColor('#000000')
-    .setFontLine('underline');
-  sheet.setRowHeight(row, 20);
-  row ++;
-  sheet.getRange(row, ttdStart, 1, ttdSpan)
-    .merge()
-    .setValue('Direktur')
-    .setHorizontalAlignment('right')
-    .setFontWeight('normal')
-    .setFontColor('#000000')
-    .setFontStyle('italic');
-  sheet.setRowHeight(row, 20);
+  // Tanda tangan + QR verifikasi
+  row = _insertDocSign(sheet, row, 1, inv.id, NCOLS);
 }
 
 function _capitalize(s) {
