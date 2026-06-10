@@ -319,6 +319,37 @@ function filterTabelUsers() {
   });
 }
 
+function _onUserRoleChange() {
+  var role = document.getElementById('modal-user-role').value;
+  var leadWrap = document.getElementById('modal-user-lead-wrap');
+  if (leadWrap) {
+    if (role === 'sales') {
+      leadWrap.classList.remove('hidden');
+      _populateLeadDropdown();
+    } else {
+      leadWrap.classList.add('hidden');
+    }
+  }
+}
+
+function _populateLeadDropdown(selectedLeadId) {
+  var sel = document.getElementById('modal-user-lead');
+  if (!sel) return;
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        var leads = (data || []).filter(function(u) { return u.role === 'leadsales' && u.aktif; });
+        var opts = '<option value="">— Tidak di-assign —</option>';
+        leads.forEach(function(u) {
+          var sel2 = (selectedLeadId && u.id === selectedLeadId) ? ' selected' : '';
+          opts += '<option value="' + u.id + '"' + sel2 + '>' + u.nama + '</option>';
+        });
+        sel.innerHTML = opts;
+      })
+      .getUserList();
+  }
+}
+
 function bukaModalTambahUser() {
   document.getElementById('modal-user-title').innerText = 'Tambah User Baru';
   document.getElementById('modal-user-id').value        = '';
@@ -329,6 +360,8 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-target').value    = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
+  var leadWrap = document.getElementById('modal-user-lead-wrap');
+  if (leadWrap) { leadWrap.classList.remove('hidden'); _populateLeadDropdown(); }
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -343,6 +376,15 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
   document.getElementById('modal-user-aktif').checked         = u.aktif;
   document.getElementById('modal-user-target').value          = u.targetBulanan || '';
+  var leadWrap = document.getElementById('modal-user-lead-wrap');
+  if (leadWrap) {
+    if (u.role === 'sales') {
+      leadWrap.classList.remove('hidden');
+      _populateLeadDropdown(u.leadId || '');
+    } else {
+      leadWrap.classList.add('hidden');
+    }
+  }
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -358,6 +400,8 @@ function simpanUserModal() {
   const role     = document.getElementById('modal-user-role').value;
   const aktif    = document.getElementById('modal-user-aktif').checked;
   const target   = parseFloat(document.getElementById('modal-user-target').value) || 0;
+  const leadSel  = document.getElementById('modal-user-lead');
+  const leadId   = (leadSel && role === 'sales') ? (leadSel.value || '') : '';
 
   if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
   if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
@@ -368,8 +412,8 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif, target]
-      : [nama, username, password, role];
+      ? [id, nama, username, password, role, aktif, target, leadId]
+      : [nama, username, password, role, leadId];
 
     google.script.run
       .withSuccessHandler(function(res) {

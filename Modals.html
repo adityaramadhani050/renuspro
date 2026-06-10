@@ -490,12 +490,19 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Role</label>
-          <select id="modal-user-role" class="input-field text-sm">
+          <select id="modal-user-role" class="input-field text-sm" onchange="_onUserRoleChange()">
             <option value="sales">Sales</option>
             <option value="leadsales">Lead Sales</option>
             <option value="finance">Finance</option>
             <option value="admin">Admin</option>
           </select>
+        </div>
+        <div id="modal-user-lead-wrap" class="hidden">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lead Sales</label>
+          <select id="modal-user-lead" class="input-field text-sm">
+            <option value="">— Tidak di-assign —</option>
+          </select>
+          <p class="text-[11px] text-slate-400 mt-1">Assign sales person ini ke Lead Sales tertentu.</p>
         </div>
       </div>
       <!-- Target Bulanan (untuk sales) -->
