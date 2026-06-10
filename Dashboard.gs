@@ -81,9 +81,10 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
           namaProject: dataMain[i][4].toString(),
           klienId:     dataMain[i][5].toString(),
           namaKlien:   klienMap[dataMain[i][5].toString()] || dataMain[i][5].toString(),
-          dibuatOleh:  dataMain[i][6].toString(),
-          grandTotal:  parseFloat(dataMain[i][10]) || 0,
-          status:      status
+          dibuatOleh:        dataMain[i][6].toString(),
+          grandTotal:        parseFloat(dataMain[i][10]) || 0,
+          status:            status,
+          channelMarketing:  dataMain[i][19] ? dataMain[i][19].toString() : ''
         };
       }
     }
