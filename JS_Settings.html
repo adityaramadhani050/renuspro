@@ -299,9 +299,7 @@ function _loadDocSign() {
   google.script.run
     .withSuccessHandler(function(cfg) {
       var enableEl = document.getElementById('sign-enabled');
-      var urlEl    = document.getElementById('sign-verify-url');
       if (enableEl) enableEl.checked = cfg.sigEnabled !== false;
-      if (urlEl)    urlEl.value = cfg.verifyUrl || '';
       if (cfg.sigBase64) {
         _showSignPreview('data:image/png;base64,' + cfg.sigBase64);
       }
@@ -347,9 +345,7 @@ window.clearSignature = function() {
 
 window.simpanDocSign = function() {
   var enabled = document.getElementById('sign-enabled').checked;
-  var url     = (document.getElementById('sign-verify-url').value || '').trim();
-
-  var payload = { sigEnabled: enabled, verifyUrl: url };
+  var payload = { sigEnabled: enabled };
   google.script.run
     .withSuccessHandler(function(r) {
       if (_signBase64Pending) {
