@@ -20,8 +20,7 @@ var MIGRASI_CFG = {
   PEN_SHEET:       'Penawaran_Main',
   KLIEN_SHEET:     'Master_Klien',
   DRY_RUN:         true,    // ubah ke false untuk eksekusi nyata
-  SKIP_EXISTING:   true,    // skip jika No Invoice sudah ada di Invoice_Main
-  MATCH_THRESHOLD: 0.40     // skor minimum Jaccard untuk matching penawaran
+  SKIP_EXISTING:   true     // skip jika No Invoice sudah ada di Invoice_Main
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,23 +87,17 @@ function migrasiARAll() {
     // Status bayar
     var statusBayar = (outstanding !== null && outstanding <= 0 && paid > 0) ? 'Lunas' : 'Belum Lunas';
 
-    // Coba match ke Penawaran_Main
-    var match = null;
-    if (noQuot) {
-      match = penIndex.byNoPen[noQuot.trim()] || null;
-    }
-    if (!match) {
-      match = _mFindPenawaran(namaKlien, namaProj, penIndex, MIGRASI_CFG.MATCH_THRESHOLD);
-    }
+    // Match ke Penawaran_Main hanya berdasarkan No Penawaran (exact)
+    var match = noQuot ? (penIndex.byNoPen[noQuot.trim()] || null) : null;
 
-    var noPenawaran = match ? match.noPenawaran : noQuot;
-    var noWO        = match ? (match.noWO || '') : '';
-    var klienId     = match ? (match.klienId || '') : '';
+    var noPenawaran     = noQuot || '';
+    var noWO            = match ? (match.noWO     || '') : '';
+    var klienId         = match ? (match.klienId  || '') : '';
     var namaKlienFinal  = match ? (match.namaKlien  || namaKlien) : namaKlien;
     var namaProjFinal   = match ? (match.namaProject || namaProj)  : namaProj;
-    var matchScore  = match ? match.score : 0;
 
     if (!match) cntNoMatch++;
+    var matchInfo = match ? ('MATCH: ' + match.noPenawaran) : (noQuot ? 'NO MATCH (no penawaran tidak ditemukan)' : 'NO QUOT (pakai data AR ALL)');
 
     // Deteksi jenis invoice
     var jenis = _mDetectJenis(namaProj + ' ' + noInv);
@@ -139,9 +132,6 @@ function migrasiARAll() {
     toWrite.push(mapped);
     cntOk++;
 
-    var matchInfo = match
-      ? ('MATCH: ' + match.noPenawaran + ' (skor ' + matchScore.toFixed(2) + ')')
-      : 'NO MATCH';
     logRows.push([noInv, 'OK', matchInfo, namaKlienFinal, namaProjFinal, statusBayar]);
 
     Logger.log((MIGRASI_CFG.DRY_RUN ? '[DRY] ' : '[OK]  ')
@@ -208,7 +198,7 @@ function _mBuildColMap(headers) {
 // Helper: bangun index Penawaran_Main
 // ─────────────────────────────────────────────────────────────────────────────
 function _mBuildPenawaranIndex(ss) {
-  var index = { byNoPen: {}, list: [] };
+  var index = { byNoPen: {} };
 
   var kSheet = ss.getSheetByName(MIGRASI_CFG.KLIEN_SHEET);
   var klienMap = {};
@@ -246,47 +236,10 @@ function _mBuildPenawaranIndex(ss) {
       score:       1
     };
     index.byNoPen[noPen] = obj;
-    index.list.push(obj);
   }
   return index;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: fuzzy match penawaran berdasarkan klien + project
-// ─────────────────────────────────────────────────────────────────────────────
-function _mFindPenawaran(namaKlien, namaProject, index, threshold) {
-  var qKlien = _mNorm(namaKlien);
-  var qProj  = _mStripJenis(_mNorm(namaProject));
-  if (!qKlien && !qProj) return null;
-
-  var best = null, bestScore = 0;
-  for (var j = 0; j < index.list.length; j++) {
-    var p = index.list[j];
-    var sKlien = _mJaccard(qKlien, _mNorm(p.namaKlien));
-    var sProj  = _mJaccard(qProj,  _mStripJenis(_mNorm(p.namaProject)));
-    var score  = sKlien * 0.4 + sProj * 0.6;
-    if (score > bestScore) { bestScore = score; best = p; }
-  }
-  if (bestScore >= threshold) {
-    return { noPenawaran: best.noPenawaran, noWO: best.noWO, klienId: best.klienId,
-             namaKlien: best.namaKlien, namaProject: best.namaProject, score: bestScore };
-  }
-  return null;
-}
-
-function _mNorm(s) {
-  return (s||'').toString().toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
-}
-function _mStripJenis(s) {
-  return s.replace(/\b(dp|down payment|fp|full payment|term|termin|pelunasan|retention|lunas)\b/g,' ').replace(/\s+/g,' ').trim();
-}
-function _mJaccard(a, b) {
-  if (!a && !b) return 0;
-  var ta = a.split(' ').filter(Boolean), tb = b.split(' ').filter(Boolean);
-  if (!ta.length && !tb.length) return 0;
-  var inter = ta.filter(function(t) { return tb.indexOf(t) !== -1; }).length;
-  return inter / (ta.length + tb.length - inter);
-}
 
 function _mDetectJenis(s) {
   s = (s || '').toLowerCase();
