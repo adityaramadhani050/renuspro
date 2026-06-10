@@ -83,7 +83,7 @@ function _insertDocSign(sheet, anchorRow, anchorCol, noDoc, totalCols) {
       var sigBlob  = Utilities.newBlob(sigBytes, 'image/png', 'signature.png');
 
       // Baca dimensi asli dari header PNG (bytes 16-23) untuk menjaga proporsi
-      var TARGET_H = 80;
+      var TARGET_H = 130;
       var origW = 1, origH = 1;
       try {
         origW = ((sigBytes[16] & 0xff) << 24) | ((sigBytes[17] & 0xff) << 16) |
