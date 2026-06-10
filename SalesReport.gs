@@ -150,6 +150,7 @@ function getSalesReportData(params) {
     // Master_User → nama: { targetBulanan }
     var userMap = {}; // key: nama (col 1)
     var allSalesNames = []; // all active sales user names
+    var teamNames = null; // null = semua, array = filter ke anggota tim (leadsales)
     try {
       var userSheet = ss.getSheetByName('Master_User');
       if (userSheet) {
@@ -163,6 +164,14 @@ function getSalesReportData(params) {
             userMap[uNama] = { targetBulanan: uTarget };
             if (uAktif === true || uAktif === 'TRUE' || uAktif === 'Ya' || uAktif === 1) {
               allSalesNames.push(uNama);
+            }
+          }
+          // Kumpulkan anggota tim untuk leadsales
+          if (params.role === 'leadsales' && params.userId) {
+            var uLeadId = urow[7] ? urow[7].toString().trim() : '';
+            if (uLeadId === params.userId && (uAktif === true || uAktif === 'TRUE')) {
+              if (!teamNames) teamNames = [];
+              teamNames.push((uNama || '').toString().trim());
             }
           }
         }
@@ -239,9 +248,12 @@ function getSalesReportData(params) {
       var namaKlien = klienMap[klienId] || klienId;
 
       // Access control
-      if (!isAdmin && params.role !== 'leadsales' && dibuatOleh !== namaUser) continue;
-      if (params.role === 'leadsales' && Array.isArray(params.teamNames) && params.teamNames.length > 0) {
-        if (!params.teamNames.includes(dibuatOleh)) continue;
+      if (params.role === 'leadsales') {
+        // Lead Sales: hanya tampilkan data anggota tim
+        if (!teamNames || !teamNames.includes(dibuatOleh)) continue;
+      } else if (!isAdmin) {
+        // Sales biasa: hanya data milik sendiri
+        if (dibuatOleh !== namaUser) continue;
       }
 
       ensureSales(dibuatOleh);
