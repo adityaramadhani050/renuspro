@@ -81,15 +81,28 @@ function _insertDocSign(sheet, anchorRow, anchorCol, noDoc, totalCols) {
     try {
       var sigBytes = Utilities.base64Decode(cfg.sigBase64);
       var sigBlob  = Utilities.newBlob(sigBytes, 'image/png', 'signature.png');
-      var SIG_W = 150;
-      // Hitung total lebar area agar gambar rata kanan
+
+      // Baca dimensi asli dari header PNG (bytes 16-23) untuk menjaga proporsi
+      var TARGET_H = 80;
+      var origW = 1, origH = 1;
+      try {
+        origW = ((sigBytes[16] & 0xff) << 24) | ((sigBytes[17] & 0xff) << 16) |
+                ((sigBytes[18] & 0xff) << 8)  |  (sigBytes[19] & 0xff);
+        origH = ((sigBytes[20] & 0xff) << 24) | ((sigBytes[21] & 0xff) << 16) |
+                ((sigBytes[22] & 0xff) << 8)  |  (sigBytes[23] & 0xff);
+      } catch(pe) {}
+      var ratio  = origH > 0 ? origW / origH : 1;
+      var SIG_H  = TARGET_H;
+      var SIG_W  = Math.max(60, Math.round(SIG_H * ratio));
+
+      // Hitung offset X agar gambar rata kanan
       var totalWidthPx = 0;
       for (var c = anchorCol; c < anchorCol + totalCols; c++) {
         totalWidthPx += sheet.getColumnWidth(c);
       }
       var offsetX = Math.max(0, totalWidthPx - SIG_W);
       var img = sheet.insertImage(sigBlob, anchorCol, anchorRow + 1, offsetX, 4);
-      img.setWidth(SIG_W); // hanya set lebar, tinggi menyesuaikan proporsi asli
+      img.setWidth(SIG_W).setHeight(SIG_H);
     } catch (e) {
       Logger.log('Insert signature error: ' + e);
     }
