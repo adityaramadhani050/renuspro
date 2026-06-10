@@ -369,13 +369,19 @@ function getSalesReportData(params) {
       teamPipelineCount  += s.pipelineCount;
     }
 
-    // teamTarget = sum of ALL sales users (from Master_User), not just those with data
+    // teamTarget = sum of targets sesuai scope
     if (isAdmin) {
+      // Admin: jumlah semua sales user
       for (var un in userMap) {
         teamTarget += userMap[un].targetBulanan || 0;
       }
+    } else if (params.role === 'leadsales' && teamNames && teamNames.length > 0) {
+      // Lead Sales: jumlah target anggota tim saja
+      for (var tn = 0; tn < teamNames.length; tn++) {
+        teamTarget += (userMap[teamNames[tn]] && userMap[teamNames[tn]].targetBulanan) ? userMap[teamNames[tn]].targetBulanan : 0;
+      }
     } else {
-      // For non-admin, just that user's target
+      // Sales biasa: target diri sendiri
       teamTarget = (userMap[namaUser] && userMap[namaUser].targetBulanan) ? userMap[namaUser].targetBulanan : 0;
     }
 
@@ -392,7 +398,9 @@ function getSalesReportData(params) {
       var status2     = String(row2[16] || '').trim();
       var dibuatOleh2 = String(row2[6] || '').trim();
       if (status2 !== 'Deal') continue;
-      if (!isAdmin && dibuatOleh2 !== namaUser) continue;
+      if (params.role === 'leadsales') {
+        if (!teamNames || !teamNames.includes(dibuatOleh2)) continue;
+      } else if (!isAdmin && dibuatOleh2 !== namaUser) continue;
 
       var tanggalDeal2 = parseTgl(row2[18]) || parseTgl(row2[2]);
       if (!tanggalDeal2) continue;
@@ -419,7 +427,9 @@ function getSalesReportData(params) {
       var status3     = String(row3[16] || '').trim();
       var dibuatOleh3 = String(row3[6] || '').trim();
       if (status3 !== 'Deal') continue;
-      if (!isAdmin && dibuatOleh3 !== namaUser) continue;
+      if (params.role === 'leadsales') {
+        if (!teamNames || !teamNames.includes(dibuatOleh3)) continue;
+      } else if (!isAdmin && dibuatOleh3 !== namaUser) continue;
 
       var tanggalDeal3 = parseTgl(row3[18]) || parseTgl(row3[2]);
       if (!inRange(tanggalDeal3, rangeFrom, rangeTo)) continue;

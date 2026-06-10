@@ -319,8 +319,6 @@ function _dbRenderKPIs(summary, prev, salesList) {
 }
 
 // ── Target progress bar ────────────────────────────────────────
-var _DB_TARGET_TAHUNAN = 24000000000;
-
 function _dbRenderTargetBar(summary, items) {
   var rev    = summary.teamRevenue || 0;
   var target = summary.teamTarget  || 0;
@@ -345,7 +343,9 @@ function _dbRenderTargetBar(summary, items) {
     if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += item.grandTotal;
   });
 
-  var ytdPct    = _DB_TARGET_TAHUNAN > 0 ? (ytdRev / _DB_TARGET_TAHUNAN * 100) : 0;
+  // Target tahunan = target bulanan × 12 (scope sudah sesuai role: diri sendiri / tim / semua)
+  var targetTahunan = target * 12;
+  var ytdPct    = targetTahunan > 0 ? (ytdRev / targetTahunan * 100) : 0;
   var ytdBarPct = Math.min(ytdPct, 100);
 
   var ytdPctEl = document.getElementById('db-ytd-pct');
@@ -353,7 +353,7 @@ function _dbRenderTargetBar(summary, items) {
   var ytdBar = document.getElementById('db-ytd-bar');
   if (ytdBar) ytdBar.style.width = ytdBarPct + '%';
   var ytdTxt = document.getElementById('db-ytd-text');
-  if (ytdTxt) ytdTxt.textContent = _rp(ytdRev) + ' / ' + _rp(_DB_TARGET_TAHUNAN);
+  if (ytdTxt) ytdTxt.textContent = _rp(ytdRev) + ' / ' + _rp(targetTahunan);
 }
 
 // ── Statistik Konversi ─────────────────────────────────────────
