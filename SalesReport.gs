@@ -178,6 +178,12 @@ function getSalesReportData(params) {
       }
     } catch(e) { /* ignore */ }
 
+    // Sertakan data Lead Sales itu sendiri dalam teamNames
+    if (params.role === 'leadsales' && namaUser) {
+      if (!teamNames) teamNames = [];
+      if (!teamNames.includes(namaUser.trim())) teamNames.push(namaUser.trim());
+    }
+
     // Penawaran_Main
     var pSheet = ss.getSheetByName('Penawaran_Main');
     if (!pSheet) {

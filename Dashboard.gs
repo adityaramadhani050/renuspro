@@ -20,6 +20,8 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
         if (userSheet) {
           var uData = userSheet.getDataRange().getValues();
           teamNames = [];
+          // Sertakan data Lead Sales itu sendiri
+          if (namaUser) teamNames.push(namaUser.trim());
           for (var ti = 1; ti < uData.length; ti++) {
             if (!uData[ti][0]) continue;
             var tLeadId = uData[ti][7] ? uData[ti][7].toString().trim() : '';
