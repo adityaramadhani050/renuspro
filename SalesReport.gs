@@ -392,8 +392,8 @@ function getSalesReportData(params) {
       teamTarget = (userMap[namaUser] && userMap[namaUser].targetBulanan) ? userMap[namaUser].targetBulanan : 0;
     }
 
-    var teamWinRate = (teamDealCount + teamFailCount) > 0
-      ? (teamDealCount / (teamDealCount + teamFailCount)) * 100
+    var teamWinRate = teamPenawaran > 0
+      ? (teamDealCount / teamPenawaran) * 100
       : 0;
 
     // --- Step 5: 3-month trend (team, by tanggalDeal) ---
