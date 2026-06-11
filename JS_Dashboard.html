@@ -102,13 +102,41 @@ function _dbPeriodToMs(params) {
 
 // Compute prev period KPIs from raw cache
 function _dbPrevKPI(items, fromMs, toMs) {
-  var duration  = toMs - fromMs;
-  var prevToMs  = fromMs - 1;
-  var prevFromMs = prevToMs - duration;
+  // Hitung prev period berdasarkan mode — bukan sekadar geser durasi
+  var prevFromMs, prevToMs;
+  var today = new Date();
+
+  if (_dbPeriodMode === 'mtd') {
+    // Bulan Ini 1–today → prev = 1 bulan lalu s.d. hari yang sama
+    var fromDt = new Date(fromMs);
+    var toDt   = new Date(toMs);
+    var pFrom  = new Date(fromDt.getFullYear(), fromDt.getMonth() - 1, 1);
+    var pTo    = new Date(toDt.getFullYear(), toDt.getMonth() - 1, toDt.getDate(), 23, 59, 59, 999);
+    prevFromMs = pFrom.getTime();
+    prevToMs   = pTo.getTime();
+  } else if (_dbPeriodMode === 'lastmonth') {
+    // Bulan Lalu → 2 bulan lalu (full month)
+    var pFrom2 = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    var pTo2   = new Date(today.getFullYear(), today.getMonth() - 1, 0, 23, 59, 59, 999);
+    prevFromMs = pFrom2.getTime();
+    prevToMs   = pTo2.getTime();
+  } else if (_dbPeriodMode === 'ytd') {
+    // YTD → periode sama tahun lalu
+    var fromDtY = new Date(fromMs);
+    var toDtY   = new Date(toMs);
+    prevFromMs  = new Date(fromDtY.getFullYear() - 1, 0, 1).getTime();
+    prevToMs    = new Date(toDtY.getFullYear() - 1, toDtY.getMonth(), toDtY.getDate(), 23, 59, 59, 999).getTime();
+  } else {
+    // Custom → geser durasi ke belakang
+    var duration = toMs - fromMs;
+    prevToMs   = fromMs - 1;
+    prevFromMs = prevToMs - duration;
+  }
+
   var prevRevenue = 0, prevDeals = 0;
   items.forEach(function(item) {
     if (item.status !== 'Deal') return;
-    var ts = (item.tanggalDeal) ? item.tanggalDeal : item.tanggal;
+    var ts = item.tanggalDeal || item.tanggal;
     if (ts && ts >= prevFromMs && ts <= prevToMs) {
       prevRevenue += item.grandTotal;
       prevDeals++;
