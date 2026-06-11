@@ -329,6 +329,7 @@
     function handleFormSubmission(e) {
       e.preventDefault();
       if(!document.getElementById('klienSelect').value) return showNotification("Silakan hubungkan Klien!", "error");
+      if(!document.getElementById('channelMarketing').value) return showNotification("Silakan pilih Channel Marketing!", "error");
       const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
 
       const payload = {
