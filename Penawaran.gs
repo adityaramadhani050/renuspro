@@ -271,18 +271,15 @@ function generateNextQuotationNumber(ss) {
 }
 
 function simpanPenawaranKeSheet(payload) {
+  const lock = LockService.getScriptLock();
   try {
+    lock.waitLock(20000);
     const ss = getSpreadsheet();
     const sheetMain = ss.getSheetByName('Penawaran_Main') || buatSheetPenawaranDefault(ss);
 
-    const dataMain = sheetMain.getDataRange().getValues();
-    let latestRev = 0;
-    for (let i = 1; i < dataMain.length; i++) {
-      if (dataMain[i][0] === payload.noPenawaran) {
-        const revValue = parseInt(dataMain[i][1]);
-        if (!isNaN(revValue) && revValue >= latestRev) latestRev = revValue + 1;
-      }
-    }
+    // Nomor penawaran di-generate di sini (dalam lock), bukan dari payload.
+    // Ini mencegah race condition saat dua user menyimpan bersamaan.
+    const noPenawaran = generateNextQuotationNumber(ss);
 
     const userActiveName = payload.namaUser || "Sales Executive";
 
@@ -303,7 +300,7 @@ function simpanPenawaranKeSheet(payload) {
     delete cleanTermConditions.pajakNominal;
 
     sheetMain.appendRow([
-      payload.noPenawaran, latestRev, payload.tanggal, payload.validUntil, payload.namaProject,
+      noPenawaran, 0, payload.tanggal, payload.validUntil, payload.namaProject,
       payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,
       totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTermConditions),
       JSON.stringify(payload.items), "On-Progress", '', '',
@@ -312,9 +309,11 @@ function simpanPenawaranKeSheet(payload) {
 
     invalidatePenawaranCache();
     const nextNo = generateNextQuotationNumber(ss);
-    return { success: true, message: `Penawaran ${payload.noPenawaran} (Rev ${latestRev}) berhasil disimpan!`, nextNo: nextNo };
+    return { success: true, message: `Penawaran ${noPenawaran} berhasil disimpan!`, nextNo: nextNo };
   } catch (error) {
     return { success: false, message: "Gagal menyimpan: " + error.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
   }
 }
 function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
@@ -442,7 +441,9 @@ function hapusPenawaran(noPenawaran, rev) {
 }
 
 function editPenawaran(payload) {
+  const lock = LockService.getScriptLock();
   try {
+    lock.waitLock(20000);
     const ss = getSpreadsheet();
     const sheetMain = ss.getSheetByName('Penawaran_Main') || buatSheetPenawaranDefault(ss);
     const data = sheetMain.getDataRange().getValues();
@@ -490,5 +491,7 @@ function editPenawaran(payload) {
     return { success: true, message: `${payload.noPenawaran} berhasil direvisi → Rev${newRev}!`, nextNo: nextNo };
   } catch(e) {
     return { success: false, message: "Gagal: " + e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
   }
 }
