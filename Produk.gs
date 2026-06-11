@@ -5,9 +5,7 @@
 
 function getProdukList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Master_Produk') || buatSheetProdukDefault(ss);
-    const data = sheet.getDataRange().getValues();
+    const data = _cachedProduk();
     const list = [];
     
     for (let i = 1; i < data.length; i++) {
@@ -48,7 +46,7 @@ function simpanProduk(nama, unit, harga, hpp) {
 
     const nextId = "P" + ("000" + (maxNumber + 1)).slice(-3);
     sheet.appendRow([nextId, nama, unit, Number(harga) || 0, Number(hpp) || 0]);
-
+    invalidateProdukCache();
     return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!" };
   } catch (error) {
     return { success: false, message: error.toString() };
@@ -62,6 +60,7 @@ function editProduk(id, nama, unit, harga, hpp) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.getRange(i + 1, 2, 1, 4).setValues([[nama, unit, harga, hpp]]);
+        invalidateProdukCache();
         return { success: true, message: "Produk " + id + " berhasil diperbarui!" };
       }
     }
@@ -77,6 +76,7 @@ function hapusProduk(id) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.deleteRow(i + 1);
+        invalidateProdukCache();
         return { success: true, message: "Produk " + id + " berhasil dihapus." };
       }
     }

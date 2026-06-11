@@ -44,15 +44,38 @@ function _cacheGetSheet(key, sheetName) {
 function _cachedPenawaran() { return _cacheGetSheet('cache_penawaran', 'Penawaran_Main'); }
 function _cachedKlien()     { return _cacheGetSheet('cache_klien',     'Master_Klien');   }
 function _cachedUser()      { return _cacheGetSheet('cache_user',      'Master_User');    }
+function _cachedProduk()    { return _cacheGetSheet('cache_produk',    'Master_Produk'); }
+function _cachedInvoice()   { return _cacheGetSheet('cache_invoice',   'Invoice_Main');  }
+function _cachedKwitansi()  { return _cacheGetSheet('cache_kwitansi',  'Kwitansi_Main'); }
+function _cachedTemplate()  { return _cacheGetSheet('cache_template',  'Template_Paket'); }
 
 // ── Invalidasi cache ─────────────────────────────────────────────────────────
 
 function invalidateCache(keys) {
   var cache = CacheService.getScriptCache();
-  var all = keys || ['cache_penawaran', 'cache_klien', 'cache_user', 'cache_produk'];
+  var all = keys || ['cache_penawaran','cache_klien','cache_user','cache_produk',
+                     'cache_invoice','cache_kwitansi','cache_template'];
   cache.removeAll(all);
 }
 
 function invalidatePenawaranCache() { invalidateCache(['cache_penawaran']); }
 function invalidateUserCache()      { invalidateCache(['cache_user']);      }
 function invalidateKlienCache()     { invalidateCache(['cache_klien']);     }
+function invalidateProdukCache()    { invalidateCache(['cache_produk']);    }
+function invalidateInvoiceCache()   { invalidateCache(['cache_invoice']);   }
+function invalidateKwitansiCache()  { invalidateCache(['cache_kwitansi']); }
+function invalidateTemplateCache()  { invalidateCache(['cache_template']); }
+
+// ── Format tanggal dari cache (Date atau ISO string) → "dd/MM/yyyy" ──────────
+function _fmtTgl(raw) {
+  if (!raw) return '';
+  if (raw instanceof Date) {
+    return isNaN(raw) ? '' : Utilities.formatDate(raw, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
+  var s = raw.toString();
+  if (s.indexOf('T') > 0) { // ISO string dari cache
+    var d = new Date(s);
+    return isNaN(d) ? '' : Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
+  return s; // sudah dalam format dd/MM/yyyy atau kosong
+}

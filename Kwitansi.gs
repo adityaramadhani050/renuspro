@@ -73,6 +73,7 @@ function _appendKwitansiRow(ss, payload) {
     payload.dibuatOleh || 'Sistem'
   ]);
   SpreadsheetApp.flush();
+  invalidateKwitansiCache();
   return noKwitansi;
 }
 
@@ -95,6 +96,7 @@ function simpanKwitansi(payload) {
     ]);
 
     SpreadsheetApp.flush();
+    invalidateKwitansiCache();
     return { success: true, message: 'Kwitansi ' + noKwitansi + ' berhasil dibuat!', noKwitansi: noKwitansi };
   } catch (e) {
     return { success: false, message: 'Gagal menyimpan kwitansi: ' + e.toString() };
@@ -105,17 +107,13 @@ function simpanKwitansi(payload) {
 
 function getKwitansiList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Kwitansi_Main');
-    if (!sheet) return [];
-    const data = sheet.getDataRange().getValues();
+    const data = _cachedKwitansi();
+    if (!data || data.length === 0) return [];
     const list = [];
 
     for (let i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
-      const tglStr = data[i][3] instanceof Date
-        ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][3];
+      const tglStr = _fmtTgl(data[i][3]);
       list.push({
         id:         data[i][0].toString(),
         noInvoice:  data[i][1] ? data[i][1].toString() : '',
@@ -165,6 +163,7 @@ function editKwitansi(payload) {
     sheet.getRange(r, 9).setValue(payload.catatan || '');       // Catatan
 
     SpreadsheetApp.flush();
+    invalidateKwitansiCache();
     return { success: true, message: 'Kwitansi ' + payload.id + ' berhasil diperbarui!' };
   } catch (e) {
     return { success: false, message: 'Gagal memperbarui kwitansi: ' + e.toString() };
@@ -181,6 +180,7 @@ function hapusKwitansi(idKwitansi) {
     for (let i = data.length - 1; i >= 1; i--) {
       if (data[i][0].toString() === idKwitansi) {
         sheet.deleteRow(i + 1);
+        invalidateKwitansiCache();
         return { success: true, message: 'Kwitansi ' + idKwitansi + ' dihapus.' };
       }
     }

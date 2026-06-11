@@ -73,12 +73,10 @@ function generateNextInvoiceNumber(ss) {
 // ── DPP yang sudah ditagih per WO (basis pre-tax) ───────────────────────────
 function _getTagihanMap(ss) {
   const map = {};
-  const sheet = ss.getSheetByName('Invoice_Main');
-  if (!sheet) return map;
-  const d = sheet.getDataRange().getValues();
+  const d = _cachedInvoice();
   for (let i = 1; i < d.length; i++) {
     const noWO = d[i][1] ? d[i][1].toString() : '';
-    const dpp = parseFloat(d[i][11]) || 0; // kolom 12 = DPP (pre-tax)
+    const dpp = parseFloat(d[i][11]) || 0;
     if (noWO) map[noWO] = (map[noWO] || 0) + dpp;
   }
   return map;
@@ -86,24 +84,17 @@ function _getTagihanMap(ss) {
 
 // ── Helper: ambil data satu penawaran sebagai struktur WO-like ───────────────
 function _getPenawaranData(ss, noPenawaran) {
-  const sheet = ss.getSheetByName('Penawaran_Main');
-  if (!sheet) return null;
-  const data = sheet.getDataRange().getValues();
-  // Ambil rev tertinggi dari noPenawaran yang diminta
+  const data = _cachedPenawaran();
   let best = null;
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0] || data[i][0].toString() !== noPenawaran) continue;
     if (!best || parseInt(data[i][1]) > parseInt(best[1])) best = data[i];
   }
   if (!best) return null;
-  const tglStr = best[2] instanceof Date
-    ? Utilities.formatDate(best[2], Session.getScriptTimeZone(), 'dd/MM/yyyy')
-    : (best[2] || '');
+  const tglStr = _fmtTgl(best[2]);
   const namaKlien = (function() {
     try {
-      const ks = ss.getSheetByName('Master_Klien');
-      if (!ks) return best[6] ? best[6].toString() : '';
-      const kd = ks.getDataRange().getValues();
+      const kd = _cachedKlien();
       for (let j = 1; j < kd.length; j++) {
         if (kd[j][0] && kd[j][0].toString() === (best[5] || '').toString()) return kd[j][1].toString();
       }
@@ -130,9 +121,7 @@ function _getPenawaranData(ss, noPenawaran) {
 
 // ── Helper: tagihan per noPenawaran (untuk pre-deal + post-deal) ─────────────
 function _getTagihanMapByPenawaran(ss) {
-  const sheet = ss.getSheetByName('Invoice_Main');
-  if (!sheet) return {};
-  const d = sheet.getDataRange().getValues();
+  const d = _cachedInvoice();
   const map = {};
   for (let i = 1; i < d.length; i++) {
     if (!d[i][0]) continue;
@@ -187,9 +176,8 @@ function getInvoiceInitialData() {
 
 // ── Daftar penawaran aktif yang belum Deal (untuk pre-deal DP invoice) ────────
 function _getPenawaranPreDealList(ss, tagihByPen) {
-  const sheet = ss.getSheetByName('Penawaran_Main');
-  if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
+  const data = _cachedPenawaran();
+  if (!data || data.length === 0) return [];
   tagihByPen = tagihByPen || _getTagihanMapByPenawaran(ss);
 
   // Ambil rev tertinggi per noPenawaran
@@ -209,19 +197,14 @@ function _getPenawaranPreDealList(ss, tagihByPen) {
 
   const list = [];
   const namaKlienCache = {};
-  const ks = ss.getSheetByName('Master_Klien');
-  if (ks) {
-    const kd = ks.getDataRange().getValues();
-    for (let j = 1; j < kd.length; j++) {
-      if (kd[j][0]) namaKlienCache[kd[j][0].toString()] = kd[j][1].toString();
-    }
+  const kd = _cachedKlien();
+  for (let j = 1; j < kd.length; j++) {
+    if (kd[j][0]) namaKlienCache[kd[j][0].toString()] = kd[j][1].toString();
   }
 
   Object.keys(latestRev).forEach(function(id) {
     const i = latestRev[id].idx;
-    const tglStr = data[i][2] instanceof Date
-      ? Utilities.formatDate(data[i][2], Session.getScriptTimeZone(), 'dd/MM/yyyy')
-      : (data[i][2] || '');
+    const tglStr = _fmtTgl(data[i][2]);
     const klienId = data[i][5] ? data[i][5].toString() : '';
     const namaKlien = namaKlienCache[klienId] || (data[i][6] ? data[i][6].toString() : '');
     const subtotal = parseFloat(data[i][7]) || 0;
@@ -339,6 +322,7 @@ function simpanInvoice(payload) {
     ]);
 
     SpreadsheetApp.flush();
+    invalidateInvoiceCache();
 
     // Notifikasi WA
     try {
@@ -425,6 +409,7 @@ function editInvoice(payload) {
     sheet.getRange(r, 20).setValue(payload.bankAccount || ''); // Bank Account
 
     SpreadsheetApp.flush();
+    invalidateInvoiceCache();
     return { success: true, message: 'Invoice ' + payload.id + ' berhasil diperbarui!' };
   } catch (e) {
     return { success: false, message: 'Gagal memperbarui invoice: ' + e.toString() };
@@ -436,21 +421,15 @@ function editInvoice(payload) {
 // ── Daftar semua invoice ────────────────────────────────────────────────────
 function getInvoiceList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Invoice_Main');
-    if (!sheet) return [];
-    const data = sheet.getDataRange().getValues();
-    const kwMap = _getKwitansiInvoiceMap(ss);
+    const data = _cachedInvoice();
+    if (!data || data.length === 0) return [];
+    const kwMap = _getKwitansiInvoiceMap(null);
     const list = [];
 
     for (let i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
-      const tglStr = data[i][3] instanceof Date
-        ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][3];
-      const tglPoStr = data[i][7] instanceof Date
-        ? Utilities.formatDate(data[i][7], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][7];
+      const tglStr   = _fmtTgl(data[i][3]);
+      const tglPoStr = _fmtTgl(data[i][7]);
 
       list.push({
         id:          data[i][0].toString(),
@@ -488,10 +467,8 @@ function getInvoiceList() {
 // ── Map invoice ID → no kwitansi (ambil kwitansi pertama per invoice) ────────
 function _getKwitansiInvoiceMap(ss) {
   const map = {};
-  const sheet = ss.getSheetByName('Kwitansi_Main');
-  if (!sheet || sheet.getLastRow() < 2) return map;
-  const d = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-  for (let i = 0; i < d.length; i++) {
+  const d = _cachedKwitansi();
+  for (let i = 1; i < d.length; i++) {
     const noKw  = d[i][0] ? d[i][0].toString() : '';
     const noInv = d[i][1] ? d[i][1].toString() : '';
     if (noInv && noKw && !map[noInv]) map[noInv] = noKw;
@@ -563,6 +540,8 @@ function updateStatusBayarInvoice(idInvoice, statusBaru) {
         } catch(e) {}
       }
 
+      invalidateInvoiceCache();
+      invalidateKwitansiCache();
       return { success: true, message: msg, statusBaru: statusBaru, noKwitansi: noKwitansi };
     }
     return { success: false, message: 'Invoice tidak ditemukan.' };
@@ -579,6 +558,7 @@ function hapusInvoice(idInvoice) {
     for (let i = data.length - 1; i >= 1; i--) {
       if (data[i][0].toString() === idInvoice) {
         sheet.deleteRow(i + 1);
+        invalidateInvoiceCache();
         return { success: true, message: 'Invoice ' + idInvoice + ' dihapus.' };
       }
     }

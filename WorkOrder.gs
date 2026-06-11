@@ -41,20 +41,14 @@ function generateNextWONumber(sheet) {
 // ── Daftar Work Order: semua penawaran Deal yang sudah punya No WO ───────────
 function getWorkOrderList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Penawaran_Main');
-    if (!sheet) return [];
-
-    const sheetKlien = ss.getSheetByName('Master_Klien');
     const klienMap = {};
-    if (sheetKlien) {
-      const kd = sheetKlien.getDataRange().getValues();
-      for (let i = 1; i < kd.length; i++) {
-        if (kd[i][0]) klienMap[kd[i][0].toString()] = kd[i][1].toString();
-      }
+    const kd = _cachedKlien();
+    for (let i = 1; i < kd.length; i++) {
+      if (kd[i][0]) klienMap[kd[i][0].toString()] = kd[i][1].toString();
     }
 
-    const data = sheet.getDataRange().getValues();
+    const data = _cachedPenawaran();
+    if (!data || data.length === 0) return [];
     const list = [];
 
     // Deduplikasi: ambil revisi tertinggi per noPenawaran
@@ -74,12 +68,8 @@ function getWorkOrderList() {
       const noWO   = (data[i][17] !== '' && data[i][17] != null) ? data[i][17].toString() : '';
       if (status !== 'Deal' || !noWO) continue;
 
-      const tglStr = data[i][2] instanceof Date
-        ? Utilities.formatDate(data[i][2], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][2];
-      const validStr = data[i][3] instanceof Date
-        ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][3];
+      const tglStr   = _fmtTgl(data[i][2]);
+      const validStr = _fmtTgl(data[i][3]);
       const klienId = data[i][5].toString();
 
       list.push({
@@ -135,27 +125,21 @@ function getWorkOrderDashboard() {
     const kwMap  = {};
 
     // Baca Invoice_Main: group by noWO
-    const invSheet = ss.getSheetByName('Invoice_Main');
     const invByWO  = {};
-    if (invSheet && invSheet.getLastRow() > 1) {
-      const invData = invSheet.getDataRange().getValues();
+    const invData = _cachedInvoice();
+    if (invData.length > 1) {
       // Baca kwitansi map (invoice → kwitansi)
-      const kwSheet = ss.getSheetByName('Kwitansi_Main');
-      if (kwSheet && kwSheet.getLastRow() > 1) {
-        const kwData = kwSheet.getRange(2, 1, kwSheet.getLastRow() - 1, 2).getValues();
-        for (let k = 0; k < kwData.length; k++) {
-          const noKw  = kwData[k][0] ? kwData[k][0].toString() : '';
-          const noInv = kwData[k][1] ? kwData[k][1].toString() : '';
-          if (noInv && noKw && !kwMap[noInv]) kwMap[noInv] = noKw;
-        }
+      const kwData = _cachedKwitansi();
+      for (let k = 1; k < kwData.length; k++) {
+        const noKw  = kwData[k][0] ? kwData[k][0].toString() : '';
+        const noInv = kwData[k][1] ? kwData[k][1].toString() : '';
+        if (noInv && noKw && !kwMap[noInv]) kwMap[noInv] = noKw;
       }
       for (let i = 1; i < invData.length; i++) {
         if (!invData[i][0]) continue;
         const noWO = invData[i][1] ? invData[i][1].toString() : '';
         if (!noWO) continue;
-        const tglStr = invData[i][3] instanceof Date
-          ? Utilities.formatDate(invData[i][3], Session.getScriptTimeZone(), 'dd/MM/yyyy')
-          : (invData[i][3] || '');
+        const tglStr = _fmtTgl(invData[i][3]);
         const invId  = invData[i][0].toString();
         if (!invByWO[noWO]) invByWO[noWO] = [];
         invByWO[noWO].push({

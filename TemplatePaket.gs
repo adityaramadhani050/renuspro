@@ -5,29 +5,22 @@
 
 function getTemplatePaketMap(ss) {
   try {
-    ss = ss || getSpreadsheet();
-    const sheet = ss.getSheetByName('Template_Paket') || buatSheetTemplatePaket(ss);
-    const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return {};
-
     // Bangun produk map sekali — O(1) lookup
     const produkMap = {};
-    const sheetProduk = ss.getSheetByName('Master_Produk');
-    if (sheetProduk) {
-      const pdData = sheetProduk.getDataRange().getValues();
-      for (let i = 1; i < pdData.length; i++) {
-        if (pdData[i][0]) {
-          produkMap[pdData[i][0].toString()] = {
-            nama:  pdData[i][1].toString(),
-            unit:  pdData[i][2].toString(),
-            harga: Number(pdData[i][3]) || 0,
-            hpp:   Number(pdData[i][4]) || 0
-          };
-        }
+    const pdData = _cachedProduk();
+    for (let i = 1; i < pdData.length; i++) {
+      if (pdData[i][0]) {
+        produkMap[pdData[i][0].toString()] = {
+          nama:  pdData[i][1].toString(),
+          unit:  pdData[i][2].toString(),
+          harga: Number(pdData[i][3]) || 0,
+          hpp:   Number(pdData[i][4]) || 0
+        };
       }
     }
 
-    const data = sheet.getRange(1, 1, lastRow, 3).getValues();
+    const data = _cachedTemplate();
+    if (data.length <= 1) return {};
     const map = {};
 
     for (let i = 1; i < data.length; i++) {
@@ -77,6 +70,7 @@ function simpanTemplatePaket(id, nama, itemsJson, editId) {
         if (data[i][0].toString().trim() === idCari) {
           sheet.getRange(i + 1, 1, 1, 3).setValues([[idBaru, nama, itemsJson]]);
           SpreadsheetApp.flush();
+          invalidateTemplateCache();
           return { success: true, message: 'Template ' + idBaru + ' berhasil diperbarui!' };
         }
       }
@@ -93,7 +87,7 @@ function simpanTemplatePaket(id, nama, itemsJson, editId) {
     // Append baris baru
     sheet.appendRow([idBaru, nama, itemsJson]);
     SpreadsheetApp.flush();
-
+    invalidateTemplateCache();
     return { success: true, message: 'Template ' + idBaru + ' berhasil ditambahkan!' };
   } catch(e) {
     return { success: false, message: e.toString() };
@@ -110,6 +104,7 @@ function hapusTemplatePaket(id) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id) {
         sheet.deleteRow(i + 1);
+        invalidateTemplateCache();
         return { success: true, message: 'Template ' + id + ' berhasil dihapus.' };
       }
     }

@@ -28,6 +28,7 @@ function catatTanggalBayar(idInvoice) {
       const tglBayar = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
       sheet.getRange(i + 1, 21).setValue(tglBayar);
       SpreadsheetApp.flush();
+      invalidateInvoiceCache();
       return;
     }
   }
@@ -67,8 +68,7 @@ function getFinanceReportData(filter) {
     var woList = getWorkOrderList(); // sudah ada — hanya WO yang Deal
 
     // ── 2. Baca semua Invoice ──
-    var invSheet = ss.getSheetByName('Invoice_Main');
-    var invData = invSheet ? invSheet.getDataRange().getValues() : [];
+    var invData = _cachedInvoice();
 
     // Build invoice map keyed by noWO
     var invByWO = {};   // noWO → [invoice, ...]
@@ -81,27 +81,26 @@ function getFinanceReportData(filter) {
       var noInv   = invData[i][0].toString();
       var noWO    = invData[i][1] ? invData[i][1].toString() : '';
       var noPen   = invData[i][2] ? invData[i][2].toString() : '';
-      var tgl     = invData[i][3] instanceof Date
-        ? Utilities.formatDate(invData[i][3], Session.getScriptTimeZone(), 'dd/MM/yyyy')
-        : (invData[i][3] || '');
+      var tgl     = _fmtTgl(invData[i][3]);
       var jenis   = invData[i][4] ? invData[i][4].toString() : '';
       var dpp     = parseFloat(invData[i][11]) || 0;
       var ppnPct  = parseFloat(invData[i][12]) || 0;
       var ppnNom  = parseFloat(invData[i][13]) || 0;
       var total   = parseFloat(invData[i][14]) || 0;
       var status  = invData[i][16] ? invData[i][16].toString() : 'Belum Lunas';
-      var tglBayar = '';
-      if (invData[i][20]) {
-        tglBayar = invData[i][20] instanceof Date
-          ? Utilities.formatDate(invData[i][20], Session.getScriptTimeZone(), 'dd/MM/yyyy')
-          : invData[i][20].toString();
-      }
+      var tglBayar = invData[i][20] ? _fmtTgl(invData[i][20]) : '';
 
       // Filter periode: periksa tanggal invoice
       if (dateFrom || dateTo) {
-        var invDate = invData[i][3] instanceof Date ? invData[i][3] : _frParseDate(
-          (invData[i][3] || '').toString().split('/').reverse().join('-')
-        );
+        var rawTgl3 = invData[i][3];
+        var invDate;
+        if (rawTgl3 instanceof Date) {
+          invDate = rawTgl3;
+        } else if (rawTgl3 && rawTgl3.toString().indexOf('T') > 0) {
+          invDate = new Date(rawTgl3.toString()); // ISO dari cache
+        } else {
+          invDate = _frParseDate((rawTgl3 || '').toString().split('/').reverse().join('-'));
+        }
         if (invDate) {
           if (dateFrom && invDate < dateFrom) continue;
           if (dateTo   && invDate > dateTo)   continue;
