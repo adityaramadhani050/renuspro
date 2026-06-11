@@ -9,8 +9,8 @@
   navigate('penawaran');
   toggleFormPenawaran(true);
 
-  // Gunakan nomor penawaran BARU (bukan nomor yang disalin)
-  document.getElementById('noPenawaran').value = erpState.nextNo || 'Generating...';
+  // noPenawaran dikosongkan — nomor di-generate server-side saat simpan
+  document.getElementById('noPenawaran').value = '';
 
   // Isi nama project dengan prefix "COPY - "
   document.getElementById('namaProject').value = 'COPY - ' + (item.namaProject || '');
@@ -101,11 +101,10 @@
       if (typeof google !== 'undefined') {
         google.script.run.withSuccessHandler(res => {
           if (res.success) {
-            erpState.klien = res.klien || []; erpState.produk = res.produk || []; erpState.templatePaket = res.templatePaket || {}; erpState.nextNo = res.nextNo || "";
+            erpState.klien = res.klien || []; erpState.produk = res.produk || []; erpState.templatePaket = res.templatePaket || {};
             const sKlien = document.getElementById('klienSelect');
             sKlien.innerHTML = '<option value="">-- Pilih Klien --</option>';
             erpState.klien.forEach(k => { sKlien.add(new Option(k.nama, k.id)); });
-            document.getElementById('noPenawaran').value = erpState.nextNo;
             if(showLoadingUI) {
               document.getElementById('tglPenawaran').valueAsDate = new Date();
               let vd = new Date(); vd.setDate(vd.getDate() + 3); document.getElementById('validUntil').valueAsDate = vd;
@@ -323,8 +322,8 @@
       tambahKelompokBaru();
       hitungKalkulasiGabungan();
 
-      // Set nomor penawaran dari erpState
-      document.getElementById('noPenawaran').value = erpState.nextNo || 'Generating...';
+      // Clear noPenawaran (kosong = penawaran baru, nomor di-generate server-side)
+      document.getElementById('noPenawaran').value = '';
     }
 
     function handleFormSubmission(e) {
@@ -374,23 +373,6 @@
             _dbRawCache = null;
             loadDashboard();
 
-            // Gunakan nextNo dari response langsung — lebih akurat daripada getInitialData ulang
-            if (res.nextNo) {
-              erpState.nextNo = res.nextNo;
-              document.getElementById('noPenawaran').value = res.nextNo;
-            } else {
-              // Fallback: refresh dari server hanya jika res.nextNo tidak tersedia
-              google.script.run
-                .withSuccessHandler(initRes => {
-                  if (initRes.success && initRes.nextNo) {
-                    erpState.nextNo = initRes.nextNo;
-                    if (!wasEditing) {
-                      document.getElementById('noPenawaran').value = initRes.nextNo;
-                    }
-                  }
-                })
-                .getInitialData();
-            }
           } else showNotification(res.message, "error");
         }).withFailureHandler(err => {
           toggleLoader(false); showNotification(err, "error");
