@@ -96,7 +96,7 @@ function getWorkOrderList() {
     }
 
     // Sisipkan catatan customer per No WO
-    const catatanMap = _getCatatanWOMap(ss);
+    const catatanMap = _getCatatanWOMap();
     list.forEach(wo => { wo.catatanCustomer = catatanMap[wo.noWO] || ''; });
 
     // Urutkan No WO terbaru di atas (numeric-aware)
