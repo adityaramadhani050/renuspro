@@ -46,7 +46,7 @@ function simpanCustomer(nama, perusahaan, telepon, alamat) {
 
     const nextId = "K" + ("000" + (maxNumber + 1)).slice(-3);
     sheet.appendRow([nextId, nama, perusahaan, alamat, telepon]);
-
+    invalidateKlienCache();
     return { success: true, message: "Klien (" + nextId + ") berhasil ditambahkan!", newId: nextId };
   } catch (error) {
     return { success: false, message: error.toString() };
@@ -60,6 +60,7 @@ function editCustomer(id, nama, perusahaan, telepon, alamat) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.getRange(i + 1, 2, 1, 4).setValues([[nama, perusahaan, alamat, telepon]]);
+        invalidateKlienCache();
         return { success: true, message: "Klien " + id + " berhasil diperbarui!" };
       }
     }
@@ -75,6 +76,7 @@ function hapusCustomer(id) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.deleteRow(i + 1);
+        invalidateKlienCache();
         return { success: true, message: "Klien " + id + " berhasil dihapus." };
       }
     }

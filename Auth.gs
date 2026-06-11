@@ -127,6 +127,7 @@ function simpanUser(nama, username, password, role, leadId) {
     const nextId = 'U' + String(maxNum + 1).padStart(3, '0');
 
     sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || '')]);
+    invalidateUserCache();
     return { success: true, message: 'User ' + nextId + ' (' + nama + ') berhasil ditambahkan!' };
   } catch(e) {
     return { success: false, message: e.toString() };
@@ -157,6 +158,7 @@ function editUser(id, nama, username, password, role, aktif, targetBulanan, lead
           role.toLowerCase(), aktif ? 'TRUE' : 'FALSE',
           parseFloat(targetBulanan) || 0, (leadId || '')
         ]]);
+        invalidateUserCache();
         return { success: true, message: 'User ' + id + ' berhasil diperbarui!' };
       }
     }
@@ -172,6 +174,7 @@ function hapusUser(id) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] && data[i][0].toString().trim() === id.toString().trim()) {
         sheet.deleteRow(i + 1);
+        invalidateUserCache();
         return { success: true, message: 'User ' + id + ' berhasil dihapus.' };
       }
     }

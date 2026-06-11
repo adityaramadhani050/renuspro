@@ -310,6 +310,7 @@ function simpanPenawaranKeSheet(payload) {
       payload.channelMarketing || ''
     ]);
 
+    invalidatePenawaranCache();
     const nextNo = generateNextQuotationNumber(ss);
     return { success: true, message: `Penawaran ${payload.noPenawaran} (Rev ${latestRev}) berhasil disimpan!`, nextNo: nextNo };
   } catch (error) {
@@ -381,6 +382,7 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
           } catch(e) {}
         }
 
+        invalidatePenawaranCache();
         return { success: true, message: "Status diperbarui menjadi: " + statusBaru, noWO: noWO };
       }
     }
@@ -483,6 +485,7 @@ function editPenawaran(payload) {
       payload.channelMarketing || ''
     ]);
 
+    invalidatePenawaranCache();
     const nextNo = generateNextQuotationNumber(ss);
     return { success: true, message: `${payload.noPenawaran} berhasil direvisi → Rev${newRev}!`, nextNo: nextNo };
   } catch(e) {

@@ -14,7 +14,13 @@ function parseTgl(raw) {
   if (!raw) return null;
   if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
   if (typeof raw === 'string') {
-    var parts = raw.trim().split('/');
+    var s = raw.trim();
+    // ISO string from cache (e.g. "2024-05-01T00:00:00.000Z")
+    if (s.indexOf('T') > 0) {
+      var dt = new Date(s);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+    var parts = s.split('/');
     if (parts.length === 3) {
       var d = parseInt(parts[0], 10);
       var m = parseInt(parts[1], 10) - 1;
@@ -23,7 +29,6 @@ function parseTgl(raw) {
       return isNaN(dt.getTime()) ? null : dt;
     }
   }
-  // Try native parse as last resort
   var dt = new Date(raw);
   return isNaN(dt.getTime()) ? null : dt;
 }
@@ -137,13 +142,10 @@ function getSalesReportData(params) {
     // Master_Klien → id: nama
     var klienMap = {};
     try {
-      var klienSheet = ss.getSheetByName('Master_Klien');
-      if (klienSheet) {
-        var klienData = klienSheet.getDataRange().getValues();
-        for (var ki = 1; ki < klienData.length; ki++) {
-          var krow = klienData[ki];
-          if (krow[0]) klienMap[String(krow[0])] = krow[1] || '';
-        }
+      var klienData = _cachedKlien();
+      for (var ki = 1; ki < klienData.length; ki++) {
+        var krow = klienData[ki];
+        if (krow[0]) klienMap[String(krow[0])] = krow[1] || '';
       }
     } catch(e) { /* ignore */ }
 
@@ -152,9 +154,8 @@ function getSalesReportData(params) {
     var allSalesNames = []; // all active sales user names
     var teamNames = null; // null = semua, array = filter ke anggota tim (leadsales)
     try {
-      var userSheet = ss.getSheetByName('Master_User');
-      if (userSheet) {
-        var userData = userSheet.getDataRange().getValues();
+      var userData = _cachedUser();
+      if (userData && userData.length > 0) {
         for (var ui = 1; ui < userData.length; ui++) {
           var urow = userData[ui];
           var uNama = urow[1] || '';
@@ -179,17 +180,17 @@ function getSalesReportData(params) {
     } catch(e) { /* ignore */ }
 
     // Sertakan data Lead Sales itu sendiri dalam teamNames
+
     if (params.role === 'leadsales' && namaUser) {
       if (!teamNames) teamNames = [];
       if (!teamNames.includes(namaUser.trim())) teamNames.push(namaUser.trim());
     }
 
-    // Penawaran_Main
-    var pSheet = ss.getSheetByName('Penawaran_Main');
-    if (!pSheet) {
+    // Penawaran_Main (cached)
+    var pData = _cachedPenawaran();
+    if (!pData || pData.length === 0) {
       return { success: false, error: 'Sheet Penawaran_Main tidak ditemukan.' };
     }
-    var pData = pSheet.getDataRange().getValues();
 
     // --- Step 1: Deduplicate — keep latest rev per No Penawaran ---
     // Map: noPenawaran → { rowIndex, rev }

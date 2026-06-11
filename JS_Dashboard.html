@@ -205,36 +205,16 @@ function _dbLoad() {
     return;
   }
 
-  if (_dbRawCache) {
-    // Raw cached — only re-fetch sales report
-    google.script.run
-      .withSuccessHandler(function(sales) { _dbRenderAll(_dbRawCache, sales); })
-      .withFailureHandler(function(e) { _dbShowError(e.message || 'Error'); })
-      .getSalesReportData(params);
-  } else {
-    // Fetch both concurrently
-    var pending = 2, rawR = null, salesR = null;
-    var tryRender = function() {
-      if (--pending === 0) _dbRenderAll(rawR, salesR);
-    };
-    google.script.run
-      .withSuccessHandler(function(raw) {
-        _dbRawCache = (raw && raw.success) ? raw : { success: false, items: [], isAdmin: params.isAdmin };
-        rawR = _dbRawCache;
-        tryRender();
-      })
-      .withFailureHandler(function() {
-        _dbRawCache = { success: false, items: [], isAdmin: params.isAdmin };
-        rawR = _dbRawCache;
-        tryRender();
-      })
-      .getDashboardRawData(params.namaUser, params.isAdmin, params.role, params.userId);
-
-    google.script.run
-      .withSuccessHandler(function(sales) { salesR = sales; tryRender(); })
-      .withFailureHandler(function(e) { salesR = { success: false, error: e.message }; tryRender(); })
-      .getSalesReportData(params);
-  }
+  // Single combined call — halves server round trips
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var raw   = (result && result.raw)   ? result.raw   : { success: false, items: [], isAdmin: params.isAdmin };
+      var sales = (result && result.sales) ? result.sales : { success: false };
+      _dbRawCache = raw.success ? raw : { success: false, items: [], isAdmin: params.isAdmin };
+      _dbRenderAll(raw, sales);
+    })
+    .withFailureHandler(function(e) { _dbShowError(e.message || 'Error'); })
+    .getDashboardData(params);
 }
 
 function _dbShowError(msg) {
