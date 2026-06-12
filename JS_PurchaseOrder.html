@@ -724,127 +724,283 @@ function submitTerimaPO() {
     });
 }
 
-// ── Export PDF PO ────────────────────────────────────────────────────────────
+// ── Export PDF PO — sama dengan sistem Penawaran/Invoice ──────────────────────
 function exportPOPDF(noPO) {
   if (!noPO) return;
-  toggleLoader(true, 'Memuat data PO untuk PDF...');
+  document.getElementById('preview-pdf-title').innerText    = 'Purchase Order — ' + noPO;
+  document.getElementById('preview-pdf-subtitle').innerText = 'Memuat data...';
+  document.getElementById('preview-pdf-loading').classList.remove('hidden');
+  document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+  document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+  document.getElementById('modal-preview-pdf').classList.remove('hidden');
+
+  if (typeof google === 'undefined') {
+    document.getElementById('preview-pdf-loading').innerHTML =
+      '<p class="text-sm text-slate-400">Mode lokal — tidak bisa load data.</p>';
+    return;
+  }
   google.script.run
     .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (!res || !res.success) { showNotification(res.message || 'Gagal memuat data PO.', 'error'); return; }
-      _generatePOPDF(res.po, res.items || [], res.pembayaran || []);
+      if (!res || !res.success) {
+        document.getElementById('preview-pdf-loading').innerHTML =
+          '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+          '<p class="text-sm text-rose-400 text-center px-4">' + (res ? res.message : 'Gagal') + '</p>' +
+          '<button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>';
+        return;
+      }
+      document.getElementById('preview-pdf-subtitle').innerText =
+        (res.po.namaSupplier || res.po.idSupplier || '') + (res.po.noWO ? ' · ' + res.po.noWO : '');
+      _buatDokumenPOPDF(res.po, res.items || []);
     })
     .withFailureHandler(function(err) {
-      toggleLoader(false);
-      showNotification(err.message || 'Gagal export PDF.', 'error');
+      document.getElementById('preview-pdf-loading').innerHTML =
+        '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+        '<p class="text-sm text-rose-400 text-center px-4">Error: ' + (err.message || err) + '</p>';
     })
     .getPODetail(noPO);
 }
 
-function _generatePOPDF(po, items, pembayaran) {
-  var subtotal     = po.subtotal     || 0;
-  var diskonNom    = po.diskonNominal || 0;
-  var diskonPct    = po.diskonPersen  || 0;
-  var ppnNominal   = po.ppnNominal   || 0;
-  var ppnPersen    = po.ppnPersen    || 0;
-  var grandTotal   = po.grandTotal   || 0;
+function _buatDokumenPOPDF(po, items) {
+  try {
+    var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
+    if (!jsPDF) {
+      document.getElementById('preview-pdf-loading').innerHTML =
+        '<p class="text-sm text-rose-400">Library jsPDF tidak tersedia.</p>';
+      return;
+    }
 
-  var fRp = function(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); };
+    var doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var PW   = 210;
+    var ML   = 14;
+    var MR   = 14;
+    var CW   = PW - ML - MR;
+    var BLUE = [0, 51, 153];
+    var rpNum = function(v) { return Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
 
-  var itemRows = items.map(function(it, i) {
-    return '<tr style="border-bottom:1px solid #e2e8f0">' +
-      '<td style="padding:7px 10px;text-align:center;color:#94a3b8;font-size:12px">' + (i+1) + '</td>' +
-      '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(it.namaItem||'') + '</td>' +
-      '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#475569">' + (it.qty||0) + '</td>' +
-      '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#475569">' + _escHtml(it.satuan||'') + '</td>' +
-      '<td style="padding:7px 10px;text-align:right;font-size:12px;color:#475569">' + fRp(it.hargaBeli) + '</td>' +
-      '<td style="padding:7px 10px;text-align:right;font-size:13px;font-weight:700;color:#1e293b">' + fRp(it.total) + '</td>' +
-    '</tr>';
-  }).join('');
+    // ── LOGO & HEADER PERUSAHAAN ─────────────────────────────────────────────
+    doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]);
+    doc.rect(ML, 10, 26, 10, 'F');
+    // ikon brand sederhana
+    doc.setFillColor(255, 255, 255);
+    var ix = ML + 2.5, iy = 11;
+    doc.triangle(ix, iy+7, ix+3, iy+3.5, ix+3, iy+7, 'F');
+    doc.triangle(ix+2.5, iy+7, ix+5.5, iy+3.5, ix+5.5, iy+7, 'F');
+    doc.rect(ix, iy+4.5, 5.5, 1.2, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9.5);
+    doc.text('RENUS', ML+16, 16.2, { align:'center' });
 
-  var diskonRow = diskonNom > 0
-    ? '<tr><td colspan="2" style="padding:4px 10px;font-size:12px;color:#64748b">Diskon (' + diskonPct + '%)</td>' +
-      '<td colspan="4" style="padding:4px 10px;text-align:right;font-size:12px;color:#e11d48;font-weight:600">- ' + fRp(diskonNom) + '</td></tr>'
-    : '';
+    doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 24);
 
-  var html =
-    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-    '<title>PO ' + _escHtml(po.noPO||'') + '</title>' +
-    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:13px;color:#1e293b;background:#fff;padding:32px}' +
-    '@media print{body{padding:16px}button{display:none!important}}' +
-    '.print-btn{position:fixed;top:20px;right:20px;background:#f97316;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px}' +
-    'table{width:100%;border-collapse:collapse}th{background:#f8fafc;padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border-bottom:2px solid #e2e8f0}' +
-    '</style></head><body>' +
-    '<button class="print-btn" onclick="window.print()"><i>🖨</i> Cetak / Save PDF</button>' +
+    doc.setTextColor(50,50,50);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7.5);
+    doc.text('Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari', ML, 28);
+    doc.text('Kec. Rungkut, Kota Surabaya 60293', ML, 32);
+    doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
+    doc.text('Email : admin@renergynusantara | renergynusantara@gmail.com', ML, 36);
+    doc.setTextColor(50,50,50);
+    doc.text('Telp : 0895-6059-84308 | 0813-5820-8282', ML, 40);
 
-    // Header
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">' +
-      '<div>' +
-        '<div style="font-size:22px;font-weight:900;color:#1e293b;letter-spacing:-.5px">PURCHASE ORDER</div>' +
-        '<div style="font-size:13px;color:#64748b;margin-top:2px">PT. Renus Global Indonesia</div>' +
-      '</div>' +
-      '<div style="text-align:right">' +
-        '<div style="font-size:18px;font-weight:800;color:#f97316">' + _escHtml(po.noPO||'') + '</div>' +
-        '<div style="font-size:12px;color:#64748b;margin-top:2px">Tanggal: ' + _escHtml(po.tanggal||'') + '</div>' +
-        '<div style="margin-top:6px"><span style="background:' + (po.statusPO==='Disetujui'?'#dbeafe':po.statusPO==='Diterima'?'#ccfbf1':po.statusPO==='Batal'?'#ffe4e6':'#f1f5f9') + ';color:' + (po.statusPO==='Disetujui'?'#1d4ed8':po.statusPO==='Diterima'?'#0f766e':po.statusPO==='Batal'?'#be123c':'#475569') + ';padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">' + _escHtml(po.statusPO||'') + '</span></div>' +
-      '</div>' +
-    '</div>' +
+    // ── JUDUL KANAN ──────────────────────────────────────────────────────────
+    doc.setTextColor(100,100,100);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(28);
+    doc.text('Purchase Order', PW - MR, 20, { align:'right' });
 
-    // Info
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">' +
-      '<div style="background:#f8fafc;border-radius:10px;padding:14px">' +
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px">Supplier</div>' +
-        '<div style="font-weight:700;color:#1e293b;font-size:14px">' + _escHtml(po.namaSupplier||po.idSupplier||'—') + '</div>' +
-      '</div>' +
-      '<div style="background:#f8fafc;border-radius:10px;padding:14px">' +
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px">Peruntukan / No WO</div>' +
-        '<div style="font-weight:600;color:#1e293b">' + _escHtml(po.peruntukan||'—') + (po.noWO ? ' · ' + _escHtml(po.noWO) : '') + '</div>' +
-      '</div>' +
-    '</div>' +
+    var infoLX = PW - MR - 50, infoRX = PW - MR;
+    [
+      ['Tanggal', po.tanggal || ''],
+      ['No. PO',  po.noPO   || ''],
+      ['Status',  po.statusPO || ''],
+    ].forEach(function(r, idx) {
+      var y = 28 + idx * 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(50,50,50);
+      doc.text(r[0], infoLX, y);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(20,20,20);
+      doc.text(r[1], infoRX, y, { align:'right' });
+    });
 
-    // Tabel item
-    '<div style="margin-bottom:20px">' +
-      '<table><thead><tr>' +
-        '<th style="width:36px;text-align:center">#</th>' +
-        '<th>Nama Item</th>' +
-        '<th style="width:60px;text-align:center">Qty</th>' +
-        '<th style="width:60px;text-align:center">Sat.</th>' +
-        '<th style="width:130px;text-align:right">Harga Satuan</th>' +
-        '<th style="width:140px;text-align:right">Total</th>' +
-      '</tr></thead><tbody>' + itemRows + '</tbody></table>' +
-    '</div>' +
+    // ── KEPADA SUPPLIER ──────────────────────────────────────────────────────
+    var curY = 45;
+    doc.setFillColor(BLUE[0],BLUE[1],BLUE[2]);
+    doc.rect(ML, curY, CW, 6, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.text('Kepada Supplier :', ML+2, curY+4.2);
+    curY += 6;
 
-    // Kalkulasi
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:28px">' +
-      '<div style="width:320px;background:#f8fafc;border-radius:12px;padding:16px">' +
-        '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:#64748b">Subtotal</span><span style="font-weight:600">' + fRp(subtotal) + '</span></div>' +
-        diskonRow +
-        (ppnPersen > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:#64748b">PPN (' + ppnPersen + '%)</span><span style="font-weight:600">' + fRp(ppnNominal) + '</span></div>' : '') +
-        '<div style="display:flex;justify-content:space-between;padding:8px 0 4px;border-top:2px solid #e2e8f0;margin-top:4px"><span style="font-weight:800;font-size:14px">Grand Total</span><span style="font-weight:900;font-size:16px;color:#f97316">' + fRp(grandTotal) + '</span></div>' +
-      '</div>' +
-    '</div>' +
+    doc.setFillColor(248,249,252);
+    doc.rect(ML, curY, CW, 22, 'F');
+    doc.setDrawColor(210,215,230);
+    doc.setLineWidth(0.2);
+    doc.rect(ML, curY, CW, 22);
 
-    // Catatan
-    (po.catatan ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-bottom:20px"><strong>Catatan:</strong> ' + _escHtml(po.catatan) + '</div>' : '') +
+    var c1L = ML+2, c1V = ML+32, c2L = ML+(CW/2)+2, c2V = PW-MR;
+    var supplierRows = [
+      ['Supplier',    po.namaSupplier || po.idSupplier || '—',  'No. PO',      po.noPO || ''],
+      ['Peruntukan',  po.peruntukan || '—',                     'No. WO',      po.noWO || '—'],
+      ['Dibuat Oleh', po.dibuatOleh || '—',                     'Tanggal',     po.tanggal || ''],
+    ];
+    supplierRows.forEach(function(r, idx) {
+      var y = curY + 6 + idx * 5.5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica','bold'); doc.setTextColor(70,70,70); doc.text(r[0], c1L, y);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20); doc.text(r[1], c1V, y);
+      doc.setFont('helvetica','bold'); doc.setTextColor(70,70,70); doc.text(r[2], c2L+5, y);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20); doc.text(r[3], c2V-3, y, { align:'right' });
+    });
+    curY += 25;
 
-    // Footer tanda tangan
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px">' +
-      '<div style="text-align:center">' +
-        '<div style="font-size:11px;color:#64748b;margin-bottom:64px">Disiapkan Oleh</div>' +
-        '<div style="border-top:1px solid #334155;padding-top:6px;font-size:12px;font-weight:700;color:#334155">' + _escHtml(po.dibuatOleh||'') + '</div>' +
-      '</div>' +
-      '<div style="text-align:center">' +
-        '<div style="font-size:11px;color:#64748b;margin-bottom:64px">Disetujui Oleh</div>' +
-        '<div style="border-top:1px solid #334155;padding-top:6px;font-size:12px;font-weight:700;color:#334155">Direktur</div>' +
-      '</div>' +
-    '</div>' +
+    // ── TABEL ITEM ───────────────────────────────────────────────────────────
+    var tableBody = items.map(function(it, i) {
+      return [
+        { content: String(i+1), styles: { halign:'center' } },
+        it.namaItem || '',
+        { content: String(it.qty || 0), styles: { halign:'center' } },
+        { content: it.satuan || '', styles: { halign:'center' } },
+        { content: rpNum(it.hargaBeli), styles: { halign:'right' } },
+        { content: rpNum(it.total),     styles: { halign:'right', fontStyle:'bold' } },
+      ];
+    });
 
-    '</body></html>';
+    doc.autoTable({
+      startY: curY,
+      head: [[
+        { content: 'No.',           styles: { halign:'center' } },
+        { content: 'Nama Item',     styles: { halign:'left'   } },
+        { content: 'Qty',           styles: { halign:'center' } },
+        { content: 'Satuan',        styles: { halign:'center' } },
+        { content: 'Harga (IDR)',   styles: { halign:'center' } },
+        { content: 'Total (IDR)',   styles: { halign:'center' } },
+      ]],
+      body: tableBody,
+      theme: 'grid',
+      margin: { left: ML, right: MR },
+      columnStyles: {
+        0: { cellWidth: 10, halign:'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 14, halign:'center' },
+        3: { cellWidth: 16, halign:'center' },
+        4: { cellWidth: 30, halign:'right' },
+        5: { cellWidth: 32, halign:'right' },
+      },
+      headStyles: {
+        fillColor: BLUE, textColor: [255,255,255],
+        fontStyle:'bold', fontSize:8,
+        lineColor:[255,255,255], lineWidth:0.3,
+      },
+      bodyStyles: {
+        fontSize:7.5, textColor:[40,40,40],
+        lineColor:[200,205,220], lineWidth:0.2, cellPadding:1.8,
+      },
+      alternateRowStyles: { fillColor:[255,255,255] },
+      styles: { overflow:'linebreak' },
+    });
 
-  var win = window.open('', '_blank');
-  if (!win) { showNotification('Pop-up diblokir browser. Izinkan pop-up untuk halaman ini.', 'error'); return; }
-  win.document.write(html);
-  win.document.close();
+    curY = doc.lastAutoTable.finalY + 4;
+
+    // ── SUMMARY KALKULASI ────────────────────────────────────────────────────
+    var subtotal    = po.subtotal     || 0;
+    var diskonNom   = po.diskonNominal || 0;
+    var diskonPct   = po.diskonPersen  || 0;
+    var ppnNominal  = po.ppnNominal   || 0;
+    var ppnPersen   = po.ppnPersen    || 0;
+    var grandTotal  = po.grandTotal   || 0;
+
+    var summaryLines = [];
+    summaryLines.push({ label:'Subtotal',                  value:'Rp ' + rpNum(subtotal), bold:false, red:false, highlight:false });
+    if (diskonNom > 0) summaryLines.push({ label:'Diskon (' + diskonPct + '%)', value:'- Rp ' + rpNum(diskonNom), bold:false, red:true, highlight:false });
+    if (ppnNominal > 0) summaryLines.push({ label:'PPN ' + ppnPersen + '%', value:'Rp ' + rpNum(ppnNominal), bold:false, red:false, highlight:false });
+    summaryLines.push({ label:'GRAND TOTAL', value:'Rp ' + rpNum(grandTotal), bold:true, red:false, highlight:true });
+
+    var colLabelX = PW - MR - 60, colValX = PW - MR;
+    var rowH = 6, sy = curY;
+    var summaryBoxW = colValX - colLabelX;
+    var totalSummaryH = summaryLines.length * rowH + 2;
+    doc.setDrawColor(210,215,230); doc.setLineWidth(0.2);
+    doc.rect(colLabelX, sy-1, summaryBoxW, totalSummaryH+1);
+
+    summaryLines.forEach(function(row, idx) {
+      var ry = sy + 1 + idx * rowH;
+      if (row.highlight) {
+        doc.setFillColor(235,240,255);
+        doc.rect(colLabelX, ry-0.5, summaryBoxW, rowH+1, 'F');
+        doc.setDrawColor(180,190,220); doc.setLineWidth(0.3);
+        doc.line(colLabelX, ry-0.5, colLabelX+summaryBoxW, ry-0.5);
+      }
+      doc.setFontSize(8);
+      if (row.bold)      { doc.setFont('helvetica','bold');   doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]); }
+      else if (row.red)  { doc.setFont('helvetica','normal'); doc.setTextColor(180,0,0); }
+      else               { doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); }
+      doc.text(row.label, colLabelX+3, ry+4);
+      doc.text(row.value, colValX-2,   ry+4, { align:'right' });
+    });
+    curY = sy + totalSummaryH + 6;
+
+    // ── CATATAN ──────────────────────────────────────────────────────────────
+    if (po.catatan) {
+      if (curY > 248) { doc.addPage(); curY = 15; }
+      var catatanLines = doc.splitTextToSize('Catatan: ' + po.catatan, CW - 4);
+      var catatanH = catatanLines.length * 4.2 + 6;
+      doc.setFillColor(255,252,230);
+      doc.rect(ML, curY, CW, catatanH, 'F');
+      doc.setDrawColor(220,200,100); doc.setLineWidth(0.2);
+      doc.rect(ML, curY, CW, catatanH);
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,0);
+      doc.text(catatanLines, ML+2, curY+4.5);
+      curY += catatanH + 6;
+    }
+
+    // ── TANDA TANGAN ─────────────────────────────────────────────────────────
+    if (curY > 255) { doc.addPage(); curY = 15; }
+    curY += 4;
+    doc.setDrawColor(210,215,230); doc.setLineWidth(0.3);
+    doc.line(ML, curY, PW-MR, curY);
+    curY += 5;
+
+    // Dua kolom tanda tangan
+    var ttW = CW / 2 - 10;
+    var ttCols = [
+      { x: ML+5,       label:'Disiapkan Oleh',  nama: po.dibuatOleh || 'Procurement' },
+      { x: PW-MR-ttW-5, label:'Disetujui Oleh', nama: 'Direktur' },
+    ];
+    ttCols.forEach(function(tt) {
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+      doc.text(tt.label, tt.x + ttW/2, curY, { align:'center' });
+      doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
+      doc.text(tt.nama, tt.x + ttW/2, curY + 18, { align:'center' });
+      var namaW = doc.getTextWidth(tt.nama);
+      doc.setDrawColor(20,20,20); doc.setLineWidth(0.3);
+      doc.line(tt.x + ttW/2 - namaW/2, curY+19, tt.x + ttW/2 + namaW/2, curY+19);
+    });
+
+    // ── RENDER KE MODAL PREVIEW ──────────────────────────────────────────────
+    var fileName = 'PO_' + (po.noPO || '').replace(/\//g,'-') + '.pdf';
+    _activePdfDoc  = doc;
+    _activePdfName = fileName;
+    _activePdfBase64 = null;
+
+    renderPDFKeCanvas(doc).catch(function(err) {
+      document.getElementById('preview-pdf-loading').innerHTML =
+        '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+        '<p class="text-sm text-rose-400">Gagal render preview: ' + err.message + '</p>';
+    });
+
+  } catch(err) {
+    console.error(err);
+    document.getElementById('preview-pdf-loading').innerHTML =
+      '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+      '<p class="text-sm text-rose-400">Gagal generate PDF: ' + err.message + '</p>';
+  }
 }
 
 // ── Cetak PO (stub) ──────────────────────────────────────────────────────────
