@@ -75,7 +75,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','purchaseorder']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','purchaseorder','inventory']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
