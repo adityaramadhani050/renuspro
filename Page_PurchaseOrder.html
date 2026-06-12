@@ -43,7 +43,7 @@
                     <th class="p-4 text-center">Status PO</th>
                     <th class="p-4 text-right">Grand Total</th>
                     <th class="p-4 text-center">Status Bayar</th>
-                    <th class="p-4 text-center">Aksi</th>
+                    <th class="p-4 text-center" style="width:100px">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="table-purchaseorder" class="text-sm">
@@ -59,14 +59,13 @@
         <!-- ── Form Buat / Edit PO ── -->
         <div id="form-po-section" class="hidden">
 
-          <!-- Back Button + Title -->
-          <div class="flex items-center justify-between mb-6">
+          <!-- Back Button + Title (mirip Penawaran) -->
+          <div class="mb-6">
             <button onclick="tutupFormPO()"
-              class="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition">
+              class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition mb-2">
               <i class="fas fa-arrow-left text-xs"></i> Kembali ke Daftar
             </button>
             <h2 id="form-po-title" class="text-2xl font-extrabold text-slate-900 tracking-tight">Buat Purchase Order Baru</h2>
-            <div class="w-40"></div>
           </div>
 
           <div class="space-y-6 max-w-6xl mx-auto">

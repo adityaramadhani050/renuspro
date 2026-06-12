@@ -43,7 +43,16 @@
       }
       if(pageId === 'settings') loadSettings();
       if(pageId === 'supplier') loadSupplier();
-      if(pageId === 'purchaseorder') loadPurchaseOrder();
+      if(pageId === 'purchaseorder') {
+        // Reset ke list view setiap navigasi masuk
+        var formPO   = document.getElementById('form-po-section');
+        var detailPO = document.getElementById('panel-po-detail');
+        var listPO   = document.getElementById('po-list-section');
+        if (formPO)   formPO.classList.add('hidden');
+        if (detailPO) detailPO.classList.add('hidden');
+        if (listPO)   listPO.classList.remove('hidden');
+        loadPurchaseOrder();
+      }
       if(pageId === 'inventory') loadInventory();
     }
 

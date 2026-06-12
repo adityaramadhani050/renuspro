@@ -41,6 +41,7 @@ function _pgRenderPurchaseOrder(data) {
       '<td class="p-4 text-center">' +
         '<div class="flex items-center justify-center gap-1">' +
           '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
+          '<button onclick="exportPOPDF(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
           (isDraft ? '<button onclick="konfirmasiHapus(\'po\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '') +
         '</div>' +
       '</td>' +
@@ -723,10 +724,133 @@ function submitTerimaPO() {
     });
 }
 
-// ── Cetak PO (stub — perlu Template_PO sheet) ────────────────────────────────
+// ── Export PDF PO ────────────────────────────────────────────────────────────
+function exportPOPDF(noPO) {
+  if (!noPO) return;
+  toggleLoader(true, 'Memuat data PO untuk PDF...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (!res || !res.success) { showNotification(res.message || 'Gagal memuat data PO.', 'error'); return; }
+      _generatePOPDF(res.po, res.items || [], res.pembayaran || []);
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal export PDF.', 'error');
+    })
+    .getPODetail(noPO);
+}
+
+function _generatePOPDF(po, items, pembayaran) {
+  var subtotal     = po.subtotal     || 0;
+  var diskonNom    = po.diskonNominal || 0;
+  var diskonPct    = po.diskonPersen  || 0;
+  var ppnNominal   = po.ppnNominal   || 0;
+  var ppnPersen    = po.ppnPersen    || 0;
+  var grandTotal   = po.grandTotal   || 0;
+
+  var fRp = function(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); };
+
+  var itemRows = items.map(function(it, i) {
+    return '<tr style="border-bottom:1px solid #e2e8f0">' +
+      '<td style="padding:7px 10px;text-align:center;color:#94a3b8;font-size:12px">' + (i+1) + '</td>' +
+      '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:#1e293b">' + _escHtml(it.namaItem||'') + '</td>' +
+      '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#475569">' + (it.qty||0) + '</td>' +
+      '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#475569">' + _escHtml(it.satuan||'') + '</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-size:12px;color:#475569">' + fRp(it.hargaBeli) + '</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-size:13px;font-weight:700;color:#1e293b">' + fRp(it.total) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var diskonRow = diskonNom > 0
+    ? '<tr><td colspan="2" style="padding:4px 10px;font-size:12px;color:#64748b">Diskon (' + diskonPct + '%)</td>' +
+      '<td colspan="4" style="padding:4px 10px;text-align:right;font-size:12px;color:#e11d48;font-weight:600">- ' + fRp(diskonNom) + '</td></tr>'
+    : '';
+
+  var html =
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>PO ' + _escHtml(po.noPO||'') + '</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:13px;color:#1e293b;background:#fff;padding:32px}' +
+    '@media print{body{padding:16px}button{display:none!important}}' +
+    '.print-btn{position:fixed;top:20px;right:20px;background:#f97316;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px}' +
+    'table{width:100%;border-collapse:collapse}th{background:#f8fafc;padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border-bottom:2px solid #e2e8f0}' +
+    '</style></head><body>' +
+    '<button class="print-btn" onclick="window.print()"><i>🖨</i> Cetak / Save PDF</button>' +
+
+    // Header
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">' +
+      '<div>' +
+        '<div style="font-size:22px;font-weight:900;color:#1e293b;letter-spacing:-.5px">PURCHASE ORDER</div>' +
+        '<div style="font-size:13px;color:#64748b;margin-top:2px">PT. Renus Global Indonesia</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<div style="font-size:18px;font-weight:800;color:#f97316">' + _escHtml(po.noPO||'') + '</div>' +
+        '<div style="font-size:12px;color:#64748b;margin-top:2px">Tanggal: ' + _escHtml(po.tanggal||'') + '</div>' +
+        '<div style="margin-top:6px"><span style="background:' + (po.statusPO==='Disetujui'?'#dbeafe':po.statusPO==='Diterima'?'#ccfbf1':po.statusPO==='Batal'?'#ffe4e6':'#f1f5f9') + ';color:' + (po.statusPO==='Disetujui'?'#1d4ed8':po.statusPO==='Diterima'?'#0f766e':po.statusPO==='Batal'?'#be123c':'#475569') + ';padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">' + _escHtml(po.statusPO||'') + '</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    // Info
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">' +
+      '<div style="background:#f8fafc;border-radius:10px;padding:14px">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px">Supplier</div>' +
+        '<div style="font-weight:700;color:#1e293b;font-size:14px">' + _escHtml(po.namaSupplier||po.idSupplier||'—') + '</div>' +
+      '</div>' +
+      '<div style="background:#f8fafc;border-radius:10px;padding:14px">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:6px">Peruntukan / No WO</div>' +
+        '<div style="font-weight:600;color:#1e293b">' + _escHtml(po.peruntukan||'—') + (po.noWO ? ' · ' + _escHtml(po.noWO) : '') + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Tabel item
+    '<div style="margin-bottom:20px">' +
+      '<table><thead><tr>' +
+        '<th style="width:36px;text-align:center">#</th>' +
+        '<th>Nama Item</th>' +
+        '<th style="width:60px;text-align:center">Qty</th>' +
+        '<th style="width:60px;text-align:center">Sat.</th>' +
+        '<th style="width:130px;text-align:right">Harga Satuan</th>' +
+        '<th style="width:140px;text-align:right">Total</th>' +
+      '</tr></thead><tbody>' + itemRows + '</tbody></table>' +
+    '</div>' +
+
+    // Kalkulasi
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:28px">' +
+      '<div style="width:320px;background:#f8fafc;border-radius:12px;padding:16px">' +
+        '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:#64748b">Subtotal</span><span style="font-weight:600">' + fRp(subtotal) + '</span></div>' +
+        diskonRow +
+        (ppnPersen > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:#64748b">PPN (' + ppnPersen + '%)</span><span style="font-weight:600">' + fRp(ppnNominal) + '</span></div>' : '') +
+        '<div style="display:flex;justify-content:space-between;padding:8px 0 4px;border-top:2px solid #e2e8f0;margin-top:4px"><span style="font-weight:800;font-size:14px">Grand Total</span><span style="font-weight:900;font-size:16px;color:#f97316">' + fRp(grandTotal) + '</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    // Catatan
+    (po.catatan ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-bottom:20px"><strong>Catatan:</strong> ' + _escHtml(po.catatan) + '</div>' : '') +
+
+    // Footer tanda tangan
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px">' +
+      '<div style="text-align:center">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:64px">Disiapkan Oleh</div>' +
+        '<div style="border-top:1px solid #334155;padding-top:6px;font-size:12px;font-weight:700;color:#334155">' + _escHtml(po.dibuatOleh||'') + '</div>' +
+      '</div>' +
+      '<div style="text-align:center">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:64px">Disetujui Oleh</div>' +
+        '<div style="border-top:1px solid #334155;padding-top:6px;font-size:12px;font-weight:700;color:#334155">Direktur</div>' +
+      '</div>' +
+    '</div>' +
+
+    '</body></html>';
+
+  var win = window.open('', '_blank');
+  if (!win) { showNotification('Pop-up diblokir browser. Izinkan pop-up untuk halaman ini.', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ── Cetak PO (stub) ──────────────────────────────────────────────────────────
 function cetakPO(po) {
-  if (!po) return;
-  showNotification('Fitur cetak PO memerlukan sheet Template_PO. Hubungi admin.', 'error');
+  if (!po || !po.noPO) return;
+  exportPOPDF(po.noPO);
 }
 
 // ── Helper escHtml (gunakan yang sudah ada di JS_Settings jika tersedia) ─────
