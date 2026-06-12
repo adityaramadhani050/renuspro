@@ -97,10 +97,17 @@ function _ensurePOItemCols(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('PO_Item');
   if (!sheet) return _ensurePOItemSheet(ss);
+  if (sheet.getLastColumn() < 9) sheet.getRange(1, 9).setValue('Qty Diterima');
+  return sheet;
+}
+
+function _ensurePODiskonCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Purchase_Order');
+  if (!sheet) return _ensurePOSheet(ss);
   var lastCol = sheet.getLastColumn();
-  if (lastCol < 9) {
-    sheet.getRange(1, 9).setValue('Qty Diterima');
-  }
+  if (lastCol < 19) sheet.getRange(1, 19).setValue('Diskon Persen');
+  if (lastCol < 20) sheet.getRange(1, 20).setValue('Diskon Nominal');
   return sheet;
 }
 
@@ -208,8 +215,10 @@ function getPOList() {
         catatan:      r[11] ? r[11].toString() : '',
         statusBayar:  r[12] ? r[12].toString() : '',
         totalDibayar: parseFloat(r[13]) || 0,
-        dibuatOleh:   r[14] ? r[14].toString() : '',
-        dibuatPada:   _fmtTgl(r[15])
+        dibuatOleh:    r[14] ? r[14].toString() : '',
+        dibuatPada:    _fmtTgl(r[15]),
+        diskonPersen:  parseFloat(r[18]) || 0,
+        diskonNominal: parseFloat(r[19]) || 0
       });
     }
     return list;
@@ -247,8 +256,10 @@ function getPODetail(noPO) {
           totalDibayar: parseFloat(r[13]) || 0,
           dibuatOleh:   r[14] ? r[14].toString() : '',
           dibuatPada:   _fmtTgl(r[15]),
-          diubahOleh:   r[16] ? r[16].toString() : '',
-          diubahPada:   _fmtTgl(r[17])
+          diubahOleh:    r[16] ? r[16].toString() : '',
+          diubahPada:    _fmtTgl(r[17]),
+          diskonPersen:  parseFloat(r[18]) || 0,
+          diskonNominal: parseFloat(r[19]) || 0
         };
         break;
       }
@@ -325,14 +336,19 @@ function simpanPO(payload) {
     var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
 
     // Hitung nilai
+    _ensurePODiskonCols(ss);
     var subtotal = 0;
     for (var i = 0; i < payload.items.length; i++) {
       var it = payload.items[i];
       subtotal += (parseFloat(it.qty) || 0) * (parseFloat(it.hargaBeli) || 0);
     }
+    var diskonPersen  = parseFloat(payload.diskonPersen)  || 0;
+    var diskonNominal = parseFloat(payload.diskonNominal) || Math.round(subtotal * diskonPersen / 100);
+    if (diskonNominal > subtotal) diskonNominal = subtotal;
+    var setelahDiskon = subtotal - diskonNominal;
     var ppnPersen  = parseFloat(payload.ppnPersen) || 0;
-    var ppnNominal = subtotal * ppnPersen / 100;
-    var grandTotal = subtotal + ppnNominal;
+    var ppnNominal = Math.round(setelahDiskon * ppnPersen / 100);
+    var grandTotal = setelahDiskon + ppnNominal;
 
     var tanggalStr = payload.tanggal ? payload.tanggal.toString() : _fmtTgl(now);
 
@@ -355,7 +371,9 @@ function simpanPO(payload) {
       payload.dibuatOleh     ? payload.dibuatOleh.toString()     : '',
       nowStr,
       '',
-      ''
+      '',
+      diskonPersen,
+      diskonNominal
     ]);
 
     // Tulis item
@@ -425,21 +443,26 @@ function editPO(payload) {
     }
 
     // Hitung ulang nilai
+    _ensurePODiskonCols(ss);
     var subtotal = 0;
     for (var k = 0; k < payload.items.length; k++) {
       var it = payload.items[k];
       subtotal += (parseFloat(it.qty) || 0) * (parseFloat(it.hargaBeli) || 0);
     }
+    var diskonPersen  = parseFloat(payload.diskonPersen)  || 0;
+    var diskonNominal = parseFloat(payload.diskonNominal) || Math.round(subtotal * diskonPersen / 100);
+    if (diskonNominal > subtotal) diskonNominal = subtotal;
+    var setelahDiskon = subtotal - diskonNominal;
     var ppnPersen  = parseFloat(payload.ppnPersen) || 0;
-    var ppnNominal = subtotal * ppnPersen / 100;
-    var grandTotal = subtotal + ppnNominal;
+    var ppnNominal = Math.round(setelahDiskon * ppnPersen / 100);
+    var grandTotal = setelahDiskon + ppnNominal;
 
     var now    = new Date();
     var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
     var tanggalStr = payload.tanggal ? payload.tanggal.toString() : _fmtTgl(now);
 
     // Update header row
-    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 18);
+    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 20);
     var existingRow = updateRange.getValues()[0];
     updateRange.setValues([[
       noPO,
@@ -459,7 +482,9 @@ function editPO(payload) {
       existingRow[14], // dibuatOleh
       existingRow[15], // dibuatPada
       payload.diubahOleh ? payload.diubahOleh.toString() : '',
-      nowStr
+      nowStr,
+      diskonPersen,
+      diskonNominal
     ]]);
 
     // Tulis item baru

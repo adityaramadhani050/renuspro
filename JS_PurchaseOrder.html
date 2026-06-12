@@ -94,6 +94,8 @@ function bukaFormPO() {
   document.getElementById('po-tanggal').value   = today;
   document.getElementById('po-peruntukan').value = '';
   document.getElementById('po-ppn-persen').value = '11';
+  if (document.getElementById('po-diskon-persen'))  document.getElementById('po-diskon-persen').value  = '0';
+  if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = '';
   document.getElementById('po-catatan').value    = '';
   renderItemsPO();
   hitungTotalPO();
@@ -211,14 +213,20 @@ function hitungTotalPO() {
   var subtotal = _poItems.reduce(function(s, item) {
     return s + (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
   }, 0);
-  var ppnPct  = parseFloat(document.getElementById('po-ppn-persen').value) || 0;
-  var ppn     = Math.round(subtotal * ppnPct / 100);
-  var grand   = subtotal + ppn;
 
-  document.getElementById('po-subtotal').innerText    = _fmtRp(subtotal);
-  document.getElementById('po-ppn-label').innerText   = ppnPct;
-  document.getElementById('po-ppn-display').innerText = _fmtRp(ppn);
-  document.getElementById('po-grandtotal').innerText  = _fmtRp(grand);
+  var diskonPct = parseFloat((document.getElementById('po-diskon-persen') || {}).value) || 0;
+  var diskonNomEl = document.getElementById('po-diskon-nominal');
+  var diskonNom = diskonNomEl && diskonNomEl.value ? _parseRp(diskonNomEl.value) : Math.round(subtotal * diskonPct / 100);
+  if (diskonNom > subtotal) diskonNom = subtotal;
+  var setelahDiskon = subtotal - diskonNom;
+
+  var ppnPct  = parseFloat((document.getElementById('po-ppn-persen') || {}).value) || 0;
+  var ppn     = Math.round(setelahDiskon * ppnPct / 100);
+  var grand   = setelahDiskon + ppn;
+
+  if (document.getElementById('po-subtotal'))    document.getElementById('po-subtotal').innerText    = _fmtRp(subtotal);
+  if (document.getElementById('po-ppn-display')) document.getElementById('po-ppn-display').innerText = _fmtRp(ppn);
+  if (document.getElementById('po-grandtotal'))  document.getElementById('po-grandtotal').innerText  = _fmtRp(grand);
   // update total per baris tanpa re-render penuh
   var rows = document.querySelectorAll('#po-items-body tr');
   _poItems.forEach(function(item, idx) {
@@ -227,6 +235,23 @@ function hitungTotalPO() {
       if (totalEl) totalEl.innerText = 'Rp ' + _fmtRp((parseFloat(item.qty)||0) * (parseFloat(item.hargaBeli)||0));
     }
   });
+}
+
+function _onDiskonNominalInput(el) {
+  var subtotal = _poItems.reduce(function(s, item) {
+    return s + (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
+  }, 0);
+  var raw = _parseRp(el.value);
+  // back-calculate pct
+  var pct = subtotal > 0 ? Math.round(raw / subtotal * 10000) / 100 : 0;
+  var diskonPctEl = document.getElementById('po-diskon-persen');
+  if (diskonPctEl) diskonPctEl.value = pct;
+  // format nominal
+  var pos = el.selectionStart, oldLen = el.value.length;
+  el.value = raw > 0 ? _fmtRp(raw) : '';
+  var newLen = el.value.length;
+  try { el.selectionStart = el.selectionEnd = pos + (newLen - oldLen); } catch(e){}
+  hitungTotalPO();
 }
 
 // ── Submit PO ────────────────────────────────────────────────────────────────
@@ -248,6 +273,8 @@ function submitPO() {
     peruntukan:   document.getElementById('po-peruntukan').value.trim(),
     noWO:         document.getElementById('sel-wo-po').value,
     ppnPersen:    parseFloat(document.getElementById('po-ppn-persen').value) || 0,
+    diskonPersen: parseFloat((document.getElementById('po-diskon-persen') || {}).value) || 0,
+    diskonNominal: _parseRp((document.getElementById('po-diskon-nominal') || {}).value || ''),
     catatan:      document.getElementById('po-catatan').value.trim(),
     items:        _poItems.map(function(it) {
       return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
@@ -382,6 +409,13 @@ function _renderPODetail(po, items, pembayaran) {
   if (document.getElementById('po-detail-subtotal'))  document.getElementById('po-detail-subtotal').innerText  = (po.subtotal || 0).toLocaleString('id-ID');
   if (document.getElementById('po-detail-ppn-nominal')) document.getElementById('po-detail-ppn-nominal').innerText = (po.ppnNominal || 0).toLocaleString('id-ID');
   if (document.getElementById('po-detail-grandtotal')) document.getElementById('po-detail-grandtotal').innerText = (po.grandTotal || 0).toLocaleString('id-ID');
+  var diskonRow = document.getElementById('po-detail-diskon-row');
+  if (diskonRow) {
+    var hasDiskon = (po.diskonNominal || 0) > 0;
+    diskonRow.classList.toggle('hidden', !hasDiskon);
+    if (document.getElementById('po-detail-diskon-persen'))  document.getElementById('po-detail-diskon-persen').innerText  = po.diskonPersen || 0;
+    if (document.getElementById('po-detail-diskon-nominal')) document.getElementById('po-detail-diskon-nominal').innerText = (po.diskonNominal || 0).toLocaleString('id-ID');
+  }
   // find summary els in panel
   var els = document.querySelectorAll('#panel-po-detail .po-det-subtotal'); // fallback: use specific elements if present
 
@@ -472,6 +506,8 @@ function bukaEditPO(noPO) {
       document.getElementById('po-tanggal').value    = tgl.length === 3 ? tgl[2]+'-'+tgl[1]+'-'+tgl[0] : '';
       document.getElementById('po-peruntukan').value = po.peruntukan || '';
       document.getElementById('po-ppn-persen').value = po.ppnPersen || 0;
+      if (document.getElementById('po-diskon-persen'))  document.getElementById('po-diskon-persen').value  = po.diskonPersen || 0;
+      if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = po.diskonNominal ? _fmtRp(po.diskonNominal) : '';
       document.getElementById('po-catatan').value    = po.catatan || '';
 
       renderItemsPO();
