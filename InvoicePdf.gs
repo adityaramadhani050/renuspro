@@ -369,7 +369,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
 
   const rincian = [
     { label: 'TOTAL',          value: inv.dpp,        bold: false },
-    { label: 'PPN ' + (inv.ppnPersen || 0) + '%', value: inv.ppnNominal, bold: false, skip: !(inv.ppnNominal > 0) },
+    { label: 'PPN ' + (inv.ppnPersen || 0) + '%', value: inv.ppnNominal, bold: false },
     { label: 'GRAND TOTAL',    value: inv.total,      bold: true }
   ].filter(function(r) { return !r.skip; });
 
