@@ -22,6 +22,11 @@
 
     // --- NAVIGASI DASHBOARD ---
     function navigate(pageId) {
+      // Tutup semua modal floating sebelum pindah halaman
+      ['panel-po-detail','form-po-section','form-penerimaan-tanpa-po','form-penyesuaian-stok'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
       document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.getElementById('page-' + pageId).classList.add('active');
@@ -53,7 +58,11 @@
         if (listPO)   listPO.classList.remove('hidden');
         loadPurchaseOrder();
       }
-      if(pageId === 'inventory') loadInventory();
+      if(pageId === 'inventory') {
+        var listInv = document.getElementById('inv-list-section');
+        if (listInv) listInv.classList.remove('hidden');
+        loadInventory();
+      }
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }
