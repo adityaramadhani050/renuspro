@@ -58,27 +58,27 @@
 
         <!-- ── Form Buat / Edit PO ── -->
         <div id="form-po-section" class="hidden">
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-150">
 
-            <!-- Card Header -->
-            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
-              <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-cart-flatbed"></i>
-              </span>
-              <div class="flex-1">
-                <h3 id="form-po-title" class="text-base font-bold text-slate-800">Buat Purchase Order Baru</h3>
-                <p class="text-xs text-slate-400">Isi detail PO di bawah ini</p>
+          <!-- Back Button + Title -->
+          <div class="flex items-center justify-between mb-6">
+            <button onclick="tutupFormPO()"
+              class="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition">
+              <i class="fas fa-arrow-left text-xs"></i> Kembali ke Daftar
+            </button>
+            <h2 id="form-po-title" class="text-2xl font-extrabold text-slate-900 tracking-tight">Buat Purchase Order Baru</h2>
+            <div class="w-40"></div>
+          </div>
+
+          <div class="space-y-6 max-w-6xl mx-auto">
+
+            <!-- ── Kartu 1: Info Dasar PO ── -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">1</span>
+                <h2 class="text-lg font-bold text-slate-900">Informasi Dasar PO</h2>
               </div>
-              <button onclick="tutupFormPO()"
-                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition flex items-center gap-1.5 text-sm font-semibold">
-                <i class="fa-solid fa-xmark"></i> Batal
-              </button>
-            </div>
 
-            <div class="px-6 py-5 space-y-5">
-
-              <!-- Info Dasar PO -->
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 <!-- No PO -->
                 <div>
@@ -91,21 +91,14 @@
 
                 <!-- Tanggal -->
                 <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal</label>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal <span class="text-red-400">*</span></label>
                   <input type="date" id="po-tanggal"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
 
-                <!-- Peruntukan -->
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Peruntukan</label>
-                  <input type="text" id="po-peruntukan" placeholder="Misal: Project Solar Panel..."
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
-                </div>
-
                 <!-- Supplier -->
-                <div class="lg:col-span-1">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supplier</label>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supplier <span class="text-red-400">*</span></label>
                   <div id="sd-supplier-po-wrap" class="w-full">
                     <select id="sel-supplier-po" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                       <option value="">-- Pilih Supplier --</option>
@@ -114,7 +107,7 @@
                 </div>
 
                 <!-- No WO -->
-                <div class="lg:col-span-1">
+                <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                     No WO
                     <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span>
@@ -124,6 +117,13 @@
                       <option value="">-- Pilih WO (Opsional) --</option>
                     </select>
                   </div>
+                </div>
+
+                <!-- Peruntukan -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Peruntukan</label>
+                  <input type="text" id="po-peruntukan" placeholder="Misal: Project Solar Panel..."
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
 
                 <!-- PPN % -->
@@ -139,52 +139,46 @@
                 </div>
 
               </div>
+            </div>
 
-              <!-- Catatan -->
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
-                <textarea id="po-catatan" rows="2" placeholder="Catatan tambahan untuk PO ini..."
-                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
+            <!-- ── Kartu 2: Item Pembelian & Kalkulasi ── -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-3">
+                  <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">2</span>
+                  <h2 class="text-lg font-bold text-slate-900">Item Pembelian</h2>
+                </div>
+                <button onclick="tambahItemPO()"
+                  class="flex items-center gap-1.5 text-sm font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-xl transition">
+                  <i class="fa-solid fa-plus"></i> Tambah Item
+                </button>
               </div>
 
-              <!-- ── Item Pembelian ── -->
-              <div>
-                <div class="flex items-center justify-between mb-3">
-                  <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <i class="fa-solid fa-list-check text-orange-400"></i> Item Pembelian
-                  </h4>
-                  <button onclick="tambahItemPO()"
-                    class="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition">
-                    <i class="fa-solid fa-plus"></i> Tambah Item
-                  </button>
-                </div>
-
-                <div class="overflow-x-auto rounded-xl border border-slate-200">
-                  <table class="w-full text-left border-collapse">
-                    <thead>
-                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        <th class="px-3 py-2.5" style="min-width:200px">Nama Item</th>
-                        <th class="px-3 py-2.5" style="min-width:80px">Qty</th>
-                        <th class="px-3 py-2.5" style="min-width:90px">Satuan</th>
-                        <th class="px-3 py-2.5 text-right" style="min-width:140px">Harga Beli</th>
-                        <th class="px-3 py-2.5 text-right" style="min-width:130px">Total</th>
-                        <th class="px-3 py-2.5 text-center" style="min-width:60px"></th>
-                      </tr>
-                    </thead>
-                    <tbody id="po-items-body">
-                      <tr id="po-items-empty">
-                        <td colspan="6" class="px-4 py-6 text-center text-slate-400 text-sm italic">
-                          Klik "Tambah Item" untuk menambahkan item pembelian.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div class="overflow-x-auto rounded-xl border border-slate-200 mb-5">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="px-3 py-2.5" style="min-width:220px">Nama Item</th>
+                      <th class="px-3 py-2.5" style="min-width:80px">Qty</th>
+                      <th class="px-3 py-2.5" style="min-width:90px">Satuan</th>
+                      <th class="px-3 py-2.5 text-right" style="min-width:150px">Harga Beli</th>
+                      <th class="px-3 py-2.5 text-right" style="min-width:140px">Total</th>
+                      <th class="px-3 py-2.5 text-center" style="min-width:60px"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="po-items-body">
+                    <tr id="po-items-empty">
+                      <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm italic">
+                        Klik "Tambah Item" untuk menambahkan item pembelian.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <!-- ── Summary ── -->
+              <!-- Summary -->
               <div class="flex justify-end">
-                <div class="bg-orange-50 border border-orange-100 rounded-xl p-4 w-full max-w-sm space-y-1.5 text-sm">
+                <div class="bg-orange-50 border border-orange-100 rounded-xl p-5 w-full max-w-sm space-y-2 text-sm">
                   <div class="flex justify-between items-center">
                     <span class="text-slate-500">Subtotal</span>
                     <span class="font-bold text-slate-700">Rp <span id="po-subtotal">0</span></span>
@@ -193,17 +187,27 @@
                     <span class="text-slate-500">PPN (<span id="po-ppn-label">11</span>%)</span>
                     <span class="font-bold text-slate-700">Rp <span id="po-ppn-display">0</span></span>
                   </div>
-                  <div class="flex justify-between items-center border-t border-orange-200 pt-2 mt-1">
-                    <span class="font-extrabold text-slate-800">Grand Total</span>
-                    <span class="font-extrabold text-orange-600 text-base">Rp <span id="po-grandtotal">0</span></span>
+                  <div class="flex justify-between items-center border-t border-orange-200 pt-2.5 mt-1">
+                    <span class="font-extrabold text-slate-800 text-base">Grand Total</span>
+                    <span class="font-extrabold text-orange-600 text-lg">Rp <span id="po-grandtotal">0</span></span>
                   </div>
                 </div>
               </div>
 
             </div>
 
-            <!-- Card Footer -->
-            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100">
+            <!-- ── Kartu 3: Catatan ── -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">3</span>
+                <h2 class="text-lg font-bold text-slate-900">Catatan Tambahan</h2>
+              </div>
+              <textarea id="po-catatan" rows="3" placeholder="Catatan tambahan untuk PO ini (opsional)..."
+                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
+            </div>
+
+            <!-- ── Submit Bar ── -->
+            <div class="flex justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
               <button onclick="tutupFormPO()"
                 class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
                 Batal
