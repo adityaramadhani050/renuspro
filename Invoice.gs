@@ -355,18 +355,37 @@ function editInvoice(payload) {
     }
     if (rowIdx < 0) return { success: false, message: 'Invoice tidak ditemukan.' };
 
-    const noWO = data[rowIdx][1] ? data[rowIdx][1].toString() : '';
-    const oldDpp = parseFloat(data[rowIdx][11]) || 0;
+    const noWOSheet      = data[rowIdx][1] ? data[rowIdx][1].toString() : '';
+    const noPenawaranSheet = data[rowIdx][2] ? data[rowIdx][2].toString() : '';
+    const isStub         = !noWOSheet && !noPenawaranSheet;
+    const oldDpp         = parseFloat(data[rowIdx][11]) || 0;
 
-    // Data WO (sumber kebenaran)
-    const wo = getWorkOrderList().find(function(w) { return w.noWO === noWO; });
-    if (!wo) return { success: false, message: 'Work Order sumber tidak ditemukan.' };
+    // Untuk invoice stub (hanya nomor), ambil WO/Penawaran dari payload
+    const resolvedNoWO      = isStub ? (payload.noWO || '') : noWOSheet;
+    const resolvedNoPen     = isStub ? (payload.noPenawaran || '') : noPenawaranSheet;
+    const isPredeal         = !resolvedNoWO;
+
+    let wo;
+    if (isPredeal) {
+      if (!resolvedNoPen) return { success: false, message: 'Pilih Work Order atau Penawaran terlebih dahulu.' };
+      wo = _getPenawaranData(ss, resolvedNoPen);
+      if (!wo) return { success: false, message: 'Penawaran tidak ditemukan.' };
+      if (payload.jenis !== 'DP') return { success: false, message: 'Invoice pre-deal hanya boleh jenis DP.' };
+    } else {
+      wo = getWorkOrderList().find(function(w) { return w.noWO === resolvedNoWO; });
+      if (!wo) return { success: false, message: 'Work Order sumber tidak ditemukan.' };
+    }
 
     const nilaiKontrak = Math.max(0, (wo.subtotal || 0) - (wo.diskon || 0));
     const ppnPersen    = nilaiKontrak > 0 ? Math.round((wo.pajak || 0) / nilaiKontrak * 100) : 0;
 
     // Sisa kontrak tidak termasuk invoice ini sendiri
-    const ditagihLain = (_getTagihanMap(ss)[noWO] || 0) - oldDpp;
+    let ditagihLain;
+    if (isPredeal) {
+      ditagihLain = (_getTagihanMapByPenawaran(ss)[resolvedNoPen] || 0) - oldDpp;
+    } else {
+      ditagihLain = (_getTagihanMap(ss)[resolvedNoWO] || 0) - oldDpp;
+    }
     const sisaDpp = Math.max(0, nilaiKontrak - ditagihLain);
 
     const jenis = payload.jenis || 'Penuh';
@@ -395,6 +414,14 @@ function editInvoice(payload) {
     const meta = { scope: scope, nilaiKontrak: nilaiKontrak, inputMode: payload.inputMode || 'persen' };
 
     const r = rowIdx + 1; // 1-based
+    // Untuk invoice stub: tulis juga WO, Penawaran, Klien, Project
+    if (isStub) {
+      sheet.getRange(r, 2).setValue(isPredeal ? '' : resolvedNoWO); // No WO
+      sheet.getRange(r, 3).setValue(wo.id);                         // No Penawaran
+      sheet.getRange(r, 9).setValue(wo.klienId);                    // Klien ID
+      sheet.getRange(r, 10).setValue(wo.namaKlien);                 // Nama Klien
+      sheet.getRange(r, 11).setValue(wo.namaProject);               // Nama Project
+    }
     sheet.getRange(r, 4).setValue(payload.tanggal);          // Tanggal
     sheet.getRange(r, 5).setValue(jenis);                    // Jenis
     sheet.getRange(r, 6).setValue(persen);                   // Persen
