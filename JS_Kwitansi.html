@@ -152,7 +152,7 @@
       const inv = _currentKwitansiInvoice();
       if (!inv) return;
       document.getElementById('kw-terima').value = inv.namaKlien || '';
-      document.getElementById('kw-untuk').value  = 'Pembayaran ' + inv.jenis + (inv.persen ? ' ' + inv.persen + '%' : '') +
+      document.getElementById('kw-untuk').value  = inv.jenis + (inv.persen ? ' ' + inv.persen + '%' : '') +
         ' - ' + inv.namaProject;
       document.getElementById('kw-jumlah').value = formatNominalRupiah(inv.total || 0);
       onKwitansiJumlahInput();
