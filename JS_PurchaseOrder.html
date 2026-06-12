@@ -104,7 +104,7 @@ function bukaFormPO() {
       .withSuccessHandler(function(res) {
         var sel = document.getElementById('sel-supplier-po');
         sel.innerHTML = '<option value="">-- Pilih Supplier --</option>';
-        (res.list || []).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
+        (Array.isArray(res) ? res : (res.list || [])).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
           var opt = document.createElement('option');
           opt.value = s.id;
           opt.textContent = s.namaAkun ? s.nama : (s.nama + (s.pic ? ' - ' + s.pic : ''));
@@ -161,6 +161,11 @@ function hapusItemPO(idx) {
   hitungTotalPO();
 }
 
+// Format angka ribuan → "1.234.567"
+function _fmtRp(n) { return (n || 0).toLocaleString('id-ID'); }
+// Parse string berformat ribuan → angka
+function _parseRp(s) { return parseFloat((s || '').replace(/\./g,'').replace(',','.')) || 0; }
+
 function renderItemsPO() {
   var tbody = document.getElementById('po-items-body');
   if (!_poItems.length) {
@@ -169,15 +174,32 @@ function renderItemsPO() {
   }
   tbody.innerHTML = _poItems.map(function(item, idx) {
     var total = (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
+    var hargaDisplay = item.hargaBeli ? _fmtRp(item.hargaBeli) : '';
     return '<tr class="border-b border-slate-100">' +
+      // Nama item — lebar penuh
       '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.namaItem) + '" oninput="_poItemChange(' + idx + ',\'namaItem\',this.value)" placeholder="Nama item..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></td>' +
-      '<td class="px-2 py-1.5"><input type="number" value="' + (item.qty || 1) + '" min="0" oninput="_poItemChange(' + idx + ',\'qty\',this.value);hitungTotalPO()" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
-      '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.satuan) + '" oninput="_poItemChange(' + idx + ',\'satuan\',this.value)" placeholder="Pcs/Unit..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
-      '<td class="px-2 py-1.5"><input type="number" value="' + (item.hargaBeli || 0) + '" min="0" oninput="_poItemChange(' + idx + ',\'hargaBeli\',this.value);hitungTotalPO()" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-right"></td>' +
-      '<td class="px-2 py-1.5 text-right font-semibold text-slate-700 text-sm">Rp ' + total.toLocaleString('id-ID') + '</td>' +
+      // Qty — lebar kecil
+      '<td class="px-2 py-1.5"><input type="number" value="' + (item.qty || 1) + '" min="0" step="any" oninput="_poItemChange(' + idx + ',\'qty\',this.value);hitungTotalPO()" class="w-20 px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
+      // Satuan — lebar kecil
+      '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.satuan) + '" oninput="_poItemChange(' + idx + ',\'satuan\',this.value)" placeholder="pcs" class="w-20 px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
+      // Harga — format currency
+      '<td class="px-2 py-1.5"><input type="text" inputmode="numeric" value="' + hargaDisplay + '" oninput="_onHargaPoInput(this,' + idx + ')" placeholder="0" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-right font-medium"></td>' +
+      '<td class="px-2 py-1.5 text-right font-semibold text-slate-700 text-sm whitespace-nowrap">Rp ' + _fmtRp(total) + '</td>' +
       '<td class="px-2 py-1.5 text-center"><button onclick="hapusItemPO(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fa-solid fa-trash-can text-xs"></i></button></td>' +
     '</tr>';
   }).join('');
+}
+
+function _onHargaPoInput(el, idx) {
+  var raw = _parseRp(el.value);
+  _poItems[idx].hargaBeli = raw;
+  // format tampilan
+  var pos = el.selectionStart;
+  var oldLen = el.value.length;
+  el.value = raw > 0 ? _fmtRp(raw) : '';
+  var newLen = el.value.length;
+  el.selectionStart = el.selectionEnd = pos + (newLen - oldLen);
+  hitungTotalPO();
 }
 
 function _poItemChange(idx, field, val) {
@@ -193,19 +215,16 @@ function hitungTotalPO() {
   var ppn     = Math.round(subtotal * ppnPct / 100);
   var grand   = subtotal + ppn;
 
-  document.getElementById('po-subtotal').innerText   = subtotal.toLocaleString('id-ID');
-  document.getElementById('po-ppn-label').innerText  = ppnPct;
-  document.getElementById('po-ppn-display').innerText = ppn.toLocaleString('id-ID');
-  document.getElementById('po-grandtotal').innerText = grand.toLocaleString('id-ID');
-  // re-render item totals
+  document.getElementById('po-subtotal').innerText    = _fmtRp(subtotal);
+  document.getElementById('po-ppn-label').innerText   = ppnPct;
+  document.getElementById('po-ppn-display').innerText = _fmtRp(ppn);
+  document.getElementById('po-grandtotal').innerText  = _fmtRp(grand);
+  // update total per baris tanpa re-render penuh
   var rows = document.querySelectorAll('#po-items-body tr');
   _poItems.forEach(function(item, idx) {
     if (rows[idx]) {
       var totalEl = rows[idx].querySelector('td:nth-child(5)');
-      if (totalEl) {
-        var t = (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
-        totalEl.innerText = 'Rp ' + t.toLocaleString('id-ID');
-      }
+      if (totalEl) totalEl.innerText = 'Rp ' + _fmtRp((parseFloat(item.qty)||0) * (parseFloat(item.hargaBeli)||0));
     }
   });
 }

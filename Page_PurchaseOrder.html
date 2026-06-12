@@ -78,16 +78,11 @@
                 <h2 class="text-lg font-bold text-slate-900">Informasi Dasar PO</h2>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Hidden inputs untuk mode edit -->
+              <input type="hidden" id="po-no-field">
+              <input type="hidden" id="po-edit-nopo">
 
-                <!-- No PO -->
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No PO</label>
-                  <input type="text" id="po-no-field" readonly
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-500 font-mono font-bold focus:outline-none"
-                    placeholder="Auto-generate...">
-                  <input type="hidden" id="po-edit-nopo">
-                </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 <!-- Tanggal -->
                 <div>
