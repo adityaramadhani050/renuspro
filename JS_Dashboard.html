@@ -71,7 +71,7 @@ function _dbGetPeriodParams() {
   var from, to;
   if (_dbPeriodMode === 'mtd') {
     from = new Date(today.getFullYear(), today.getMonth(), 1);
-    to   = today;
+    to   = new Date(today.getFullYear(), today.getMonth() + 1, 0); // hari terakhir bulan ini
   } else if (_dbPeriodMode === 'lastmonth') {
     from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     to   = new Date(today.getFullYear(), today.getMonth(), 0);
@@ -107,11 +107,9 @@ function _dbPrevKPI(items, fromMs, toMs) {
   var today = new Date();
 
   if (_dbPeriodMode === 'mtd') {
-    // Bulan Ini 1–today → prev = 1 bulan lalu s.d. hari yang sama
-    var fromDt = new Date(fromMs);
-    var toDt   = new Date(toMs);
-    var pFrom  = new Date(fromDt.getFullYear(), fromDt.getMonth() - 1, 1);
-    var pTo    = new Date(toDt.getFullYear(), toDt.getMonth() - 1, toDt.getDate(), 23, 59, 59, 999);
+    // Bulan Ini (full month) → prev = bulan lalu full month
+    var pFrom  = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    var pTo    = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
     prevFromMs = pFrom.getTime();
     prevToMs   = pTo.getTime();
   } else if (_dbPeriodMode === 'lastmonth') {
