@@ -46,6 +46,14 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit</label>
                     <input type="text" name="unit" required class="input-field text-sm" placeholder="Contoh: unit, m, Ls, set, kWp">
                   </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe <span class="text-slate-300 font-normal normal-case ml-1">Wajib untuk inventory stok</span></label>
+                    <select id="modal-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+                      <option value="">-- Belum Ditentukan --</option>
+                      <option value="Material">Material (punya stok)</option>
+                      <option value="Jasa">Jasa (tidak ada stok)</option>
+                    </select>
+                  </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
                     <div class="relative">
@@ -101,6 +109,7 @@
                 <th class="p-4">ID</th>
                 <th class="p-4">Nama Item</th>
                 <th class="p-4 text-center">Unit</th>
+                <th class="p-4 text-center">Tipe</th>
                 <th class="p-4 text-right">Harga Jual</th>
                 <th class="p-4 text-right">HPP</th>
                 <th class="p-4 text-right">Margin</th>

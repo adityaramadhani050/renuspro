@@ -10,6 +10,8 @@ const _pgState = {
   customer:      { page: 1, perPage: 10, data: [] },
   supplier:      { page: 1, perPage: 10, data: [] },
   purchaseorder: { page: 1, perPage: 10, data: [] },
+  stok:          { page: 1, perPage: 20, data: [] },
+  mutasi:        { page: 1, perPage: 20, data: [] },
 };
 
 // ── Style injeksi sekali ──────────────────────────────────────────
@@ -209,6 +211,8 @@ function _pgRender(tipe) {
   if (tipe === 'customer')      _pgRenderCustomer(sliced);
   if (tipe === 'supplier')      _pgRenderSupplier(sliced);
   if (tipe === 'purchaseorder') _pgRenderPurchaseOrder(sliced);
+  if (tipe === 'stok')          _pgRenderStok(sliced);
+  if (tipe === 'mutasi')        _pgRenderMutasi(sliced);
 
   _renderPaginationBar(tipe);
 }
@@ -303,17 +307,23 @@ let _cachedProdukData = [];
 function _pgRenderProduk(data) {
   const tbody = document.getElementById('table-produk');
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">
+    tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">
       <i class="fas fa-search mr-2"></i>Tidak ada data produk.</td></tr>`;
     return;
   }
+  const tipeBadge = { 'Material': 'bg-teal-100 text-teal-700', 'Jasa': 'bg-violet-100 text-violet-700' };
   tbody.innerHTML = data.map(i => {
     const margin = i.harga > 0 ? (((i.harga - i.hpp) / i.harga) * 100).toFixed(1) : 0;
     const mc = margin >= 25 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
+    const tc = i.tipe ? (tipeBadge[i.tipe] || 'bg-slate-100 text-slate-600') : '';
+    const tipeHtml = i.tipe
+      ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${tc}">${i.tipe}</span>`
+      : `<span class="text-[10px] text-slate-300">—</span>`;
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600">${i.sku}</td>
       <td class="p-4 font-semibold">${i.nama}</td>
       <td class="p-4 text-slate-500 text-center">${i.unit}</td>
+      <td class="p-4 text-center">${tipeHtml}</td>
       <td class="p-4 text-right font-bold text-slate-800">Rp ${i.harga.toLocaleString('id-ID')}</td>
       <td class="p-4 text-right font-medium text-rose-600">Rp ${i.hpp.toLocaleString('id-ID')}</td>
       <td class="p-4 text-right"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>

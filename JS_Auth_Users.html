@@ -41,11 +41,11 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','purchaseorder'],
-  finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder'],
+  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','purchaseorder','inventory'],
+  finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder','inventory'],
   sales:       ['penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
-  procurement: ['supplier','purchaseorder','workorder']
+  procurement: ['supplier','purchaseorder','workorder','inventory']
 };
 const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',

@@ -1,0 +1,271 @@
+      <section id="page-inventory" class="page-section">
+
+        <!-- ── Daftar Stok & Riwayat Mutasi ── -->
+        <div id="inv-list-section">
+
+          <!-- Header -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+            <div>
+              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Inventory</h2>
+              <p class="text-sm text-slate-400 mt-0.5">Daftar stok material & riwayat mutasi</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="bukaFormPenerimaanTanpaPO()"
+                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
+              </button>
+              <button onclick="bukaFormPenyesuaian()"
+                class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-sliders text-xs"></i> Penyesuaian
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex gap-1 mb-4 bg-slate-100 p-1 rounded-xl w-fit">
+            <button id="tab-btn-stok" onclick="switchInvTab('stok')"
+              class="px-5 py-2 rounded-lg text-sm font-bold transition tab-inv-active">
+              <i class="fas fa-boxes-stacked mr-1.5"></i> Daftar Stok
+            </button>
+            <button id="tab-btn-mutasi" onclick="switchInvTab('mutasi')"
+              class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
+              <i class="fas fa-list-ul mr-1.5"></i> Riwayat Mutasi
+            </button>
+          </div>
+
+          <!-- ── Tab Daftar Stok ── -->
+          <div id="tab-stok">
+            <!-- Summary -->
+            <div id="inv-summary" class="bg-teal-50 border border-teal-100 rounded-2xl px-5 py-3 mb-4 flex items-center justify-between">
+              <span class="text-sm text-teal-700 font-semibold">Total Nilai Stok</span>
+              <span id="inv-total-nilai" class="text-lg font-extrabold text-teal-700">Rp 0</span>
+            </div>
+            <!-- Search -->
+            <div class="mb-3">
+              <div class="relative w-full sm:w-72">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="search-stok" oninput="filterStok()"
+                  placeholder="Cari nama produk..."
+                  class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+              </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="p-4">ID Produk</th>
+                      <th class="p-4">Nama Produk</th>
+                      <th class="p-4 text-center">Satuan</th>
+                      <th class="p-4 text-right">Qty Tersedia</th>
+                      <th class="p-4 text-right">Harga Beli Terakhir</th>
+                      <th class="p-4 text-right">Nilai Stok</th>
+                      <th class="p-4 text-center">Terakhir Diubah</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-stok" class="text-sm">
+                    <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data stok...
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Tab Riwayat Mutasi ── -->
+          <div id="tab-mutasi" class="hidden">
+            <!-- Filter -->
+            <div class="flex flex-wrap gap-2 mb-3">
+              <select id="filter-mutasi-produk" onchange="filterMutasi()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-400 bg-white text-slate-600 font-medium">
+                <option value="">Semua Produk</option>
+              </select>
+              <select id="filter-mutasi-jenis" onchange="filterMutasi()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-400 bg-white text-slate-600 font-medium">
+                <option value="">Semua Jenis Mutasi</option>
+                <option value="Penerimaan PO">Penerimaan PO</option>
+                <option value="Penerimaan Tanpa PO">Penerimaan Tanpa PO</option>
+                <option value="Penggunaan WO">Penggunaan WO</option>
+                <option value="Penyesuaian +">Penyesuaian +</option>
+                <option value="Penyesuaian -">Penyesuaian -</option>
+              </select>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="p-4">ID Mutasi</th>
+                      <th class="p-4">Tanggal</th>
+                      <th class="p-4">Produk</th>
+                      <th class="p-4">Jenis</th>
+                      <th class="p-4">Referensi</th>
+                      <th class="p-4 text-right">Qty Masuk</th>
+                      <th class="p-4 text-right">Qty Keluar</th>
+                      <th class="p-4 text-right">Harga Satuan</th>
+                      <th class="p-4 text-right">Saldo Setelah</th>
+                      <th class="p-4">Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-mutasi" class="text-sm">
+                    <tr><td colspan="10" class="p-8 text-center text-slate-500">
+                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat riwayat mutasi...
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── Form Penerimaan Tanpa PO ── -->
+        <div id="form-penerimaan-tanpa-po" class="hidden">
+
+          <div class="flex items-center justify-between mb-6">
+            <button onclick="tutupFormPenerimaanTanpaPO()"
+              class="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition">
+              <i class="fas fa-arrow-left text-xs"></i> Kembali ke Inventory
+            </button>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Penerimaan Stok Tanpa PO</h2>
+            <div class="w-52"></div>
+          </div>
+
+          <div class="space-y-6 max-w-3xl mx-auto">
+
+            <!-- Kartu 1: Detail Penerimaan -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-teal-50 text-teal-700 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">1</span>
+                <h2 class="text-lg font-bold text-slate-900">Detail Penerimaan</h2>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Produk (Material) <span class="text-red-400">*</span></label>
+                  <select id="sel-produk-ptnpo"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="">-- Pilih Produk --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal <span class="text-red-400">*</span></label>
+                  <input type="date" id="ptnpo-tanggal"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Qty <span class="text-red-400">*</span></label>
+                  <input type="number" id="ptnpo-qty" min="0" step="any" placeholder="0"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Satuan (Rp) <span class="text-red-400">*</span></label>
+                  <input type="number" id="ptnpo-harga" min="0" step="any" placeholder="0"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Akun Pembayaran <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span></label>
+                  <select id="sel-akun-ptnpo"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="">-- Kosongkan untuk Stok Awal --</option>
+                  </select>
+                </div>
+                <div class="flex items-end pb-1">
+                  <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="ptnpo-jangan-update-harga"
+                      class="w-4 h-4 rounded border-slate-300 accent-teal-600">
+                    <span class="text-sm font-semibold text-slate-700">Jangan update harga beli / HPP master</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kartu 2: Keterangan -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-teal-50 text-teal-700 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">2</span>
+                <h2 class="text-lg font-bold text-slate-900">Keterangan</h2>
+              </div>
+              <textarea id="ptnpo-keterangan" rows="3" placeholder="Keterangan (opsional)..."
+                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white resize-none"></textarea>
+            </div>
+
+            <!-- Submit Bar -->
+            <div class="flex justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
+              <button onclick="tutupFormPenerimaanTanpaPO()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitPenerimaanTanpaPO()"
+                class="px-6 py-2.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Penerimaan
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Form Penyesuaian Stok ── -->
+        <div id="form-penyesuaian-stok" class="hidden">
+
+          <div class="flex items-center justify-between mb-6">
+            <button onclick="tutupFormPenyesuaian()"
+              class="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition">
+              <i class="fas fa-arrow-left text-xs"></i> Kembali ke Inventory
+            </button>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Penyesuaian Stok</h2>
+            <div class="w-52"></div>
+          </div>
+
+          <div class="space-y-6 max-w-2xl mx-auto">
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-amber-50 text-amber-700 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">1</span>
+                <h2 class="text-lg font-bold text-slate-900">Detail Penyesuaian</h2>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Produk <span class="text-red-400">*</span></label>
+                  <select id="sel-produk-adj"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 bg-white">
+                    <option value="">-- Pilih Produk --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis <span class="text-red-400">*</span></label>
+                  <select id="adj-jenis"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 bg-white font-bold">
+                    <option value="+">+ Penambahan</option>
+                    <option value="-">− Pengurangan</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Qty <span class="text-red-400">*</span></label>
+                  <input type="number" id="adj-qty" min="1" step="any" placeholder="0"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 bg-white">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan <span class="text-red-400">*</span> <span class="text-slate-400 font-normal normal-case text-xs">Wajib — alasan penyesuaian</span></label>
+                  <textarea id="adj-keterangan" rows="3" placeholder="Alasan penyesuaian stok (wajib)..."
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 bg-white resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit Bar -->
+            <div class="flex justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
+              <button onclick="tutupFormPenyesuaian()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitPenyesuaianStok()"
+                class="px-6 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Penyesuaian
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </section>

@@ -51,6 +51,8 @@ function _cachedTemplate()  { return _cacheGetSheet('cache_template',  'Template
 function _cachedSupplier()  { return _cacheGetSheet('cache_supplier',  'Supplier'); }
 function _cachedPO()        { return _cacheGetSheet('cache_po',        'Purchase_Order'); }
 function _cachedPembayaranPO() { return _cacheGetSheet('cache_pem_po', 'Pembayaran_PO'); }
+function _cachedStok()       { return _cacheGetSheet('cache_stok',       'Stok'); }
+function _cachedMutasiStok() { return _cacheGetSheet('cache_mutasi_stok','Mutasi_Stok'); }
 
 // ── Invalidasi cache ─────────────────────────────────────────────────────────
 
@@ -71,6 +73,8 @@ function invalidateTemplateCache()   { invalidateCache(['cache_template']); }
 function invalidateSupplierCache()   { invalidateCache(['cache_supplier']); }
 function invalidatePOCache()         { invalidateCache(['cache_po', 'cache_po_item']); }
 function invalidatePembayaranPOCache() { invalidateCache(['cache_pem_po']); }
+function invalidateStokCache()         { invalidateCache(['cache_stok']); }
+function invalidateMutasiStokCache()   { invalidateCache(['cache_mutasi_stok']); }
 
 // ── Format tanggal dari cache (Date atau ISO string) → "dd/MM/yyyy" ──────────
 function _fmtTgl(raw) {

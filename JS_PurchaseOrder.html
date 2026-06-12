@@ -331,19 +331,28 @@ function _renderPODetail(po, items, pembayaran) {
   var btnStatus = document.getElementById('po-detail-btn-status');
   if (btnStatus) btnStatus.classList.toggle('hidden', po.statusPO === 'Selesai' || po.statusPO === 'Batal');
 
+  // Tombol Terima Barang: tampil jika Disetujui atau Diterima Sebagian
+  var btnTerima = document.getElementById('po-detail-btn-terima');
+  if (btnTerima) {
+    var bisaTerima = po.statusPO === 'Disetujui' || po.statusPO === 'Diterima Sebagian';
+    btnTerima.classList.toggle('hidden', !bisaTerima);
+  }
+
   // Items
   var tbody = document.getElementById('po-detail-items');
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-5 text-center text-slate-400 italic text-sm">Tidak ada item.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-slate-400 italic text-sm">Tidak ada item.</td></tr>';
   } else {
-    tbody.innerHTML = items.map(function(it) {
+    tbody.innerHTML = items.map(function(it, idx) {
+      var diterimaClass = it.qtyDiterima >= it.qty ? 'text-teal-600 font-bold' : (it.qtyDiterima > 0 ? 'text-amber-600 font-bold' : 'text-slate-400');
       return '<tr class="border-b border-slate-100">' +
+        '<td class="px-3 py-2 text-center text-slate-400 text-xs">' + (idx + 1) + '</td>' +
         '<td class="px-3 py-2 font-medium text-slate-800">' + _escHtml(it.namaItem || '') + '</td>' +
         '<td class="px-3 py-2 text-center">' + (it.qty || 0) + '</td>' +
+        '<td class="px-3 py-2 text-center ' + diterimaClass + '">' + (it.qtyDiterima || 0) + '</td>' +
         '<td class="px-3 py-2 text-center text-slate-500">' + _escHtml(it.satuan || '') + '</td>' +
         '<td class="px-3 py-2 text-right text-slate-700">Rp ' + ((it.hargaBeli || 0).toLocaleString('id-ID')) + '</td>' +
         '<td class="px-3 py-2 text-right font-bold text-slate-800">Rp ' + ((it.total || 0).toLocaleString('id-ID')) + '</td>' +
-        '<td class="px-3 py-2 text-slate-400 text-xs">' + _escHtml(it.catatan || '') + '</td>' +
       '</tr>';
     }).join('');
   }
@@ -558,6 +567,105 @@ function hapusPembayaranPOUI(idBayar) {
       showNotification(err.message || 'Gagal menghapus pembayaran.', 'error');
     })
     .hapusPembayaranPO(idBayar);
+}
+
+// ── Terima Barang dari PO ────────────────────────────────────────────────────
+
+function bukaFormTerimaPO() {
+  if (!_currentPODetail) return;
+  var noPO = _currentPODetail.noPO;
+  var formDiv = document.getElementById('form-terima-po');
+  formDiv.classList.remove('hidden');
+
+  var tbody = document.getElementById('form-terima-items');
+  tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">' + _escHtml(res.message) + '</td></tr>';
+        return;
+      }
+      var items = res.items || [];
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(function(it) {
+        var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
+        return '<tr class="border-b border-teal-50" data-id-item="' + _escHtml(it.idItem) + '">' +
+          '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
+          '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
+          '<td class="px-3 py-2 text-center text-sm text-teal-600 font-bold">' + it.qtyDiterima + '</td>' +
+          '<td class="px-3 py-2 text-center text-sm ' + sisaClass + '">' + it.qtySisa + '</td>' +
+          '<td class="px-3 py-2 text-center">' +
+            (it.qtySisa > 0
+              ? '<input type="number" class="terima-qty-input w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
+              : '<span class="text-xs text-slate-300">Penuh</span>') +
+          '</td>' +
+          '<td class="px-3 py-2">' +
+            '<input type="text" class="terima-idproduk-input w-28 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 text-slate-600" placeholder="P001" value="' + _escHtml(it.idProduk || '') + '" title="ID Produk Material (opsional — untuk update stok)">' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+      // Scroll ke form
+      formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    })
+    .withFailureHandler(function(err) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ' + err.message + '</td></tr>';
+    })
+    .getPOItemsUntukPenerimaan(noPO);
+}
+
+function submitTerimaPO() {
+  if (!_currentPODetail) return;
+  var noPO  = _currentPODetail.noPO;
+  var rows  = document.querySelectorAll('#form-terima-items tr[data-id-item]');
+  var items = [];
+  rows.forEach(function(row) {
+    var idItem    = row.getAttribute('data-id-item');
+    var qtyInput  = row.querySelector('.terima-qty-input');
+    var idProduk  = (row.querySelector('.terima-idproduk-input') || {}).value || '';
+    if (!qtyInput) return;
+    var qty = parseFloat(qtyInput.value) || 0;
+    if (qty <= 0) return;
+    var sisa = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
+    if (qty > sisa) {
+      showNotification('Qty melebihi sisa untuk item ' + idItem, 'error');
+      return;
+    }
+    // Cari nama item & harga dari baris
+    var namaItem = (row.querySelector('td:first-child') || {}).innerText || '';
+    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idProduk: idProduk.trim(),
+      hargaBeli: (_currentPODetail && _currentPODetail.items
+        ? ((_currentPODetail.items.find(function(i) { return i.idItem === idItem; }) || {}).hargaBeli || 0)
+        : 0),
+      satuan: ''
+    });
+  });
+
+  if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
+
+  toggleLoader(true, 'Menyimpan penerimaan...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        document.getElementById('form-terima-po').classList.add('hidden');
+        bukaPODetail(noPO);
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .terimaPOItems({
+      noPO: noPO, items: items,
+      namaUser: (_currentUser && _currentUser.nama) || ''
+    });
 }
 
 // ── Cetak PO (stub — perlu Template_PO sheet) ────────────────────────────────

@@ -439,8 +439,9 @@
       const form = e.target;
       const nama  = form.querySelector('[name="nama"]').value.trim();
       const unit  = form.querySelector('[name="unit"]').value.trim();
-      const harga = pN(document.getElementById('modal-produk-harga').value); // ← pN()
-      const hpp   = pN(document.getElementById('modal-produk-hpp').value);   // ← pN()
+      const harga = pN(document.getElementById('modal-produk-harga').value);
+      const hpp   = pN(document.getElementById('modal-produk-hpp').value);
+      const tipe  = (document.getElementById('modal-produk-tipe') || {}).value || '';
 
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
 
@@ -452,9 +453,9 @@
             if (res.success) {
               showNotification(res.message);
               form.reset();
-              // Reset field format manual juga
               document.getElementById('modal-produk-harga').value = '';
               document.getElementById('modal-produk-hpp').value   = '';
+              if (document.getElementById('modal-produk-tipe')) document.getElementById('modal-produk-tipe').value = '';
               document.getElementById('modal-produk').classList.add('hidden');
               loadProduk();
               muatSeluruhDataAwal(false);
@@ -466,7 +467,7 @@
             toggleLoader(false);
             showNotification("Gagal: " + err.message, "error");
           })
-          .simpanProduk(nama, unit, harga, hpp);
+          .simpanProduk(nama, unit, harga, hpp, tipe);
       }
     }
 
@@ -475,8 +476,10 @@
       document.getElementById('edit-produk-id').value    = item.sku;
       document.getElementById('edit-produk-nama').value  = item.nama;
       document.getElementById('edit-produk-unit').value  = item.unit;
-      document.getElementById('edit-produk-harga').value = formatNominalRupiah(item.harga); // ← format
-      document.getElementById('edit-produk-hpp').value   = formatNominalRupiah(item.hpp);   // ← format
+      document.getElementById('edit-produk-harga').value = formatNominalRupiah(item.harga);
+      document.getElementById('edit-produk-hpp').value   = formatNominalRupiah(item.hpp);
+      var tipeEl = document.getElementById('edit-produk-tipe');
+      if (tipeEl) tipeEl.value = item.tipe || '';
       hitungMarginEditProduk();
       document.getElementById('modal-edit-produk').classList.remove('hidden');
     }
@@ -503,8 +506,9 @@
       const id    = document.getElementById('edit-produk-id').value;
       const nama  = document.getElementById('edit-produk-nama').value.trim();
       const unit  = document.getElementById('edit-produk-unit').value.trim();
-      const harga = pN(document.getElementById('edit-produk-harga').value); // ← pN()
-      const hpp   = pN(document.getElementById('edit-produk-hpp').value);   // ← pN()
+      const harga = pN(document.getElementById('edit-produk-harga').value);
+      const hpp   = pN(document.getElementById('edit-produk-hpp').value);
+      const tipe  = (document.getElementById('edit-produk-tipe') || {}).value || '';
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
       toggleLoader(true, "Menyimpan Perubahan...");
       google.script.run
@@ -518,7 +522,7 @@
           } else showNotification(res.message, "error");
         })
         .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
-        .editProduk(id, nama, unit, harga, hpp); // ← sudah angka bersih
+        .editProduk(id, nama, unit, harga, hpp, tipe);
     }
 
     // --- EDIT & DELETE CUSTOMER ---

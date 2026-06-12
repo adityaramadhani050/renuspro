@@ -248,6 +248,11 @@
                   class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
                   <i class="fa-solid fa-arrows-rotate"></i> Ubah Status
                 </button>
+                <!-- Tombol Terima Barang (tampil jika Disetujui/Diterima Sebagian) -->
+                <button id="po-detail-btn-terima" onclick="bukaFormTerimaPO()"
+                  class="hidden px-4 py-2 text-sm bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-boxes-stacked"></i> Terima Barang
+                </button>
                 <!-- Tombol Cetak PO -->
                 <button onclick="cetakPO(_currentPODetail)"
                   class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
@@ -300,14 +305,15 @@
                       <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                         <th class="px-3 py-2.5">No</th>
                         <th class="px-3 py-2.5">Nama Item</th>
-                        <th class="px-3 py-2.5 text-center">Qty</th>
+                        <th class="px-3 py-2.5 text-center">Qty Pesan</th>
+                        <th class="px-3 py-2.5 text-center">Qty Diterima</th>
                         <th class="px-3 py-2.5">Satuan</th>
                         <th class="px-3 py-2.5 text-right">Harga Beli</th>
                         <th class="px-3 py-2.5 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody id="po-detail-items" class="text-sm">
-                      <tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>
+                      <tr><td colspan="7" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -327,6 +333,42 @@
                   <div class="flex justify-between border-t border-slate-200 pt-2 mt-1">
                     <span class="font-extrabold text-slate-800">Grand Total</span>
                     <span class="font-extrabold text-orange-600 text-base">Rp <span id="po-detail-grandtotal">0</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Form Terima Barang ── -->
+              <div id="form-terima-po" class="hidden">
+                <div class="bg-teal-50 border border-teal-100 rounded-xl p-4">
+                  <p class="text-sm font-bold text-teal-700 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-boxes-stacked"></i> Form Penerimaan Barang
+                  </p>
+                  <div class="overflow-x-auto rounded-xl border border-teal-200 mb-3">
+                    <table class="w-full text-left border-collapse">
+                      <thead>
+                        <tr class="bg-teal-100 border-b border-teal-200 text-xs font-bold text-teal-600 uppercase tracking-wider">
+                          <th class="px-3 py-2.5">Nama Item</th>
+                          <th class="px-3 py-2.5 text-center">Qty Pesan</th>
+                          <th class="px-3 py-2.5 text-center">Sdh Diterima</th>
+                          <th class="px-3 py-2.5 text-center">Sisa</th>
+                          <th class="px-3 py-2.5 text-center" style="min-width:110px">Terima Skrg</th>
+                          <th class="px-3 py-2.5">Produk (ID)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="form-terima-items" class="text-sm bg-white">
+                        <tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Memuat item...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button onclick="document.getElementById('form-terima-po').classList.add('hidden')"
+                      class="px-4 py-2 text-sm text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold transition border border-slate-200">
+                      Batal
+                    </button>
+                    <button onclick="submitTerimaPO()"
+                      class="px-5 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-sm transition flex items-center gap-2">
+                      <i class="fa-solid fa-floppy-disk"></i> Simpan Penerimaan
+                    </button>
                   </div>
                 </div>
               </div>

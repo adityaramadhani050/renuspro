@@ -66,6 +66,10 @@
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-cart-flatbed w-6"></i> Purchase Order
         </button>
+        <button onclick="navigate('inventory')" id="nav-inventory"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-boxes-stacked w-6"></i> Inventory
+        </button>
         <button onclick="navigate('settings')" id="nav-settings"
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-gear w-6"></i> Pengaturan
@@ -144,6 +148,7 @@
       <?!= include('Page_Settings'); ?>
       <?!= include('Page_Supplier'); ?>
       <?!= include('Page_PurchaseOrder'); ?>
+      <?!= include('Page_Inventory'); ?>
 
 
 
@@ -173,5 +178,6 @@
   <?!= include('JS_Settings'); ?>
   <?!= include('JS_Supplier'); ?>
   <?!= include('JS_PurchaseOrder'); ?>
+  <?!= include('JS_Inventory'); ?>
 </body>
 </html>

@@ -31,6 +31,7 @@
  *  5  Harga Beli Satuan
  *  6  Total
  *  7  Catatan
+ *  8  Qty Diterima  (ditambah Modul Inventory)
  *
  * Sheet Pembayaran_PO — kolom (0-based):
  *  0  ID Bayar
@@ -86,8 +87,19 @@ function _ensurePOItemSheet(ss) {
     sheet = ss.insertSheet('PO_Item');
     sheet.appendRow([
       'ID Item', 'No PO', 'Nama Item', 'Qty', 'Satuan',
-      'Harga Beli Satuan', 'Total', 'Catatan'
+      'Harga Beli Satuan', 'Total', 'Catatan', 'Qty Diterima'
     ]);
+  }
+  return sheet;
+}
+
+function _ensurePOItemCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('PO_Item');
+  if (!sheet) return _ensurePOItemSheet(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 9) {
+    sheet.getRange(1, 9).setValue('Qty Diterima');
   }
   return sheet;
 }
@@ -251,14 +263,15 @@ function getPODetail(noPO) {
       var ir = itemData[j];
       if (ir[1] && ir[1].toString() === noPO) {
         items.push({
-          idItem:    ir[0] ? ir[0].toString() : '',
-          noPO:      ir[1] ? ir[1].toString() : '',
-          namaItem:  ir[2] ? ir[2].toString() : '',
-          qty:       parseFloat(ir[3]) || 0,
-          satuan:    ir[4] ? ir[4].toString() : '',
-          hargaBeli: parseFloat(ir[5]) || 0,
-          total:     parseFloat(ir[6]) || 0,
-          catatan:   ir[7] ? ir[7].toString() : ''
+          idItem:      ir[0] ? ir[0].toString() : '',
+          noPO:        ir[1] ? ir[1].toString() : '',
+          namaItem:    ir[2] ? ir[2].toString() : '',
+          qty:         parseFloat(ir[3]) || 0,
+          satuan:      ir[4] ? ir[4].toString() : '',
+          hargaBeli:   parseFloat(ir[5]) || 0,
+          total:       parseFloat(ir[6]) || 0,
+          catatan:     ir[7] ? ir[7].toString() : '',
+          qtyDiterima: parseFloat(ir[8]) || 0
         });
       }
     }
