@@ -38,11 +38,21 @@ function exportKwitansiDariTemplate(idKwitansi) {
     set('kw_untuk',       kw.untuk);
     set('kw_ref_invoice', kw.noInvoice);
 
-    // Isi bank account dari data invoice terkait
+    // Isi bank account: dari invoice terkait, fallback ke default Settings
+    var bankAccount = '';
     if (kw.noInvoice) {
-      const bankAccount = _getBankAccountFromInvoice(ss, kw.noInvoice);
-      set('kw_bank_account', bankAccount);
+      bankAccount = _getBankAccountFromInvoice(ss, kw.noInvoice);
     }
+    if (!bankAccount) {
+      try {
+        var raw = PropertiesService.getScriptProperties().getProperty('BANK_ACCOUNTS');
+        if (raw) {
+          var accs = JSON.parse(raw);
+          if (accs && accs.length > 0) bankAccount = accs[0].detail || '';
+        }
+      } catch(e) {}
+    }
+    set('kw_bank_account', bankAccount);
 
     SpreadsheetApp.flush();
 
