@@ -627,50 +627,90 @@ function hapusPembayaranPOUI(idBayar) {
 
 // ── Terima Barang dari PO ────────────────────────────────────────────────────
 
+// Cache daftar produk Material untuk dropdown form terima PO
+var _produkMaterialCache = [];
+
 function bukaFormTerimaPO() {
   if (!_currentPODetail) return;
-  var noPO = _currentPODetail.noPO;
+  var noPO    = _currentPODetail.noPO;
   var formDiv = document.getElementById('form-terima-po');
   formDiv.classList.remove('hidden');
 
   var tbody = document.getElementById('form-terima-items');
   tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
+  // Load produk Material + PO items secara paralel
+  var produkDone = false, itemsDone = false;
+  var produkList = [], poItems = [], poItemsRes = null;
+
+  function _tryRender() {
+    if (!produkDone || !itemsDone) return;
+    _produkMaterialCache = produkList;
+    _renderFormTerimaItems(tbody, poItemsRes, produkList);
+    formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      produkList = (data || []).filter(function(p) { return p.tipe === 'Material'; });
+      produkDone = true;
+      _tryRender();
+    })
+    .withFailureHandler(function() { produkDone = true; _tryRender(); })
+    .getProdukList();
+
   google.script.run
     .withSuccessHandler(function(res) {
-      if (!res.success) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">' + _escHtml(res.message) + '</td></tr>';
-        return;
-      }
-      var items = res.items || [];
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = items.map(function(it) {
-        var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
-        return '<tr class="border-b border-teal-50" data-id-item="' + _escHtml(it.idItem) + '">' +
-          '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
-          '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
-          '<td class="px-3 py-2 text-center text-sm text-teal-600 font-bold">' + it.qtyDiterima + '</td>' +
-          '<td class="px-3 py-2 text-center text-sm ' + sisaClass + '">' + it.qtySisa + '</td>' +
-          '<td class="px-3 py-2 text-center">' +
-            (it.qtySisa > 0
-              ? '<input type="number" class="terima-qty-input w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
-              : '<span class="text-xs text-slate-300">Penuh</span>') +
-          '</td>' +
-          '<td class="px-3 py-2">' +
-            '<input type="text" class="terima-idproduk-input w-28 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 text-slate-600" placeholder="P001" value="' + _escHtml(it.idProduk || '') + '" title="ID Produk Material (opsional — untuk update stok)">' +
-          '</td>' +
-        '</tr>';
-      }).join('');
-      // Scroll ke form
-      formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      poItemsRes = res;
+      itemsDone  = true;
+      _tryRender();
     })
     .withFailureHandler(function(err) {
       tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ' + err.message + '</td></tr>';
     })
     .getPOItemsUntukPenerimaan(noPO);
+}
+
+function _renderFormTerimaItems(tbody, res, produkList) {
+  if (!res || !res.success) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">' + _escHtml(res ? res.message : 'Gagal') + '</td></tr>';
+    return;
+  }
+  var items = res.items || [];
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+    return;
+  }
+
+  // Build dropdown options HTML sekali
+  var optionsHtml = '<option value="">— Tidak terhubung ke stok —</option>' +
+    produkList.map(function(p) {
+      return '<option value="' + _escHtml(p.id) + '">' + _escHtml(p.id) + ' — ' + _escHtml(p.nama) + '</option>';
+    }).join('');
+
+  tbody.innerHTML = items.map(function(it) {
+    var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
+    var selectedOpt = optionsHtml.replace(
+      'value="' + _escHtml(it.idProduk || '') + '"',
+      'value="' + _escHtml(it.idProduk || '') + '" selected'
+    );
+    return '<tr class="border-b border-teal-50" data-id-item="' + _escHtml(it.idItem) + '">' +
+      '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm text-teal-600 font-bold">' + it.qtyDiterima + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm ' + sisaClass + '">' + it.qtySisa + '</td>' +
+      '<td class="px-3 py-2 text-center">' +
+        (it.qtySisa > 0
+          ? '<input type="number" class="terima-qty-input w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
+          : '<span class="text-xs text-slate-300">Penuh</span>') +
+      '</td>' +
+      '<td class="px-3 py-2">' +
+        '<select class="terima-idproduk-select w-full min-w-[200px] px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 bg-white text-slate-700">' +
+          selectedOpt +
+        '</select>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
 }
 
 function submitTerimaPO() {
@@ -681,7 +721,7 @@ function submitTerimaPO() {
   rows.forEach(function(row) {
     var idItem    = row.getAttribute('data-id-item');
     var qtyInput  = row.querySelector('.terima-qty-input');
-    var idProduk  = (row.querySelector('.terima-idproduk-input') || {}).value || '';
+    var idProduk  = (row.querySelector('.terima-idproduk-select') || {}).value || '';
     if (!qtyInput) return;
     var qty = parseFloat(qtyInput.value) || 0;
     if (qty <= 0) return;
