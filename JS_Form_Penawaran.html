@@ -355,7 +355,7 @@
         }); payload.items.push(sub);
       });
 
-      toggleLoader(true, window._editMode ? "Menyimpan Revisi..." : "Menyimpan Penawaran...");
+      toggleLoader(true, window._editMode ? "Menyimpan Revisi..." : "Menyimpan Transaksi...");
       const fnBackend = window._editMode ? 'editPenawaran' : 'simpanPenawaranKeSheet';
 
       if (typeof google !== 'undefined') {
@@ -390,7 +390,7 @@
         if (window._editMode) {
           window._editMode = null;
           document.getElementById('btnSubmitForm').innerHTML =
-            '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran;
+            '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran Ke Database';
         }
       } else {
         vForm.classList.remove('hidden');
