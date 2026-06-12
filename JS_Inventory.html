@@ -189,7 +189,6 @@ function _loadProdukMaterialOptions(selId) {
 // ── Form Penerimaan Tanpa PO ───────────────────────────────────
 
 function bukaFormPenerimaanTanpaPO() {
-  _showInvSection('form-penerimaan-tanpa-po');
   var tgl = new Date(); tgl = tgl.toISOString().slice(0, 10);
   document.getElementById('ptnpo-tanggal').value = tgl;
   document.getElementById('ptnpo-qty').value = '';
@@ -198,10 +197,11 @@ function bukaFormPenerimaanTanpaPO() {
   document.getElementById('ptnpo-jangan-update-harga').checked = false;
   _loadProdukMaterialOptions('sel-produk-ptnpo');
   _loadAkunPembayaranOptions('sel-akun-ptnpo');
+  document.getElementById('form-penerimaan-tanpa-po').classList.remove('hidden');
 }
 
 function tutupFormPenerimaanTanpaPO() {
-  _showInvSection('inv-list-section');
+  document.getElementById('form-penerimaan-tanpa-po').classList.add('hidden');
 }
 
 function _loadAkunPembayaranOptions(selId) {
@@ -242,6 +242,7 @@ function submitPenerimaanTanpaPO() {
     .withSuccessHandler(function(res) {
       toggleLoader(false);
       if (res.success) {
+        tutupFormPenerimaanTanpaPO();
         showNotification(res.message, 'success');
         _cachedStokData = [];
         _cachedMutasiData = [];
@@ -265,15 +266,15 @@ function submitPenerimaanTanpaPO() {
 // ── Form Penyesuaian Stok ──────────────────────────────────────
 
 function bukaFormPenyesuaian() {
-  _showInvSection('form-penyesuaian-stok');
   document.getElementById('adj-qty').value = '';
   document.getElementById('adj-keterangan').value = '';
   document.getElementById('adj-jenis').value = '+';
   _loadProdukMaterialOptions('sel-produk-adj');
+  document.getElementById('form-penyesuaian-stok').classList.remove('hidden');
 }
 
 function tutupFormPenyesuaian() {
-  _showInvSection('inv-list-section');
+  document.getElementById('form-penyesuaian-stok').classList.add('hidden');
 }
 
 function submitPenyesuaianStok() {
@@ -291,6 +292,7 @@ function submitPenyesuaianStok() {
     .withSuccessHandler(function(res) {
       toggleLoader(false);
       if (res.success) {
+        tutupFormPenyesuaian();
         showNotification(res.message, 'success');
         _cachedStokData = [];
         _cachedMutasiData = [];
