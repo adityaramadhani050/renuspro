@@ -314,6 +314,8 @@ function submitPO() {
 // ── Detail PO ────────────────────────────────────────────────────────────────
 function bukaPODetail(noPO) {
   if (typeof google === 'undefined') return;
+  // Preload akun pembayaran so dropdown is ready when payment form opens
+  _loadAkunPembayaranOptions('sel-akun-po');
   toggleLoader(true, 'Memuat detail PO...');
   google.script.run
     .withSuccessHandler(function(res) {
@@ -541,8 +543,14 @@ function _loadAkunPembayaranOptions(selId) {
     .withSuccessHandler(function(res) {
       var sel = document.getElementById(selId);
       if (!sel) return;
+      var list = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
+      var aktif = list.filter(function(a){ return a.status === 'Aktif'; });
       sel.innerHTML = '<option value="">-- Pilih Akun --</option>';
-      (res.list || []).filter(function(a){ return a.status === 'Aktif'; }).forEach(function(a) {
+      if (!aktif.length) {
+        sel.innerHTML += '<option value="" disabled>Tambah akun pembayaran di Pengaturan</option>';
+        return;
+      }
+      aktif.forEach(function(a) {
         var opt = document.createElement('option');
         opt.value = a.id;
         opt.dataset.nama = a.namaAkun;
@@ -550,7 +558,10 @@ function _loadAkunPembayaranOptions(selId) {
         sel.appendChild(opt);
       });
     })
-    .withFailureHandler(function() {})
+    .withFailureHandler(function(err) {
+      var sel = document.getElementById(selId);
+      if (sel) sel.innerHTML = '<option value="" disabled>Gagal memuat akun</option>';
+    })
     .getAkunPembayaranList();
 }
 

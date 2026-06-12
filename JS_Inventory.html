@@ -206,18 +206,17 @@ function tutupFormPenerimaanTanpaPO() {
 
 function _loadAkunPembayaranOptions(selId) {
   if (typeof google === 'undefined') return;
-  google.script.run.withSuccessHandler(function(data) {
+  google.script.run.withSuccessHandler(function(res) {
     var sel = document.getElementById(selId);
     if (!sel) return;
+    var list = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
     var opts = '<option value="">-- Kosongkan untuk Stok Awal --</option>';
-    (data || []).forEach(function(a) {
-      if (a.status === 'Aktif') {
-        opts += '<option value="' + _escHtml(a.id) + '" data-nama="' + _escHtml(a.nama) + '">' +
-          _escHtml(a.nama) + '</option>';
-      }
+    list.filter(function(a){ return a.status === 'Aktif'; }).forEach(function(a) {
+      opts += '<option value="' + _escHtml(a.id) + '" data-nama="' + _escHtml(a.namaAkun) + '">' +
+        _escHtml(a.namaAkun) + ' (' + _escHtml(a.tipe) + ')</option>';
     });
     sel.innerHTML = opts;
-  }).getAkunPembayaranList();
+  }).withFailureHandler(function() {}).getAkunPembayaranList();
 }
 
 function submitPenerimaanTanpaPO() {
