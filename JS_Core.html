@@ -27,7 +27,7 @@
       document.getElementById('page-' + pageId).classList.add('active');
       document.getElementById('nav-' + pageId).classList.add('active');
       if(pageId === 'dashboard') loadDashboard();
-      if(pageId === 'penawaran') { loadPenawaran(); toggleFormPenawaran(false); }
+      if(pageId === 'penawaran') { loadPenawaran(); toggleFormPenawaran(false); muatSeluruhDataAwal(true); }
       if(pageId === 'workorder') loadWorkOrder();
       if(pageId === 'invoice') loadInvoice();
       if(pageId === 'kwitansi') loadKwitansi();
