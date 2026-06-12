@@ -240,12 +240,12 @@
           </div>
         </div>
 
-        <!-- ── Panel Detail PO ── -->
-        <div id="panel-po-detail" class="hidden">
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-150">
+        <!-- ── Modal Detail PO ── -->
+        <div id="panel-po-detail" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
 
-            <!-- Detail Header -->
-            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+            <!-- Header modal -->
+            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
                 <i class="fa-solid fa-file-invoice"></i>
               </span>
@@ -254,41 +254,18 @@
                   <h3 id="po-detail-nopo" class="text-base font-extrabold text-slate-800"></h3>
                   <span id="po-detail-status-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full"></span>
                 </div>
-                <p id="po-detail-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+                <p id="po-detail-subtitle" class="text-xs text-slate-400 mt-0.5 truncate"></p>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <!-- Tombol Edit (tampil jika Draft) -->
-                <button id="po-detail-btn-edit" onclick="bukaEditPO(_currentPODetail && _currentPODetail.noPO)"
-                  class="hidden px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-pen-to-square"></i> Edit
-                </button>
-                <!-- Tombol Ubah Status -->
-                <button id="po-detail-btn-status" onclick="ubahStatusPOUI(_currentPODetail && _currentPODetail.noPO, _currentPODetail && _currentPODetail.statusPO)"
-                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-arrows-rotate"></i> Ubah Status
-                </button>
-                <!-- Tombol Terima Barang (tampil jika Disetujui/Diterima Sebagian) -->
-                <button id="po-detail-btn-terima" onclick="bukaFormTerimaPO()"
-                  class="hidden px-4 py-2 text-sm bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-boxes-stacked"></i> Terima Barang
-                </button>
-                <!-- Tombol Cetak PO -->
-                <button onclick="cetakPO(_currentPODetail)"
-                  class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-print"></i> Cetak PO
-                </button>
-                <!-- Tombol Tutup -->
-                <button onclick="tutupPanelPO()"
-                  class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
-                  <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-              </div>
+              <button onclick="tutupPanelPO()" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
             </div>
 
-            <div class="px-6 py-5 space-y-5">
+            <!-- Body modal -->
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
               <!-- Info Grid -->
-              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div class="bg-slate-50 rounded-xl p-3">
                   <p class="text-slate-400 mb-0.5">Tanggal</p>
                   <p id="po-detail-tanggal" class="font-bold text-slate-700">—</p>
@@ -402,7 +379,7 @@
                   <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                     <i class="fa-solid fa-money-bill-wave text-emerald-500"></i> Riwayat Pembayaran
                   </p>
-                  <button id="po-detail-btn-tambah-bayar" onclick="document.getElementById('form-tambah-bayar-po').classList.toggle('hidden'); _loadAkunPembayaranOptions('sel-akun-po')"
+                  <button id="po-detail-btn-tambah-bayar" onclick="bukaFormBayarPO()"
                     class="hidden flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">
                     <i class="fa-solid fa-plus"></i> Tambah Pembayaran
                   </button>
@@ -424,6 +401,82 @@
                         <option value="">-- Pilih Akun --</option>
                       </select>
                     </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jumlah (Rp)</label>
+                      <input type="number" id="po-bayar-jumlah" min="0" step="any" placeholder="0"
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan</label>
+                      <input type="text" id="po-bayar-catatan" placeholder="Opsional..."
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2 mt-3">
+                    <button onclick="document.getElementById('form-tambah-bayar-po').classList.add('hidden')"
+                      class="px-4 py-2 text-sm text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold transition border border-slate-200">
+                      Batal
+                    </button>
+                    <button onclick="submitPembayaranPO()"
+                      class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-sm transition flex items-center gap-2">
+                      <i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Tabel Pembayaran -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th class="px-3 py-2.5">Tanggal</th>
+                        <th class="px-3 py-2.5">Akun</th>
+                        <th class="px-3 py-2.5 text-right">Jumlah</th>
+                        <th class="px-3 py-2.5">Catatan</th>
+                        <th class="px-3 py-2.5 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="po-detail-payments" class="text-sm">
+                      <tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Footer modal -->
+            <div class="flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl flex-wrap">
+              <div class="flex gap-2 flex-wrap">
+                <button id="po-detail-btn-edit" onclick="bukaEditPO(_currentPODetail && _currentPODetail.noPO)"
+                  class="hidden px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+                <button id="po-detail-btn-status" onclick="ubahStatusPOUI(_currentPODetail && _currentPODetail.noPO, _currentPODetail && _currentPODetail.statusPO)"
+                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-arrows-rotate"></i> Ubah Status
+                </button>
+                <button id="po-detail-btn-terima" onclick="bukaFormTerimaPO()"
+                  class="hidden px-4 py-2 text-sm bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-boxes-stacked"></i> Terima Barang
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="cetakPO(_currentPODetail)"
+                  class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-file-pdf"></i> PDF
+                </button>
+                <button onclick="tutupPanelPO()"
+                  class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                  Tutup
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
                     <div>
                       <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jumlah (Rp)</label>
                       <input type="number" id="po-bayar-jumlah" min="0" step="any" placeholder="0"

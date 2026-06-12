@@ -321,9 +321,9 @@ function bukaPODetail(noPO) {
       if (!res || !res.success) { showNotification(res.message || 'Gagal memuat detail.', 'error'); return; }
       _currentPODetail = res.po;
       _renderPODetail(res.po, res.items || [], res.pembayaran || []);
+      document.getElementById('form-terima-po').classList.add('hidden');
+      document.getElementById('form-tambah-bayar-po').classList.add('hidden');
       document.getElementById('panel-po-detail').classList.remove('hidden');
-      document.getElementById('po-list-section').classList.add('hidden');
-      document.getElementById('form-po-section').classList.add('hidden');
     })
     .withFailureHandler(function(err) {
       toggleLoader(false);
@@ -335,7 +335,8 @@ function bukaPODetail(noPO) {
 function tutupPanelPO() {
   _currentPODetail = null;
   document.getElementById('panel-po-detail').classList.add('hidden');
-  document.getElementById('po-list-section').classList.remove('hidden');
+  document.getElementById('form-terima-po').classList.add('hidden');
+  document.getElementById('form-tambah-bayar-po').classList.add('hidden');
 }
 
 function _renderPODetail(po, items, pembayaran) {
@@ -514,9 +515,8 @@ function bukaEditPO(noPO) {
       renderItemsPO();
       hitungTotalPO();
 
-      document.getElementById('form-po-section').classList.remove('hidden');
       document.getElementById('panel-po-detail').classList.add('hidden');
-      document.getElementById('po-list-section').classList.add('hidden');
+      document.getElementById('form-po-section').classList.remove('hidden');
     })
     .withFailureHandler(function(err) {
       toggleLoader(false);
