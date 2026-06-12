@@ -48,6 +48,9 @@ function _cachedProduk()    { return _cacheGetSheet('cache_produk',    'Master_P
 function _cachedInvoice()   { return _cacheGetSheet('cache_invoice',   'Invoice_Main');  }
 function _cachedKwitansi()  { return _cacheGetSheet('cache_kwitansi',  'Kwitansi_Main'); }
 function _cachedTemplate()  { return _cacheGetSheet('cache_template',  'Template_Paket'); }
+function _cachedSupplier()  { return _cacheGetSheet('cache_supplier',  'Supplier'); }
+function _cachedPO()        { return _cacheGetSheet('cache_po',        'Purchase_Order'); }
+function _cachedPembayaranPO() { return _cacheGetSheet('cache_pem_po', 'Pembayaran_PO'); }
 
 // ── Invalidasi cache ─────────────────────────────────────────────────────────
 
@@ -58,13 +61,16 @@ function invalidateCache(keys) {
   cache.removeAll(all);
 }
 
-function invalidatePenawaranCache() { invalidateCache(['cache_penawaran']); }
-function invalidateUserCache()      { invalidateCache(['cache_user']);      }
-function invalidateKlienCache()     { invalidateCache(['cache_klien']);     }
-function invalidateProdukCache()    { invalidateCache(['cache_produk']);    }
-function invalidateInvoiceCache()   { invalidateCache(['cache_invoice']);   }
-function invalidateKwitansiCache()  { invalidateCache(['cache_kwitansi']); }
-function invalidateTemplateCache()  { invalidateCache(['cache_template']); }
+function invalidatePenawaranCache()  { invalidateCache(['cache_penawaran']); }
+function invalidateUserCache()       { invalidateCache(['cache_user']);      }
+function invalidateKlienCache()      { invalidateCache(['cache_klien']);     }
+function invalidateProdukCache()     { invalidateCache(['cache_produk']);    }
+function invalidateInvoiceCache()    { invalidateCache(['cache_invoice']);   }
+function invalidateKwitansiCache()   { invalidateCache(['cache_kwitansi']); }
+function invalidateTemplateCache()   { invalidateCache(['cache_template']); }
+function invalidateSupplierCache()   { invalidateCache(['cache_supplier']); }
+function invalidatePOCache()         { invalidateCache(['cache_po', 'cache_po_item']); }
+function invalidatePembayaranPOCache() { invalidateCache(['cache_pem_po']); }
 
 // ── Format tanggal dari cache (Date atau ISO string) → "dd/MM/yyyy" ──────────
 function _fmtTgl(raw) {

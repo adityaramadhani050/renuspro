@@ -1,0 +1,179 @@
+      <section id="page-supplier" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Master Supplier</h2>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-supplier" oninput="filterTabel('supplier')"
+                placeholder="Cari nama, PIC, telepon..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 bg-white">
+            </div>
+            <button onclick="document.getElementById('modal-supplier').classList.remove('hidden')"
+              class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-truck text-sm"></i> Tambah Supplier
+            </button>
+          </div>
+        </div>
+
+        <!-- MODAL TAMBAH SUPPLIER -->
+        <div id="modal-supplier" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-purple-50 text-purple-600 h-9 w-9 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-truck"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Form Tambah Supplier Baru</h3>
+                <p class="text-xs text-slate-400">Isi data supplier atau vendor di bawah ini</p>
+              </div>
+              <button onclick="document.getElementById('modal-supplier').classList.add('hidden')"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <form onsubmit="submitTambahSupplier(event)">
+              <div class="px-6 py-5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Supplier</label>
+                    <input type="text" name="nama" required class="input-field text-sm" placeholder="PT / CV / Nama Toko">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PIC (Person In Charge)</label>
+                    <input type="text" name="pic" class="input-field text-sm" placeholder="Nama kontak person">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Telepon</label>
+                    <input type="text" name="telepon" class="input-field text-sm" placeholder="0812xxxx">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email</label>
+                    <input type="email" name="email" class="input-field text-sm" placeholder="email@supplier.com">
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alamat</label>
+                    <input type="text" name="alamat" class="input-field text-sm" placeholder="Jl. Raya...">
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
+                    <textarea name="catatan" rows="3" class="input-field text-sm resize-none" placeholder="Catatan tambahan mengenai supplier..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+                <button type="button"
+                  onclick="document.getElementById('modal-supplier').classList.add('hidden')"
+                  class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                  Batal
+                </button>
+                <button type="submit"
+                  class="px-6 py-2.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Supplier
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+
+        <!-- MODAL EDIT SUPPLIER -->
+        <div id="modal-edit-supplier" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-amber-50 text-amber-600 h-9 w-9 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Edit Data Supplier</h3>
+                <p class="text-xs text-slate-400">Perubahan akan langsung tersimpan ke database</p>
+              </div>
+              <button onclick="document.getElementById('modal-edit-supplier').classList.add('hidden')"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <form onsubmit="submitEditSupplier(event)">
+              <div class="px-6 py-5">
+                <input type="hidden" id="edit-supplier-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Supplier</label>
+                    <input type="text" id="edit-supplier-nama" name="nama" required class="input-field text-sm" placeholder="PT / CV / Nama Toko">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PIC (Person In Charge)</label>
+                    <input type="text" id="edit-supplier-pic" name="pic" class="input-field text-sm" placeholder="Nama kontak person">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Telepon</label>
+                    <input type="text" id="edit-supplier-telepon" name="telepon" class="input-field text-sm" placeholder="0812xxxx">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email</label>
+                    <input type="email" id="edit-supplier-email" name="email" class="input-field text-sm" placeholder="email@supplier.com">
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alamat</label>
+                    <input type="text" id="edit-supplier-alamat" name="alamat" class="input-field text-sm" placeholder="Jl. Raya...">
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
+                    <textarea id="edit-supplier-catatan" name="catatan" rows="3" class="input-field text-sm resize-none" placeholder="Catatan tambahan mengenai supplier..."></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+                    <select id="edit-supplier-status" name="status" class="input-field text-sm">
+                      <option value="Aktif">Aktif</option>
+                      <option value="Non-Aktif">Non-Aktif</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+                <button type="button"
+                  onclick="document.getElementById('modal-edit-supplier').classList.add('hidden')"
+                  class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                  Batal
+                </button>
+                <button type="submit"
+                  class="px-6 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+
+        <!-- TABEL SUPPLIER -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th class="p-4">ID</th>
+                <th class="p-4">Nama Supplier</th>
+                <th class="p-4">PIC</th>
+                <th class="p-4">Telepon</th>
+                <th class="p-4">Email</th>
+                <th class="p-4 text-center">Status</th>
+                <th class="p-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-supplier" class="text-sm">
+              <tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data supplier...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>

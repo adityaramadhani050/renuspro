@@ -42,6 +42,8 @@
         setFRPreset('thisMonth');
       }
       if(pageId === 'settings') loadSettings();
+      if(pageId === 'supplier') loadSupplier();
+      if(pageId === 'purchaseorder') loadPurchaseOrder();
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }

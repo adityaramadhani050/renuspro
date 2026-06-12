@@ -66,7 +66,7 @@ function getWorkOrderList() {
       const i      = latestRevMap[noPen].rowIdx;
       const status = data[i][16] ? data[i][16].toString() : '';
       const noWO   = (data[i][17] !== '' && data[i][17] != null) ? data[i][17].toString() : '';
-      if (status !== 'Deal' || !noWO) continue;
+      if ((status !== 'Deal' && status !== 'Closed') || !noWO) continue;
 
       const tglStr   = _fmtTgl(data[i][2]);
       const validStr = _fmtTgl(data[i][3]);
@@ -321,5 +321,41 @@ function requestInvoice(payload) {
     return { success: true, message: 'Request invoice berhasil dikirim ke Finance.' };
   } catch(e) {
     return { success: false, message: e.toString() };
+  }
+}
+
+// ── Tutup Work Order (ubah status ke Closed) ─────────────────────────────────
+function closeWorkOrder(noWO, namaUser) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const ss    = getSpreadsheet();
+    const sheet = ss.getSheetByName('Penawaran_Main');
+    if (!sheet) return { success: false, message: 'Sheet Penawaran_Main tidak ditemukan.' };
+
+    SpreadsheetApp.flush();
+    const data    = sheet.getDataRange().getValues();
+    const noWOStr = String(noWO);
+    let   found   = false;
+
+    for (let i = 1; i < data.length; i++) {
+      const rowNoWO = data[i][17] !== '' && data[i][17] != null ? data[i][17].toString() : '';
+      if (rowNoWO !== noWOStr) continue;
+      const status = data[i][16] ? data[i][16].toString() : '';
+      if (status === 'Closed') return { success: false, message: 'WO sudah berstatus Closed.' };
+      if (status !== 'Deal' && status !== 'On-Progress')
+        return { success: false, message: 'Hanya WO berstatus Deal atau On-Progress yang bisa ditutup.' };
+      sheet.getRange(i + 1, 17).setValue('Closed');
+      found = true;
+    }
+
+    if (!found) return { success: false, message: 'Work Order tidak ditemukan.' };
+    SpreadsheetApp.flush();
+    invalidatePenawaranCache();
+    return { success: true, message: 'Work Order ' + noWO + ' berhasil ditutup.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
   }
 }

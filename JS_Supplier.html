@@ -1,0 +1,164 @@
+<script>
+// ================================================================
+//  SUPPLIER — JavaScript
+// ================================================================
+
+let _cachedSupplierData = [];
+
+// ── Render tabel supplier ─────────────────────────────────────────
+function _pgRenderSupplier(data) {
+  const tbody = document.getElementById('table-supplier');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">
+      <i class="fas fa-search mr-2"></i>Tidak ada data supplier.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(i => {
+    const statusBadge = i.status === 'Aktif'
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-rose-100 text-rose-600';
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+      <td class="p-4 font-bold text-slate-600">${i.id}</td>
+      <td class="p-4 font-bold text-slate-800">${i.nama}</td>
+      <td class="p-4 text-slate-600">${i.pic || '-'}</td>
+      <td class="p-4 text-slate-600">${i.telepon || '-'}</td>
+      <td class="p-4 text-slate-600">${i.email || '-'}</td>
+      <td class="p-4 text-center">
+        <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${statusBadge}">
+          ${i.status || 'Aktif'}
+        </span>
+      </td>
+      <td class="p-4 text-center">
+        <div class="flex items-center justify-center gap-2">
+          <button onclick='bukaModalEditSupplier(JSON.stringify(${JSON.stringify(i).replace(/'/g, "&#39;")}))' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button onclick="konfirmasiHapus('supplier','${i.id}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Load data supplier ────────────────────────────────────────────
+window.loadSupplier = function() {
+  if (typeof google !== 'undefined') {
+    google.script.run.withSuccessHandler(function(data) {
+      _cachedSupplierData = data || [];
+      if (typeof resetSearch === 'function') resetSearch('supplier');
+      _pgState.supplier.data = _cachedSupplierData;
+      _pgState.supplier.page = 1;
+      _injectPgBar('supplier', '#table-supplier');
+      _pgRender('supplier');
+    }).withFailureHandler(function(err) {
+      const tbody = document.getElementById('table-supplier');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-rose-400">
+        <i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat data supplier.</td></tr>`;
+    }).getSupplierList();
+  }
+};
+
+// ── Submit tambah supplier ────────────────────────────────────────
+function submitTambahSupplier(event) {
+  event.preventDefault();
+  const form   = event.target;
+  const nama   = (form.nama.value   || '').trim();
+  const pic    = (form.pic.value    || '').trim();
+  const telepon = (form.telepon.value || '').trim();
+  const email  = (form.email.value  || '').trim();
+  const alamat = (form.alamat.value || '').trim();
+  const catatan = (form.catatan.value || '').trim();
+
+  if (!nama) {
+    showNotification('Nama supplier wajib diisi.', 'error');
+    return;
+  }
+
+  document.getElementById('modal-supplier').classList.add('hidden');
+  toggleLoader(true, 'Menyimpan supplier...');
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res && res.success === false) {
+          showNotification(res.message || 'Gagal menyimpan supplier.', 'error');
+        } else {
+          showNotification(res && res.message ? res.message : 'Supplier berhasil disimpan.');
+          form.reset();
+          loadSupplier();
+        }
+      })
+      .withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification(err.message || 'Gagal menyimpan supplier.', 'error');
+      })
+      .simpanSupplier({ nama, pic, telepon, email, alamat, catatan, dibuatOleh: _currentUser ? _currentUser.nama : '' });
+  } else {
+    toggleLoader(false);
+    showNotification('Tidak terhubung ke server.', 'error');
+  }
+}
+
+// ── Buka modal edit supplier ──────────────────────────────────────
+function bukaModalEditSupplier(supplierJson) {
+  let supplier;
+  try {
+    supplier = typeof supplierJson === 'string' ? JSON.parse(supplierJson) : supplierJson;
+  } catch (e) {
+    showNotification('Gagal memuat data supplier.', 'error');
+    return;
+  }
+
+  document.getElementById('edit-supplier-id').value      = supplier.id      || '';
+  document.getElementById('edit-supplier-nama').value    = supplier.nama    || '';
+  document.getElementById('edit-supplier-pic').value     = supplier.pic     || '';
+  document.getElementById('edit-supplier-telepon').value = supplier.telepon || '';
+  document.getElementById('edit-supplier-email').value   = supplier.email   || '';
+  document.getElementById('edit-supplier-alamat').value  = supplier.alamat  || '';
+  document.getElementById('edit-supplier-catatan').value = supplier.catatan || '';
+  document.getElementById('edit-supplier-status').value  = supplier.status  || 'Aktif';
+
+  document.getElementById('modal-edit-supplier').classList.remove('hidden');
+}
+
+// ── Submit edit supplier ──────────────────────────────────────────
+function submitEditSupplier(event) {
+  event.preventDefault();
+  const id      = document.getElementById('edit-supplier-id').value.trim();
+  const nama    = document.getElementById('edit-supplier-nama').value.trim();
+  const pic     = document.getElementById('edit-supplier-pic').value.trim();
+  const telepon = document.getElementById('edit-supplier-telepon').value.trim();
+  const email   = document.getElementById('edit-supplier-email').value.trim();
+  const alamat  = document.getElementById('edit-supplier-alamat').value.trim();
+  const catatan = document.getElementById('edit-supplier-catatan').value.trim();
+  const status  = document.getElementById('edit-supplier-status').value;
+
+  if (!nama) {
+    showNotification('Nama supplier wajib diisi.', 'error');
+    return;
+  }
+
+  document.getElementById('modal-edit-supplier').classList.add('hidden');
+  toggleLoader(true, 'Menyimpan perubahan...');
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res && res.success === false) {
+          showNotification(res.message || 'Gagal menyimpan perubahan.', 'error');
+        } else {
+          showNotification(res && res.message ? res.message : 'Data supplier berhasil diperbarui.');
+          loadSupplier();
+        }
+      })
+      .withFailureHandler(function(err) {
+        toggleLoader(false);
+        showNotification(err.message || 'Gagal menyimpan perubahan.', 'error');
+      })
+      .editSupplier({ id, nama, pic, telepon, email, alamat, catatan, status, diubahOleh: _currentUser ? _currentUser.nama : '' });
+  } else {
+    toggleLoader(false);
+    showNotification('Tidak terhubung ke server.', 'error');
+  }
+}
+</script>

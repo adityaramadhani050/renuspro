@@ -75,3 +75,129 @@ function saveBankAccounts(payload) {
     return { success: false, message: e.toString() };
   }
 }
+
+// ── Akun Pembayaran (untuk Purchase Order) ───────────────────────────────────
+
+function _ensureAkunPembayaranSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Akun_Pembayaran');
+  if (!sheet) {
+    sheet = ss.insertSheet('Akun_Pembayaran');
+    sheet.appendRow(['ID', 'Nama Akun', 'Tipe', 'Keterangan', 'Status', 'Dibuat Oleh', 'Dibuat Pada']);
+    sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+    // Seed akun Stok terkunci
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.appendRow(['AP001', 'Stok', 'Stok', 'Akun stok default (terkunci)', 'Aktif', 'System', when]);
+  }
+  return sheet;
+}
+
+function getAkunPembayaranList() {
+  try {
+    var ss    = getSpreadsheet();
+    var sheet = _ensureAkunPembayaranSheet(ss);
+    var data  = sheet.getDataRange().getValues();
+    var list  = [];
+    for (var i = 1; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      list.push({
+        id:         data[i][0].toString(),
+        namaAkun:   data[i][1].toString(),
+        tipe:       data[i][2].toString(),
+        keterangan: data[i][3].toString(),
+        status:     data[i][4].toString(),
+        dibuatOleh: data[i][5].toString(),
+        dibuatPada: _fmtTgl(data[i][6]),
+        locked:     data[i][0].toString() === 'AP001'
+      });
+    }
+    return { success: true, list: list };
+  } catch(e) {
+    return { success: false, message: e.toString(), list: [] };
+  }
+}
+
+function simpanAkunPembayaran(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    if (!payload.namaAkun) return { success: false, message: 'Nama akun wajib diisi.' };
+    var ss    = getSpreadsheet();
+    var sheet = _ensureAkunPembayaranSheet(ss);
+    SpreadsheetApp.flush();
+
+    var lastRow = sheet.getLastRow();
+    var maxNum  = 0;
+    if (lastRow > 1) {
+      var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        var m = (ids[i][0] || '').toString().match(/^AP(\d+)/i);
+        if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+      }
+    }
+    var newId = 'AP' + ('000' + (maxNum + 1)).slice(-3);
+    var when  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.appendRow([newId, payload.namaAkun, payload.tipe || 'Bank', payload.keterangan || '', 'Aktif', payload.dibuatOleh || '', when]);
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Akun ' + newId + ' berhasil ditambahkan.', newId: newId };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+function editAkunPembayaran(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    if (payload.id === 'AP001') return { success: false, message: 'Akun Stok default tidak bisa diubah.' };
+    var sheet = getSpreadsheet().getSheetByName('Akun_Pembayaran');
+    if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString() === payload.id.toString()) {
+        sheet.getRange(i + 1, 2, 1, 4).setValues([[payload.namaAkun, payload.tipe || 'Bank', payload.keterangan || '', payload.status || 'Aktif']]);
+        SpreadsheetApp.flush();
+        return { success: true, message: 'Akun berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'ID akun tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+function hapusAkunPembayaran(id) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    if (id === 'AP001') return { success: false, message: 'Akun Stok default tidak bisa dihapus.' };
+    // Cek referensi di Pembayaran_PO
+    var poSheet = getSpreadsheet().getSheetByName('Pembayaran_PO');
+    if (poSheet && poSheet.getLastRow() > 1) {
+      var poData = poSheet.getRange(2, 4, poSheet.getLastRow() - 1, 1).getValues();
+      for (var j = 0; j < poData.length; j++) {
+        if (poData[j][0].toString() === id.toString())
+          return { success: false, message: 'Akun sudah digunakan di riwayat pembayaran PO.' };
+      }
+    }
+    var sheet = getSpreadsheet().getSheetByName('Akun_Pembayaran');
+    if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString() === id.toString()) {
+        sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
+        return { success: true, message: 'Akun berhasil dihapus.' };
+      }
+    }
+    return { success: false, message: 'ID akun tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}

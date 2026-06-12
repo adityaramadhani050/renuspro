@@ -41,18 +41,20 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:     ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings'],
-  finance:   ['workorder','invoice','kwitansi','laporanfinance'],
-  sales:     ['penawaran','workorder','produk','template','customer'],
-  leadsales: ['dashboard','penawaran','workorder','produk','template','customer']
+  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','purchaseorder'],
+  finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder'],
+  sales:       ['penawaran','workorder','produk','template','customer'],
+  leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
+  procurement: ['supplier','purchaseorder','workorder']
 };
 const _ROLE_BADGE = {
-  admin:     'bg-blue-100 text-blue-700',
-  finance:   'bg-violet-100 text-violet-700',
-  sales:     'bg-emerald-100 text-emerald-700',
-  leadsales: 'bg-orange-100 text-orange-700'
+  admin:       'bg-blue-100 text-blue-700',
+  finance:     'bg-violet-100 text-violet-700',
+  sales:       'bg-emerald-100 text-emerald-700',
+  leadsales:   'bg-orange-100 text-orange-700',
+  procurement: 'bg-amber-100 text-amber-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
@@ -73,7 +75,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','purchaseorder']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
@@ -150,6 +152,11 @@ function doLogin() {
     } else if (username === 'finance1' && password === 'finance123') {
       _onLoginSuccess(
         { id:'U003', nama:'Finance Officer', username:'finance1', role:'finance' },
+        'Login berhasil (dev mode)'
+      );
+    } else if (username === 'procurement1' && password === 'proc123') {
+      _onLoginSuccess(
+        { id:'U004', nama:'Procurement Officer', username:'procurement1', role:'procurement' },
         'Login berhasil (dev mode)'
       );
     } else {
