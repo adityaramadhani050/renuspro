@@ -685,7 +685,7 @@ function _renderFormTerimaItems(tbody, res, produkList) {
   // Build dropdown options HTML sekali
   var optionsHtml = '<option value="">— Tidak terhubung ke stok —</option>' +
     produkList.map(function(p) {
-      return '<option value="' + _escHtml(p.id) + '">' + _escHtml(p.id) + ' — ' + _escHtml(p.nama) + '</option>';
+      return '<option value="' + _escHtml(p.sku) + '">' + _escHtml(p.sku) + ' — ' + _escHtml(p.nama) + '</option>';
     }).join('');
 
   tbody.innerHTML = items.map(function(it) {
