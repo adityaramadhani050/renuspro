@@ -11,6 +11,7 @@ function loadSettings() {
   _loadTCOptions();
   _loadBankAccounts();
   _loadDocSign();
+  _loadAkunPembayaranList();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -344,6 +345,123 @@ window.clearSignature = function() {
     .withSuccessHandler(function() { showToast('Tanda tangan dihapus.', 'success'); })
     .clearSignatureImage();
 };
+
+// ═══════════════════════════════════════════════════════
+// AKUN PEMBAYARAN PO
+// ═══════════════════════════════════════════════════════
+
+var _akunPembayaranData = [];
+
+function _loadAkunPembayaranList() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) return;
+      _akunPembayaranData = res.list || [];
+      _renderAkunPembayaranList();
+    })
+    .withFailureHandler(function() {})
+    .getAkunPembayaranList();
+}
+
+function _renderAkunPembayaranList() {
+  var container = document.getElementById('akun-pembayaran-list');
+  if (!container) return;
+  if (!_akunPembayaranData.length) {
+    container.innerHTML = '<div class="text-xs text-slate-400 italic">Belum ada akun pembayaran.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  _akunPembayaranData.forEach(function(akun) {
+    var locked = akun.locked || akun.id === 'AP001';
+    var html = '<div class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl">' +
+      '<div class="bg-amber-50 text-amber-600 h-8 w-8 rounded-lg flex items-center justify-center shrink-0">' +
+        '<i class="fa-solid fa-' + (akun.tipe === 'Kas' ? 'wallet' : akun.tipe === 'Stok' ? 'boxes-stacked' : 'building-columns') + ' text-sm"></i></div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<p class="text-sm font-bold text-slate-700">' + _escHtml(akun.namaAkun) + ' <span class="text-xs font-semibold text-slate-400">(' + _escHtml(akun.tipe) + ')</span>' +
+          (locked ? ' <span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold ml-1">TERKUNCI</span>' : '') +
+        '</p>' +
+        '<p class="text-xs text-slate-400">' + _escHtml(akun.keterangan || '') + '</p>' +
+      '</div>' +
+      '<div class="flex gap-1 shrink-0">' +
+        (!locked ? '<button onclick="bukaModalEditAkunPembayaran(' + JSON.stringify(akun) + ')" class="p-1.5 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition"><i class="fa-solid fa-pen text-xs"></i></button>' : '') +
+        (!locked ? '<button onclick="hapusAkunPembayaranUI(\'' + akun.id + '\')" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>' : '') +
+      '</div>' +
+    '</div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function bukaModalTambahAkunPembayaran() {
+  document.getElementById('akun-modal-title').textContent = 'Tambah Akun Pembayaran';
+  document.getElementById('akun-edit-id').value = '';
+  document.getElementById('akun-nama').value = '';
+  document.getElementById('akun-tipe').value = 'Bank';
+  document.getElementById('akun-keterangan').value = '';
+  document.getElementById('akun-status-wrap').classList.add('hidden');
+  document.getElementById('modal-akun-pembayaran').classList.remove('hidden');
+  document.getElementById('akun-nama').focus();
+}
+
+function bukaModalEditAkunPembayaran(akun) {
+  document.getElementById('akun-modal-title').textContent = 'Edit Akun Pembayaran';
+  document.getElementById('akun-edit-id').value = akun.id;
+  document.getElementById('akun-nama').value = akun.namaAkun || '';
+  document.getElementById('akun-tipe').value = akun.tipe || 'Bank';
+  document.getElementById('akun-keterangan').value = akun.keterangan || '';
+  document.getElementById('akun-status').value = akun.status || 'Aktif';
+  document.getElementById('akun-status-wrap').classList.remove('hidden');
+  document.getElementById('modal-akun-pembayaran').classList.remove('hidden');
+}
+
+function simpanAkunPembayaranModal() {
+  var id         = document.getElementById('akun-edit-id').value.trim();
+  var namaAkun   = document.getElementById('akun-nama').value.trim();
+  var tipe       = document.getElementById('akun-tipe').value;
+  var keterangan = document.getElementById('akun-keterangan').value.trim();
+  var status     = id ? document.getElementById('akun-status').value : 'Aktif';
+
+  if (!namaAkun) { showToast('Nama akun wajib diisi.', 'error'); return; }
+
+  document.getElementById('modal-akun-pembayaran').classList.add('hidden');
+  toggleLoader(true, 'Menyimpan akun...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+
+  var fn      = id ? 'editAkunPembayaran' : 'simpanAkunPembayaran';
+  var payload = id
+    ? { id: id, namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, status: status }
+    : { namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, dibuatOleh: _currentUser ? _currentUser.nama : '' };
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showToast((res && res.message) || 'Tersimpan.', res && res.success ? 'success' : 'error');
+      if (res && res.success) _loadAkunPembayaranList();
+    })
+    .withFailureHandler(function(e) {
+      toggleLoader(false);
+      showToast('Error: ' + e.message, 'error');
+    })
+    [fn](payload);
+}
+
+function hapusAkunPembayaranUI(id) {
+  var akun = _akunPembayaranData.find(function(a){ return a.id === id; });
+  if (!confirm('Hapus akun "' + (akun ? akun.namaAkun : id) + '"?')) return;
+  toggleLoader(true, 'Menghapus akun...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showToast((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
+      if (res && res.success) _loadAkunPembayaranList();
+    })
+    .withFailureHandler(function(e) {
+      toggleLoader(false);
+      showToast('Error: ' + e.message, 'error');
+    })
+    .hapusAkunPembayaran(id);
+}
 
 window.simpanDocSign = function() {
   var enabled = document.getElementById('sign-enabled').checked;

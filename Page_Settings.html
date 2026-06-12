@@ -183,4 +183,56 @@
     </div>
   </div>
 
+  <!-- ── Akun Pembayaran (untuk Purchase Order) ── -->
+  <div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-base font-bold text-slate-800">Akun Pembayaran PO</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Daftar akun (Bank/Kas/Stok) yang digunakan untuk pembayaran Purchase Order.</p>
+      </div>
+      <button onclick="bukaModalTambahAkunPembayaran()"
+        class="flex items-center gap-2 text-sm bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-bold shadow-sm transition">
+        <i class="fa-solid fa-plus text-xs"></i> Tambah Akun
+      </button>
+    </div>
+    <div id="akun-pembayaran-list" class="space-y-2">
+      <div class="text-xs text-slate-400 italic">Memuat...</div>
+    </div>
+  </div>
+
+  <!-- Modal Akun Pembayaran -->
+  <div id="modal-akun-pembayaran" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+      <h3 class="font-bold text-slate-800" id="akun-modal-title">Tambah Akun Pembayaran</h3>
+      <input type="hidden" id="akun-edit-id">
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Akun <span class="text-rose-500">*</span></label>
+        <input type="text" id="akun-nama" placeholder="BCA 1234567890" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipe</label>
+        <select id="akun-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 bg-white">
+          <option value="Bank">Bank</option>
+          <option value="Kas">Kas</option>
+          <option value="Stok">Stok</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Keterangan</label>
+        <input type="text" id="akun-keterangan" placeholder="Opsional..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
+      </div>
+      <div id="akun-status-wrap" class="hidden">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+        <select id="akun-status" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400 bg-white">
+          <option value="Aktif">Aktif</option>
+          <option value="Non-Aktif">Non-Aktif</option>
+        </select>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="simpanAkunPembayaranModal()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-sm transition">Simpan</button>
+        <button onclick="document.getElementById('modal-akun-pembayaran').classList.add('hidden')" class="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 rounded-xl font-bold text-sm transition">Batal</button>
+      </div>
+    </div>
+  </div>
+
 </section>

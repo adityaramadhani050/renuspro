@@ -1,13 +1,15 @@
 <script>
 // ── State Pagination ──────────────────────────────────────────────
 const _pgState = {
-  penawaran: { page: 1, perPage: 10, data: [] },
-  workorder: { page: 1, perPage: 10, data: [] },
-  invoice:   { page: 1, perPage: 10, data: [] },
-  kwitansi:  { page: 1, perPage: 10, data: [] },
-  produk:    { page: 1, perPage: 10, data: [] },
-  template:  { page: 1, perPage: 10, data: [] },
-  customer:  { page: 1, perPage: 10, data: [] },
+  penawaran:     { page: 1, perPage: 10, data: [] },
+  workorder:     { page: 1, perPage: 10, data: [] },
+  invoice:       { page: 1, perPage: 10, data: [] },
+  kwitansi:      { page: 1, perPage: 10, data: [] },
+  produk:        { page: 1, perPage: 10, data: [] },
+  template:      { page: 1, perPage: 10, data: [] },
+  customer:      { page: 1, perPage: 10, data: [] },
+  supplier:      { page: 1, perPage: 10, data: [] },
+  purchaseorder: { page: 1, perPage: 10, data: [] },
 };
 
 // ── Style injeksi sekali ──────────────────────────────────────────
@@ -198,13 +200,15 @@ function _pgRender(tipe) {
   const start  = (state.page - 1) * state.perPage;
   const sliced = state.data.slice(start, start + state.perPage);
 
-  if (tipe === 'penawaran') _renderTabelPenawaran(sliced);
-  if (tipe === 'workorder') _pgRenderWorkOrder(sliced);
-  if (tipe === 'invoice')   _pgRenderInvoice(sliced);
-  if (tipe === 'kwitansi')  _pgRenderKwitansi(sliced);
-  if (tipe === 'produk')    _pgRenderProduk(sliced);
-  if (tipe === 'template')  _pgRenderTemplate(sliced);
-  if (tipe === 'customer')  _pgRenderCustomer(sliced);
+  if (tipe === 'penawaran')     _renderTabelPenawaran(sliced);
+  if (tipe === 'workorder')     _pgRenderWorkOrder(sliced);
+  if (tipe === 'invoice')       _pgRenderInvoice(sliced);
+  if (tipe === 'kwitansi')      _pgRenderKwitansi(sliced);
+  if (tipe === 'produk')        _pgRenderProduk(sliced);
+  if (tipe === 'template')      _pgRenderTemplate(sliced);
+  if (tipe === 'customer')      _pgRenderCustomer(sliced);
+  if (tipe === 'supplier')      _pgRenderSupplier(sliced);
+  if (tipe === 'purchaseorder') _pgRenderPurchaseOrder(sliced);
 
   _renderPaginationBar(tipe);
 }
@@ -448,6 +452,14 @@ window.filterTabel = function(tipe) {
       (i.id + i.nama + i.perusahaan + i.alamat + i.kontak).toLowerCase().includes(q));
     _pgState.customer.page = 1;
     _pgRender('customer');
+    return;
+  }
+  if (tipe === 'supplier') {
+    const q = document.getElementById('search-supplier').value.toLowerCase().trim();
+    _pgState.supplier.data = _cachedSupplierData.filter(i =>
+      (i.id + i.nama + i.pic + i.telepon + i.email).toLowerCase().includes(q));
+    _pgState.supplier.page = 1;
+    _pgRender('supplier');
     return;
   }
 };

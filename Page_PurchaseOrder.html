@@ -1,0 +1,404 @@
+      <section id="page-purchaseorder" class="page-section">
+
+        <!-- ── Header ── -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Purchase Order</h2>
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-60">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-po" oninput="filterPO()"
+                placeholder="Cari No PO, supplier, No WO..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+            </div>
+            <select id="filter-po-status" onchange="filterPO()"
+              class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
+              <option value="">Semua Status</option>
+              <option value="Draft">Draft</option>
+              <option value="Disetujui">Disetujui</option>
+              <option value="Diterima Sebagian">Diterima Sebagian</option>
+              <option value="Diterima">Diterima</option>
+              <option value="Selesai">Selesai</option>
+              <option value="Batal">Batal</option>
+            </select>
+            <button onclick="bukaFormPO()"
+              class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fas fa-plus text-sm"></i> Buat PO Baru
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Tabel Daftar PO ── -->
+        <div id="po-list-section">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th class="p-4">No PO</th>
+                    <th class="p-4">Tanggal</th>
+                    <th class="p-4">Supplier</th>
+                    <th class="p-4">No WO</th>
+                    <th class="p-4 text-center">Status PO</th>
+                    <th class="p-4 text-right">Grand Total</th>
+                    <th class="p-4 text-center">Status Bayar</th>
+                    <th class="p-4 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="table-purchaseorder" class="text-sm">
+                  <tr><td colspan="8" class="p-8 text-center text-slate-500">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data purchase order...
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Form Buat / Edit PO ── -->
+        <div id="form-po-section" class="hidden">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150">
+
+            <!-- Card Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-cart-flatbed"></i>
+              </span>
+              <div class="flex-1">
+                <h3 id="form-po-title" class="text-base font-bold text-slate-800">Buat Purchase Order Baru</h3>
+                <p class="text-xs text-slate-400">Isi detail PO di bawah ini</p>
+              </div>
+              <button onclick="tutupFormPO()"
+                class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition flex items-center gap-1.5 text-sm font-semibold">
+                <i class="fa-solid fa-xmark"></i> Batal
+              </button>
+            </div>
+
+            <div class="px-6 py-5 space-y-5">
+
+              <!-- Info Dasar PO -->
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                <!-- No PO -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No PO</label>
+                  <input type="text" id="po-no-field" readonly
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-500 font-mono font-bold focus:outline-none"
+                    placeholder="Auto-generate...">
+                  <input type="hidden" id="po-edit-nopo">
+                </div>
+
+                <!-- Tanggal -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal</label>
+                  <input type="date" id="po-tanggal"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                </div>
+
+                <!-- Peruntukan -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Peruntukan</label>
+                  <input type="text" id="po-peruntukan" placeholder="Misal: Project Solar Panel..."
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                </div>
+
+                <!-- Supplier -->
+                <div class="lg:col-span-1">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supplier</label>
+                  <div id="sd-supplier-po-wrap" class="w-full">
+                    <select id="sel-supplier-po" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+                      <option value="">-- Pilih Supplier --</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- No WO -->
+                <div class="lg:col-span-1">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    No WO
+                    <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span>
+                  </label>
+                  <div id="sd-wo-po-wrap" class="w-full">
+                    <select id="sel-wo-po" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+                      <option value="">-- Pilih WO (Opsional) --</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- PPN % -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PPN %</label>
+                  <div class="relative">
+                    <input type="number" id="po-ppn-persen" min="0" max="100" step="any" value="11"
+                      oninput="hitungTotalPO()"
+                      class="w-full pl-3 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white"
+                      placeholder="11">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Catatan -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
+                <textarea id="po-catatan" rows="2" placeholder="Catatan tambahan untuk PO ini..."
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
+              </div>
+
+              <!-- ── Item Pembelian ── -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-orange-400"></i> Item Pembelian
+                  </h4>
+                  <button onclick="tambahItemPO()"
+                    class="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-plus"></i> Tambah Item
+                  </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th class="px-3 py-2.5" style="min-width:200px">Nama Item</th>
+                        <th class="px-3 py-2.5" style="min-width:80px">Qty</th>
+                        <th class="px-3 py-2.5" style="min-width:90px">Satuan</th>
+                        <th class="px-3 py-2.5 text-right" style="min-width:140px">Harga Beli</th>
+                        <th class="px-3 py-2.5 text-right" style="min-width:130px">Total</th>
+                        <th class="px-3 py-2.5 text-center" style="min-width:60px"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="po-items-body">
+                      <tr id="po-items-empty">
+                        <td colspan="6" class="px-4 py-6 text-center text-slate-400 text-sm italic">
+                          Klik "Tambah Item" untuk menambahkan item pembelian.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ── Summary ── -->
+              <div class="flex justify-end">
+                <div class="bg-orange-50 border border-orange-100 rounded-xl p-4 w-full max-w-sm space-y-1.5 text-sm">
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-500">Subtotal</span>
+                    <span class="font-bold text-slate-700">Rp <span id="po-subtotal">0</span></span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-500">PPN (<span id="po-ppn-label">11</span>%)</span>
+                    <span class="font-bold text-slate-700">Rp <span id="po-ppn-display">0</span></span>
+                  </div>
+                  <div class="flex justify-between items-center border-t border-orange-200 pt-2 mt-1">
+                    <span class="font-extrabold text-slate-800">Grand Total</span>
+                    <span class="font-extrabold text-orange-600 text-base">Rp <span id="po-grandtotal">0</span></span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Card Footer -->
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100">
+              <button onclick="tutupFormPO()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitPO()"
+                class="px-6 py-2.5 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan PO
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Panel Detail PO ── -->
+        <div id="panel-po-detail" class="hidden">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150">
+
+            <!-- Detail Header -->
+            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                <i class="fa-solid fa-file-invoice"></i>
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 id="po-detail-nopo" class="text-base font-extrabold text-slate-800"></h3>
+                  <span id="po-detail-status-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full"></span>
+                </div>
+                <p id="po-detail-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <!-- Tombol Edit (tampil jika Draft) -->
+                <button id="po-detail-btn-edit" onclick="bukaEditPO(_currentPODetail && _currentPODetail.noPO)"
+                  class="hidden px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+                <!-- Tombol Ubah Status -->
+                <button id="po-detail-btn-status" onclick="ubahStatusPOUI(_currentPODetail && _currentPODetail.noPO, _currentPODetail && _currentPODetail.statusPO)"
+                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-arrows-rotate"></i> Ubah Status
+                </button>
+                <!-- Tombol Cetak PO -->
+                <button onclick="cetakPO(_currentPODetail)"
+                  class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-print"></i> Cetak PO
+                </button>
+                <!-- Tombol Tutup -->
+                <button onclick="tutupPanelPO()"
+                  class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+                  <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="px-6 py-5 space-y-5">
+
+              <!-- Info Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Tanggal</p>
+                  <p id="po-detail-tanggal" class="font-bold text-slate-700">—</p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Supplier</p>
+                  <p id="po-detail-supplier" class="font-bold text-slate-700">—</p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">No WO</p>
+                  <p id="po-detail-wo" class="font-bold text-slate-700">—</p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Peruntukan</p>
+                  <p id="po-detail-peruntukan" class="font-bold text-slate-700 truncate">—</p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5">Status Bayar</p>
+                  <span id="po-detail-status-bayar-badge" class="font-bold text-xs px-2 py-0.5 rounded-full"></span>
+                </div>
+                <div class="bg-emerald-50 rounded-xl p-3">
+                  <p class="text-emerald-600 mb-0.5">Total Dibayar</p>
+                  <p id="po-detail-total-dibayar" class="font-extrabold text-emerald-700">Rp 0</p>
+                </div>
+              </div>
+
+              <!-- Tabel Item PO -->
+              <div>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Pembelian</p>
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th class="px-3 py-2.5">No</th>
+                        <th class="px-3 py-2.5">Nama Item</th>
+                        <th class="px-3 py-2.5 text-center">Qty</th>
+                        <th class="px-3 py-2.5">Satuan</th>
+                        <th class="px-3 py-2.5 text-right">Harga Beli</th>
+                        <th class="px-3 py-2.5 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody id="po-detail-items" class="text-sm">
+                      <tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Summary Detail -->
+              <div class="flex justify-end">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 w-full max-w-sm space-y-1.5 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-slate-500">Subtotal</span>
+                    <span class="font-bold text-slate-700">Rp <span id="po-detail-subtotal">0</span></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-500">PPN (<span id="po-detail-ppn-label">0</span>%)</span>
+                    <span class="font-bold text-slate-700">Rp <span id="po-detail-ppn-nominal">0</span></span>
+                  </div>
+                  <div class="flex justify-between border-t border-slate-200 pt-2 mt-1">
+                    <span class="font-extrabold text-slate-800">Grand Total</span>
+                    <span class="font-extrabold text-orange-600 text-base">Rp <span id="po-detail-grandtotal">0</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Section Pembayaran ── -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-money-bill-wave text-emerald-500"></i> Riwayat Pembayaran
+                  </p>
+                  <button id="po-detail-btn-tambah-bayar" onclick="document.getElementById('form-tambah-bayar-po').classList.toggle('hidden'); _loadAkunPembayaranOptions('sel-akun-po')"
+                    class="hidden flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-plus"></i> Tambah Pembayaran
+                  </button>
+                </div>
+
+                <!-- Form Tambah Pembayaran -->
+                <div id="form-tambah-bayar-po" class="hidden bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-4">
+                  <p class="text-xs font-bold text-emerald-700 mb-3">Form Tambah Pembayaran</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
+                      <input type="date" id="po-bayar-tanggal"
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Akun Pembayaran</label>
+                      <select id="sel-akun-po"
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                        <option value="">-- Pilih Akun --</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jumlah (Rp)</label>
+                      <input type="number" id="po-bayar-jumlah" min="0" step="any" placeholder="0"
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan</label>
+                      <input type="text" id="po-bayar-catatan" placeholder="Opsional..."
+                        class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2 mt-3">
+                    <button onclick="document.getElementById('form-tambah-bayar-po').classList.add('hidden')"
+                      class="px-4 py-2 text-sm text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold transition border border-slate-200">
+                      Batal
+                    </button>
+                    <button onclick="submitPembayaranPO()"
+                      class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-sm transition flex items-center gap-2">
+                      <i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Tabel Pembayaran -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th class="px-3 py-2.5">Tanggal</th>
+                        <th class="px-3 py-2.5">Akun</th>
+                        <th class="px-3 py-2.5 text-right">Jumlah</th>
+                        <th class="px-3 py-2.5">Catatan</th>
+                        <th class="px-3 py-2.5 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="po-detail-payments" class="text-sm">
+                      <tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </section>

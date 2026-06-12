@@ -627,6 +627,30 @@
         return;
       }
 
+      if (tipe === 'supplier') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) { showNotification(res.message); loadSupplier(); }
+            else showNotification(res.message, 'error');
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, 'error'); })
+          .hapusSupplier(id);
+        return;
+      }
+
+      if (tipe === 'po') {
+        google.script.run
+          .withSuccessHandler(res => {
+            toggleLoader(false);
+            if (res.success) { showNotification(res.message); loadPurchaseOrder(); }
+            else showNotification(res.message, 'error');
+          })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, 'error'); })
+          .hapusPO(id);
+        return;
+      }
+
       const fnName = tipe === 'produk' ? 'hapusProduk' : 'hapusCustomer';
       google.script.run
         .withSuccessHandler(res => {

@@ -54,6 +54,18 @@
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-user-shield w-6"></i> Manajemen User
         </button>
+        <button onclick="navigate('supplier')" id="nav-supplier"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-truck w-6"></i> Supplier
+        </button>
+        <button onclick="navigate('purchaseorder')" id="nav-purchaseorder"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-cart-flatbed w-6"></i> Purchase Order
+        </button>
+        <button onclick="navigate('settings')" id="nav-settings"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-gear w-6"></i> Pengaturan
+        </button>
       </nav>
     </div>
 
@@ -124,6 +136,10 @@
       <?!= include('Page_Template'); ?>
       <?!= include('Page_Customer'); ?>
       <?!= include('Page_Users'); ?>
+      <?!= include('Page_FinanceReport'); ?>
+      <?!= include('Page_Settings'); ?>
+      <?!= include('Page_Supplier'); ?>
+      <?!= include('Page_PurchaseOrder'); ?>
 
 
 
@@ -149,5 +165,9 @@
   <?!= include('JS_SearchableDropdown'); ?>
   <?!= include('JS_DashboardFilter'); ?>
   <?!= include('JS_Pagination'); ?>
+  <?!= include('JS_FinanceReport'); ?>
+  <?!= include('JS_Settings'); ?>
+  <?!= include('JS_Supplier'); ?>
+  <?!= include('JS_PurchaseOrder'); ?>
 </body>
 </html>

@@ -1,0 +1,575 @@
+<script>
+// ── Purchase Order Module ─────────────────────────────────────────────────────
+
+let _cachedPOData   = [];
+let _poFormMode     = 'new'; // 'new' | 'edit'
+let _poItems        = [];
+let _currentPODetail = null;
+
+// ── Render tabel daftar PO ──────────────────────────────────────────────────
+function _pgRenderPurchaseOrder(data) {
+  var tbody = document.getElementById('table-purchaseorder');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fas fa-inbox mr-2"></i>Belum ada data Purchase Order.</td></tr>';
+    return;
+  }
+  var statusPOClass = {
+    'Draft': 'bg-slate-100 text-slate-600',
+    'Disetujui': 'bg-blue-100 text-blue-700',
+    'Diterima Sebagian': 'bg-amber-100 text-amber-700',
+    'Diterima': 'bg-teal-100 text-teal-700',
+    'Selesai': 'bg-emerald-100 text-emerald-700',
+    'Batal': 'bg-rose-100 text-rose-600'
+  };
+  var statusBayarClass = {
+    'Belum Dibayar': 'bg-slate-100 text-slate-600',
+    'Dibayar Sebagian': 'bg-amber-100 text-amber-700',
+    'Lunas': 'bg-emerald-100 text-emerald-700'
+  };
+  tbody.innerHTML = data.map(function(po) {
+    var sc = statusPOClass[po.statusPO] || 'bg-slate-100 text-slate-500';
+    var bc = statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-500';
+    var isDraft = po.statusPO === 'Draft';
+    return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">' +
+      '<td class="p-4 font-mono font-bold text-slate-700">' + (po.noPO || '') + '</td>' +
+      '<td class="p-4 text-slate-600">' + (po.tanggal || '') + '</td>' +
+      '<td class="p-4 font-medium text-slate-800">' + (po.namaSupplier || po.idSupplier || '—') + '</td>' +
+      '<td class="p-4 text-slate-500">' + (po.noWO || '—') + '</td>' +
+      '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
+      '<td class="p-4 text-right font-bold text-slate-800">Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</td>' +
+      '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
+      '<td class="p-4 text-center">' +
+        '<div class="flex items-center justify-center gap-1">' +
+          '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
+          (isDraft ? '<button onclick="konfirmasiHapus(\'po\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '') +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Load daftar PO ──────────────────────────────────────────────────────────
+window.loadPurchaseOrder = function() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(data) {
+      _cachedPOData = data || [];
+      _pgState.purchaseorder.data = _cachedPOData;
+      _pgState.purchaseorder.page = 1;
+      _injectPgBar('purchaseorder', '#table-purchaseorder');
+      _pgRender('purchaseorder');
+    })
+    .withFailureHandler(function() {
+      document.getElementById('table-purchaseorder').innerHTML =
+        '<tr><td colspan="8" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';
+    })
+    .getPOList();
+};
+
+// ── Filter PO ───────────────────────────────────────────────────────────────
+window.filterPO = function() {
+  var q      = (document.getElementById('search-po').value || '').toLowerCase().trim();
+  var status = (document.getElementById('filter-po-status').value || '').trim();
+  var filtered = _cachedPOData.filter(function(po) {
+    if (q) {
+      var hay = ((po.noPO || '') + (po.namaSupplier || '') + (po.noWO || '') + (po.peruntukan || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (status && po.statusPO !== status) return false;
+    return true;
+  });
+  _pgState.purchaseorder.data = filtered;
+  _pgState.purchaseorder.page = 1;
+  _pgRender('purchaseorder');
+};
+
+// ── Form Buat/Edit PO ────────────────────────────────────────────────────────
+function bukaFormPO() {
+  _poFormMode = 'new';
+  _poItems    = [];
+  document.getElementById('form-po-title').innerText = 'Buat Purchase Order Baru';
+  document.getElementById('po-no-field').value       = 'Auto-generate...';
+  document.getElementById('po-edit-nopo') && (document.getElementById('po-edit-nopo').value = '');
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('po-tanggal').value   = today;
+  document.getElementById('po-peruntukan').value = '';
+  document.getElementById('po-ppn-persen').value = '11';
+  document.getElementById('po-catatan').value    = '';
+  renderItemsPO();
+  hitungTotalPO();
+
+  // Populate supplier dropdown
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        var sel = document.getElementById('sel-supplier-po');
+        sel.innerHTML = '<option value="">-- Pilih Supplier --</option>';
+        (res.list || []).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.namaAkun ? s.nama : (s.nama + (s.pic ? ' - ' + s.pic : ''));
+          sel.appendChild(opt);
+        });
+        // re-init searchable dropdown
+        var native = document.getElementById('sel-supplier-po');
+        if (native && typeof initSearchableDropdown === 'function') {
+          native.dataset.sdInit = '';
+          initSearchableDropdown('sel-supplier-po', { placeholder: '-- Pilih Supplier --' });
+        }
+      })
+      .withFailureHandler(function() {})
+      .getSupplierList();
+
+    google.script.run
+      .withSuccessHandler(function(data) {
+        var sel = document.getElementById('sel-wo-po');
+        sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
+        (data || []).filter(function(w) { return w.status !== 'Closed'; }).forEach(function(w) {
+          var opt = document.createElement('option');
+          opt.value = w.noWO;
+          opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
+          sel.appendChild(opt);
+        });
+        if (typeof initSearchableDropdown === 'function') {
+          var n2 = document.getElementById('sel-wo-po');
+          if (n2) { n2.dataset.sdInit = ''; initSearchableDropdown('sel-wo-po', { placeholder: '-- Tidak terikat WO --' }); }
+        }
+      })
+      .withFailureHandler(function() {})
+      .getWorkOrderList();
+  }
+
+  document.getElementById('form-po-section').classList.remove('hidden');
+  document.getElementById('panel-po-detail').classList.add('hidden');
+  document.getElementById('po-list-section').classList.add('hidden');
+}
+
+function tutupFormPO() {
+  document.getElementById('form-po-section').classList.add('hidden');
+  document.getElementById('po-list-section').classList.remove('hidden');
+}
+
+// ── Items PO ─────────────────────────────────────────────────────────────────
+function tambahItemPO() {
+  _poItems.push({ namaItem: '', qty: 1, satuan: '', hargaBeli: 0, catatan: '' });
+  renderItemsPO();
+}
+
+function hapusItemPO(idx) {
+  _poItems.splice(idx, 1);
+  renderItemsPO();
+  hitungTotalPO();
+}
+
+function renderItemsPO() {
+  var tbody = document.getElementById('po-items-body');
+  if (!_poItems.length) {
+    tbody.innerHTML = '<tr id="po-items-empty"><td colspan="6" class="px-4 py-6 text-center text-slate-400 text-sm italic">Klik "Tambah Item" untuk menambahkan item pembelian.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _poItems.map(function(item, idx) {
+    var total = (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
+    return '<tr class="border-b border-slate-100">' +
+      '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.namaItem) + '" oninput="_poItemChange(' + idx + ',\'namaItem\',this.value)" placeholder="Nama item..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></td>' +
+      '<td class="px-2 py-1.5"><input type="number" value="' + (item.qty || 1) + '" min="0" oninput="_poItemChange(' + idx + ',\'qty\',this.value);hitungTotalPO()" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
+      '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.satuan) + '" oninput="_poItemChange(' + idx + ',\'satuan\',this.value)" placeholder="Pcs/Unit..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
+      '<td class="px-2 py-1.5"><input type="number" value="' + (item.hargaBeli || 0) + '" min="0" oninput="_poItemChange(' + idx + ',\'hargaBeli\',this.value);hitungTotalPO()" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-right"></td>' +
+      '<td class="px-2 py-1.5 text-right font-semibold text-slate-700 text-sm">Rp ' + total.toLocaleString('id-ID') + '</td>' +
+      '<td class="px-2 py-1.5 text-center"><button onclick="hapusItemPO(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fa-solid fa-trash-can text-xs"></i></button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function _poItemChange(idx, field, val) {
+  if (!_poItems[idx]) return;
+  _poItems[idx][field] = field === 'qty' || field === 'hargaBeli' ? (parseFloat(val) || 0) : val;
+}
+
+function hitungTotalPO() {
+  var subtotal = _poItems.reduce(function(s, item) {
+    return s + (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
+  }, 0);
+  var ppnPct  = parseFloat(document.getElementById('po-ppn-persen').value) || 0;
+  var ppn     = Math.round(subtotal * ppnPct / 100);
+  var grand   = subtotal + ppn;
+
+  document.getElementById('po-subtotal').innerText   = subtotal.toLocaleString('id-ID');
+  document.getElementById('po-ppn-label').innerText  = ppnPct;
+  document.getElementById('po-ppn-display').innerText = ppn.toLocaleString('id-ID');
+  document.getElementById('po-grandtotal').innerText = grand.toLocaleString('id-ID');
+  // re-render item totals
+  var rows = document.querySelectorAll('#po-items-body tr');
+  _poItems.forEach(function(item, idx) {
+    if (rows[idx]) {
+      var totalEl = rows[idx].querySelector('td:nth-child(5)');
+      if (totalEl) {
+        var t = (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
+        totalEl.innerText = 'Rp ' + t.toLocaleString('id-ID');
+      }
+    }
+  });
+}
+
+// ── Submit PO ────────────────────────────────────────────────────────────────
+function submitPO() {
+  var idSupplier = (document.getElementById('sel-supplier-po').value || '').trim();
+  if (!idSupplier) return showNotification('Pilih supplier terlebih dahulu.', 'error');
+  if (!_poItems.length) return showNotification('Tambahkan minimal 1 item pembelian.', 'error');
+  for (var i = 0; i < _poItems.length; i++) {
+    if (!_poItems[i].namaItem) return showNotification('Nama item baris ' + (i+1) + ' tidak boleh kosong.', 'error');
+  }
+
+  var sel = document.getElementById('sel-supplier-po');
+  var namaSupplier = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : idSupplier;
+
+  var payload = {
+    tanggal:      document.getElementById('po-tanggal').value,
+    idSupplier:   idSupplier,
+    namaSupplier: namaSupplier,
+    peruntukan:   document.getElementById('po-peruntukan').value.trim(),
+    noWO:         document.getElementById('sel-wo-po').value,
+    ppnPersen:    parseFloat(document.getElementById('po-ppn-persen').value) || 0,
+    catatan:      document.getElementById('po-catatan').value.trim(),
+    items:        _poItems.map(function(it) {
+      return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
+    }),
+    dibuatOleh: _currentUser ? _currentUser.nama : ''
+  };
+
+  if (_poFormMode === 'edit') {
+    var noPOEdit = document.getElementById('po-edit-nopo') ? document.getElementById('po-edit-nopo').value : '';
+    payload.noPO      = noPOEdit;
+    payload.diubahOleh = payload.dibuatOleh;
+  }
+
+  toggleLoader(true, _poFormMode === 'edit' ? 'Menyimpan perubahan PO...' : 'Menyimpan PO...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+
+  var fn = _poFormMode === 'edit' ? 'editPO' : 'simpanPO';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message);
+        tutupFormPO();
+        loadPurchaseOrder();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal menyimpan PO.', 'error');
+    })
+    [fn](payload);
+}
+
+// ── Detail PO ────────────────────────────────────────────────────────────────
+function bukaPODetail(noPO) {
+  if (typeof google === 'undefined') return;
+  toggleLoader(true, 'Memuat detail PO...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (!res || !res.success) { showNotification(res.message || 'Gagal memuat detail.', 'error'); return; }
+      _currentPODetail = res.po;
+      _renderPODetail(res.po, res.items || [], res.pembayaran || []);
+      document.getElementById('panel-po-detail').classList.remove('hidden');
+      document.getElementById('po-list-section').classList.add('hidden');
+      document.getElementById('form-po-section').classList.add('hidden');
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal memuat detail.', 'error');
+    })
+    .getPODetail(noPO);
+}
+
+function tutupPanelPO() {
+  _currentPODetail = null;
+  document.getElementById('panel-po-detail').classList.add('hidden');
+  document.getElementById('po-list-section').classList.remove('hidden');
+}
+
+function _renderPODetail(po, items, pembayaran) {
+  var statusPOClass = {
+    'Draft': 'bg-slate-100 text-slate-600',
+    'Disetujui': 'bg-blue-100 text-blue-700',
+    'Diterima Sebagian': 'bg-amber-100 text-amber-700',
+    'Diterima': 'bg-teal-100 text-teal-700',
+    'Selesai': 'bg-emerald-100 text-emerald-700',
+    'Batal': 'bg-rose-100 text-rose-600'
+  };
+  var statusBayarClass = {
+    'Belum Dibayar': 'bg-slate-100 text-slate-600',
+    'Dibayar Sebagian': 'bg-amber-100 text-amber-700',
+    'Lunas': 'bg-emerald-100 text-emerald-700'
+  };
+
+  document.getElementById('po-detail-nopo').innerText         = po.noPO || '';
+  var badge = document.getElementById('po-detail-status-badge');
+  badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full ' + (statusPOClass[po.statusPO] || 'bg-slate-100 text-slate-600');
+  badge.innerText = po.statusPO || '';
+
+  document.getElementById('po-detail-subtitle').innerText    = 'Dibuat oleh ' + (po.dibuatOleh || '—') + ' pada ' + (po.dibuatPada || '—');
+  document.getElementById('po-detail-tanggal').innerText     = po.tanggal || '—';
+  document.getElementById('po-detail-supplier').innerText    = po.namaSupplier || po.idSupplier || '—';
+  document.getElementById('po-detail-wo').innerText          = po.noWO || '—';
+  document.getElementById('po-detail-peruntukan').innerText  = po.peruntukan || '—';
+
+  var bayarBadge = document.getElementById('po-detail-status-bayar-badge');
+  bayarBadge.className = 'font-bold text-xs px-2 py-0.5 rounded-full ' + (statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-600');
+  bayarBadge.innerText = po.statusBayar || '—';
+
+  document.getElementById('po-detail-total-dibayar').innerText = 'Rp ' + ((po.totalDibayar || 0).toLocaleString('id-ID'));
+
+  // Edit button visibility
+  var btnEdit = document.getElementById('po-detail-btn-edit');
+  if (btnEdit) btnEdit.classList.toggle('hidden', po.statusPO !== 'Draft');
+
+  // Ubah status button: hide if Selesai or Batal
+  var btnStatus = document.getElementById('po-detail-btn-status');
+  if (btnStatus) btnStatus.classList.toggle('hidden', po.statusPO === 'Selesai' || po.statusPO === 'Batal');
+
+  // Items
+  var tbody = document.getElementById('po-detail-items');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-5 text-center text-slate-400 italic text-sm">Tidak ada item.</td></tr>';
+  } else {
+    tbody.innerHTML = items.map(function(it) {
+      return '<tr class="border-b border-slate-100">' +
+        '<td class="px-3 py-2 font-medium text-slate-800">' + _escHtml(it.namaItem || '') + '</td>' +
+        '<td class="px-3 py-2 text-center">' + (it.qty || 0) + '</td>' +
+        '<td class="px-3 py-2 text-center text-slate-500">' + _escHtml(it.satuan || '') + '</td>' +
+        '<td class="px-3 py-2 text-right text-slate-700">Rp ' + ((it.hargaBeli || 0).toLocaleString('id-ID')) + '</td>' +
+        '<td class="px-3 py-2 text-right font-bold text-slate-800">Rp ' + ((it.total || 0).toLocaleString('id-ID')) + '</td>' +
+        '<td class="px-3 py-2 text-slate-400 text-xs">' + _escHtml(it.catatan || '') + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // Summary
+  var ppnPct = po.ppnPersen || 0;
+  if (document.getElementById('po-detail-ppn-label')) document.getElementById('po-detail-ppn-label').innerText = ppnPct;
+  if (document.getElementById('po-detail-subtotal'))  document.getElementById('po-detail-subtotal').innerText  = (po.subtotal || 0).toLocaleString('id-ID');
+  if (document.getElementById('po-detail-ppn-nominal')) document.getElementById('po-detail-ppn-nominal').innerText = (po.ppnNominal || 0).toLocaleString('id-ID');
+  if (document.getElementById('po-detail-grandtotal')) document.getElementById('po-detail-grandtotal').innerText = (po.grandTotal || 0).toLocaleString('id-ID');
+  // find summary els in panel
+  var els = document.querySelectorAll('#panel-po-detail .po-det-subtotal'); // fallback: use specific elements if present
+
+  // Tambah Pembayaran button: show if statusPO in Disetujui/Diterima Sebagian/Diterima/Selesai
+  var canPay = ['Disetujui','Diterima Sebagian','Diterima','Selesai'].includes(po.statusPO);
+  var btnBayar = document.getElementById('po-detail-btn-tambah-bayar');
+  if (btnBayar) btnBayar.classList.toggle('hidden', !canPay);
+
+  // Render pembayaran
+  _renderPembayaranPO(pembayaran, po);
+}
+
+function _renderPembayaranPO(pembayaran, po) {
+  var tbody = document.getElementById('po-detail-payments');
+  if (!pembayaran || !pembayaran.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>';
+    return;
+  }
+  var canPay = po && ['Disetujui','Diterima Sebagian','Diterima','Selesai'].includes(po.statusPO);
+  tbody.innerHTML = pembayaran.map(function(p) {
+    return '<tr class="border-b border-slate-100">' +
+      '<td class="px-3 py-2 text-slate-600">' + (p.tanggalBayar || '') + '</td>' +
+      '<td class="px-3 py-2 font-medium text-slate-700">' + _escHtml(p.namaAkun || p.idAkun || '') + '</td>' +
+      '<td class="px-3 py-2 text-right font-bold text-emerald-700">Rp ' + ((p.jumlah || 0).toLocaleString('id-ID')) + '</td>' +
+      '<td class="px-3 py-2 text-slate-400 text-xs">' + _escHtml(p.catatan || '') + '</td>' +
+      '<td class="px-3 py-2 text-center">' +
+        (canPay ? '<button onclick="hapusPembayaranPOUI(\'' + p.idBayar.replace(/'/g,"\\'")+  '\')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition" title="Hapus"><i class="fa-solid fa-trash-can text-xs"></i></button>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Ubah Status PO ───────────────────────────────────────────────────────────
+function ubahStatusPOUI(noPO, currentStatus) {
+  if (!noPO) return;
+  var statusMap = {
+    'Draft': { next: 'Disetujui', label: 'Setujui PO' },
+    'Disetujui': { next: 'Diterima', label: 'Tandai Diterima' },
+    'Diterima': { next: 'Selesai', label: 'Selesaikan PO' }
+  };
+  var transition = statusMap[currentStatus];
+  if (!transition) {
+    showNotification('Status ' + currentStatus + ' tidak bisa diubah lagi.', 'error');
+    return;
+  }
+  if (!confirm('Ubah status PO ' + noPO + ' dari "' + currentStatus + '" ke "' + transition.next + '"?')) return;
+  toggleLoader(true, 'Mengubah status PO...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message);
+        loadPurchaseOrder();
+        if (_currentPODetail && _currentPODetail.noPO === noPO) bukaPODetail(noPO);
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal ubah status.', 'error');
+    })
+    .ubahStatusPO(noPO, transition.next, _currentUser ? _currentUser.nama : '');
+}
+
+// ── Edit PO ──────────────────────────────────────────────────────────────────
+function bukaEditPO(noPO) {
+  if (!noPO) return;
+  toggleLoader(true, 'Memuat data PO...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (!res || !res.success) { showNotification(res.message || 'Gagal.', 'error'); return; }
+      var po    = res.po;
+      var items = res.items || [];
+      _poFormMode = 'edit';
+      _poItems    = items.map(function(it) {
+        return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '', hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
+      });
+
+      document.getElementById('form-po-title').innerText    = 'Edit PO – ' + po.noPO;
+      document.getElementById('po-no-field').value          = po.noPO;
+      if (document.getElementById('po-edit-nopo')) document.getElementById('po-edit-nopo').value = po.noPO;
+      // Convert tanggal dd/MM/yyyy -> yyyy-MM-dd for date input
+      var tgl = (po.tanggal || '').split('/');
+      document.getElementById('po-tanggal').value    = tgl.length === 3 ? tgl[2]+'-'+tgl[1]+'-'+tgl[0] : '';
+      document.getElementById('po-peruntukan').value = po.peruntukan || '';
+      document.getElementById('po-ppn-persen').value = po.ppnPersen || 0;
+      document.getElementById('po-catatan').value    = po.catatan || '';
+
+      renderItemsPO();
+      hitungTotalPO();
+
+      document.getElementById('form-po-section').classList.remove('hidden');
+      document.getElementById('panel-po-detail').classList.add('hidden');
+      document.getElementById('po-list-section').classList.add('hidden');
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal memuat PO.', 'error');
+    })
+    .getPODetail(noPO);
+}
+
+// ── Pembayaran PO ─────────────────────────────────────────────────────────────
+function bukaFormBayarPO() {
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('po-bayar-tanggal').value = today;
+  document.getElementById('po-bayar-jumlah').value  = '';
+  document.getElementById('po-bayar-catatan').value = '';
+  _loadAkunPembayaranOptions('sel-akun-po');
+  document.getElementById('form-tambah-bayar-po').classList.remove('hidden');
+}
+
+function _loadAkunPembayaranOptions(selId) {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Pilih Akun --</option>';
+      (res.list || []).filter(function(a){ return a.status === 'Aktif'; }).forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a.id;
+        opt.dataset.nama = a.namaAkun;
+        opt.textContent  = a.namaAkun + ' (' + a.tipe + ')';
+        sel.appendChild(opt);
+      });
+    })
+    .withFailureHandler(function() {})
+    .getAkunPembayaranList();
+}
+
+function submitPembayaranPO() {
+  if (!_currentPODetail) return;
+  var idAkun = document.getElementById('sel-akun-po').value;
+  var sel    = document.getElementById('sel-akun-po');
+  var namaAkun = sel.options[sel.selectedIndex] ? (sel.options[sel.selectedIndex].dataset.nama || sel.options[sel.selectedIndex].text) : '';
+  var jumlah = parseFloat(document.getElementById('po-bayar-jumlah').value) || 0;
+  var tanggalBayar = document.getElementById('po-bayar-tanggal').value;
+  var catatan = document.getElementById('po-bayar-catatan').value.trim();
+
+  if (!idAkun)     return showNotification('Pilih akun pembayaran.', 'error');
+  if (!jumlah)     return showNotification('Jumlah pembayaran wajib diisi.', 'error');
+  if (!tanggalBayar) return showNotification('Tanggal bayar wajib diisi.', 'error');
+
+  // Convert date yyyy-MM-dd → dd/MM/yyyy
+  var parts = tanggalBayar.split('-');
+  var tglFormatted = parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : tanggalBayar;
+
+  var payload = {
+    noPO:        _currentPODetail.noPO,
+    tanggalBayar: tglFormatted,
+    idAkun:      idAkun,
+    namaAkun:    namaAkun,
+    jumlah:      jumlah,
+    catatan:     catatan,
+    dibuatOleh:  _currentUser ? _currentUser.nama : ''
+  };
+
+  toggleLoader(true, 'Menyimpan pembayaran...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message);
+        document.getElementById('form-tambah-bayar-po').classList.add('hidden');
+        bukaPODetail(_currentPODetail.noPO);
+        loadPurchaseOrder();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal menyimpan pembayaran.', 'error');
+    })
+    .simpanPembayaranPO(payload);
+}
+
+function hapusPembayaranPOUI(idBayar) {
+  if (!confirm('Hapus riwayat pembayaran ini?')) return;
+  var noPO = _currentPODetail ? _currentPODetail.noPO : null;
+  toggleLoader(true, 'Menghapus pembayaran...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message);
+        if (noPO) bukaPODetail(noPO);
+        loadPurchaseOrder();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification(err.message || 'Gagal menghapus pembayaran.', 'error');
+    })
+    .hapusPembayaranPO(idBayar);
+}
+
+// ── Cetak PO (stub — perlu Template_PO sheet) ────────────────────────────────
+function cetakPO(po) {
+  if (!po) return;
+  showNotification('Fitur cetak PO memerlukan sheet Template_PO. Hubungi admin.', 'error');
+}
+
+// ── Helper escHtml (gunakan yang sudah ada di JS_Settings jika tersedia) ─────
+if (typeof _escHtml === 'undefined') {
+  window._escHtml = function(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  };
+}
+</script>
