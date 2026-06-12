@@ -1,36 +1,36 @@
       <section id="page-purchaseorder" class="page-section">
 
-        <!-- ── Header ── -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Purchase Order</h2>
-          </div>
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <div class="relative flex-1 sm:w-60">
-              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-              <input type="text" id="search-po" oninput="filterPO()"
-                placeholder="Cari No PO, supplier, No WO..."
-                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
-            </div>
-            <select id="filter-po-status" onchange="filterPO()"
-              class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
-              <option value="">Semua Status</option>
-              <option value="Draft">Draft</option>
-              <option value="Disetujui">Disetujui</option>
-              <option value="Diterima Sebagian">Diterima Sebagian</option>
-              <option value="Diterima">Diterima</option>
-              <option value="Selesai">Selesai</option>
-              <option value="Batal">Batal</option>
-            </select>
-            <button onclick="bukaFormPO()"
-              class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
-              <i class="fas fa-plus text-sm"></i> Buat PO Baru
-            </button>
-          </div>
-        </div>
-
         <!-- ── Tabel Daftar PO ── -->
         <div id="po-list-section">
+
+          <!-- Header -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+            <div>
+              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Purchase Order</h2>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <div class="relative flex-1 sm:w-60">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="search-po" oninput="filterPO()"
+                  placeholder="Cari No PO, supplier, No WO..."
+                  class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+              </div>
+              <select id="filter-po-status" onchange="filterPO()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
+                <option value="">Semua Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Disetujui">Disetujui</option>
+                <option value="Diterima Sebagian">Diterima Sebagian</option>
+                <option value="Diterima">Diterima</option>
+                <option value="Selesai">Selesai</option>
+                <option value="Batal">Batal</option>
+              </select>
+              <button onclick="bukaFormPO()"
+                class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus text-sm"></i> Buat PO Baru
+              </button>
+            </div>
+          </div>
           <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
