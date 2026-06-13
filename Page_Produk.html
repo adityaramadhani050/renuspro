@@ -56,7 +56,7 @@
                   </div>
                   <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tautkan ke Item Stok <span class="text-slate-400 font-normal normal-case ml-1">Opsional — HPP & Qty Tersedia auto-sync</span></label>
-                    <select id="modal-produk-stok-id" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
+                    <select id="modal-produk-stok-id" onchange="_onStokLinkChange('modal-produk-stok-id','modal-produk-hpp', hitungMarginModalProduk)" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
                       <option value="">— Tidak terhubung ke stok —</option>
                     </select>
                   </div>

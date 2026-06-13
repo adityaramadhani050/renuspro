@@ -535,14 +535,31 @@
       google.script.run.withSuccessHandler(function(data) {
         var sel = document.getElementById(selId);
         if (!sel) return;
-        var opts = '<option value="">— Tidak terhubung ke stok —</option>';
+        var opts = '<option value="" data-harga="0" data-qty="0">— Tidak terhubung ke stok —</option>';
         (data || []).forEach(function(s) {
           var sel2 = selectedId && s.idStok === selectedId ? ' selected' : '';
-          opts += '<option value="' + (s.idStok || '').replace(/"/g,'&quot;') + '"' + sel2 + '>' +
-            (s.idStok || '') + ' — ' + (s.namaProduk || '') + '</option>';
+          opts += '<option value="' + (s.idStok || '').replace(/"/g,'&quot;') + '"' +
+            ' data-harga="' + (s.hargaBeliTerakhir || 0) + '"' +
+            ' data-qty="' + (s.qtyTersedia || 0) + '"' +
+            sel2 + '>' +
+            (s.idStok || '') + ' — ' + (s.namaProduk || '') + ' (' + (s.qtyTersedia||0).toLocaleString('id-ID') + ' ' + (s.satuan||'') + ')' + '</option>';
         });
         sel.innerHTML = opts;
       }).withFailureHandler(function(){}).getStokList();
+    }
+
+    function _onStokLinkChange(selId, hppFieldId, marginFn) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      var opt = sel.options[sel.selectedIndex];
+      var harga = parseFloat((opt && opt.dataset.harga) || 0) || 0;
+      if (harga > 0) {
+        var hppEl = document.getElementById(hppFieldId);
+        if (hppEl) {
+          hppEl.value = harga.toLocaleString('id-ID');
+          if (typeof marginFn === 'function') marginFn();
+        }
+      }
     }
 
     // --- EDIT & DELETE CUSTOMER ---

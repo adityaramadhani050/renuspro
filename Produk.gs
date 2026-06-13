@@ -74,7 +74,25 @@ function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
     }
 
     const nextId = "P" + ("000" + (maxNumber + 1)).slice(-3);
-    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, Number(hpp) || 0, tipe || '', stokId || '', 0]);
+
+    // Jika stokId diberikan, ambil hargaBeli dan qty dari sheet Stok
+    let hppFinal = Number(hpp) || 0;
+    let qtyTersedia = 0;
+    if (stokId) {
+      const stokSheet = ss.getSheetByName('Stok');
+      if (stokSheet) {
+        const stokData = stokSheet.getDataRange().getValues();
+        for (let j = 1; j < stokData.length; j++) {
+          if ((stokData[j][0] || '').toString().trim() === stokId) {
+            qtyTersedia = Number(stokData[j][3]) || 0;
+            if (!hppFinal) hppFinal = Number(stokData[j][4]) || 0;
+            break;
+          }
+        }
+      }
+    }
+
+    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia]);
     invalidateProdukCache();
     return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!" };
   } catch (error) {
@@ -88,11 +106,32 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
     const sheet = ss.getSheetByName('Master_Produk');
     if (!sheet) return { success: false, message: "Sheet tidak ditemukan." };
     _ensureStokLinkKolom(ss);
+
+    // Jika stokId diberikan, ambil hargaBeli dan qty dari sheet Stok
+    let qtyTersedia = 0;
+    if (stokId) {
+      const stokSheet = ss.getSheetByName('Stok');
+      if (stokSheet) {
+        const stokData = stokSheet.getDataRange().getValues();
+        for (let j = 1; j < stokData.length; j++) {
+          if ((stokData[j][0] || '').toString().trim() === stokId) {
+            qtyTersedia = Number(stokData[j][3]) || 0;
+            // Jika HPP tidak di-override oleh user (== 0), gunakan harga beli dari stok
+            if (!hpp || Number(hpp) === 0) {
+              hpp = Number(stokData[j][4]) || 0;
+            }
+            break;
+          }
+        }
+      }
+    }
+
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.getRange(i + 1, 2, 1, 5).setValues([[nama, unit, harga, hpp, tipe || '']]);
         sheet.getRange(i + 1, 7).setValue(stokId || '');
+        sheet.getRange(i + 1, 8).setValue(qtyTersedia);
         invalidateProdukCache();
         return { success: true, message: "Produk " + id + " berhasil diperbarui!" };
       }
