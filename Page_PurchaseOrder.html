@@ -157,10 +157,17 @@
                 </table>
               </div>
 
-              <!-- Kalkulasi — mirip Penawaran -->
+              <!-- Kalkulasi + Catatan -->
               <div class="flex flex-col md:flex-row gap-6 justify-end">
 
-                <!-- Ringkasan -->
+                <!-- Catatan (kiri) -->
+                <div class="flex-1">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan Tambahan</label>
+                  <textarea id="po-catatan" rows="5" placeholder="Catatan tambahan untuk PO ini (opsional)..."
+                    class="w-full h-full min-h-[120px] px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
+                </div>
+
+                <!-- Ringkasan (kanan) -->
                 <div class="w-full md:w-96 space-y-3 bg-slate-50 p-5 rounded-xl border border-slate-200">
 
                   <!-- Subtotal -->
@@ -212,16 +219,6 @@
                 </div>
               </div>
 
-            </div>
-
-            <!-- ── Kartu 3: Catatan ── -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
-              <div class="flex items-center gap-3 mb-5">
-                <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">3</span>
-                <h2 class="text-lg font-bold text-slate-900">Catatan Tambahan</h2>
-              </div>
-              <textarea id="po-catatan" rows="3" placeholder="Catatan tambahan untuk PO ini (opsional)..."
-                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
             </div>
 
             <!-- ── Submit Bar ── -->

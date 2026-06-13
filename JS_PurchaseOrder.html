@@ -115,11 +115,11 @@ function bukaFormPO() {
           opt.textContent = s.namaAkun ? s.nama : (s.nama + (s.pic ? ' - ' + s.pic : ''));
           sel.appendChild(opt);
         });
-        // re-init searchable dropdown
+        // init or refresh searchable dropdown
         var native = document.getElementById('sel-supplier-po');
-        if (native && typeof initSearchableDropdown === 'function') {
-          native.dataset.sdInit = '';
-          initSearchableDropdown('sel-supplier-po', { placeholder: '-- Pilih Supplier --' });
+        if (native) {
+          if (native.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh('sel-supplier-po');
+          else if (typeof initSearchableDropdown === 'function') initSearchableDropdown('sel-supplier-po', { placeholder: '-- Pilih Supplier --' });
         }
       })
       .withFailureHandler(function() {})
@@ -135,9 +135,10 @@ function bukaFormPO() {
           opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
           sel.appendChild(opt);
         });
-        if (typeof initSearchableDropdown === 'function') {
-          var n2 = document.getElementById('sel-wo-po');
-          if (n2) { n2.dataset.sdInit = ''; initSearchableDropdown('sel-wo-po', { placeholder: '-- Tidak terikat WO --' }); }
+        var n2 = document.getElementById('sel-wo-po');
+        if (n2) {
+          if (n2.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh('sel-wo-po');
+          else if (typeof initSearchableDropdown === 'function') initSearchableDropdown('sel-wo-po', { placeholder: '-- Tidak terikat WO --' });
         }
       })
       .withFailureHandler(function() {})
