@@ -322,6 +322,7 @@ function bukaPODetail(noPO) {
       toggleLoader(false);
       if (!res || !res.success) { showNotification(res.message || 'Gagal memuat detail.', 'error'); return; }
       _currentPODetail = res.po;
+      _currentPODetail.items = res.items || [];
       _renderPODetail(res.po, res.items || [], res.pembayaran || []);
       document.getElementById('form-terima-po').classList.add('hidden');
       document.getElementById('form-tambah-bayar-po').classList.add('hidden');
