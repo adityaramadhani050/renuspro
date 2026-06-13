@@ -10,7 +10,7 @@ let _currentPODetail = null;
 function _pgRenderPurchaseOrder(data) {
   var tbody = document.getElementById('table-purchaseorder');
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fas fa-inbox mr-2"></i>Belum ada data Purchase Order.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-inbox mr-2"></i>Belum ada data Purchase Order.</td></tr>';
     return;
   }
   var statusPOClass = {
@@ -31,8 +31,10 @@ function _pgRenderPurchaseOrder(data) {
     var bc = statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-500';
     var isDraft = po.statusPO === 'Draft';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">' +
-      '<td class="p-4 font-mono font-bold text-slate-700">' + (po.noPO || '') + '</td>' +
-      '<td class="p-4 text-slate-600">' + (po.tanggal || '') + '</td>' +
+      '<td class="p-4">' +
+        '<div class="font-mono font-bold text-slate-700">' + (po.noPO || '') + '</div>' +
+        '<div class="text-xs text-slate-400 mt-0.5">' + (po.tanggal || '') + '</div>' +
+      '</td>' +
       '<td class="p-4 font-medium text-slate-800">' + (po.namaSupplier || po.idSupplier || '—') + '</td>' +
       '<td class="p-4 text-slate-500">' + (po.noWO || '—') + '</td>' +
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
@@ -62,7 +64,7 @@ window.loadPurchaseOrder = function() {
     })
     .withFailureHandler(function() {
       document.getElementById('table-purchaseorder').innerHTML =
-        '<tr><td colspan="8" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';
+        '<tr><td colspan="7" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';
     })
     .getPOList();
 };
