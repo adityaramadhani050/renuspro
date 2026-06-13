@@ -7,6 +7,14 @@ let _cachedStokData   = [];
 let _cachedMutasiData = [];
 let _invActiveTab     = 'stok';
 
+function _fmtCurrencyInv(el) {
+  var raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
+}
+function _parseCurrencyInv(val) {
+  return parseInt((val || '').toString().replace(/\D/g, ''), 10) || 0;
+}
+
 function _fmtTglInv(s) {
   if (!s) return '—';
   // Already in dd/MM/yyyy or dd/MM/yyyy HH:mm → take first 10 chars and split
@@ -241,7 +249,7 @@ function submitPenerimaanTanpaPO() {
   var idProduk = document.getElementById('sel-produk-ptnpo').value;
   var tanggal  = document.getElementById('ptnpo-tanggal').value;
   var qty      = parseFloat(document.getElementById('ptnpo-qty').value) || 0;
-  var harga    = parseFloat(document.getElementById('ptnpo-harga').value) || 0;
+  var harga    = _parseCurrencyInv(document.getElementById('ptnpo-harga').value);
   var keterangan = document.getElementById('ptnpo-keterangan').value.trim();
   var jangan   = document.getElementById('ptnpo-jangan-update-harga').checked;
 

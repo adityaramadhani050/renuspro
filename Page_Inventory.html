@@ -159,7 +159,8 @@
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Satuan (Rp) <span class="text-red-400">*</span></label>
-                  <input type="number" id="ptnpo-harga" min="0" step="any" placeholder="0"
+                  <input type="text" id="ptnpo-harga" inputmode="numeric" placeholder="0"
+                    oninput="_fmtCurrencyInv(this)"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
                 </div>
                 <div>
