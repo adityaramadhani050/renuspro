@@ -314,8 +314,6 @@ function submitPO() {
 // ── Detail PO ────────────────────────────────────────────────────────────────
 function bukaPODetail(noPO) {
   if (typeof google === 'undefined') return;
-  // Preload akun pembayaran so dropdown is ready when payment form opens
-  _loadAkunPembayaranOptions('sel-akun-po');
   toggleLoader(true, 'Memuat detail PO...');
   google.script.run
     .withSuccessHandler(function(res) {
@@ -325,7 +323,6 @@ function bukaPODetail(noPO) {
       _currentPODetail.items = res.items || [];
       _renderPODetail(res.po, res.items || [], res.pembayaran || []);
       document.getElementById('form-terima-po').classList.add('hidden');
-      document.getElementById('form-tambah-bayar-po').classList.add('hidden');
       document.getElementById('panel-po-detail').classList.remove('hidden');
     })
     .withFailureHandler(function(err) {
@@ -339,7 +336,6 @@ function tutupPanelPO() {
   _currentPODetail = null;
   document.getElementById('panel-po-detail').classList.add('hidden');
   document.getElementById('form-terima-po').classList.add('hidden');
-  document.getElementById('form-tambah-bayar-po').classList.add('hidden');
 }
 
 function _renderPODetail(po, items, pembayaran) {
@@ -424,31 +420,22 @@ function _renderPODetail(po, items, pembayaran) {
   // find summary els in panel
   var els = document.querySelectorAll('#panel-po-detail .po-det-subtotal'); // fallback: use specific elements if present
 
-  // Tambah Pembayaran button: show if statusPO in Disetujui/Diterima Sebagian/Diterima/Selesai
-  var canPay = ['Disetujui','Diterima Sebagian','Diterima','Selesai'].includes(po.statusPO);
-  var btnBayar = document.getElementById('po-detail-btn-tambah-bayar');
-  if (btnBayar) btnBayar.classList.toggle('hidden', !canPay);
-
-  // Render pembayaran
-  _renderPembayaranPO(pembayaran, po);
+  // Render pembayaran (read-only)
+  _renderPembayaranPO(pembayaran);
 }
 
-function _renderPembayaranPO(pembayaran, po) {
+function _renderPembayaranPO(pembayaran) {
   var tbody = document.getElementById('po-detail-payments');
   if (!pembayaran || !pembayaran.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>';
     return;
   }
-  var canPay = po && ['Disetujui','Diterima Sebagian','Diterima','Selesai'].includes(po.statusPO);
   tbody.innerHTML = pembayaran.map(function(p) {
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 text-slate-600">' + (p.tanggalBayar || '') + '</td>' +
       '<td class="px-3 py-2 font-medium text-slate-700">' + _escHtml(p.namaAkun || p.idAkun || '') + '</td>' +
       '<td class="px-3 py-2 text-right font-bold text-emerald-700">Rp ' + ((p.jumlah || 0).toLocaleString('id-ID')) + '</td>' +
       '<td class="px-3 py-2 text-slate-400 text-xs">' + _escHtml(p.catatan || '') + '</td>' +
-      '<td class="px-3 py-2 text-center">' +
-        (canPay ? '<button onclick="hapusPembayaranPOUI(\'' + p.idBayar.replace(/'/g,"\\'")+  '\')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition" title="Hapus"><i class="fa-solid fa-trash-can text-xs"></i></button>' : '') +
-      '</td>' +
     '</tr>';
   }).join('');
 }
