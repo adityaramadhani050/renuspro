@@ -7,6 +7,20 @@ let _cachedStokData   = [];
 let _cachedMutasiData = [];
 let _invActiveTab     = 'stok';
 
+function _fmtTglInv(s) {
+  if (!s) return '—';
+  // Already in dd/MM/yyyy or dd/MM/yyyy HH:mm → take first 10 chars and split
+  var str = s.toString().trim();
+  // ISO format: 2026-06-12T18:11:00.000Z
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    var parts = str.substring(0, 10).split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+  // Already dd/MM/yyyy HH:mm → strip time
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str.substring(0, 10);
+  return str;
+}
+
 // ── Tab switching ──────────────────────────────────────────────
 
 function switchInvTab(tab) {
@@ -107,7 +121,7 @@ function _pgRenderStok(data) {
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
       '<td class="p-4 text-right text-slate-700">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
       '<td class="p-4 text-right font-bold text-teal-700">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-4 text-center text-xs text-slate-400">' + _escHtml(d.terakhirDiubah || '—') + '</td>' +
+      '<td class="p-4 text-center text-xs text-slate-400">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
       '</tr>';
   }).join('');
 }
