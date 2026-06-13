@@ -103,47 +103,9 @@ function bukaFormPO() {
   renderItemsPO();
   hitungTotalPO();
 
-  // Populate supplier dropdown
-  if (typeof google !== 'undefined') {
-    google.script.run
-      .withSuccessHandler(function(res) {
-        var sel = document.getElementById('sel-supplier-po');
-        sel.innerHTML = '<option value="">-- Pilih Supplier --</option>';
-        (Array.isArray(res) ? res : (res.list || [])).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
-          var opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = s.namaAkun ? s.nama : (s.nama + (s.pic ? ' - ' + s.pic : ''));
-          sel.appendChild(opt);
-        });
-        // init or refresh searchable dropdown
-        var native = document.getElementById('sel-supplier-po');
-        if (native) {
-          if (native.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh('sel-supplier-po');
-          else if (typeof initSearchableDropdown === 'function') initSearchableDropdown('sel-supplier-po', { placeholder: '-- Pilih Supplier --' });
-        }
-      })
-      .withFailureHandler(function() {})
-      .getSupplierList();
-
-    google.script.run
-      .withSuccessHandler(function(data) {
-        var sel = document.getElementById('sel-wo-po');
-        sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
-        (data || []).filter(function(w) { return w.status !== 'Closed'; }).forEach(function(w) {
-          var opt = document.createElement('option');
-          opt.value = w.noWO;
-          opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
-          sel.appendChild(opt);
-        });
-        var n2 = document.getElementById('sel-wo-po');
-        if (n2) {
-          if (n2.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh('sel-wo-po');
-          else if (typeof initSearchableDropdown === 'function') initSearchableDropdown('sel-wo-po', { placeholder: '-- Tidak terikat WO --' });
-        }
-      })
-      .withFailureHandler(function() {})
-      .getWorkOrderList();
-  }
+  // Populate dropdowns
+  _loadSupplierOptions('sel-supplier-po', '');
+  _loadWOOptions('sel-wo-po', '');
 
   document.getElementById('form-po-section').classList.remove('hidden');
   document.getElementById('panel-po-detail').classList.add('hidden');
@@ -496,7 +458,6 @@ function bukaEditPO(noPO) {
       document.getElementById('form-po-title').innerText    = 'Edit PO – ' + po.noPO;
       document.getElementById('po-no-field').value          = po.noPO;
       if (document.getElementById('po-edit-nopo')) document.getElementById('po-edit-nopo').value = po.noPO;
-      // Convert tanggal dd/MM/yyyy -> yyyy-MM-dd for date input
       var tgl = (po.tanggal || '').split('/');
       document.getElementById('po-tanggal').value    = tgl.length === 3 ? tgl[2]+'-'+tgl[1]+'-'+tgl[0] : '';
       document.getElementById('po-peruntukan').value = po.peruntukan || '';
@@ -505,10 +466,16 @@ function bukaEditPO(noPO) {
       if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = po.diskonNominal ? _fmtRp(po.diskonNominal) : '';
       document.getElementById('po-catatan').value    = po.catatan || '';
 
+      // Populate & select supplier dropdown
+      _loadSupplierOptions('sel-supplier-po', po.idSupplier || '');
+      // Populate & select WO dropdown
+      _loadWOOptions('sel-wo-po', po.noWO || '');
+
       renderItemsPO();
       hitungTotalPO();
 
       document.getElementById('panel-po-detail').classList.add('hidden');
+      document.getElementById('po-list-section').classList.add('hidden');
       document.getElementById('form-po-section').classList.remove('hidden');
     })
     .withFailureHandler(function(err) {
@@ -516,6 +483,48 @@ function bukaEditPO(noPO) {
       showNotification(err.message || 'Gagal memuat PO.', 'error');
     })
     .getPODetail(noPO);
+}
+
+function _loadSupplierOptions(selId, selectedId) {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Pilih Supplier --</option>';
+      (Array.isArray(res) ? res : (res.list || [])).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.nama + (s.pic ? ' - ' + s.pic : '');
+        if (s.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      if (sel.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh(selId);
+      else if (typeof initSearchableDropdown === 'function') initSearchableDropdown(selId, { placeholder: '-- Pilih Supplier --' });
+    })
+    .withFailureHandler(function() {})
+    .getSupplierList();
+}
+
+function _loadWOOptions(selId, selectedWO) {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(data) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
+      (data || []).filter(function(w) { return w.status !== 'Closed'; }).forEach(function(w) {
+        var opt = document.createElement('option');
+        opt.value = w.noWO;
+        opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
+        if (w.noWO === selectedWO) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      if (sel.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh(selId);
+      else if (typeof initSearchableDropdown === 'function') initSearchableDropdown(selId, { placeholder: '-- Tidak terikat WO --' });
+    })
+    .withFailureHandler(function() {})
+    .getWorkOrderList();
 }
 
 // ── Pembayaran PO ─────────────────────────────────────────────────────────────
