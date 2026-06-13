@@ -43,7 +43,7 @@ function _pgRenderPurchaseOrder(data) {
       '<td class="p-4 text-center">' +
         '<div class="flex items-center justify-center gap-1">' +
           '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
-          (isDraft ? '<button onclick="bukaEditPO(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen text-sm"></i></button>' : '') +
+          (isDraft ? '<button onclick="bukaEditPO(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' : '') +
           '<button onclick="exportPOPDF(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
           (isDraft ? '<button onclick="konfirmasiHapus(\'po\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '') +
         '</div>' +
