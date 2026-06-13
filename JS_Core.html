@@ -23,7 +23,7 @@
     // --- NAVIGASI DASHBOARD ---
     function navigate(pageId) {
       // Tutup semua modal floating sebelum pindah halaman
-      ['panel-po-detail','form-po-section','form-penerimaan-tanpa-po','form-penyesuaian-stok'].forEach(function(id) {
+      ['panel-po-detail','form-po-section','form-penerimaan-tanpa-po','form-penyesuaian-stok','form-tambah-item-stok','form-edit-item-stok'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });

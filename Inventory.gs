@@ -52,6 +52,19 @@ function _ensurePenerimaanTanpaPOSheet(ss) {
 
 // ── ID Generator ─────────────────────────────────────────────────────────────
 
+function _generateIdStok(sheet) {
+  var data   = sheet.getDataRange().getValues();
+  var maxSeq = 0;
+  for (var i = 1; i < data.length; i++) {
+    var id = (data[i][0] || '').toString();
+    if (/^STK-\d+$/i.test(id)) {
+      var seq = parseInt(id.replace(/^STK-/i, ''), 10) || 0;
+      if (seq > maxSeq) maxSeq = seq;
+    }
+  }
+  return 'STK-' + ('000' + (maxSeq + 1)).slice(-3);
+}
+
 function _generateIdMutasi(sheet) {
   var now    = new Date();
   var tz     = Session.getScriptTimeZone();
@@ -82,6 +95,118 @@ function _generateIdPenerimaanTanpaPO(sheet) {
     }
   }
   return prefix + ('000' + (maxSeq + 1)).slice(-3);
+}
+
+// ── Stok CRUD ────────────────────────────────────────────────────────────────
+
+function tambahItemStok(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss     = getSpreadsheet();
+    var sheet  = _ensureStokSheet(ss);
+    var nama   = (payload.nama || '').trim();
+    var satuan = (payload.satuan || '').trim();
+    var harga  = Number(payload.hargaBeli) || 0;
+    var qty    = Number(payload.stokAwal) || 0;
+    if (!nama)   return { success: false, message: 'Nama item wajib diisi.' };
+    if (!satuan) return { success: false, message: 'Satuan wajib diisi.' };
+    var id      = _generateIdStok(sheet);
+    var tz      = Session.getScriptTimeZone();
+    var nowStr  = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
+    var nilai   = qty * harga;
+    sheet.appendRow([id, nama, satuan, qty, harga, nilai, nowStr]);
+    if (qty > 0) {
+      var mSheet = _ensureMutasiStokSheet(ss);
+      var idMut  = _generateIdMutasi(mSheet);
+      mSheet.appendRow([idMut, Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy'), id, nama,
+        'Stok Awal', '', qty, 0, harga, qty, 'Stok awal saat pendaftaran item', payload.namaUser || '', nowStr]);
+    }
+    invalidateStokCache();
+    return { success: true, message: 'Item stok ' + id + ' berhasil ditambahkan.', idStok: id };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function editItemStok(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss     = getSpreadsheet();
+    var sheet  = _ensureStokSheet(ss);
+    var idStok = (payload.idStok || '').toString().trim();
+    var nama   = (payload.nama || '').trim();
+    var satuan = (payload.satuan || '').trim();
+    if (!idStok) return { success: false, message: 'ID Stok wajib diisi.' };
+    if (!nama)   return { success: false, message: 'Nama item wajib diisi.' };
+    if (!satuan) return { success: false, message: 'Satuan wajib diisi.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === idStok) {
+        sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, satuan]]);
+        invalidateStokCache();
+        return { success: true, message: 'Item stok ' + idStok + ' berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'ID Stok tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function hapusItemStok(idStok) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss     = getSpreadsheet();
+    // Cek apakah ada Master_Produk yang link ke stok ini
+    _ensureStokLinkKolom(ss);
+    var pSheet = ss.getSheetByName('Master_Produk');
+    if (pSheet) {
+      var pData = pSheet.getDataRange().getValues();
+      for (var k = 1; k < pData.length; k++) {
+        if ((pData[k][6] || '').toString().trim() === idStok) {
+          return { success: false, message: 'Tidak bisa dihapus — Produk/Jasa "' + pData[k][1] + '" terhubung ke item stok ini.' };
+        }
+      }
+    }
+    var sSheet = _ensureStokSheet(ss);
+    var data   = sSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === idStok) {
+        sSheet.deleteRow(i + 1);
+        invalidateStokCache();
+        return { success: true, message: 'Item stok ' + idStok + ' berhasil dihapus.' };
+      }
+    }
+    return { success: false, message: 'ID Stok tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Sinkron col[7] Qty Tersedia di Master_Produk untuk semua produk yang link ke idStok.
+ */
+function _syncQtyTersediaProduk(ss, idStok, qtyBaru) {
+  ss = ss || getSpreadsheet();
+  _ensureStokLinkKolom(ss);
+  var pSheet = ss.getSheetByName('Master_Produk');
+  if (!pSheet) return;
+  var data = pSheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if ((data[i][6] || '').toString().trim() === idStok) {
+      pSheet.getRange(i + 1, 8).setValue(qtyBaru);
+    }
+  }
+  invalidateProdukCache();
 }
 
 // ── Internal Helpers ─────────────────────────────────────────────────────────
@@ -144,6 +269,7 @@ function getStokList() {
       var qty    = Number(data[i][3]) || 0;
       var harga  = Number(data[i][4]) || 0;
       list.push({
+        idStok:          data[i][0].toString(),
         idProduk:        data[i][0].toString(),
         namaProduk:      data[i][1].toString(),
         satuan:          data[i][2].toString(),
@@ -402,13 +528,15 @@ function terimaPOItems(payload) {
       if (qtyTerima > qtySisa) {
         return { success: false, message: 'Qty item "' + it.namaItem + '" melebihi sisa (' + qtySisa + ').' };
       }
-      // Validasi produk Material jika idProduk diberikan
-      if (it.idProduk) {
-        var p = produkMap[it.idProduk];
-        if (!p) return { success: false, message: 'Produk ' + it.idProduk + ' tidak ditemukan.' };
-        if (p.tipe && p.tipe !== 'Material') {
-          return { success: false, message: 'Produk "' + p.nama + '" bukan Material, tidak bisa masuk stok.' };
+      // Validasi item stok ada di sheet Stok
+      var idStokCheck = it.idStok || it.idProduk;
+      if (idStokCheck) {
+        var sDataCheck = sSheet.getDataRange().getValues();
+        var stokFound = false;
+        for (var sc = 1; sc < sDataCheck.length; sc++) {
+          if ((sDataCheck[sc][0] || '').toString().trim() === idStokCheck) { stokFound = true; break; }
         }
+        if (!stokFound) return { success: false, message: 'Item stok ' + idStokCheck + ' tidak ditemukan.' };
       }
     }
 
@@ -429,18 +557,19 @@ function terimaPOItems(payload) {
         satuanProduk = produkMap[it2.idProduk].satuan;
       }
 
-      if (it2.idProduk) {
-        var saldoBaru = _updateStokEntry(ss, it2.idProduk, namaProduk, satuanProduk, qtyTerima2, harga2);
+      var idStokItem = it2.idStok || it2.idProduk;
+      if (idStokItem) {
+        var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
         mSheet.appendRow([
-          idMutasi, tglStr, it2.idProduk, namaProduk,
+          idMutasi, tglStr, idStokItem, namaProduk,
           'Penerimaan PO', noPO,
           qtyTerima2, 0, harga2, saldoBaru,
           'Penerimaan dari PO ' + noPO,
           namaUser, nowStr
         ]);
-        // Sinkron HPP
-        _syncHPPProduk(ss, it2.idProduk, harga2);
+        _syncHPPProduk(ss, idStokItem, harga2);
+        _syncQtyTersediaProduk(ss, idStokItem, saldoBaru);
       }
 
       // Track qty diterima per item
@@ -503,7 +632,7 @@ function simpanPenerimaanTanpaPO(payload) {
     var mSheet  = _ensureMutasiStokSheet(ss);
     var produkSheet = ss.getSheetByName('Master_Produk');
 
-    var idProduk  = payload.idProduk;
+    var idProduk  = payload.idStok || payload.idProduk;
     var qty       = Number(payload.qty) || 0;
     var harga     = Number(payload.hargaSatuan) || 0;
     var tgl       = payload.tanggal || '';
@@ -511,26 +640,24 @@ function simpanPenerimaanTanpaPO(payload) {
     var tz        = Session.getScriptTimeZone();
     var nowStr    = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
 
-    if (!idProduk) return { success: false, message: 'Produk wajib dipilih.' };
+    if (!idProduk) return { success: false, message: 'Item stok wajib dipilih.' };
     if (qty <= 0)  return { success: false, message: 'Qty harus lebih dari 0.' };
     if (!tgl)      return { success: false, message: 'Tanggal wajib diisi.' };
 
-    // Cari info produk
+    // Cari info item dari sheet Stok
     var namaProduk = idProduk, satuanProduk = '';
-    if (produkSheet) {
-      var pData = produkSheet.getDataRange().getValues();
-      for (var i = 1; i < pData.length; i++) {
-        if ((pData[i][0] || '').toString().trim() === idProduk) {
-          namaProduk   = (pData[i][1] || '').toString();
-          satuanProduk = (pData[i][2] || '').toString();
-          var tipeProduk = (pData[i][5] || '').toString();
-          if (tipeProduk && tipeProduk !== 'Material') {
-            return { success: false, message: 'Produk "' + namaProduk + '" bukan Material.' };
-          }
-          break;
-        }
+    var stokSheet  = _ensureStokSheet(ss);
+    var stokData   = stokSheet.getDataRange().getValues();
+    var stokFound  = false;
+    for (var i = 1; i < stokData.length; i++) {
+      if ((stokData[i][0] || '').toString().trim() === idProduk) {
+        namaProduk   = (stokData[i][1] || '').toString();
+        satuanProduk = (stokData[i][2] || '').toString();
+        stokFound = true;
+        break;
       }
     }
+    if (!stokFound) return { success: false, message: 'Item stok tidak ditemukan.' };
 
     var updateHarga = !payload.janganhUpdateHarga;
     var hargaUntukStok = updateHarga ? harga : null;
@@ -557,6 +684,7 @@ function simpanPenerimaanTanpaPO(payload) {
     ]);
 
     if (updateHarga && harga > 0) _syncHPPProduk(ss, idProduk, harga);
+    _syncQtyTersediaProduk(ss, idProduk, saldoBaru);
 
     SpreadsheetApp.flush();
     invalidateStokCache();
@@ -582,7 +710,7 @@ function simpanPenyesuaianStok(payload) {
     var mSheet = _ensureMutasiStokSheet(ss);
     var sSheet = _ensureStokSheet(ss);
 
-    var idProduk  = payload.idProduk;
+    var idProduk  = payload.idStok || payload.idProduk;
     var jenis     = payload.jenis; // '+' atau '-'
     var qty       = Number(payload.qty) || 0;
     var keterangan = (payload.keterangan || '').trim();
@@ -626,6 +754,8 @@ function simpanPenyesuaianStok(payload) {
       hargaTerakhir, saldoBaru,
       keterangan, namaUser, nowStr
     ]);
+
+    _syncQtyTersediaProduk(ss, idProduk, saldoBaru);
 
     SpreadsheetApp.flush();
     invalidateStokCache();

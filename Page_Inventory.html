@@ -9,7 +9,11 @@
               <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Inventory</h2>
               <p class="text-sm text-slate-400 mt-0.5">Daftar stok material & riwayat mutasi</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="bukaFormTambahItemStok()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-cube text-xs"></i> Tambah Item Stok
+              </button>
               <button onclick="bukaFormPenerimaanTanpaPO()"
                 class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
@@ -54,17 +58,18 @@
                 <table class="w-full text-left border-collapse">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th class="p-4">ID Produk</th>
-                      <th class="p-4">Nama Produk</th>
+                      <th class="p-4">ID Stok</th>
+                      <th class="p-4">Nama Item</th>
                       <th class="p-4 text-right">Stok Tersedia</th>
                       <th class="p-4 text-center">Satuan</th>
                       <th class="p-4 text-right">Harga Beli Terakhir</th>
                       <th class="p-4 text-right">Total Nilai Stok</th>
                       <th class="p-4 text-center">Terakhir Diubah</th>
+                      <th class="p-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody id="table-stok" class="text-sm">
-                    <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                    <tr><td colspan="8" class="p-8 text-center text-slate-500">
                       <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data stok...
                     </td></tr>
                   </tbody>
@@ -141,7 +146,7 @@
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Produk (Material) <span class="text-red-400">*</span></label>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Stok <span class="text-red-400">*</span></label>
                   <select id="sel-produk-ptnpo"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
                     <option value="">-- Pilih Produk --</option>
@@ -261,6 +266,94 @@
               </button>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ── Modal Tambah Item Stok ── -->
+        <div id="form-tambah-item-stok" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <span class="bg-indigo-50 text-indigo-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-cube"></i>
+              </span>
+              <div class="flex-1">
+                <h3 class="text-base font-extrabold text-slate-800">Tambah Item Stok</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Daftarkan item baru ke daftar stok</p>
+              </div>
+              <button onclick="tutupFormTambahItemStok()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item <span class="text-red-400">*</span></label>
+                <input type="text" id="new-stok-nama" placeholder="Contoh: Panel Surya Jinko 625Wp"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Satuan <span class="text-red-400">*</span></label>
+                <input type="text" id="new-stok-satuan" placeholder="Contoh: unit, pcs, meter, kg"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Beli Awal (Rp) <span class="text-slate-400 font-normal normal-case ml-1">Opsional</span></label>
+                <input type="text" id="new-stok-harga" inputmode="numeric" placeholder="0"
+                  oninput="_fmtCurrencyInv(this)"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Stok Awal (Qty) <span class="text-slate-400 font-normal normal-case ml-1">Opsional</span></label>
+                <input type="number" id="new-stok-qty" min="0" step="any" placeholder="0"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onclick="tutupFormTambahItemStok()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button onclick="submitTambahItemStok()"
+                class="px-6 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Item
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Modal Edit Item Stok ── -->
+        <div id="form-edit-item-stok" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </span>
+              <div class="flex-1">
+                <h3 class="text-base font-extrabold text-slate-800">Edit Item Stok</h3>
+                <p id="edit-stok-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="tutupFormEditItemStok()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <input type="hidden" id="edit-stok-id">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item <span class="text-red-400">*</span></label>
+                <input type="text" id="edit-stok-nama"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Satuan <span class="text-red-400">*</span></label>
+                <input type="text" id="edit-stok-satuan"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onclick="tutupFormEditItemStok()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button onclick="submitEditItemStok()"
+                class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
+              </button>
+            </div>
           </div>
         </div>
 

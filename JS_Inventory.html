@@ -115,14 +115,21 @@ function _populateMutasiProdukFilter(data) {
 function _pgRenderStok(data) {
   const tbody = document.getElementById('table-stok');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400 italic">Tidak ada data stok.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Tidak ada data stok.</td></tr>';
     return;
   }
   tbody.innerHTML = data.map(function(d) {
     var lowStock = d.qtyTersedia === 0;
     var qtyClass = lowStock ? 'text-red-600 font-extrabold' : (d.qtyTersedia <= 5 ? 'text-amber-600 font-bold' : 'font-bold text-slate-800');
+    var isSTK = /^STK-/i.test(d.idStok || d.idProduk);
+    var aksiBtn = isSTK
+      ? '<div class="flex items-center justify-center gap-1">' +
+          '<button onclick=\'bukaFormEditItemStok(' + JSON.stringify(d).replace(/'/g,"&#39;") + ')\' class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' +
+          '<button onclick="konfirmasiHapusItemStok(\'' + _escHtml(d.idStok || d.idProduk) + '\',\'' + _escHtml(d.namaProduk) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' +
+        '</div>'
+      : '<span class="text-xs text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
-      '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(d.idProduk) + '</td>' +
+      '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(d.idStok || d.idProduk) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800">' + _escHtml(d.namaProduk) + '</td>' +
       '<td class="p-4 text-right ' + qtyClass + '">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
@@ -130,6 +137,7 @@ function _pgRenderStok(data) {
       '<td class="p-4 text-right text-slate-700">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
       '<td class="p-4 text-right font-bold text-teal-700">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
       '<td class="p-4 text-center text-xs text-slate-400">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
+      '<td class="p-4 text-center">' + aksiBtn + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -173,7 +181,7 @@ function _pgRenderMutasi(data) {
 window.filterStok = function() {
   var q = (document.getElementById('search-stok').value || '').toLowerCase().trim();
   _pgState.stok.data = q
-    ? _cachedStokData.filter(function(d) { return (d.idProduk + d.namaProduk).toLowerCase().includes(q); })
+    ? _cachedStokData.filter(function(d) { return ((d.idStok || d.idProduk) + d.namaProduk).toLowerCase().includes(q); })
     : _cachedStokData;
   _pgState.stok.page = 1;
   _pgRender('stok');
@@ -196,21 +204,120 @@ document.getElementById('tab-btn-mutasi').addEventListener('click', function() {
   if (!_cachedMutasiData.length) _loadMutasi();
 });
 
-// ── Produk Material dropdown helper ───────────────────────────
+// ── CRUD Item Stok ─────────────────────────────────────────────
 
-function _loadProdukMaterialOptions(selId) {
+function bukaFormTambahItemStok() {
+  document.getElementById('new-stok-nama').value   = '';
+  document.getElementById('new-stok-satuan').value = '';
+  document.getElementById('new-stok-harga').value  = '';
+  document.getElementById('new-stok-qty').value    = '';
+  document.getElementById('form-tambah-item-stok').classList.remove('hidden');
+}
+
+function tutupFormTambahItemStok() {
+  document.getElementById('form-tambah-item-stok').classList.add('hidden');
+}
+
+function submitTambahItemStok() {
+  var nama   = document.getElementById('new-stok-nama').value.trim();
+  var satuan = document.getElementById('new-stok-satuan').value.trim();
+  var harga  = _parseCurrencyInv(document.getElementById('new-stok-harga').value);
+  var qty    = parseFloat(document.getElementById('new-stok-qty').value) || 0;
+
+  if (!nama)   return showNotification('Nama item wajib diisi.', 'error');
+  if (!satuan) return showNotification('Satuan wajib diisi.', 'error');
+
+  toggleLoader(true, 'Menyimpan item stok...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        tutupFormTambahItemStok();
+        showNotification(res.message, 'success');
+        _cachedStokData = [];
+        window.loadInventory();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+    .tambahItemStok({ nama: nama, satuan: satuan, hargaBeli: harga, stokAwal: qty, namaUser: (_currentUser && _currentUser.nama) || '' });
+}
+
+function bukaFormEditItemStok(item) {
+  document.getElementById('edit-stok-id').value      = item.idStok || item.idProduk;
+  document.getElementById('edit-stok-nama').value    = item.namaProduk || '';
+  document.getElementById('edit-stok-satuan').value  = item.satuan || '';
+  document.getElementById('edit-stok-subtitle').textContent = (item.idStok || item.idProduk);
+  document.getElementById('form-edit-item-stok').classList.remove('hidden');
+}
+
+function tutupFormEditItemStok() {
+  document.getElementById('form-edit-item-stok').classList.add('hidden');
+}
+
+function submitEditItemStok() {
+  var idStok = document.getElementById('edit-stok-id').value;
+  var nama   = document.getElementById('edit-stok-nama').value.trim();
+  var satuan = document.getElementById('edit-stok-satuan').value.trim();
+
+  if (!nama)   return showNotification('Nama item wajib diisi.', 'error');
+  if (!satuan) return showNotification('Satuan wajib diisi.', 'error');
+
+  toggleLoader(true, 'Menyimpan perubahan...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        tutupFormEditItemStok();
+        showNotification(res.message, 'success');
+        _cachedStokData = [];
+        window.loadInventory();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+    .editItemStok({ idStok: idStok, nama: nama, satuan: satuan });
+}
+
+function konfirmasiHapusItemStok(idStok, namaItem) {
+  if (!confirm('Hapus item stok "' + namaItem + '" (' + idStok + ')?\nItem tidak bisa dihapus jika ada Produk/Jasa yang terhubung.')) return;
+  toggleLoader(true, 'Menghapus...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        _cachedStokData = [];
+        window.loadInventory();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+    .hapusItemStok(idStok);
+}
+
+// ── Stok dropdown helper ───────────────────────────────────────
+
+function _loadStokOptions(selId, selectedId) {
   if (typeof google === 'undefined') return;
   google.script.run.withSuccessHandler(function(data) {
     var sel  = document.getElementById(selId);
     if (!sel) return;
-    var opts = '<option value="">-- Pilih Produk --</option>';
-    (data || []).filter(function(p) { return p.tipe === 'Material'; }).forEach(function(p) {
-      opts += '<option value="' + _escHtml(p.sku) + '" data-satuan="' + _escHtml(p.unit) + '">' +
-        _escHtml(p.sku + ' — ' + p.nama) + '</option>';
+    var opts = '<option value="">-- Pilih Item Stok --</option>';
+    (data || []).forEach(function(s) {
+      var sel2 = selectedId && s.idStok === selectedId ? ' selected' : '';
+      opts += '<option value="' + _escHtml(s.idStok) + '" data-satuan="' + _escHtml(s.satuan) + '"' + sel2 + '>' +
+        _escHtml(s.idStok + ' — ' + s.namaProduk) + '</option>';
     });
     sel.innerHTML = opts;
-  }).getProdukList();
+  }).getStokList();
 }
+
+// Alias untuk backward compat
+function _loadProdukMaterialOptions(selId) { _loadStokOptions(selId, ''); }
 
 // ── Form Penerimaan Tanpa PO ───────────────────────────────────
 
@@ -281,7 +388,7 @@ function submitPenerimaanTanpaPO() {
       showNotification('Error: ' + err.message, 'error');
     })
     .simpanPenerimaanTanpaPO({
-      tanggal: tanggal, idProduk: idProduk, qty: qty, hargaSatuan: harga,
+      tanggal: tanggal, idStok: idProduk, qty: qty, hargaSatuan: harga,
       idAkun: idAkun, namaAkun: namaAkun, keterangan: keterangan,
       janganhUpdateHarga: jangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
@@ -331,7 +438,7 @@ function submitPenyesuaianStok() {
       showNotification('Error: ' + err.message, 'error');
     })
     .simpanPenyesuaianStok({
-      idProduk: idProduk, jenis: jenis, qty: qty,
+      idProduk: idProduk, idStok: idProduk, jenis: jenis, qty: qty,
       keterangan: keterangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
     });

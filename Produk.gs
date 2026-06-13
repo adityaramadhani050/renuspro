@@ -13,9 +13,21 @@ function _ensureTipeKolom(ss) {
   if (!sheet) return;
   var lastCol = sheet.getLastColumn();
   if (lastCol < 6) {
-    // Tambah header Tipe di kolom 6
     sheet.getRange(1, 6).setValue('Tipe');
   }
+}
+
+/**
+ * Pastikan kolom Stok ID [6] dan Qty Tersedia [7] ada di Master_Produk.
+ */
+function _ensureStokLinkKolom(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Master_Produk');
+  if (!sheet) return;
+  _ensureTipeKolom(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 7) sheet.getRange(1, 7).setValue('Stok ID');
+  if (lastCol < 8) sheet.getRange(1, 8).setValue('Qty Tersedia');
 }
 
 function getProdukList() {
@@ -25,12 +37,14 @@ function getProdukList() {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0]) {
         list.push({
-          sku:   data[i][0].toString(),
-          nama:  data[i][1].toString(),
-          unit:  data[i][2].toString(),
-          harga: Number(data[i][3]) || 0,
-          hpp:   Number(data[i][4]) || 0,
-          tipe:  data[i][5] ? data[i][5].toString() : ''
+          sku:          data[i][0].toString(),
+          nama:         data[i][1].toString(),
+          unit:         data[i][2].toString(),
+          harga:        Number(data[i][3]) || 0,
+          hpp:          Number(data[i][4]) || 0,
+          tipe:         data[i][5] ? data[i][5].toString() : '',
+          stokId:       data[i][6] ? data[i][6].toString() : '',
+          qtyTersedia:  Number(data[i][7]) || 0
         });
       }
     }
@@ -38,14 +52,14 @@ function getProdukList() {
   } catch(e) { return []; }
 }
 
-function simpanProduk(nama, unit, harga, hpp, tipe) {
+function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
   try {
     if (!nama || !unit) {
       return { success: false, message: "Data nama/unit tidak boleh kosong." };
     }
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk') || buatSheetProdukDefault(ss);
-    _ensureTipeKolom(ss);
+    _ensureStokLinkKolom(ss);
     SpreadsheetApp.flush();
 
     const lastRow = sheet.getLastRow();
@@ -60,7 +74,7 @@ function simpanProduk(nama, unit, harga, hpp, tipe) {
     }
 
     const nextId = "P" + ("000" + (maxNumber + 1)).slice(-3);
-    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, Number(hpp) || 0, tipe || '']);
+    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, Number(hpp) || 0, tipe || '', stokId || '', 0]);
     invalidateProdukCache();
     return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!" };
   } catch (error) {
@@ -68,16 +82,17 @@ function simpanProduk(nama, unit, harga, hpp, tipe) {
   }
 }
 
-function editProduk(id, nama, unit, harga, hpp, tipe) {
+function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
   try {
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk');
     if (!sheet) return { success: false, message: "Sheet tidak ditemukan." };
-    _ensureTipeKolom(ss);
+    _ensureStokLinkKolom(ss);
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.getRange(i + 1, 2, 1, 5).setValues([[nama, unit, harga, hpp, tipe || '']]);
+        sheet.getRange(i + 1, 7).setValue(stokId || '');
         invalidateProdukCache();
         return { success: true, message: "Produk " + id + " berhasil diperbarui!" };
       }
