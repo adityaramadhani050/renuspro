@@ -56,7 +56,7 @@ window.loadPurchaseOrder = function() {
   if (typeof google === 'undefined') return;
   google.script.run
     .withSuccessHandler(function(data) {
-      _cachedPOData = data || [];
+      _cachedPOData = (data || []).slice().reverse();
       _pgState.purchaseorder.data = _cachedPOData;
       _pgState.purchaseorder.page = 1;
       _injectPgBar('purchaseorder', '#table-purchaseorder');
