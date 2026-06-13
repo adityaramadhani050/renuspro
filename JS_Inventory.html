@@ -129,7 +129,7 @@ function _pgRenderStok(data) {
 function _pgRenderMutasi(data) {
   const tbody = document.getElementById('table-mutasi');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400 italic">Tidak ada riwayat mutasi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Tidak ada riwayat mutasi.</td></tr>';
     return;
   }
   const jenisBadge = {
@@ -142,11 +142,15 @@ function _pgRenderMutasi(data) {
   tbody.innerHTML = data.map(function(d) {
     var badge = jenisBadge[d.jenisMutasi] || 'bg-slate-100 text-slate-600';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
-      '<td class="p-3 font-mono font-bold text-slate-500">' + _escHtml(d.idMutasi) + '</td>' +
+      '<td class="p-3">' +
+        '<div class="font-mono font-bold text-slate-700">' + _escHtml(d.idMutasi) + '</div>' +
+        '<div class="text-slate-400 mt-0.5">' + _escHtml(d.tanggal) + '</div>' +
+      '</td>' +
       '<td class="p-3 font-semibold text-slate-700">' + _escHtml(d.namaProduk) + '</td>' +
-      '<td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ' + badge + '">' + _escHtml(d.jenisMutasi) + '</span></td>' +
-      '<td class="p-3 text-slate-500">' + _escHtml(d.referensi || '—') + '</td>' +
-      '<td class="p-3 text-slate-600">' + _escHtml(d.tanggal) + '</td>' +
+      '<td class="p-3">' +
+        '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ' + badge + '">' + _escHtml(d.jenisMutasi) + '</span>' +
+        '<div class="text-slate-400 mt-1">' + _escHtml(d.referensi || '—') + '</div>' +
+      '</td>' +
       '<td class="p-3 text-right font-bold text-teal-700">' + (d.qtyMasuk ? '+' + d.qtyMasuk.toLocaleString('id-ID') : '—') + '</td>' +
       '<td class="p-3 text-right font-bold text-red-600">' + (d.qtyKeluar ? '-' + d.qtyKeluar.toLocaleString('id-ID') : '—') + '</td>' +
       '<td class="p-3 text-right text-slate-600">Rp ' + (d.hargaSatuan || 0).toLocaleString('id-ID') + '</td>' +
