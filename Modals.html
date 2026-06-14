@@ -34,12 +34,14 @@
     <!-- MODAL EDIT PRODUK -->
     <div id="modal-edit-produk" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+
+        <!-- Header -->
         <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
-          <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center">
+          <span class="bg-blue-50 text-blue-500 h-9 w-9 rounded-xl flex items-center justify-center">
             <i class="fa-solid fa-pen-to-square"></i>
           </span>
           <div>
-            <h3 class="text-base font-bold text-slate-800">Edit Produk / Jasa</h3>
+            <h3 class="text-base font-bold text-slate-800">Edit Item Produk / Jasa</h3>
             <p class="text-xs text-slate-400">Perubahan akan langsung tersimpan ke database</p>
           </div>
           <button onclick="document.getElementById('modal-edit-produk').classList.add('hidden')"
@@ -47,20 +49,22 @@
             <i class="fa-solid fa-xmark text-lg"></i>
           </button>
         </div>
+
+        <!-- Body -->
         <div class="px-6 py-5 space-y-4">
           <input type="hidden" id="edit-produk-id">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item</label>
-              <input type="text" id="edit-produk-nama" class="input-field text-sm" required>
+              <input type="text" id="edit-produk-nama" required class="input-field text-sm" placeholder="Contoh: Panel Surya Jinko 625Wp">
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit</label>
-              <input type="text" id="edit-produk-unit" class="input-field text-sm" required>
+              <input type="text" id="edit-produk-unit" required class="input-field text-sm" placeholder="Contoh: unit, m, Ls, set, kWp">
             </div>
             <div class="md:col-span-2">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe <span class="text-slate-300 font-normal normal-case ml-1">Wajib untuk inventory stok</span></label>
-              <select id="edit-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 bg-white">
+              <select id="edit-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                 <option value="">-- Belum Ditentukan --</option>
                 <option value="Material">Material (punya stok)</option>
                 <option value="Jasa">Jasa (tidak ada stok)</option>
@@ -78,6 +82,7 @@
                   <i class="fa-solid fa-rotate"></i>
                 </button>
               </div>
+            </div>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
               <div class="relative">
@@ -95,6 +100,7 @@
               </div>
             </div>
           </div>
+
           <!-- Preview Margin -->
           <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
             <span class="text-xs font-bold text-amber-900 uppercase tracking-wide">
@@ -106,16 +112,19 @@
             </div>
           </div>
         </div>
+
+        <!-- Footer -->
         <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
           <button onclick="document.getElementById('modal-edit-produk').classList.add('hidden')"
             class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
             Batal
           </button>
           <button onclick="simpanEditProduk()"
-            class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+            class="px-6 py-2.5 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
             <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
           </button>
         </div>
+
       </div>
     </div>
 
