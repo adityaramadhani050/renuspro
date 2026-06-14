@@ -36,8 +36,8 @@ function _pgRenderPurchaseOrder(data) {
         '<div class="text-xs text-slate-400 mt-0.5">' + (po.tanggal || '') + '</div>' +
       '</td>' +
       '<td class="p-4">' +
-        '<div class="font-medium text-slate-800">' + (po.namaSupplier || po.idSupplier || '—') + '</div>' +
-        (po.peruntukan ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.peruntukan) + '</div>' : '') +
+        '<div class="font-medium text-slate-800">' + (_escHtml(po.peruntukan) || (po.namaSupplier || po.idSupplier || '—')) + '</div>' +
+        '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaSupplier || po.idSupplier || '') + '</div>' +
       '</td>' +
       '<td class="p-4">' +
         (po.noWO
@@ -926,7 +926,7 @@ function _buatDokumenPOPDF(po, items) {
     var c1L = ML+2, c1V = ML+32, c2L = ML+(CW/2)+2, c2V = PW-MR;
     var supplierRows = [
       ['Supplier',    po.namaSupplier || po.idSupplier || '—',  'No. PO',      po.noPO || ''],
-      ['Peruntukan',  po.peruntukan || '—',                     'No. WO',      po.noWO || '—'],
+      ['Nama Order',  po.peruntukan || '—',                     'No. WO',      po.noWO || '—'],
       ['Dibuat Oleh', po.dibuatOleh || '—',                     'Tanggal',     po.tanggal || ''],
     ];
     supplierRows.forEach(function(r, idx) {
