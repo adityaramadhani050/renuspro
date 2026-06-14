@@ -329,7 +329,6 @@ function bukaFormPenerimaanTanpaPO() {
   document.getElementById('ptnpo-keterangan').value = '';
   document.getElementById('ptnpo-jangan-update-harga').checked = false;
   _loadProdukMaterialOptions('sel-produk-ptnpo');
-  _loadAkunPembayaranOptions('sel-akun-ptnpo');
   document.getElementById('form-penerimaan-tanpa-po').classList.remove('hidden');
 }
 
@@ -360,10 +359,6 @@ function submitPenerimaanTanpaPO() {
   var keterangan = document.getElementById('ptnpo-keterangan').value.trim();
   var jangan   = document.getElementById('ptnpo-jangan-update-harga').checked;
 
-  var akunSel  = document.getElementById('sel-akun-ptnpo');
-  var idAkun   = akunSel.value;
-  var namaAkun = idAkun ? (akunSel.options[akunSel.selectedIndex].getAttribute('data-nama') || '') : '';
-
   if (!idProduk) return showNotification('Produk wajib dipilih.', 'error');
   if (!tanggal)  return showNotification('Tanggal wajib diisi.', 'error');
   if (qty <= 0)  return showNotification('Qty harus lebih dari 0.', 'error');
@@ -389,7 +384,7 @@ function submitPenerimaanTanpaPO() {
     })
     .simpanPenerimaanTanpaPO({
       tanggal: tanggal, idStok: idProduk, qty: qty, hargaSatuan: harga,
-      idAkun: idAkun, namaAkun: namaAkun, keterangan: keterangan,
+      keterangan: keterangan,
       janganhUpdateHarga: jangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
     });
