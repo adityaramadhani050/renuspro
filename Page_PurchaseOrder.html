@@ -124,15 +124,11 @@
 
             <!-- ── Kartu 2: Item Pembelian & Kalkulasi ── -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
-              <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center mb-5">
                 <div class="flex items-center gap-3">
                   <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">2</span>
                   <h2 class="text-lg font-bold text-slate-900">Item Pembelian</h2>
                 </div>
-                <button onclick="tambahItemPO()"
-                  class="flex items-center gap-1.5 text-sm font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-xl transition">
-                  <i class="fa-solid fa-plus"></i> Tambah Item
-                </button>
               </div>
 
               <div class="overflow-x-auto rounded-xl border border-slate-200 mb-6">
@@ -150,10 +146,20 @@
                   <tbody id="po-items-body">
                     <tr id="po-items-empty">
                       <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm italic">
-                        Klik "Tambah Item" untuk menambahkan item pembelian.
+                        Klik "+ Tambah Item" untuk menambahkan item pembelian.
                       </td>
                     </tr>
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="6" class="px-3 py-2 border-t border-slate-100">
+                        <button onclick="tambahItemPO()"
+                          class="flex items-center gap-1.5 text-sm font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition">
+                          <i class="fa-solid fa-plus text-xs"></i> Tambah Item
+                        </button>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
 
