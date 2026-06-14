@@ -45,16 +45,18 @@ const _ROLE_NAV = {
   finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder','inventory'],
   sales:       ['penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
-  procurement: ['supplier','purchaseorder','workorder','inventory']
+  procurement: ['supplier','purchaseorder','workorder','inventory'],
+  warehouse:   ['inventory','workorder']
 };
 const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',
   finance:     'bg-violet-100 text-violet-700',
   sales:       'bg-emerald-100 text-emerald-700',
   leadsales:   'bg-orange-100 text-orange-700',
-  procurement: 'bg-amber-100 text-amber-700'
+  procurement: 'bg-amber-100 text-amber-700',
+  warehouse:   'bg-cyan-100 text-cyan-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
@@ -157,6 +159,11 @@ function doLogin() {
     } else if (username === 'procurement1' && password === 'proc123') {
       _onLoginSuccess(
         { id:'U004', nama:'Procurement Officer', username:'procurement1', role:'procurement' },
+        'Login berhasil (dev mode)'
+      );
+    } else if (username === 'warehouse1' && password === 'wh123') {
+      _onLoginSuccess(
+        { id:'U005', nama:'Warehouse Staff', username:'warehouse1', role:'warehouse' },
         'Login berhasil (dev mode)'
       );
     } else {

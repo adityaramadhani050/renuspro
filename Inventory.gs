@@ -810,11 +810,14 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
 
     var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, -qty, null);
     var idMutasi  = _generateIdMutasi(mSheet);
+    var jenisMutasi = noWO ? 'Penggunaan WO' : 'Penggunaan';
+    var referensi   = noWO || '';
+    var defaultKet  = noWO ? ('Penggunaan untuk WO ' + noWO) : 'Penggunaan stok';
     mSheet.appendRow([
       idMutasi, tglStr, idProduk, namaProduk,
-      'Penggunaan WO', noWO,
+      jenisMutasi, referensi,
       0, qty, hargaTerakhir, saldoBaru,
-      keterangan || 'Penggunaan untuk WO ' + noWO,
+      keterangan || defaultKet,
       namaUser, nowStr
     ]);
 

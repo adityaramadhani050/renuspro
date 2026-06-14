@@ -438,4 +438,68 @@ function submitPenyesuaianStok() {
       namaUser: (_currentUser && _currentUser.nama) || ''
     });
 }
+
+// ── Form Catat Penggunaan Stok ─────────────────────────────────
+
+function bukaFormPenggunaanStok() {
+  var tgl = new Date().toISOString().slice(0, 10);
+  document.getElementById('penggunaan-tanggal').value = tgl;
+  document.getElementById('penggunaan-qty').value = '';
+  document.getElementById('penggunaan-keterangan').value = '';
+  _loadStokOptions('sel-stok-penggunaan', '');
+  _loadWOOptionsForInventory('sel-wo-penggunaan');
+  document.getElementById('form-penggunaan-stok').classList.remove('hidden');
+}
+
+function tutupFormPenggunaanStok() {
+  document.getElementById('form-penggunaan-stok').classList.add('hidden');
+}
+
+function _loadWOOptionsForInventory(selId) {
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(data) {
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
+    (data || []).filter(function(w) { return w.status === 'Deal'; }).forEach(function(w) {
+      var opt = document.createElement('option');
+      opt.value = w.noWO;
+      opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
+      sel.appendChild(opt);
+    });
+  }).withFailureHandler(function() {}).getWorkOrderList();
+}
+
+function submitPenggunaanStok() {
+  var idStok     = document.getElementById('sel-stok-penggunaan').value;
+  var noWO       = document.getElementById('sel-wo-penggunaan').value;
+  var tanggal    = document.getElementById('penggunaan-tanggal').value;
+  var qty        = parseFloat(document.getElementById('penggunaan-qty').value) || 0;
+  var keterangan = document.getElementById('penggunaan-keterangan').value.trim();
+
+  if (!idStok)   return showNotification('Item stok wajib dipilih.', 'error');
+  if (!tanggal)  return showNotification('Tanggal wajib diisi.', 'error');
+  if (qty <= 0)  return showNotification('Qty harus lebih dari 0.', 'error');
+
+  toggleLoader(true, 'Menyimpan penggunaan stok...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        tutupFormPenggunaanStok();
+        showNotification(res.message, 'success');
+        _cachedStokData = [];
+        _cachedMutasiData = [];
+        window.loadInventory();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .gunakanStok(noWO, idStok, qty, tanggal, keterangan,
+      (_currentUser && _currentUser.nama) || '');
+}
 </script>
