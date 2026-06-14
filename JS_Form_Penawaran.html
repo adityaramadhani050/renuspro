@@ -553,12 +553,10 @@
       if (!sel) return;
       var opt = sel.options[sel.selectedIndex];
       var harga = parseFloat((opt && opt.dataset.harga) || 0) || 0;
-      if (harga > 0) {
-        var hppEl = document.getElementById(hppFieldId);
-        if (hppEl) {
-          hppEl.value = harga.toLocaleString('id-ID');
-          if (typeof marginFn === 'function') marginFn();
-        }
+      var hppEl = document.getElementById(hppFieldId);
+      if (hppEl && harga > 0) {
+        hppEl.value = formatNominalRupiah(harga);
+        if (typeof marginFn === 'function') marginFn();
       }
     }
 
