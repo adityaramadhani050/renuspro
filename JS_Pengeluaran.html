@@ -1,0 +1,395 @@
+<script>
+// ================================================================
+//  PENGELUARAN PROJECT — JavaScript (Modul 3 Fase 1)
+// ================================================================
+
+var _expData       = [];
+var _expWOList     = [];
+var _expAkunList   = [];
+var _expEditMode   = false;
+
+// ── Format helpers ─────────────────────────────────────────────
+
+function _fmtRpExp(n) {
+  n = parseFloat(n) || 0;
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+
+function _fmtCurrencyExp(el) {
+  var raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
+}
+
+function _parseCurrencyExp(val) {
+  return parseInt((val || '').toString().replace(/\D/g, ''), 10) || 0;
+}
+
+function _fmtTglExp(s) {
+  if (!s) return '—';
+  var str = s.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    var p = str.substring(0, 10).split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  return str.substring(0, 10);
+}
+
+// ── Load utama ─────────────────────────────────────────────────
+
+window.loadPengeluaran = function() {
+  _loadExpData();
+  _loadWOOptionsExp('filter-exp-wo', '');
+  _loadWOOptionsExp('exp-wo', '');
+  _loadAkunOptionsExp('filter-exp-akun', '');
+  _loadAkunOptionsExp('exp-akun', '');
+};
+
+function _loadExpData() {
+  if (typeof google === 'undefined') return;
+  document.getElementById('table-pengeluaran').innerHTML =
+    '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _expData = (res && res.list) ? res.list : [];
+      _renderPengeluaran(_expData);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('table-pengeluaran').innerHTML =
+        '<tr><td colspan="10" class="p-8 text-center text-rose-500">Gagal memuat data: ' + err.message + '</td></tr>';
+    })
+    .getPengeluaranList({});
+}
+
+function _loadWOOptionsExp(selId, selectedVal) {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(data) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      var isFilter = selId.startsWith('filter-');
+      var placeholder = isFilter ? '<option value="">Semua WO</option>' : '<option value="">-- Pilih Work Order --</option>';
+      sel.innerHTML = placeholder;
+      _expWOList = (data || []).filter(function(w) { return w.status === 'Deal'; });
+      _expWOList.forEach(function(w) {
+        var opt = document.createElement('option');
+        opt.value = w.noWO;
+        opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
+        if (w.noWO === selectedVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    })
+    .withFailureHandler(function() {})
+    .getWorkOrderList();
+}
+
+function _loadAkunOptionsExp(selId, selectedVal) {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var sel = document.getElementById(selId);
+      if (!sel) return;
+      var isFilter = selId.startsWith('filter-');
+      var placeholder = isFilter ? '<option value="">Semua Akun</option>' : '<option value="">-- Pilih Akun --</option>';
+      sel.innerHTML = placeholder;
+      _expAkunList = (res && res.list ? res.list : []).filter(function(a) {
+        return a.status === 'Aktif' && a.id !== 'AP001';
+      });
+      _expAkunList.forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a.id;
+        opt.dataset.nama = a.namaAkun;
+        opt.textContent = a.namaAkun + (a.tipe !== 'Bank' ? ' (' + a.tipe + ')' : '');
+        if (a.id === selectedVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    })
+    .withFailureHandler(function() {})
+    .getAkunPembayaranList();
+}
+
+// ── Render table ───────────────────────────────────────────────
+
+function _renderPengeluaran(list) {
+  var tbody = document.getElementById('table-pengeluaran');
+  if (!list || list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Belum ada data pengeluaran.</td></tr>';
+    document.getElementById('exp-summary-bar').classList.add('hidden');
+    document.getElementById('exp-total-badge').textContent = '0 entri';
+    return;
+  }
+
+  var grandTotal = 0;
+  var html = '';
+  list.forEach(function(r) {
+    grandTotal += r.total;
+    var sumberBadge = _sumberBadge(r.sumber);
+    var isOtomatis  = (r.sumber === 'Pembayaran PO' || r.sumber === 'Penggunaan Stok');
+    html += '<tr class="hover:bg-slate-50 transition-colors">';
+    html += '<td class="p-4"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
+    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
+    html += '<td class="p-4 text-center">' + sumberBadge + '</td>';
+    html += '<td class="p-4 text-xs text-slate-600">' + (r.noPO || '—') + '</td>';
+    html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';
+    html += '<td class="p-4 text-sm text-slate-700 max-w-[180px]"><div class="truncate" title="' + _esc(r.deskripsi) + '">' + _esc(r.deskripsi) + '</div></td>';
+    html += '<td class="p-4 text-right text-xs text-slate-600">' + (r.qty || 0) + ' ' + (r.satuan || '') + '</td>';
+    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpExp(r.hargaSatuan) + '</td>';
+    html += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpExp(r.total) + '</td>';
+    html += '<td class="p-4 text-center">';
+    if (isOtomatis) {
+      html += '<span class="text-slate-400 text-xs" title="Kelola dari sumbernya"><i class="fas fa-lock text-xs"></i></span>';
+    } else {
+      html += '<div class="flex justify-center gap-1.5">';
+      html += '<button onclick="editPengeluaran(\'' + r.id + '\')" class="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-500 flex items-center justify-center transition" title="Edit"><i class="fas fa-pen text-xs"></i></button>';
+      html += '<button onclick="bukaModalHapusExp(\'' + r.id + '\',\'' + _esc(r.sumber) + '\')" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center transition" title="Hapus"><i class="fas fa-trash text-xs"></i></button>';
+      html += '</div>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  });
+
+  tbody.innerHTML = html;
+  document.getElementById('exp-total-badge').textContent = list.length + ' entri';
+  document.getElementById('exp-grand-total').textContent = _fmtRpExp(grandTotal);
+  document.getElementById('exp-summary-bar').classList.remove('hidden');
+}
+
+function _sumberBadge(sumber) {
+  var cfg = {
+    'Pembayaran PO':   ['bg-blue-100 text-blue-700',   'fa-file-invoice-dollar', 'Pembayaran PO'],
+    'Penggunaan Stok': ['bg-amber-100 text-amber-700',  'fa-boxes-stacked',       'Penggunaan Stok'],
+    'Langsung':        ['bg-emerald-100 text-emerald-700','fa-money-bill-wave',   'Langsung']
+  };
+  var c = cfg[sumber] || ['bg-slate-100 text-slate-600','fa-circle-question', sumber];
+  return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ' + c[0] + '"><i class="fas ' + c[1] + ' text-[10px]"></i>' + c[2] + '</span>';
+}
+
+function _esc(s) {
+  return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Filter ─────────────────────────────────────────────────────
+
+window.filterPengeluaran = function() {
+  var noWO    = document.getElementById('filter-exp-wo').value;
+  var sumber  = document.getElementById('filter-exp-sumber').value;
+  var idAkun  = document.getElementById('filter-exp-akun').value;
+  var dari    = document.getElementById('filter-exp-dari').value;
+  var sampai  = document.getElementById('filter-exp-sampai').value;
+  var noPO    = document.getElementById('filter-exp-nopo').value.trim().toLowerCase();
+
+  var filtered = _expData.filter(function(r) {
+    if (noWO   && r.noWO   !== noWO)   return false;
+    if (sumber && r.sumber !== sumber)  return false;
+    if (idAkun && r.idAkun !== idAkun)  return false;
+    if (noPO   && (r.noPO || '').toLowerCase().indexOf(noPO) === -1) return false;
+    if (dari || sampai) {
+      var tp = (r.tanggal || '').split('/');
+      if (tp.length === 3) {
+        var ms = new Date(parseInt(tp[2]), parseInt(tp[1])-1, parseInt(tp[0])).getTime();
+        if (dari) {
+          var fp = dari.split('-');
+          if (ms < new Date(parseInt(fp[0]), parseInt(fp[1])-1, parseInt(fp[2])).getTime()) return false;
+        }
+        if (sampai) {
+          var sp = sampai.split('-');
+          if (ms > new Date(parseInt(sp[0]), parseInt(sp[1])-1, parseInt(sp[2])).getTime()) return false;
+        }
+      }
+    }
+    return true;
+  });
+  _renderPengeluaran(filtered);
+};
+
+window.resetFilterPengeluaran = function() {
+  ['filter-exp-wo','filter-exp-sumber','filter-exp-akun','filter-exp-nopo'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['filter-exp-dari','filter-exp-sampai'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  _renderPengeluaran(_expData);
+};
+
+// ── Form Pengeluaran Langsung ──────────────────────────────────
+
+window.bukaFormPengeluaranLangsung = function(preNoWO) {
+  _expEditMode = false;
+  document.getElementById('exp-form-title').textContent   = 'Tambah Pengeluaran Langsung';
+  document.getElementById('exp-submit-label').textContent = 'Simpan';
+  document.getElementById('exp-id-field').value    = '';
+  document.getElementById('exp-wo').value          = preNoWO || '';
+  document.getElementById('exp-tanggal').value     = new Date().toISOString().slice(0, 10);
+  document.getElementById('exp-akun').value        = '';
+  document.getElementById('exp-nopo').value        = '';
+  document.getElementById('exp-deskripsi').value   = '';
+  document.getElementById('exp-qty').value         = '';
+  document.getElementById('exp-satuan').value      = '';
+  document.getElementById('exp-harga').value       = '';
+  document.getElementById('exp-catatan').value     = '';
+  document.getElementById('exp-total-display').textContent = 'Rp 0';
+
+  _loadWOOptionsExp('exp-wo', preNoWO || '');
+  _loadAkunOptionsExp('exp-akun', '');
+  document.getElementById('modal-exp-langsung').classList.remove('hidden');
+};
+
+window.tutupFormPengeluaranLangsung = function() {
+  document.getElementById('modal-exp-langsung').classList.add('hidden');
+};
+
+function _hitungTotalExp() {
+  var qty   = parseFloat(document.getElementById('exp-qty').value) || 0;
+  var harga = _parseCurrencyExp(document.getElementById('exp-harga').value);
+  document.getElementById('exp-total-display').textContent = _fmtRpExp(qty * harga);
+}
+
+function _onExpAkunChange() {
+  // Tidak ada logika khusus untuk Fase 1; placeholder untuk Fase 2
+}
+
+window.submitPengeluaranLangsung = function() {
+  var noWO    = document.getElementById('exp-wo').value;
+  var tanggal = document.getElementById('exp-tanggal').value;
+  var idAkun  = document.getElementById('exp-akun').value;
+  var noPO    = document.getElementById('exp-nopo').value.trim();
+  var desk    = document.getElementById('exp-deskripsi').value.trim();
+  var qty     = parseFloat(document.getElementById('exp-qty').value) || 0;
+  var satuan  = document.getElementById('exp-satuan').value.trim();
+  var harga   = _parseCurrencyExp(document.getElementById('exp-harga').value);
+  var catatan = document.getElementById('exp-catatan').value.trim();
+
+  if (!noWO)   return showNotification('Work Order wajib dipilih.', 'error');
+  if (!tanggal) return showNotification('Tanggal wajib diisi.', 'error');
+  if (!idAkun)  return showNotification('Akun pembayaran wajib dipilih.', 'error');
+  if (!desk)    return showNotification('Deskripsi wajib diisi.', 'error');
+  if (qty <= 0) return showNotification('Qty harus lebih dari 0.', 'error');
+  if (harga <= 0) return showNotification('Harga satuan harus lebih dari 0.', 'error');
+
+  // Ambil namaAkun dari option
+  var akunSel = document.getElementById('exp-akun');
+  var namaAkun = akunSel.options[akunSel.selectedIndex] ? (akunSel.options[akunSel.selectedIndex].dataset.nama || '') : '';
+
+  // Format tanggal ke dd/MM/yyyy
+  var tParts   = tanggal.split('-');
+  var tanggalFmt = tParts[2] + '/' + tParts[1] + '/' + tParts[0];
+
+  var payload = {
+    noWO:        noWO,
+    tanggal:     tanggalFmt,
+    idAkun:      idAkun,
+    namaAkun:    namaAkun,
+    noPO:        noPO,
+    deskripsi:   desk,
+    qty:         qty,
+    satuan:      satuan,
+    hargaSatuan: harga,
+    catatan:     catatan,
+    dibuatOleh:  (_currentUser && _currentUser.nama) || ''
+  };
+
+  toggleLoader(true, _expEditMode ? 'Menyimpan perubahan...' : 'Menyimpan pengeluaran...');
+
+  if (_expEditMode) {
+    payload.id       = document.getElementById('exp-id-field').value;
+    payload.diubahOleh = (_currentUser && _currentUser.nama) || '';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          tutupFormPengeluaranLangsung();
+          _loadExpData();
+        } else {
+          showNotification(res.message || 'Gagal menyimpan.', 'error');
+        }
+      })
+      .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+      .editPengeluaranLangsung(payload);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res.success) {
+          showNotification(res.message);
+          tutupFormPengeluaranLangsung();
+          _loadExpData();
+        } else {
+          showNotification(res.message || 'Gagal menyimpan.', 'error');
+        }
+      })
+      .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+      .simpanPengeluaranLangsung(payload);
+  }
+};
+
+// ── Edit ───────────────────────────────────────────────────────
+
+window.editPengeluaran = function(id) {
+  var r = _expData.find(function(e) { return e.id === id; });
+  if (!r) return showNotification('Data tidak ditemukan.', 'error');
+  if (r.sumber !== 'Langsung') {
+    showNotification('Pengeluaran bersumber "' + r.sumber + '" tidak bisa diedit di sini.', 'error');
+    return;
+  }
+
+  _expEditMode = true;
+  document.getElementById('exp-form-title').textContent   = 'Edit Pengeluaran Langsung';
+  document.getElementById('exp-submit-label').textContent = 'Perbarui';
+  document.getElementById('exp-id-field').value    = r.id;
+  document.getElementById('exp-tanggal').value     = _tglToInput(r.tanggal);
+  document.getElementById('exp-nopo').value        = r.noPO || '';
+  document.getElementById('exp-deskripsi').value   = r.deskripsi || '';
+  document.getElementById('exp-qty').value         = r.qty || '';
+  document.getElementById('exp-satuan').value      = r.satuan || '';
+  document.getElementById('exp-harga').value       = r.hargaSatuan ? r.hargaSatuan.toLocaleString('id-ID') : '';
+  document.getElementById('exp-catatan').value     = r.catatan || '';
+  document.getElementById('exp-total-display').textContent = _fmtRpExp(r.total);
+
+  _loadWOOptionsExp('exp-wo', r.noWO);
+  _loadAkunOptionsExp('exp-akun', r.idAkun);
+  document.getElementById('modal-exp-langsung').classList.remove('hidden');
+};
+
+function _tglToInput(tgl) {
+  if (!tgl) return '';
+  var p = tgl.split('/');
+  if (p.length === 3) return p[2] + '-' + p[1] + '-' + p[0];
+  return tgl;
+}
+
+// ── Hapus ──────────────────────────────────────────────────────
+
+window.bukaModalHapusExp = function(id, sumber) {
+  document.getElementById('exp-hapus-id').value = id;
+  var info = 'ID: ' + id;
+  if (sumber === 'Penggunaan Stok') info += ' — stok akan dikembalikan.';
+  document.getElementById('exp-hapus-info').textContent = info;
+  document.getElementById('modal-exp-hapus').classList.remove('hidden');
+};
+
+window.tutupModalHapusExp = function() {
+  document.getElementById('modal-exp-hapus').classList.add('hidden');
+};
+
+window.konfirmasiHapusExp = function() {
+  var id = document.getElementById('exp-hapus-id').value;
+  if (!id) return;
+  tutupModalHapusExp();
+  toggleLoader(true, 'Menghapus pengeluaran...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message);
+        _loadExpData();
+      } else {
+        showNotification(res.message || 'Gagal menghapus.', 'error');
+      }
+    })
+    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
+    .hapusPengeluaran(id);
+};
+</script>

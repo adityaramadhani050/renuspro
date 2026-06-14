@@ -51,8 +51,9 @@ function _cachedTemplate()  { return _cacheGetSheet('cache_template',  'Template
 function _cachedSupplier()  { return _cacheGetSheet('cache_supplier',  'Supplier'); }
 function _cachedPO()        { return _cacheGetSheet('cache_po',        'Purchase_Order'); }
 function _cachedPembayaranPO() { return _cacheGetSheet('cache_pem_po', 'Pembayaran_PO'); }
-function _cachedStok()       { return _cacheGetSheet('cache_stok',       'Stok'); }
-function _cachedMutasiStok() { return _cacheGetSheet('cache_mutasi_stok','Mutasi_Stok'); }
+function _cachedStok()         { return _cacheGetSheet('cache_stok',         'Stok'); }
+function _cachedMutasiStok()   { return _cacheGetSheet('cache_mutasi_stok',   'Mutasi_Stok'); }
+function _cachedPengeluaran()  { return _cacheGetSheet('cache_pengeluaran',   'Pengeluaran'); }
 
 // ── Invalidasi cache ─────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ function invalidatePOCache()         { invalidateCache(['cache_po', 'cache_po_it
 function invalidatePembayaranPOCache() { invalidateCache(['cache_pem_po']); }
 function invalidateStokCache()         { invalidateCache(['cache_stok']); }
 function invalidateMutasiStokCache()   { invalidateCache(['cache_mutasi_stok']); }
+function invalidatePengeluaranCache()  { invalidateCache(['cache_pengeluaran']); }
 
 // ── Format tanggal dari cache (Date atau ISO string) → "dd/MM/yyyy" ──────────
 function _fmtTgl(raw) {

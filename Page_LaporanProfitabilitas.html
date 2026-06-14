@@ -1,0 +1,116 @@
+      <section id="page-laporanprofitabilitas" class="page-section">
+
+        <!-- ── Header ── -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Profitabilitas Project</h2>
+            <p class="text-sm text-slate-400 mt-0.5">Nilai kontrak, estimasi & realisasi HPP, margin per work order</p>
+          </div>
+          <button onclick="exportLaporanProfitPDF()"
+            class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+            <i class="fas fa-file-pdf text-xs"></i> Export PDF
+          </button>
+        </div>
+
+        <!-- ── Filter Bar ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">Dari Tanggal WO</label>
+              <input type="date" id="lp-dari" onchange="loadLaporanProfitabilitas()"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-violet-400">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">Sampai Tanggal WO</label>
+              <input type="date" id="lp-sampai" onchange="loadLaporanProfitabilitas()"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-violet-400">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">Status WO</label>
+              <select id="lp-status" onchange="loadLaporanProfitabilitas()"
+                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-violet-400 bg-white text-slate-700">
+                <option value="">Semua Status</option>
+                <option value="Deal">Deal</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button onclick="resetFilterLP()"
+                class="w-full text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-2 font-medium transition">
+                <i class="fas fa-xmark mr-1"></i> Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Summary Cards ── -->
+        <div id="lp-summary-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Nilai Kontrak</p>
+            <p id="lp-card-kontrak" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Realisasi HPP</p>
+            <p id="lp-card-hpp" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rata-rata Margin Realisasi</p>
+            <p id="lp-card-margin" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+        </div>
+
+        <!-- ── Tab: Profitabilitas / Rekap Akun ── -->
+        <div class="flex gap-2 mb-4">
+          <button id="lp-tab-profit-btn" onclick="switchLPTab('profit')"
+            class="px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-violet-700 shadow-sm">
+            Profitabilitas per WO
+          </button>
+          <button id="lp-tab-akun-btn" onclick="switchLPTab('akun')"
+            class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
+            Rekap per Akun
+          </button>
+        </div>
+
+        <!-- Tab Profitabilitas per WO -->
+        <div id="lp-tab-profit" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" style="min-width:900px">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">No WO / Project</th>
+                  <th class="p-4">Customer</th>
+                  <th class="p-4">Tanggal</th>
+                  <th class="p-4 text-center">Status</th>
+                  <th class="p-4 text-right">Nilai Kontrak</th>
+                  <th class="p-4 text-right">Est. HPP</th>
+                  <th class="p-4 text-right">Real. HPP</th>
+                  <th class="p-4 text-right">Selisih</th>
+                  <th class="p-4 text-right">Margin Est.</th>
+                  <th class="p-4 text-right">Margin Real.</th>
+                </tr>
+              </thead>
+              <tbody id="lp-table-profit" class="text-sm divide-y divide-slate-100">
+                <tr><td colspan="10" class="p-8 text-center text-slate-400">Muat data untuk melihat laporan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab Rekap per Akun -->
+        <div id="lp-tab-akun" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">Akun Pembayaran</th>
+                  <th class="p-4 text-right">Total Pengeluaran</th>
+                </tr>
+              </thead>
+              <tbody id="lp-table-akun" class="text-sm divide-y divide-slate-100">
+                <tr><td colspan="2" class="p-8 text-center text-slate-400">Muat data untuk melihat rekap.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>

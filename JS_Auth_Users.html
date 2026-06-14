@@ -41,8 +41,8 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','purchaseorder','inventory'],
-  finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder','inventory'],
+  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','purchaseorder','inventory','pengeluaran','laporanprofitabilitas'],
+  finance:     ['workorder','invoice','kwitansi','laporanfinance','purchaseorder','inventory','pengeluaran','laporanprofitabilitas'],
   sales:       ['penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
   procurement: ['supplier','purchaseorder','workorder','inventory'],
@@ -77,7 +77,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','purchaseorder','inventory']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','purchaseorder','inventory','pengeluaran','laporanprofitabilitas']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));

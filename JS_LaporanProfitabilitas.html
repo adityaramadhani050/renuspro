@@ -1,0 +1,183 @@
+<script>
+// ================================================================
+//  LAPORAN PROFITABILITAS PROJECT — JavaScript (Modul 3 Fase 4)
+// ================================================================
+
+var _lpData = null;
+var _lpActiveTab = 'profit';
+
+function _fmtRpLP(n) {
+  n = parseFloat(n) || 0;
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+
+function _fmtPctLP(n) {
+  if (n === null || n === undefined) return '—';
+  return parseFloat(n).toFixed(1) + '%';
+}
+
+window.loadLaporanProfitabilitas = function() {
+  var dari   = document.getElementById('lp-dari').value;
+  var sampai = document.getElementById('lp-sampai').value;
+  var status = document.getElementById('lp-status').value;
+
+  document.getElementById('lp-table-profit').innerHTML =
+    '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  document.getElementById('lp-table-akun').innerHTML =
+    '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) {
+        showNotification(res.message || 'Gagal memuat laporan.', 'error');
+        return;
+      }
+      _lpData = res;
+      _renderLaporanProfit(res);
+    })
+    .withFailureHandler(function(err) {
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .getLaporanProfitabilitas({ tanggalDari: dari, tanggalSampai: sampai, status: status });
+};
+
+function _renderLaporanProfit(res) {
+  // Summary cards
+  var s = res.summary || {};
+  document.getElementById('lp-card-kontrak').textContent = _fmtRpLP(s.totalKontrak);
+  document.getElementById('lp-card-hpp').textContent     = _fmtRpLP(s.totalRealisasiHPP);
+  document.getElementById('lp-card-margin').textContent  = s.rataMarginRealisasi !== null ? _fmtPctLP(s.rataMarginRealisasi) : '—';
+
+  // Tabel profitabilitas
+  var rows = res.rows || [];
+  if (rows.length === 0) {
+    document.getElementById('lp-table-profit').innerHTML =
+      '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data untuk filter ini.</td></tr>';
+  } else {
+    var html = '';
+    rows.forEach(function(r) {
+      var overBudget = r.isOverBudget;
+      var rowClass   = overBudget ? 'bg-rose-50 hover:bg-rose-100' : 'hover:bg-slate-50';
+      var selisihCls = r.selisih >= 0 ? 'text-emerald-600' : 'text-rose-600';
+      html += '<tr class="' + rowClass + ' transition-colors">';
+      html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5">' + _escLP(r.namaProject) + '</div></td>';
+      html += '<td class="p-4 text-xs text-slate-600">' + _escLP(r.namaKlien) + '</td>';
+      html += '<td class="p-4 text-xs text-slate-500">' + r.tanggal + '</td>';
+      html += '<td class="p-4 text-center"><span class="text-xs font-bold px-2 py-0.5 rounded-full ' + (r.status === 'Closed' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700') + '">' + r.status + '</span></td>';
+      html += '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(r.nilaiKontrak) + '</td>';
+      html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.estimasiHPP) + '</td>';
+      html += '<td class="p-4 text-right text-xs font-bold text-slate-800">' + _fmtRpLP(r.realisasiHPP) + '</td>';
+      html += '<td class="p-4 text-right text-xs font-semibold ' + selisihCls + '">' + (r.selisih >= 0 ? '+' : '') + _fmtRpLP(r.selisih) + '</td>';
+      html += '<td class="p-4 text-right text-xs text-slate-500">' + _fmtPctLP(r.marginEstimasi) + '</td>';
+      html += '<td class="p-4 text-right text-xs font-bold ' + (overBudget ? 'text-rose-600' : 'text-emerald-600') + '">' + _fmtPctLP(r.marginRealisasi) + '</td>';
+      html += '</tr>';
+    });
+    document.getElementById('lp-table-profit').innerHTML = html;
+  }
+
+  // Tabel rekap akun
+  var akunRows = res.rekapAkun || [];
+  if (akunRows.length === 0) {
+    document.getElementById('lp-table-akun').innerHTML =
+      '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>';
+  } else {
+    var htmlA = '';
+    akunRows.forEach(function(a) {
+      htmlA += '<tr class="hover:bg-slate-50">';
+      htmlA += '<td class="p-4 text-sm text-slate-700">' + _escLP(a.namaAkun) + '</td>';
+      htmlA += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpLP(a.total) + '</td>';
+      htmlA += '</tr>';
+    });
+    document.getElementById('lp-table-akun').innerHTML = htmlA;
+  }
+}
+
+function _escLP(s) {
+  return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.switchLPTab = function(tab) {
+  _lpActiveTab = tab;
+  var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-violet-700 shadow-sm';
+  var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
+  document.getElementById('lp-tab-profit-btn').className = tab === 'profit' ? active : inactive;
+  document.getElementById('lp-tab-akun-btn').className   = tab === 'akun'   ? active : inactive;
+  document.getElementById('lp-tab-profit').classList.toggle('hidden', tab !== 'profit');
+  document.getElementById('lp-tab-akun').classList.toggle('hidden',   tab !== 'akun');
+};
+
+window.resetFilterLP = function() {
+  ['lp-dari','lp-sampai'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('lp-status').value = '';
+  loadLaporanProfitabilitas();
+};
+
+// ── Export PDF ─────────────────────────────────────────────────
+
+window.exportLaporanProfitPDF = function() {
+  if (!_lpData) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
+  try {
+    var { jsPDF } = window.jspdf;
+    var doc  = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    var rows = (_lpData.rows || []);
+    var s    = _lpData.summary || {};
+    var now  = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    doc.text('LAPORAN PROFITABILITAS PROJECT', 14, 16);
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.setTextColor(100);
+    doc.text('PT. Renus Global Indonesia  |  Dicetak: ' + now, 14, 22);
+    doc.setTextColor(0);
+
+    // Summary
+    doc.setFontSize(9); doc.setFont(undefined, 'bold');
+    doc.text('Total Kontrak: ' + _fmtRpLP(s.totalKontrak) +
+             '   |   Total Realisasi HPP: ' + _fmtRpLP(s.totalRealisasiHPP) +
+             '   |   Rata Margin: ' + _fmtPctLP(s.rataMarginRealisasi), 14, 29);
+
+    doc.setFont(undefined, 'normal');
+
+    var tableRows = rows.map(function(r) {
+      return [
+        r.noWO,
+        r.namaProject,
+        r.namaKlien,
+        r.tanggal,
+        r.status,
+        _fmtRpLP(r.nilaiKontrak),
+        _fmtRpLP(r.estimasiHPP),
+        _fmtRpLP(r.realisasiHPP),
+        _fmtPctLP(r.marginEstimasi),
+        _fmtPctLP(r.marginRealisasi)
+      ];
+    });
+
+    doc.autoTable({
+      startY:   34,
+      head:     [['No WO','Project','Customer','Tanggal','Status','Kontrak','Est. HPP','Real. HPP','Margin Est.','Margin Real.']],
+      body:     tableRows,
+      styles:   { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [109, 40, 217], fontStyle: 'bold', fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 16 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 },
+        3: { cellWidth: 18 }, 4: { cellWidth: 15 }, 5: { halign: 'right', cellWidth: 25 },
+        6: { halign: 'right', cellWidth: 25 }, 7: { halign: 'right', cellWidth: 25 },
+        8: { halign: 'right', cellWidth: 18 }, 9: { halign: 'right', cellWidth: 18 }
+      },
+      didParseCell: function(data) {
+        var rowIdx = data.row.index;
+        if (data.section === 'body' && rows[rowIdx] && rows[rowIdx].isOverBudget) {
+          data.cell.styles.textColor = [220, 38, 38];
+        }
+      }
+    });
+
+    var fname = 'LaporanProfitabilitas_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.pdf';
+    doc.save(fname);
+    showNotification('PDF berhasil diunduh!');
+  } catch(e) {
+    showNotification('Gagal export PDF: ' + e.message, 'error');
+  }
+};
+</script>
