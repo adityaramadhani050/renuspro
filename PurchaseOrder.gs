@@ -765,16 +765,32 @@ function simpanPembayaranPO(payload) {
 
     // Cari PO header
     var poData = poSheet.getDataRange().getValues();
-    var poRowIdx  = -1;
-    var grandTotal = 0;
+    var poRowIdx    = -1;
+    var grandTotal  = 0;
+    var peruntukan  = '';
+    var noWOPO      = '';
+    var namaSupplier = '';
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
-        poRowIdx   = i + 1;
-        grandTotal = parseFloat(poData[i][10]) || 0;
+        poRowIdx     = i + 1;
+        grandTotal   = parseFloat(poData[i][10]) || 0;
+        peruntukan   = (poData[i][4] || '').toString();
+        noWOPO       = (poData[i][5] || '').toString().trim();
+        namaSupplier = (poData[i][3] || '').toString();
         break;
       }
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
+
+    // Blokir pembayaran jika PO peruntukan Work Order dan WO sudah Closed
+    if (peruntukan === 'Work Order' && noWOPO) {
+      try {
+        var statusWOCek = _getStatusWO(noWOPO);
+        if (statusWOCek === 'Closed') {
+          return { success: false, message: 'Work Order ' + noWOPO + ' sudah Closed — pembayaran PO untuk WO ini tidak bisa ditambahkan.' };
+        }
+      } catch(eWO) { /* lanjut jika WO tidak ditemukan — biarkan PO bayar tetap jalan */ }
+    }
 
     var idBayar  = _generateIdPembayaranPO(bayarSheet);
     var now      = new Date();
@@ -808,6 +824,30 @@ function simpanPembayaranPO(payload) {
     poSheet.getRange(poRowIdx, 13).setValue(statusBayar);   // col 12 = col 13
     poSheet.getRange(poRowIdx, 14).setValue(totalDibayar);  // col 13 = col 14
 
+    // Hook Pengeluaran: jika PO peruntukan Work Order, buat entry pengeluaran otomatis
+    if (peruntukan === 'Work Order' && noWOPO) {
+      try {
+        _buatPengeluaranOtomatis({
+          noWO:        noWOPO,
+          tanggal:     tanggalBayarStr,
+          sumber:      'Pembayaran PO',
+          noPO:        noPO,
+          idReferensi: idBayar,
+          idAkun:      payload.idAkun   ? payload.idAkun.toString()   : '',
+          namaAkun:    payload.namaAkun ? payload.namaAkun.toString() : '',
+          deskripsi:   'Pembayaran PO ' + noPO + ' — ' + namaSupplier,
+          qty:         1,
+          satuan:      '',
+          hargaSatuan: jumlah,
+          total:       jumlah,
+          catatan:     payload.catatan  ? payload.catatan.toString()  : '',
+          dibuatOleh:  payload.dibuatOleh ? payload.dibuatOleh.toString() : ''
+        });
+      } catch(eHook) {
+        Logger.log('Hook pengeluaran PO gagal: ' + eHook.toString());
+      }
+    }
+
     invalidatePOCache();
     invalidatePembayaranPOCache();
     return { success: true, message: 'Pembayaran PO ' + idBayar + ' berhasil disimpan.' };
@@ -839,6 +879,19 @@ function hapusPembayaranPO(idBayar) {
     }
     if (bayarRowIdx === -1) return { success: false, message: 'ID Pembayaran tidak ditemukan.' };
 
+    // Cek apakah PO ini peruntukan Work Order (untuk hook pengeluaran)
+    var peruntukanHapus = '';
+    try {
+      var poSheetHapus = _ensurePOSheet(ss);
+      var poDataHapus  = poSheetHapus.getDataRange().getValues();
+      for (var ph = 1; ph < poDataHapus.length; ph++) {
+        if ((poDataHapus[ph][0] || '').toString() === noPO) {
+          peruntukanHapus = (poDataHapus[ph][4] || '').toString();
+          break;
+        }
+      }
+    } catch(ePH) {}
+
     bayarSheet.deleteRow(bayarRowIdx);
 
     // Hitung ulang totalDibayar
@@ -862,6 +915,15 @@ function hapusPembayaranPO(idBayar) {
         poSheet.getRange(p + 1, 13).setValue(statusBayar);
         poSheet.getRange(p + 1, 14).setValue(totalDibayar);
         break;
+      }
+    }
+
+    // Hook Pengeluaran: hapus entry pengeluaran otomatis jika PO peruntukan Work Order
+    if (peruntukanHapus === 'Work Order') {
+      try {
+        _hapusPengeluaranByReferensi(idBayar);
+      } catch(eHook2) {
+        Logger.log('Hook hapus pengeluaran PO gagal: ' + eHook2.toString());
       }
     }
 

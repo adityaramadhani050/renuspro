@@ -826,6 +826,16 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
       return { success: false, message: 'Stok "' + namaProduk + '" tidak cukup. Tersedia: ' + saldoSaat + ' ' + satuanProduk };
     }
 
+    // Blokir jika WO sudah Closed
+    if (noWO) {
+      try {
+        var statusWOStok = _getStatusWO(noWO.toString());
+        if (statusWOStok === 'Closed') {
+          return { success: false, message: 'Work Order ' + noWO + ' sudah Closed — tidak bisa menggunakan stok.' };
+        }
+      } catch(eWOStok) { /* lanjut jika WO tidak ditemukan */ }
+    }
+
     var tz     = Session.getScriptTimeZone();
     var nowStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
     var tglStr = tanggal || Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
@@ -846,6 +856,31 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
     SpreadsheetApp.flush();
     invalidateStokCache();
     invalidateMutasiStokCache();
+
+    // Hook Pengeluaran: jika penggunaan terikat WO, buat entry pengeluaran otomatis
+    if (noWO) {
+      try {
+        _buatPengeluaranOtomatis({
+          noWO:        noWO.toString(),
+          tanggal:     tglStr,
+          sumber:      'Penggunaan Stok',
+          noPO:        '',
+          idReferensi: idMutasi,
+          idAkun:      'AP001',
+          namaAkun:    'Stok',
+          deskripsi:   'Penggunaan stok: ' + namaProduk,
+          qty:         qty,
+          satuan:      satuanProduk,
+          hargaSatuan: hargaTerakhir,
+          total:       qty * hargaTerakhir,
+          catatan:     keterangan || defaultKet,
+          dibuatOleh:  namaUser || ''
+        });
+      } catch(eHookStok) {
+        Logger.log('Hook pengeluaran stok gagal: ' + eHookStok.toString());
+      }
+    }
+
     return {
       success:      true,
       idMutasi:     idMutasi,
