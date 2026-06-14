@@ -35,8 +35,16 @@ function _pgRenderPurchaseOrder(data) {
         '<div class="font-mono font-bold text-slate-700">' + (po.noPO || '') + '</div>' +
         '<div class="text-xs text-slate-400 mt-0.5">' + (po.tanggal || '') + '</div>' +
       '</td>' +
-      '<td class="p-4 font-medium text-slate-800">' + (po.namaSupplier || po.idSupplier || '—') + '</td>' +
-      '<td class="p-4 text-slate-500">' + (po.noWO || '—') + '</td>' +
+      '<td class="p-4">' +
+        '<div class="font-medium text-slate-800">' + (po.namaSupplier || po.idSupplier || '—') + '</div>' +
+        (po.peruntukan ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.peruntukan) + '</div>' : '') +
+      '</td>' +
+      '<td class="p-4">' +
+        (po.noWO
+          ? '<div class="font-mono text-sm text-teal-700">' + _escHtml(po.noWO) + '</div>' +
+            (po.namaProject ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaProject) + '</div>' : '')
+          : '<span class="text-slate-400">—</span>') +
+      '</td>' +
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
       '<td class="p-4 text-right font-bold text-slate-800">Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</td>' +
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +

@@ -196,17 +196,36 @@ function _hitungStatusBayarPO(grandTotal, totalDibayar) {
 function getPOList() {
   try {
     var data = _cachedPO();
+
+    // Build noWO → namaProject map from Master_Penawaran
+    var woNamaMap = {};
+    try {
+      var ss       = getSpreadsheet();
+      var penSheet = ss.getSheetByName('Master_Penawaran');
+      if (penSheet) {
+        var penData = penSheet.getDataRange().getValues();
+        // col[17]=noWO, col[4]=namaProject (same as WorkOrder.gs)
+        for (var p = 1; p < penData.length; p++) {
+          var wNo = penData[p][17] ? penData[p][17].toString().trim() : '';
+          var wNm = penData[p][4]  ? penData[p][4].toString().trim()  : '';
+          if (wNo && wNm) woNamaMap[wNo] = wNm;
+        }
+      }
+    } catch(e2) { /* ignore — nama project not critical */ }
+
     var list = [];
     for (var i = 1; i < data.length; i++) {
       var r = data[i];
       if (!r[0]) continue;
+      var noWO2 = r[5] ? r[5].toString() : '';
       list.push({
         noPO:         r[0]  ? r[0].toString()  : '',
         tanggal:      _fmtTgl(r[1]),
         idSupplier:   r[2]  ? r[2].toString()  : '',
         namaSupplier: r[3]  ? r[3].toString()  : '',
         peruntukan:   r[4]  ? r[4].toString()  : '',
-        noWO:         r[5]  ? r[5].toString()  : '',
+        noWO:         noWO2,
+        namaProject:  noWO2 ? (woNamaMap[noWO2] || '') : '',
         statusPO:     r[6]  ? r[6].toString()  : '',
         subtotal:     parseFloat(r[7])  || 0,
         ppnPersen:    parseFloat(r[8])  || 0,
@@ -526,15 +545,21 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
 
     var poData = poSheet.getDataRange().getValues();
     var poRowIdx = -1;
-    var statusLama = '';
+    var statusLama = '', statusBayar = '';
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
-        poRowIdx  = i + 1;
-        statusLama = poData[i][6] ? poData[i][6].toString() : '';
+        poRowIdx    = i + 1;
+        statusLama  = poData[i][6]  ? poData[i][6].toString()  : '';
+        statusBayar = poData[i][12] ? poData[i][12].toString() : '';
         break;
       }
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
+
+    // Blokir status "Selesai" jika belum lunas
+    if (statusBaru === 'Selesai' && statusBayar !== 'Lunas') {
+      return { success: false, message: 'PO tidak bisa diselesaikan — status pembayaran belum Lunas (saat ini: "' + statusBayar + '").' };
+    }
 
     // Validasi transisi
     var validTransitions = {
