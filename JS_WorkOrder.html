@@ -224,7 +224,24 @@
         btnReq.classList.add('hidden');
       }
 
+      // HPP panel: reset and trigger async load
+      var hppLoading = el('wo-hpp-loading');
+      var hppContent = el('wo-hpp-content');
+      if (hppLoading) {
+        hppLoading.classList.remove('hidden');
+        hppLoading.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat data HPP...';
+      }
+      if (hppContent) hppContent.classList.add('hidden');
+
+      // Export laporan button — hanya finance/admin
+      var btnExportLap = el('wo-btn-export-lap');
+      if (btnExportLap) {
+        if (typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()) btnExportLap.classList.remove('hidden');
+        else btnExportLap.classList.add('hidden');
+      }
+
       el('modal-detail-wo').classList.remove('hidden');
+      _loadRealisasiHPP(item.noWO);
     };
 
     window.tutupModalDetailWO = function() {
@@ -512,6 +529,356 @@
     window.tutupModalRequestInvoice = function() {
       document.getElementById('modal-request-invoice').classList.add('hidden');
     };
+
+    // ================================================================
+    // REALISASI HPP & MARGIN — Panel di Detail WO (Fase 3)
+    // ================================================================
+
+    window._loadRealisasiHPP = function(noWO) {
+      if (!noWO) return;
+      var loading = document.getElementById('wo-hpp-loading');
+      var content = document.getElementById('wo-hpp-content');
+      if (loading) {
+        loading.classList.remove('hidden');
+        loading.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1 text-slate-400"></i> <span class="text-slate-400">Memuat data HPP...</span>';
+      }
+      if (content) content.classList.add('hidden');
+      if (typeof google === 'undefined') return;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res.success) {
+            if (loading) {
+              loading.classList.remove('hidden');
+              loading.innerHTML = '<p class="text-rose-400 text-xs"><i class="fa-solid fa-circle-exclamation mr-1"></i>' + ((res && res.message) || 'Gagal memuat.') + '</p>';
+            }
+            return;
+          }
+          if (loading) loading.classList.add('hidden');
+          if (content) content.classList.remove('hidden');
+          _renderRealisasiHPP(res);
+          switchWOHPPTab('akun');
+        })
+        .withFailureHandler(function(err) {
+          if (loading) {
+            loading.classList.remove('hidden');
+            loading.innerHTML = '<p class="text-rose-400 text-xs"><i class="fa-solid fa-circle-exclamation mr-1"></i>' + (err.message || err) + '</p>';
+          }
+        })
+        .getRealisasiHPP(noWO);
+    };
+
+    function _renderRealisasiHPP(res) {
+      var rp = function(v) { return 'Rp ' + Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
+      var el = function(id) { return document.getElementById(id); };
+
+      el('wo-hpp-kontrak').innerText = rp(res.nilaiKontrak);
+      el('wo-hpp-est').innerText     = (res.estimasiHPP > 0) ? rp(res.estimasiHPP) : '—';
+      el('wo-hpp-real').innerText    = rp(res.realisasiHPP);
+
+      // Selisih card
+      var isOver = (res.selisih || 0) < 0;
+      el('wo-hpp-selisih-card').className = 'rounded-xl p-3 text-center border ' + (isOver ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100');
+      el('wo-hpp-selisih-label').className = 'text-[10px] uppercase font-semibold mb-1 ' + (isOver ? 'text-rose-500' : 'text-emerald-600');
+      el('wo-hpp-selisih-label').innerText = isOver ? 'Over Budget' : 'Hemat';
+      el('wo-hpp-selisih').className = 'text-sm font-extrabold ' + (isOver ? 'text-rose-600' : 'text-emerald-700');
+      el('wo-hpp-selisih').innerText = (isOver ? '- ' : '') + rp(Math.abs(res.selisih || 0));
+      el('wo-hpp-selisih-pct').className = 'text-[10px] mt-0.5 ' + (isOver ? 'text-rose-400' : 'text-emerald-500');
+      el('wo-hpp-selisih-pct').innerText = (res.selisihPersen !== null && res.selisihPersen !== undefined)
+        ? Math.abs(res.selisihPersen) + '% dari est. HPP' : '—';
+
+      // Margin cards
+      var margEst  = res.marginEstimasi;
+      var margReal = res.marginRealisasi;
+      el('wo-hpp-marg-est').innerText = (margEst !== null && margEst !== undefined) ? margEst.toFixed(1) + '%' : '—';
+      var isLower = (margReal !== null && margReal !== undefined && margEst !== null && margEst !== undefined && margReal < margEst);
+      el('wo-hpp-marg-real-card').className = 'rounded-xl p-3 text-center border ' + (isLower ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100');
+      el('wo-hpp-marg-real-label').className = 'text-[10px] uppercase font-semibold mb-1 ' + (isLower ? 'text-rose-500' : 'text-emerald-600');
+      el('wo-hpp-marg-real').className = 'text-sm font-extrabold ' + (isLower ? 'text-rose-600' : 'text-emerald-700');
+      el('wo-hpp-marg-real').innerText = (margReal !== null && margReal !== undefined) ? margReal.toFixed(1) + '%' : '—';
+
+      // Breakdown per akun
+      var akunTbody = el('wo-hpp-akun-tbody');
+      if (!res.breakdownAkun || res.breakdownAkun.length === 0) {
+        akunTbody.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-300">Belum ada pengeluaran</td></tr>';
+      } else {
+        akunTbody.innerHTML = res.breakdownAkun.map(function(a) {
+          return '<tr class="border-b border-slate-50">'
+            + '<td class="p-2 text-slate-700 font-medium">' + _escWO(a.namaAkun) + '</td>'
+            + '<td class="p-2 text-right text-slate-800 font-bold whitespace-nowrap">' + rp(a.total) + '</td>'
+            + '<td class="p-2 text-right text-slate-400 whitespace-nowrap">' + a.persen + '%</td>'
+            + '</tr>';
+        }).join('');
+      }
+
+      // Breakdown per sumber
+      var sumberTbody = el('wo-hpp-sumber-tbody');
+      var sClr = { 'Pembayaran PO': 'text-blue-700', 'Penggunaan Stok': 'text-amber-700', 'Langsung': 'text-emerald-700' };
+      var sumerHtml = (res.breakdownSumber || []).map(function(s) {
+        return '<tr class="border-b border-slate-50">'
+          + '<td class="p-2 font-medium ' + (sClr[s.sumber] || 'text-slate-600') + '">' + _escWO(s.sumber) + '</td>'
+          + '<td class="p-2 text-right text-slate-800 font-bold whitespace-nowrap">' + rp(s.total) + '</td>'
+          + '<td class="p-2 text-right text-slate-400 whitespace-nowrap">' + s.persen + '%</td>'
+          + '</tr>';
+      }).join('');
+      sumberTbody.innerHTML = sumerHtml || '<tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>';
+
+      // Daftar pengeluaran
+      var expTbody = el('wo-hpp-exp-tbody');
+      var sBadge   = function(s) {
+        var cls = { 'Pembayaran PO': 'bg-blue-50 text-blue-700', 'Penggunaan Stok': 'bg-amber-50 text-amber-700', 'Langsung': 'bg-emerald-50 text-emerald-700' };
+        return '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold ' + (cls[s] || 'bg-slate-100 text-slate-500') + '">' + _escWO(s) + '</span>';
+      };
+      if (!res.pengeluaranList || res.pengeluaranList.length === 0) {
+        expTbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-300">Belum ada pengeluaran untuk WO ini.</td></tr>';
+      } else {
+        expTbody.innerHTML = res.pengeluaranList.map(function(p) {
+          return '<tr class="border-b border-slate-50 hover:bg-slate-50/50">'
+            + '<td class="p-2 text-slate-400 whitespace-nowrap">' + (p.tanggal || '—') + '</td>'
+            + '<td class="p-2 whitespace-nowrap">' + sBadge(p.sumber) + '</td>'
+            + '<td class="p-2 text-slate-700 max-w-[140px] truncate" title="' + _escWO(p.deskripsi) + '">'
+            + _escWO(p.deskripsi)
+            + (p.noPO ? ' <span class="text-slate-400 text-[10px]">· ' + _escWO(p.noPO) + '</span>' : '')
+            + '</td>'
+            + '<td class="p-2 text-slate-500 whitespace-nowrap max-w-[80px] truncate" title="' + _escWO(p.namaAkun) + '">' + _escWO(p.namaAkun) + '</td>'
+            + '<td class="p-2 text-right font-bold text-slate-800 whitespace-nowrap">' + rp(p.total) + '</td>'
+            + '</tr>';
+        }).join('');
+      }
+
+      // Tombol tambah (finance/admin)
+      var addBtns = el('wo-hpp-add-btns');
+      if (addBtns) {
+        if (typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()) addBtns.classList.remove('hidden');
+        else addBtns.classList.add('hidden');
+      }
+
+      // PO Terkait
+      var poCont = el('wo-hpp-po-content');
+      if (!res.poTerkait || res.poTerkait.length === 0) {
+        poCont.innerHTML = '<p class="text-xs text-slate-300 text-center py-4">Tidak ada PO yang terkait dengan WO ini.</p>';
+      } else {
+        poCont.innerHTML = '<div class="space-y-2">'
+          + res.poTerkait.map(function(po) {
+            var lunas = po.statusBayar === 'Lunas';
+            return '<div class="bg-slate-50 rounded-xl p-3 text-xs flex items-start justify-between gap-2">'
+              + '<div class="flex-1 min-w-0">'
+              + '<p class="font-bold text-blue-700">' + _escWO(po.noPO) + '</p>'
+              + '<p class="text-slate-500 truncate">' + _escWO(po.namaSupplier) + '</p>'
+              + '</div>'
+              + '<div class="text-right shrink-0">'
+              + '<p class="font-bold text-slate-800">' + rp(po.grandTotal) + '</p>'
+              + (po.sisaTagihan > 0 ? '<p class="text-rose-500 text-[10px]">Sisa: ' + rp(po.sisaTagihan) + '</p>' : '<p class="text-emerald-500 text-[10px]">Lunas</p>')
+              + '</div>'
+              + '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap '
+              + (lunas ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')
+              + '">' + _escWO(po.statusBayar) + '</span>'
+              + '</div>';
+          }).join('')
+          + '</div>';
+      }
+    }
+
+    function _escWO(s) {
+      return (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    window.switchWOHPPTab = function(tab) {
+      ['akun', 'exp', 'po'].forEach(function(t) {
+        var btn  = document.getElementById('wo-hpp-tab-' + t);
+        var cont = document.getElementById('wo-hpp-content-' + t);
+        if (t === tab) {
+          if (btn)  btn.className  = 'flex-1 py-1.5 text-xs font-bold rounded-lg transition bg-white text-slate-700 shadow-sm';
+          if (cont) cont.classList.remove('hidden');
+        } else {
+          if (btn)  btn.className  = 'flex-1 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-slate-600';
+          if (cont) cont.classList.add('hidden');
+        }
+      });
+    };
+
+    function _tambahPengeluaranDariWO() {
+      if (!_woDetailCurrent) return;
+      var noWO = _woDetailCurrent.noWO;
+      tutupModalDetailWO();
+      navigate('pengeluaran');
+      setTimeout(function() {
+        if (typeof bukaFormPengeluaranLangsung === 'function') bukaFormPengeluaranLangsung(noWO);
+      }, 400);
+    }
+
+    // ── Export Laporan Pengeluaran per WO (Fase 4) ─────────────────
+    window.exportLaporanPengeluaranWO = function() {
+      if (!_woDetailCurrent) return;
+      var noWO = _woDetailCurrent.noWO;
+      toggleLoader(true, 'Menyiapkan laporan pengeluaran...');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (!res || !res.success) { showNotification((res && res.message) || 'Gagal mengambil data.', 'error'); return; }
+          _generateLaporanPengeluaranPDF(res);
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification('Gagal: ' + (err.message || err), 'error');
+        })
+        .getExportPengeluaranWO(noWO);
+    };
+
+    function _generateLaporanPengeluaranPDF(data) {
+      try {
+        var jsPDF = window.jspdf.jsPDF;
+        var doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        var PW = 210, ML = 14, MR = 14;
+        var DARK  = [30, 41, 59];
+        var SLATE = [100, 116, 139];
+        var BLUE  = [30, 64, 175];
+        var rp    = function(v) { return Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
+
+        // ── Header ──
+        doc.setFillColor(DARK[0], DARK[1], DARK[2]);
+        doc.rect(0, 0, PW, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.text('LAPORAN PENGELUARAN PROJECT', ML, 11);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+        doc.setTextColor(190, 200, 220);
+        doc.text('PT. Renus Global Indonesia', ML, 17);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(170, 195, 255);
+        doc.text('WO ' + data.header.noWO, PW - MR, 10, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(190, 200, 220);
+        doc.text('Cetak: ' + data.header.tanggalCetak, PW - MR, 16, { align: 'right' });
+
+        var y = 28;
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+        doc.text('Project', ML, y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+        doc.text(': ' + (data.header.namaProject || '—'), ML + 22, y); y += 5;
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+        doc.text('Customer', ML, y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+        doc.text(': ' + (data.header.namaKlien || '—'), ML + 22, y); y += 8;
+
+        // ── A. Ringkasan ──
+        var r = data.ringkasan;
+        var isOver   = (r.selisih || 0) < 0;
+        var margEst  = (r.marginEstimasi  !== null && r.marginEstimasi  !== undefined) ? r.marginEstimasi.toFixed(1)  + '%' : '—';
+        var margReal = (r.marginRealisasi !== null && r.marginRealisasi !== undefined) ? r.marginRealisasi.toFixed(1) + '%' : '—';
+
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+        doc.text('A. RINGKASAN', ML, y); y += 4;
+
+        doc.autoTable({
+          startY: y,
+          body: [
+            ['Nilai Kontrak (excl. PPN)', 'Rp ' + rp(r.nilaiKontrak), '', ''],
+            ['Estimasi HPP', 'Rp ' + rp(r.estimasiHPP), 'Estimasi Margin', margEst],
+            ['Realisasi HPP', 'Rp ' + rp(r.realisasiHPP), 'Realisasi Margin', margReal],
+            [(isOver ? 'Over Budget' : 'Hemat') + ' vs Estimasi', (isOver ? '- ' : '') + 'Rp ' + rp(Math.abs(r.selisih || 0)), '', '']
+          ],
+          theme: 'plain',
+          margin: { left: ML, right: MR },
+          bodyStyles: { fontSize: 8, cellPadding: 2, textColor: DARK },
+          columnStyles: {
+            0: { fontStyle: 'bold', textColor: SLATE, cellWidth: 52 },
+            1: { cellWidth: 38 },
+            2: { fontStyle: 'bold', textColor: SLATE, cellWidth: 36 },
+            3: { cellWidth: 30 }
+          }
+        });
+        y = doc.lastAutoTable.finalY + 7;
+
+        // ── B. Rekap per akun ──
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+        doc.text('B. REKAP PER AKUN PEMBAYARAN', ML, y); y += 4;
+
+        var rekapRows = (data.rekapAkun || []).map(function(a) {
+          return [a.namaAkun || '', 'Rp ' + rp(a.total), (a.persen || 0) + '%'];
+        });
+        rekapRows.push(['TOTAL REALISASI HPP', 'Rp ' + rp(r.realisasiHPP), '100%']);
+
+        doc.autoTable({
+          startY: y,
+          head: [['Akun Pembayaran', 'Total', '%']],
+          body: rekapRows,
+          theme: 'grid',
+          margin: { left: ML, right: MR },
+          headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold', halign: 'center' },
+          bodyStyles: { fontSize: 8, textColor: DARK, cellPadding: 2 },
+          columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 40 }, 2: { halign: 'right', cellWidth: 16 } },
+          didParseCell: function(d) {
+            if (d.section === 'body' && d.row.index === rekapRows.length - 1) {
+              d.cell.styles.fontStyle = 'bold';
+              d.cell.styles.fillColor = [226, 232, 240];
+            }
+          }
+        });
+        y = doc.lastAutoTable.finalY + 7;
+
+        // ── C. Rincian per akun ──
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+        doc.text('C. RINCIAN PENGELUARAN PER AKUN', ML, y); y += 4;
+
+        (data.detailPerAkun || []).forEach(function(grp) {
+          var itemRows = grp.items.map(function(it) {
+            return [
+              it.tanggal || '—',
+              it.sumber  || '',
+              it.noPO    || '—',
+              it.deskripsi || '',
+              (it.qty || 1) + (it.satuan ? ' ' + it.satuan : ''),
+              'Rp ' + rp(it.hargaSatuan),
+              'Rp ' + rp(it.total)
+            ];
+          });
+          itemRows.push(['', '', '', 'Subtotal ' + (grp.namaAkun || ''), '', '', 'Rp ' + rp(grp.subtotal)]);
+
+          doc.autoTable({
+            startY: y,
+            head: [
+              [{ content: grp.namaAkun || '', colSpan: 7, styles: { fillColor: [226, 232, 240], textColor: DARK, fontStyle: 'bold', halign: 'left' } }],
+              ['Tgl', 'Sumber', 'No PO', 'Deskripsi', 'Qty', 'Harga Sat.', 'Total']
+            ],
+            body: itemRows,
+            theme: 'grid',
+            margin: { left: ML, right: MR },
+            headStyles: { fillColor: [241, 245, 249], textColor: SLATE, fontSize: 7.5, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 7.5, textColor: DARK, cellPadding: 1.8 },
+            columnStyles: {
+              0: { cellWidth: 18 },
+              1: { cellWidth: 26 },
+              2: { cellWidth: 18 },
+              3: { cellWidth: 'auto' },
+              4: { halign: 'right', cellWidth: 16 },
+              5: { halign: 'right', cellWidth: 24 },
+              6: { halign: 'right', cellWidth: 24 }
+            },
+            didParseCell: function(d) {
+              if (d.section === 'body' && d.row.index === itemRows.length - 1) {
+                d.cell.styles.fontStyle = 'bold';
+                d.cell.styles.fillColor = [241, 245, 249];
+              }
+            }
+          });
+          y = doc.lastAutoTable.finalY + 4;
+        });
+
+        // ── Footer per halaman ──
+        var pageCount = doc.internal.getNumberOfPages();
+        for (var pg = 1; pg <= pageCount; pg++) {
+          doc.setPage(pg);
+          doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+          doc.text('Laporan Pengeluaran WO ' + data.header.noWO + ' — PT. Renus Global Indonesia', ML, 293);
+          doc.text('Hal ' + pg + ' / ' + pageCount, PW - MR, 293, { align: 'right' });
+        }
+
+        var fname = 'LaporanPengeluaran_WO' + data.header.noWO + '_' + (data.header.namaProject || '').replace(/[\\/\s:*?"<>|]/g, '-') + '.pdf';
+        doc.save(fname);
+        showNotification('Laporan pengeluaran berhasil diunduh: ' + fname);
+      } catch (err) {
+        console.error(err);
+        showNotification('Gagal membuat PDF: ' + (err.message || err), 'error');
+      }
+    }
 
     window.kirimRequestInvoice = function() {
       if (!_woDetailCurrent) return;
