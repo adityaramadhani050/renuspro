@@ -14,7 +14,7 @@
 
         <!-- ── Filter Bar ── -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-500 mb-1">Dari Tanggal WO</label>
               <input type="date" id="lp-dari" onchange="loadLaporanProfitabilitas()"
@@ -34,12 +34,12 @@
                 <option value="Closed">Closed</option>
               </select>
             </div>
-            <div class="flex items-end">
-              <button onclick="resetFilterLP()"
-                class="w-full text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-2 font-medium transition">
-                <i class="fas fa-xmark mr-1"></i> Reset
-              </button>
-            </div>
+          </div>
+          <div class="flex items-center justify-end mt-3 pt-3 border-t border-slate-100">
+            <button onclick="resetFilterLP()"
+              class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition">
+              <i class="fas fa-rotate-left text-[10px]"></i> Reset Filter
+            </button>
           </div>
         </div>
 
