@@ -451,16 +451,27 @@ function loadPOMenungguPenerimaan() {
       var list = data || [];
       document.getElementById('po-gudang-count').innerText = list.length ? list.length + ' PO' : '';
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic">Tidak ada PO yang menunggu penerimaan gudang.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Tidak ada PO yang menunggu penerimaan gudang.</td></tr>';
         return;
       }
       tbody.innerHTML = list.map(function(po) {
-        var proyek = po.noWO ? po.noWO : (po.peruntukan || '—');
+        var noWO   = po.noWO || '';
+        var proyek = po.namaProject || '';
         return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
-          '<td class="p-4 font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(po.noPO) + '</td>' +
-          '<td class="p-4 text-sm text-slate-700">' + _escHtmlInv(po.namaSupplier) + '</td>' +
-          '<td class="p-4 text-sm text-slate-500">' + _escHtmlInv(proyek) + '</td>' +
-          '<td class="p-4 text-sm text-slate-500">' + _fmtTglInv(po.tanggal) + '</td>' +
+          '<td class="p-4">' +
+            '<div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(po.noPO) + '</div>' +
+            '<div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(po.tanggal) + '</div>' +
+          '</td>' +
+          '<td class="p-4">' +
+            '<div class="text-sm font-medium text-slate-800">' + _escHtmlInv(po.peruntukan || po.namaSupplier || '—') + '</div>' +
+            '<div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(po.namaSupplier) + '</div>' +
+          '</td>' +
+          '<td class="p-4">' +
+            (noWO
+              ? '<div class="font-mono text-sm text-teal-700">' + _escHtmlInv(noWO) + '</div>' +
+                (proyek ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(proyek) + '</div>' : '')
+              : '<span class="text-slate-400 text-sm">—</span>') +
+          '</td>' +
           '<td class="p-4 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg text-xs font-bold">' + po.jumlahItemPending + ' item</span></td>' +
           '<td class="p-4 text-center"><button onclick="bukaProsesTerimaPOGudang(' + JSON.stringify(po).replace(/"/g,'&quot;') + ')" class="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition">Proses</button></td>' +
         '</tr>';

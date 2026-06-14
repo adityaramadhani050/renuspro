@@ -924,19 +924,38 @@ function getPOMenungguPenerimaan() {
       });
     }
 
+    // Build noWO → namaProject map from Penawaran_Main
+    var woNamaMap = {};
+    try {
+      var penData = _cachedPenawaran();
+      for (var p = 1; p < penData.length; p++) {
+        var wNo = penData[p][17] != null ? penData[p][17].toString().trim() : '';
+        var wNm = penData[p][4]  ? penData[p][4].toString().trim() : '';
+        if (wNo && wNm) woNamaMap[wNo] = wNm;
+      }
+    } catch(ep) { /* ignore */ }
+
+    var tz = Session.getScriptTimeZone();
     var result = [];
     for (var i = 1; i < poData.length; i++) {
       var status = (poData[i][6] || '').toString();
       if (status !== 'Menunggu Penerimaan Gudang') continue;
       var noPO2 = (poData[i][0] || '').toString().trim();
+      var noWO3 = (poData[i][5] || '').toString();
+      var tgl   = poData[i][1]
+        ? (poData[i][1] instanceof Date
+            ? Utilities.formatDate(poData[i][1], tz, 'dd/MM/yyyy')
+            : poData[i][1].toString())
+        : '';
       result.push({
-        noPO:          noPO2,
-        tanggal:       poData[i][1] ? poData[i][1].toString() : '',
-        namaSupplier:  (poData[i][3] || '').toString(),
-        peruntukan:    (poData[i][4] || '').toString(),
-        noWO:          (poData[i][5] || '').toString(),
+        noPO:              noPO2,
+        tanggal:           tgl,
+        namaSupplier:      (poData[i][3] || '').toString(),
+        peruntukan:        (poData[i][4] || '').toString(),
+        noWO:              noWO3,
+        namaProject:       noWO3 ? (woNamaMap[noWO3] || '') : '',
         jumlahItemPending: (itemsByPO[noPO2] || []).length,
-        items:         itemsByPO[noPO2] || []
+        items:             itemsByPO[noPO2] || []
       });
     }
     return result;

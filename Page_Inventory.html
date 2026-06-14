@@ -14,10 +14,6 @@
                 class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-cube text-xs"></i> Tambah Item Stok
               </button>
-              <button onclick="bukaFormPenerimaanTanpaPO()"
-                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
-                <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
-              </button>
               <button onclick="bukaFormPenggunaanStok()"
                 class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-arrow-right-from-bracket text-xs"></i> Catat Penggunaan
@@ -106,16 +102,15 @@
                 <table class="w-full text-left border-collapse">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th class="p-4">No PO</th>
-                      <th class="p-4">Supplier</th>
-                      <th class="p-4">Proyek / WO</th>
-                      <th class="p-4">Tanggal</th>
+                      <th class="p-4">No PO / Tanggal</th>
+                      <th class="p-4">Nama Order / Supplier</th>
+                      <th class="p-4">No WO / Proyek</th>
                       <th class="p-4 text-center">Item Pending</th>
                       <th class="p-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody id="table-po-gudang" class="text-sm">
-                    <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">
+                    <tr><td colspan="5" class="p-8 text-center text-slate-400 italic">
                       <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
                     </td></tr>
                   </tbody>
