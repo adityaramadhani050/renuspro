@@ -46,8 +46,8 @@ function _pgRenderPurchaseOrder(data) {
           : '<span class="text-slate-400">—</span>') +
       '</td>' +
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
-      '<td class="p-4 text-right font-bold text-slate-800">Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</td>' +
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
+      '<td class="p-4 text-right font-bold text-slate-800">Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</td>' +
       '<td class="p-4 text-center">' +
         '<div class="flex items-center justify-center gap-1">' +
           '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
