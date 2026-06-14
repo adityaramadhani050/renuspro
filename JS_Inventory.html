@@ -237,7 +237,6 @@ function bukaFormPenerimaanTanpaPO() {
   document.getElementById('ptnpo-qty').value = '';
   document.getElementById('ptnpo-harga').value = '';
   document.getElementById('ptnpo-keterangan').value = '';
-  document.getElementById('ptnpo-jangan-update-harga').checked = false;
   document.getElementById('ptnpo-nama-baru').value = '';
   document.getElementById('ptnpo-satuan-baru').value = '';
   _setPtnpoMode('existing');
@@ -269,7 +268,6 @@ function submitPenerimaanTanpaPO() {
   var qty        = parseFloat(document.getElementById('ptnpo-qty').value) || 0;
   var harga      = _parseCurrencyInv(document.getElementById('ptnpo-harga').value);
   var keterangan = document.getElementById('ptnpo-keterangan').value.trim();
-  var jangan     = document.getElementById('ptnpo-jangan-update-harga').checked;
 
   if (!tanggal)  return showNotification('Tanggal wajib diisi.', 'error');
   if (qty <= 0)  return showNotification('Qty harus lebih dari 0.', 'error');
@@ -312,7 +310,6 @@ function submitPenerimaanTanpaPO() {
       namaBaru: namaBaru, satuanBaru: satuanBaru,
       qty: qty, hargaSatuan: harga,
       keterangan: keterangan,
-      janganhUpdateHarga: jangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
     });
 }

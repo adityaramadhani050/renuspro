@@ -181,33 +181,36 @@
 
             <!-- Body -->
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Stok <span class="text-red-400">*</span></label>
-                  <!-- Toggle: pilih existing vs baru -->
-                  <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-3">
-                    <button type="button" id="ptnpo-mode-existing" onclick="_setPtnpoMode('existing')"
-                      class="px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-teal-700 shadow-sm">
-                      Pilih dari Stok
-                    </button>
-                    <button type="button" id="ptnpo-mode-baru" onclick="_setPtnpoMode('baru')"
-                      class="px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-700">
-                      Item Baru
-                    </button>
-                  </div>
-                  <div id="ptnpo-panel-existing">
-                    <select id="sel-produk-ptnpo"
-                      class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
-                      <option value="">-- Pilih Item Stok --</option>
-                    </select>
-                  </div>
-                  <div id="ptnpo-panel-baru" class="hidden space-y-3">
-                    <input type="text" id="ptnpo-nama-baru" placeholder="Nama item stok baru..."
-                      class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
-                    <input type="text" id="ptnpo-satuan-baru" placeholder="Satuan (unit, pcs, meter, kg...)"
-                      class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
-                  </div>
+
+              <!-- Item Stok -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Stok <span class="text-red-400">*</span></label>
+                <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-3">
+                  <button type="button" id="ptnpo-mode-existing" onclick="_setPtnpoMode('existing')"
+                    class="px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-teal-700 shadow-sm">
+                    Pilih dari Stok
+                  </button>
+                  <button type="button" id="ptnpo-mode-baru" onclick="_setPtnpoMode('baru')"
+                    class="px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-700">
+                    Item Baru
+                  </button>
                 </div>
+                <div id="ptnpo-panel-existing">
+                  <select id="sel-produk-ptnpo"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="">-- Pilih Item Stok --</option>
+                  </select>
+                </div>
+                <div id="ptnpo-panel-baru" class="hidden space-y-3">
+                  <input type="text" id="ptnpo-nama-baru" placeholder="Nama item stok baru..."
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                  <input type="text" id="ptnpo-satuan-baru" placeholder="Satuan (unit, pcs, meter, kg...)"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                </div>
+              </div>
+
+              <!-- Tanggal | Qty -->
+              <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal <span class="text-red-400">*</span></label>
                   <input type="date" id="ptnpo-tanggal"
@@ -218,25 +221,23 @@
                   <input type="number" id="ptnpo-qty" min="0" step="any" placeholder="0"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Satuan (Rp) <span class="text-red-400">*</span></label>
-                  <input type="text" id="ptnpo-harga" inputmode="numeric" placeholder="0"
-                    oninput="_fmtCurrencyInv(this)"
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan</label>
-                  <textarea id="ptnpo-keterangan" rows="2" placeholder="Keterangan (opsional)..."
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white resize-none"></textarea>
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" id="ptnpo-jangan-update-harga"
-                      class="w-4 h-4 rounded border-slate-300 accent-teal-600">
-                    <span class="text-sm font-semibold text-slate-700">Jangan update harga beli / HPP master</span>
-                  </label>
-                </div>
               </div>
+
+              <!-- Harga Satuan -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Satuan (Rp) <span class="text-red-400">*</span></label>
+                <input type="text" id="ptnpo-harga" inputmode="numeric" placeholder="0"
+                  oninput="_fmtCurrencyInv(this)"
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+              </div>
+
+              <!-- Keterangan -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan</label>
+                <textarea id="ptnpo-keterangan" rows="2" placeholder="Keterangan (opsional)..."
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white resize-none"></textarea>
+              </div>
+
             </div>
 
             <!-- Footer -->
