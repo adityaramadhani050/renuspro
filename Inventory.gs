@@ -573,7 +573,6 @@ function terimaPOItems(payload) {
           'Penerimaan dari PO ' + noPO,
           namaUser, nowStr
         ]);
-        _syncHPPProduk(ss, idStokItem, harga2);
         _syncQtyTersediaProduk(ss, idStokItem, saldoBaru);
       }
 
@@ -688,7 +687,6 @@ function simpanPenerimaanTanpaPO(payload) {
       namaUser, nowStr
     ]);
 
-    if (updateHarga && harga > 0) _syncHPPProduk(ss, idProduk, harga);
     _syncQtyTersediaProduk(ss, idProduk, saldoBaru);
 
     SpreadsheetApp.flush();
