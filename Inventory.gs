@@ -562,7 +562,17 @@ function terimaPOItems(payload) {
         satuanProduk = produkMap[it2.idProduk].satuan;
       }
 
-      var idStokItem = it2.idStok || it2.idProduk;
+      var idStokItem = (it2.idStok || it2.idProduk || '').toString().trim();
+      if (!idStokItem) {
+        // Auto-create stok dari data PO item
+        var autoNama   = it2.namaItem || ('Item PO ' + it2.idItem);
+        var autoSatuan = it2.satuan || 'unit';
+        var autoId     = _generateIdStok(sSheet);
+        var autoNow    = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
+        sSheet.appendRow([autoId, autoNama, autoSatuan, 0, 0, 0, autoNow]);
+        SpreadsheetApp.flush();
+        idStokItem = autoId;
+      }
       if (idStokItem) {
         var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
@@ -636,7 +646,6 @@ function simpanPenerimaanTanpaPO(payload) {
     var mSheet  = _ensureMutasiStokSheet(ss);
     var produkSheet = ss.getSheetByName('Master_Produk');
 
-    var idProduk  = payload.idStok || payload.idProduk;
     var qty       = Number(payload.qty) || 0;
     var harga     = Number(payload.hargaSatuan) || 0;
     var tgl       = payload.tanggal || '';
@@ -644,14 +653,27 @@ function simpanPenerimaanTanpaPO(payload) {
     var tz        = Session.getScriptTimeZone();
     var nowStr    = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
 
-    if (!idProduk) return { success: false, message: 'Item stok wajib dipilih.' };
     if (qty <= 0)  return { success: false, message: 'Qty harus lebih dari 0.' };
     if (!tgl)      return { success: false, message: 'Tanggal wajib diisi.' };
 
+    var sSheet = _ensureStokSheet(ss);
+
+    // Auto-create stok baru jika namaBaru diisi
+    var idProduk = (payload.idStok || payload.idProduk || '').toString().trim();
+    if (!idProduk && payload.namaBaru) {
+      var nama   = (payload.namaBaru || '').toString().trim();
+      var satuan = (payload.satuanBaru || '').toString().trim() || 'unit';
+      var newId  = _generateIdStok(sSheet);
+      var nowNew = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
+      sSheet.appendRow([newId, nama, satuan, 0, 0, 0, nowNew]);
+      idProduk = newId;
+      SpreadsheetApp.flush();
+    }
+    if (!idProduk) return { success: false, message: 'Item stok wajib dipilih atau nama item baru wajib diisi.' };
+
     // Cari info item dari sheet Stok
     var namaProduk = idProduk, satuanProduk = '';
-    var stokSheet  = _ensureStokSheet(ss);
-    var stokData   = stokSheet.getDataRange().getValues();
+    var stokData   = sSheet.getDataRange().getValues();
     var stokFound  = false;
     for (var i = 1; i < stokData.length; i++) {
       if ((stokData[i][0] || '').toString().trim() === idProduk) {

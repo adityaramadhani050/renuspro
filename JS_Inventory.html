@@ -120,13 +120,7 @@ function _pgRenderStok(data) {
   tbody.innerHTML = data.map(function(d) {
     var lowStock = d.qtyTersedia === 0;
     var qtyClass = lowStock ? 'text-red-600 font-extrabold' : (d.qtyTersedia <= 5 ? 'text-amber-600 font-bold' : 'font-bold text-slate-800');
-    var isSTK = /^STK-/i.test(d.idStok || d.idProduk);
-    var aksiBtn = isSTK
-      ? '<div class="flex items-center justify-center gap-1">' +
-          '<button onclick=\'bukaFormEditItemStok(' + JSON.stringify(d).replace(/'/g,"&#39;") + ')\' class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' +
-          '<button onclick="konfirmasiHapusItemStok(\'' + _escHtml(d.idStok || d.idProduk) + '\',\'' + _escHtml(d.namaProduk) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' +
-        '</div>'
-      : '<span class="text-xs text-slate-300">—</span>';
+    var aksiBtn = '<span class="text-xs text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(d.idStok || d.idProduk) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800">' + _escHtml(d.namaProduk) + '</td>' +
@@ -203,101 +197,6 @@ document.getElementById('tab-btn-mutasi').addEventListener('click', function() {
   if (!_cachedMutasiData.length) _loadMutasi();
 });
 
-// ── CRUD Item Stok ─────────────────────────────────────────────
-
-function bukaFormTambahItemStok() {
-  document.getElementById('new-stok-nama').value   = '';
-  document.getElementById('new-stok-satuan').value = '';
-  document.getElementById('new-stok-harga').value  = '';
-  document.getElementById('new-stok-qty').value    = '';
-  document.getElementById('form-tambah-item-stok').classList.remove('hidden');
-}
-
-function tutupFormTambahItemStok() {
-  document.getElementById('form-tambah-item-stok').classList.add('hidden');
-}
-
-function submitTambahItemStok() {
-  var nama   = document.getElementById('new-stok-nama').value.trim();
-  var satuan = document.getElementById('new-stok-satuan').value.trim();
-  var harga  = _parseCurrencyInv(document.getElementById('new-stok-harga').value);
-  var qty    = parseFloat(document.getElementById('new-stok-qty').value) || 0;
-
-  if (!nama)   return showNotification('Nama item wajib diisi.', 'error');
-  if (!satuan) return showNotification('Satuan wajib diisi.', 'error');
-
-  toggleLoader(true, 'Menyimpan item stok...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        tutupFormTambahItemStok();
-        showNotification(res.message, 'success');
-        _cachedStokData = [];
-        window.loadInventory();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
-    .tambahItemStok({ nama: nama, satuan: satuan, hargaBeli: harga, stokAwal: qty, namaUser: (_currentUser && _currentUser.nama) || '' });
-}
-
-function bukaFormEditItemStok(item) {
-  document.getElementById('edit-stok-id').value      = item.idStok || item.idProduk;
-  document.getElementById('edit-stok-nama').value    = item.namaProduk || '';
-  document.getElementById('edit-stok-satuan').value  = item.satuan || '';
-  document.getElementById('edit-stok-subtitle').textContent = (item.idStok || item.idProduk);
-  document.getElementById('form-edit-item-stok').classList.remove('hidden');
-}
-
-function tutupFormEditItemStok() {
-  document.getElementById('form-edit-item-stok').classList.add('hidden');
-}
-
-function submitEditItemStok() {
-  var idStok = document.getElementById('edit-stok-id').value;
-  var nama   = document.getElementById('edit-stok-nama').value.trim();
-  var satuan = document.getElementById('edit-stok-satuan').value.trim();
-
-  if (!nama)   return showNotification('Nama item wajib diisi.', 'error');
-  if (!satuan) return showNotification('Satuan wajib diisi.', 'error');
-
-  toggleLoader(true, 'Menyimpan perubahan...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        tutupFormEditItemStok();
-        showNotification(res.message, 'success');
-        _cachedStokData = [];
-        window.loadInventory();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
-    .editItemStok({ idStok: idStok, nama: nama, satuan: satuan });
-}
-
-function konfirmasiHapusItemStok(idStok, namaItem) {
-  if (!confirm('Hapus item stok "' + namaItem + '" (' + idStok + ')?\nItem tidak bisa dihapus jika ada Produk/Jasa yang terhubung.')) return;
-  toggleLoader(true, 'Menghapus...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message, 'success');
-        _cachedStokData = [];
-        window.loadInventory();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
-    .hapusItemStok(idStok);
-}
-
 // ── Stok dropdown helper ───────────────────────────────────────
 
 function _loadStokOptions(selId, selectedId) {
@@ -320,6 +219,18 @@ function _loadProdukMaterialOptions(selId) { _loadStokOptions(selId, ''); }
 
 // ── Form Penerimaan Tanpa PO ───────────────────────────────────
 
+function _setPtnpoMode(mode) {
+  var isExisting = mode === 'existing';
+  document.getElementById('ptnpo-panel-existing').classList.toggle('hidden', !isExisting);
+  document.getElementById('ptnpo-panel-baru').classList.toggle('hidden', isExisting);
+  var btnE = document.getElementById('ptnpo-mode-existing');
+  var btnB = document.getElementById('ptnpo-mode-baru');
+  var active   = 'px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-teal-700 shadow-sm';
+  var inactive = 'px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-700';
+  btnE.className = isExisting ? active : inactive;
+  btnB.className = isExisting ? inactive : active;
+}
+
 function bukaFormPenerimaanTanpaPO() {
   var tgl = new Date(); tgl = tgl.toISOString().slice(0, 10);
   document.getElementById('ptnpo-tanggal').value = tgl;
@@ -327,6 +238,9 @@ function bukaFormPenerimaanTanpaPO() {
   document.getElementById('ptnpo-harga').value = '';
   document.getElementById('ptnpo-keterangan').value = '';
   document.getElementById('ptnpo-jangan-update-harga').checked = false;
+  document.getElementById('ptnpo-nama-baru').value = '';
+  document.getElementById('ptnpo-satuan-baru').value = '';
+  _setPtnpoMode('existing');
   _loadProdukMaterialOptions('sel-produk-ptnpo');
   document.getElementById('form-penerimaan-tanpa-po').classList.remove('hidden');
 }
@@ -351,17 +265,29 @@ function _loadAkunPembayaranOptions(selId) {
 }
 
 function submitPenerimaanTanpaPO() {
-  var idProduk = document.getElementById('sel-produk-ptnpo').value;
-  var tanggal  = document.getElementById('ptnpo-tanggal').value;
-  var qty      = parseFloat(document.getElementById('ptnpo-qty').value) || 0;
-  var harga    = _parseCurrencyInv(document.getElementById('ptnpo-harga').value);
+  var tanggal    = document.getElementById('ptnpo-tanggal').value;
+  var qty        = parseFloat(document.getElementById('ptnpo-qty').value) || 0;
+  var harga      = _parseCurrencyInv(document.getElementById('ptnpo-harga').value);
   var keterangan = document.getElementById('ptnpo-keterangan').value.trim();
-  var jangan   = document.getElementById('ptnpo-jangan-update-harga').checked;
+  var jangan     = document.getElementById('ptnpo-jangan-update-harga').checked;
 
-  if (!idProduk) return showNotification('Produk wajib dipilih.', 'error');
   if (!tanggal)  return showNotification('Tanggal wajib diisi.', 'error');
   if (qty <= 0)  return showNotification('Qty harus lebih dari 0.', 'error');
   if (harga <= 0) return showNotification('Harga satuan harus lebih dari 0.', 'error');
+
+  var panelBaru = document.getElementById('ptnpo-panel-baru');
+  var isNewMode = !panelBaru.classList.contains('hidden');
+  var idStok = '', namaBaru = '', satuanBaru = '';
+
+  if (isNewMode) {
+    namaBaru   = document.getElementById('ptnpo-nama-baru').value.trim();
+    satuanBaru = document.getElementById('ptnpo-satuan-baru').value.trim();
+    if (!namaBaru)   return showNotification('Nama item baru wajib diisi.', 'error');
+    if (!satuanBaru) return showNotification('Satuan item baru wajib diisi.', 'error');
+  } else {
+    idStok = document.getElementById('sel-produk-ptnpo').value;
+    if (!idStok) return showNotification('Pilih item stok atau pilih "Item Baru".', 'error');
+  }
 
   toggleLoader(true, 'Menyimpan penerimaan...');
   google.script.run
@@ -382,7 +308,9 @@ function submitPenerimaanTanpaPO() {
       showNotification('Error: ' + err.message, 'error');
     })
     .simpanPenerimaanTanpaPO({
-      tanggal: tanggal, idStok: idProduk, qty: qty, hargaSatuan: harga,
+      tanggal: tanggal, idStok: idStok,
+      namaBaru: namaBaru, satuanBaru: satuanBaru,
+      qty: qty, hargaSatuan: harga,
       keterangan: keterangan,
       janganhUpdateHarga: jangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
@@ -540,10 +468,6 @@ function submitProsesTerimaPOGudang() {
     var idStok   = (stokSel && stokSel.value) ? stokSel.value.trim() : '';
     if (qty > sisa) {
       showNotification('Qty melebihi sisa untuk "' + namaItem + '" (sisa: ' + sisa + ').', 'error');
-      hasError = true; return;
-    }
-    if (!idStok) {
-      showNotification('Pilih item stok tujuan untuk "' + namaItem + '".', 'error');
       hasError = true; return;
     }
     items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok, idProduk: idStok, hargaBeli: hargaBeli, satuan: '' });
