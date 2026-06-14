@@ -197,19 +197,14 @@ function getPOList() {
   try {
     var data = _cachedPO();
 
-    // Build noWO → namaProject map from Master_Penawaran
+    // Build noWO → namaProject map from Penawaran_Main (col[17]=noWO, col[4]=namaProject)
     var woNamaMap = {};
     try {
-      var ss       = getSpreadsheet();
-      var penSheet = ss.getSheetByName('Master_Penawaran');
-      if (penSheet) {
-        var penData = penSheet.getDataRange().getValues();
-        // col[17]=noWO, col[4]=namaProject (same as WorkOrder.gs)
-        for (var p = 1; p < penData.length; p++) {
-          var wNo = penData[p][17] ? penData[p][17].toString().trim() : '';
-          var wNm = penData[p][4]  ? penData[p][4].toString().trim()  : '';
-          if (wNo && wNm) woNamaMap[wNo] = wNm;
-        }
+      var penData = _cachedPenawaran();
+      for (var p = 1; p < penData.length; p++) {
+        var wNo = penData[p][17] != null ? penData[p][17].toString().trim() : '';
+        var wNm = penData[p][4]  ? penData[p][4].toString().trim()  : '';
+        if (wNo && wNm) woNamaMap[wNo] = wNm;
       }
     } catch(e2) { /* ignore — nama project not critical */ }
 
