@@ -241,20 +241,25 @@ function _updateStokEntry(ss, idProduk, namaProduk, satuan, qtyDelta, hargaBeli)
 }
 
 /**
- * Sinkron HPP di Master_Produk untuk idProduk tertentu.
+ * Sinkron HPP di Master_Produk.
+ * Cari baris yang col[0] === idProduk ATAU col[6] === idProduk (untuk STK-###).
  */
 function _syncHPPProduk(ss, idProduk, hargaBeli) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('Master_Produk');
   if (!sheet) return;
+  _ensureStokLinkKolom(ss);
   var data = sheet.getDataRange().getValues();
+  var updated = false;
   for (var i = 1; i < data.length; i++) {
-    if ((data[i][0] || '').toString().trim() === idProduk.toString().trim()) {
+    var matchById   = (data[i][0] || '').toString().trim() === idProduk.toString().trim();
+    var matchByStok = (data[i][6] || '').toString().trim() === idProduk.toString().trim();
+    if (matchById || matchByStok) {
       sheet.getRange(i + 1, 5).setValue(hargaBeli); // col[4] = HPP
-      break;
+      updated = true;
     }
   }
-  invalidateProdukCache();
+  if (updated) invalidateProdukCache();
 }
 
 // ── Read Functions ───────────────────────────────────────────────────────────

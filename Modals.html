@@ -68,10 +68,16 @@
             </div>
             <div class="md:col-span-2">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tautkan ke Item Stok <span class="text-slate-400 font-normal normal-case ml-1">Opsional — HPP & Qty Tersedia auto-sync</span></label>
-              <select id="edit-produk-stok-id" onchange="_onStokLinkChange('edit-produk-stok-id','edit-produk-hpp', hitungMarginEditProduk)" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
-                <option value="">— Tidak terhubung ke stok —</option>
-              </select>
-            </div>
+              <div class="flex gap-2">
+                <select id="edit-produk-stok-id" onchange="_onStokLinkChange('edit-produk-stok-id','edit-produk-hpp', hitungMarginEditProduk)" class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
+                  <option value="">— Tidak terhubung ke stok —</option>
+                </select>
+                <button type="button" onclick="_onStokLinkChange('edit-produk-stok-id','edit-produk-hpp', hitungMarginEditProduk)"
+                  title="Sync HPP dari stok terpilih"
+                  class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-slate-200 transition text-sm">
+                  <i class="fa-solid fa-rotate"></i>
+                </button>
+              </div>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
               <div class="relative">
