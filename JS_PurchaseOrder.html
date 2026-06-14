@@ -730,19 +730,25 @@ function submitTerimaPO() {
   var noPO  = _currentPODetail.noPO;
   var rows  = document.querySelectorAll('#form-terima-items tr[data-id-item]');
   var items = [];
+  var hasError = false;
   rows.forEach(function(row) {
+    if (hasError) return;
     var idItem    = row.getAttribute('data-id-item');
     var qtyInput  = row.querySelector('.terima-qty-input');
     var idStok    = (row.querySelector('.terima-idstok-select') || {}).value || '';
     if (!qtyInput) return;
     var qty = parseFloat(qtyInput.value) || 0;
     if (qty <= 0) return;
+    var namaItem = (row.querySelector('td:first-child') || {}).innerText || idItem;
     var sisa = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
     if (qty > sisa) {
-      showNotification('Qty melebihi sisa untuk item ' + idItem, 'error');
-      return;
+      showNotification('Qty melebihi sisa untuk item "' + namaItem + '".', 'error');
+      hasError = true; return;
     }
-    var namaItem = (row.querySelector('td:first-child') || {}).innerText || '';
+    if (!idStok.trim()) {
+      showNotification('Pilih item stok untuk "' + namaItem + '" — stok wajib dipilih jika qty > 0.', 'error');
+      hasError = true; return;
+    }
     items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok.trim(), idProduk: idStok.trim(),
       hargaBeli: (_currentPODetail && _currentPODetail.items
         ? ((_currentPODetail.items.find(function(i) { return i.idItem === idItem; }) || {}).hargaBeli || 0)
@@ -751,6 +757,7 @@ function submitTerimaPO() {
     });
   });
 
+  if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
   toggleLoader(true, 'Menyimpan penerimaan...');
