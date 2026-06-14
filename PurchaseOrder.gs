@@ -564,6 +564,116 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
   }
 }
 
+// Kirim PO ke gudang untuk diterima oleh warehouse
+function submitPOKeGudang(noPO, namaUser) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss      = getSpreadsheet();
+    var poSheet = _ensurePOSheet(ss);
+    SpreadsheetApp.flush();
+    var poData = poSheet.getDataRange().getValues();
+    var poRowIdx = -1, statusPO = '';
+    for (var i = 1; i < poData.length; i++) {
+      if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
+    }
+    if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
+    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+      return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
+    }
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+    poSheet.getRange(poRowIdx, 7).setValue('Menunggu Penerimaan Gudang');
+    poSheet.getRange(poRowIdx, 17).setValue(namaUser || '');
+    poSheet.getRange(poRowIdx, 18).setValue(nowStr);
+    invalidatePOCache();
+    return { success: true, message: 'PO ' + noPO + ' berhasil dikirim ke gudang.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Terima barang langsung ke klien (tidak masuk inventory)
+function terimaPOKirimLangsung(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var noPO  = (payload.noPO || '').toString().trim();
+    var items = payload.items || [];
+    if (!noPO) return { success: false, message: 'No PO tidak boleh kosong.' };
+
+    var ss      = getSpreadsheet();
+    var poSheet = _ensurePOSheet(ss);
+    var itSheet = _ensurePOItemSheet(ss);
+    _ensurePOItemCols(ss);
+    SpreadsheetApp.flush();
+
+    var poData = poSheet.getDataRange().getValues();
+    var poRowIdx = -1, statusPO = '';
+    for (var i = 1; i < poData.length; i++) {
+      if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
+    }
+    if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
+    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+      return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
+    }
+
+    var itData = itSheet.getDataRange().getValues();
+    var itRowMap = {};
+    for (var j = 1; j < itData.length; j++) {
+      itRowMap[(itData[j][0] || '').toString()] = j;
+    }
+
+    // Validasi semua item sebelum tulis
+    for (var ii = 0; ii < items.length; ii++) {
+      var it = items[ii];
+      var qtyTerima = Number(it.qty) || 0;
+      if (qtyTerima <= 0) continue;
+      var itRowIdx = itRowMap[it.idItem];
+      if (itRowIdx === undefined) return { success: false, message: 'Item ' + it.idItem + ' tidak ditemukan.' };
+      var qtyPesan = Number(itData[itRowIdx][3]) || 0;
+      var qtyDiterima = Number(itData[itRowIdx][8]) || 0;
+      var qtySisa = qtyPesan - qtyDiterima;
+      if (qtyTerima > qtySisa) {
+        return { success: false, message: 'Qty melebihi sisa untuk item "' + it.namaItem + '" (sisa: ' + qtySisa + ').' };
+      }
+    }
+
+    // Tulis qty diterima
+    var allDiterima = true;
+    for (var kk = 0; kk < items.length; kk++) {
+      var it2 = items[kk];
+      var qtyTerima2 = Number(it2.qty) || 0;
+      if (qtyTerima2 <= 0) continue;
+      var itRowIdx2 = itRowMap[it2.idItem];
+      var qtyDiterima2 = Number(itData[itRowIdx2][8]) || 0;
+      itSheet.getRange(itRowIdx2 + 1, 9).setValue(qtyDiterima2 + qtyTerima2);
+    }
+    // Hitung status baru
+    SpreadsheetApp.flush();
+    itData = itSheet.getDataRange().getValues();
+    for (var mm = 1; mm < itData.length; mm++) {
+      if ((itData[mm][1] || '').toString() !== noPO) continue;
+      var qtyP = Number(itData[mm][3]) || 0;
+      var qtyD = Number(itData[mm][8]) || 0;
+      if (qtyD < qtyP) { allDiterima = false; break; }
+    }
+    var nowStr2 = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+    var statusBaru = allDiterima ? 'Diterima' : 'Diterima Sebagian';
+    poSheet.getRange(poRowIdx, 7).setValue(statusBaru);
+    poSheet.getRange(poRowIdx, 17).setValue((payload.namaUser || '').toString());
+    poSheet.getRange(poRowIdx, 18).setValue(nowStr2);
+
+    invalidatePOCache();
+    return { success: true, message: 'Penerimaan langsung berhasil. Status PO: ' + statusBaru + '.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function hapusPO(noPO) {
   var lock = LockService.getScriptLock();
   try {

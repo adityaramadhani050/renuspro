@@ -407,7 +407,7 @@ function getPOItemsUntukPenerimaan(noPO) {
       }
     }
     if (!statusPO) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
@@ -498,7 +498,7 @@ function terimaPOItems(payload) {
       }
     }
     if (poRowIdx < 0) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
@@ -889,5 +889,58 @@ function batalkanPenggunaanStok(idMutasi, namaUser) {
     return { success: false, message: e.toString() };
   } finally {
     lock.releaseLock();
+  }
+}
+
+function getPOMenungguPenerimaan() {
+  try {
+    var ss = getSpreadsheet();
+    var poSheet = ss.getSheetByName('Purchase_Order');
+    var itSheet = ss.getSheetByName('PO_Item');
+    if (!poSheet || !itSheet) return [];
+
+    var poData = poSheet.getDataRange().getValues();
+    var itData = itSheet.getDataRange().getValues();
+
+    // Build item map by noPO
+    var itemsByPO = {};
+    for (var j = 1; j < itData.length; j++) {
+      var row = itData[j];
+      var noPO = (row[1] || '').toString().trim();
+      if (!noPO) continue;
+      if (!itemsByPO[noPO]) itemsByPO[noPO] = [];
+      var qtyPesan    = Number(row[3]) || 0;
+      var qtyDiterima = Number(row[8]) || 0;
+      var qtySisa     = qtyPesan - qtyDiterima;
+      if (qtySisa <= 0) continue; // skip item sudah penuh
+      itemsByPO[noPO].push({
+        idItem:      (row[0] || '').toString(),
+        namaItem:    (row[2] || '').toString(),
+        satuan:      (row[4] || '').toString(),
+        hargaBeli:   Number(row[5]) || 0,
+        qtyPesan:    qtyPesan,
+        qtyDiterima: qtyDiterima,
+        qtySisa:     qtySisa
+      });
+    }
+
+    var result = [];
+    for (var i = 1; i < poData.length; i++) {
+      var status = (poData[i][6] || '').toString();
+      if (status !== 'Menunggu Penerimaan Gudang') continue;
+      var noPO2 = (poData[i][0] || '').toString().trim();
+      result.push({
+        noPO:          noPO2,
+        tanggal:       poData[i][1] ? poData[i][1].toString() : '',
+        namaSupplier:  (poData[i][3] || '').toString(),
+        peruntukan:    (poData[i][4] || '').toString(),
+        noWO:          (poData[i][5] || '').toString(),
+        jumlahItemPending: (itemsByPO[noPO2] || []).length,
+        items:         itemsByPO[noPO2] || []
+      });
+    }
+    return result;
+  } catch(e) {
+    return [];
   }
 }

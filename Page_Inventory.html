@@ -35,6 +35,10 @@
               class="px-5 py-2 rounded-lg text-sm font-bold transition tab-inv-active">
               <i class="fas fa-boxes-stacked mr-1.5"></i> Daftar Stok
             </button>
+            <button id="tab-btn-penerimaan" onclick="switchInvTab('penerimaan')"
+              class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
+              <i class="fas fa-truck-ramp-box mr-1.5"></i> Penerimaan Barang
+            </button>
             <button id="tab-btn-mutasi" onclick="switchInvTab('mutasi')"
               class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
               <i class="fas fa-list-ul mr-1.5"></i> Riwayat Mutasi
@@ -75,6 +79,44 @@
                   <tbody id="table-stok" class="text-sm">
                     <tr><td colspan="8" class="p-8 text-center text-slate-500">
                       <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data stok...
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Tab Penerimaan Barang ── -->
+          <div id="tab-penerimaan" class="hidden">
+            <div class="flex justify-between items-center mb-3">
+              <p class="text-sm text-slate-500">PO yang menunggu penerimaan gudang & penerimaan langsung tanpa PO.</p>
+              <button onclick="bukaFormPenerimaanTanpaPO()"
+                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl font-bold shadow-sm transition flex items-center gap-2 text-sm">
+                <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
+              </button>
+            </div>
+            <!-- List PO Menunggu Gudang -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden mb-4">
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                <i class="fas fa-hourglass-half text-amber-500"></i>
+                <span class="text-sm font-bold text-slate-700">PO Menunggu Penerimaan Gudang</span>
+                <span id="po-gudang-count" class="ml-auto text-xs text-slate-400"></span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="p-4">No PO</th>
+                      <th class="p-4">Supplier</th>
+                      <th class="p-4">Proyek / WO</th>
+                      <th class="p-4">Tanggal</th>
+                      <th class="p-4 text-center">Item Pending</th>
+                      <th class="p-4 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-po-gudang" class="text-sm">
+                    <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">
+                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
                     </td></tr>
                   </tbody>
                 </table>
@@ -419,6 +461,52 @@
               </button>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ── Modal Proses Terima PO (Gudang) ── -->
+        <div id="form-terima-po-gudang" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <span class="bg-amber-50 text-amber-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-warehouse"></i>
+              </span>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Proses Penerimaan Barang</h3>
+                <p id="terima-po-gudang-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="tutupModalTerimaPOGudang()" class="ml-auto text-slate-400 hover:text-slate-600 transition">
+                <i class="fas fa-times text-lg"></i>
+              </button>
+            </div>
+            <div class="overflow-y-auto px-6 py-4 flex-1">
+              <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="p-3">Nama Item</th>
+                      <th class="p-3 text-center">Harga Beli</th>
+                      <th class="p-3 text-center">Sisa</th>
+                      <th class="p-3 text-center" style="min-width:110px">Qty Terima</th>
+                      <th class="p-3">Item Stok Tujuan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="terima-po-gudang-items" class="text-sm">
+                    <tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Memuat...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onclick="tutupModalTerimaPOGudang()"
+                class="px-4 py-2.5 text-sm text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold transition border border-slate-200">
+                Batal
+              </button>
+              <button onclick="submitProsesTerimaPOGudang()"
+                class="px-6 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Penerimaan
+              </button>
+            </div>
           </div>
         </div>
 

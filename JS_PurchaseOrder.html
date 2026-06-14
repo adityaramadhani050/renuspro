@@ -344,12 +344,13 @@ function _renderPODetail(po, items, pembayaran) {
   var btnStatus = document.getElementById('po-detail-btn-status');
   if (btnStatus) btnStatus.classList.toggle('hidden', po.statusPO === 'Selesai' || po.statusPO === 'Batal');
 
-  // Tombol Terima Barang: tampil jika Disetujui atau Diterima Sebagian
-  var btnTerima = document.getElementById('po-detail-btn-terima');
-  if (btnTerima) {
-    var bisaTerima = po.statusPO === 'Disetujui' || po.statusPO === 'Diterima Sebagian';
-    btnTerima.classList.toggle('hidden', !bisaTerima);
-  }
+  // Tombol Terima Barang / badge Menunggu Gudang
+  var btnTerima    = document.getElementById('po-detail-btn-terima');
+  var badgeGudang  = document.getElementById('po-detail-badge-gudang');
+  var bisaTerima   = po.statusPO === 'Disetujui' || po.statusPO === 'Diterima Sebagian';
+  var menungguGudang = po.statusPO === 'Menunggu Penerimaan Gudang';
+  if (btnTerima)   btnTerima.classList.toggle('hidden', !bisaTerima);
+  if (badgeGudang) badgeGudang.classList.toggle('hidden', !menungguGudang);
 
   // Items
   var tbody = document.getElementById('po-detail-items');
@@ -639,73 +640,66 @@ function hapusPembayaranPOUI(idBayar) {
 
 // ── Terima Barang dari PO ────────────────────────────────────────────────────
 
-// Cache daftar stok untuk dropdown form terima PO
-var _stokCachePO = [];
+var _terimaPOMode    = 'langsung'; // 'langsung' | 'gudang'
+var _terimaPOItems   = [];         // cache items dari server
+
+function _setTerimaPOMode(mode) {
+  _terimaPOMode = mode;
+  var btnL = document.getElementById('terima-mode-langsung');
+  var btnG = document.getElementById('terima-mode-gudang');
+  var panL = document.getElementById('terima-panel-langsung');
+  var panG = document.getElementById('terima-panel-gudang');
+  if (mode === 'langsung') {
+    btnL.className = 'px-4 py-2 rounded-lg text-sm font-bold transition bg-teal-600 text-white shadow-sm';
+    btnG.className = 'px-4 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
+    panL.classList.remove('hidden');
+    panG.classList.add('hidden');
+  } else {
+    btnG.className = 'px-4 py-2 rounded-lg text-sm font-bold transition bg-amber-500 text-white shadow-sm';
+    btnL.className = 'px-4 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
+    panG.classList.remove('hidden');
+    panL.classList.add('hidden');
+  }
+}
 
 function bukaFormTerimaPO() {
   if (!_currentPODetail) return;
   var noPO    = _currentPODetail.noPO;
   var formDiv = document.getElementById('form-terima-po');
   formDiv.classList.remove('hidden');
+  _setTerimaPOMode('langsung');
 
-  var tbody = document.getElementById('form-terima-items');
-  tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-
-  // Load Stok + PO items secara paralel
-  var stokDone = false, itemsDone = false;
-  var stokList = [], poItemsRes = null;
-
-  function _tryRender() {
-    if (!stokDone || !itemsDone) return;
-    _stokCachePO = stokList;
-    _renderFormTerimaItems(tbody, poItemsRes, stokList);
-    formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  google.script.run
-    .withSuccessHandler(function(data) {
-      stokList = data || [];
-      stokDone = true;
-      _tryRender();
-    })
-    .withFailureHandler(function() { stokDone = true; _tryRender(); })
-    .getStokList();
+  var tbodyL = document.getElementById('form-terima-items-langsung');
+  var tbodyG = document.getElementById('form-terima-items-gudang');
+  tbodyL.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  tbodyG.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
   google.script.run
     .withSuccessHandler(function(res) {
-      poItemsRes = res;
-      itemsDone  = true;
-      _tryRender();
+      if (!res || !res.success) {
+        var msg = '<tr><td colspan="5" class="p-4 text-center text-red-500">' + _escHtml(res ? res.message : 'Gagal') + '</td></tr>';
+        tbodyL.innerHTML = msg;
+        tbodyG.innerHTML = msg.replace('colspan="5"', 'colspan="4"');
+        return;
+      }
+      _terimaPOItems = res.items || [];
+      _renderFormTerimaLangsung(tbodyL, _terimaPOItems);
+      _renderFormTerimaGudang(tbodyG, _terimaPOItems);
+      formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     })
     .withFailureHandler(function(err) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ' + err.message + '</td></tr>';
+      tbodyL.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-red-500">Error: ' + _escHtml(err.message) + '</td></tr>';
     })
     .getPOItemsUntukPenerimaan(noPO);
 }
 
-function _renderFormTerimaItems(tbody, res, stokList) {
-  if (!res || !res.success) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">' + _escHtml(res ? res.message : 'Gagal') + '</td></tr>';
-    return;
-  }
-  var items = res.items || [];
+function _renderFormTerimaLangsung(tbody, items) {
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
     return;
   }
-
-  // Build dropdown options dari sheet Stok
-  var optionsHtml = '<option value="">— Pilih Item Stok —</option>' +
-    stokList.map(function(s) {
-      return '<option value="' + _escHtml(s.idStok) + '">' + _escHtml(s.idStok) + ' — ' + _escHtml(s.namaProduk) + '</option>';
-    }).join('');
-
   tbody.innerHTML = items.map(function(it) {
     var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
-    var preselect = it.idStok || it.idProduk || '';
-    var selectedOpt = preselect
-      ? optionsHtml.replace('value="' + _escHtml(preselect) + '"', 'value="' + _escHtml(preselect) + '" selected')
-      : optionsHtml;
     return '<tr class="border-b border-teal-50" data-id-item="' + _escHtml(it.idItem) + '">' +
       '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
       '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
@@ -713,29 +707,39 @@ function _renderFormTerimaItems(tbody, res, stokList) {
       '<td class="px-3 py-2 text-center text-sm ' + sisaClass + '">' + it.qtySisa + '</td>' +
       '<td class="px-3 py-2 text-center">' +
         (it.qtySisa > 0
-          ? '<input type="number" class="terima-qty-input w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
+          ? '<input type="number" class="terima-langsung-qty w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
           : '<span class="text-xs text-slate-300">Penuh</span>') +
-      '</td>' +
-      '<td class="px-3 py-2">' +
-        '<select class="terima-idstok-select w-full min-w-[200px] px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 bg-white text-slate-700">' +
-          selectedOpt +
-        '</select>' +
       '</td>' +
     '</tr>';
   }).join('');
 }
 
-function submitTerimaPO() {
+function _renderFormTerimaGudang(tbody, items) {
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(function(it) {
+    var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
+    return '<tr class="border-b border-amber-50">' +
+      '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm text-teal-600 font-bold">' + it.qtyDiterima + '</td>' +
+      '<td class="px-3 py-2 text-center text-sm ' + sisaClass + '">' + it.qtySisa + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function submitTerimaPOKirimLangsung() {
   if (!_currentPODetail) return;
-  var noPO  = _currentPODetail.noPO;
-  var rows  = document.querySelectorAll('#form-terima-items tr[data-id-item]');
+  var noPO = _currentPODetail.noPO;
+  var rows = document.querySelectorAll('#form-terima-items-langsung tr[data-id-item]');
   var items = [];
   var hasError = false;
   rows.forEach(function(row) {
     if (hasError) return;
-    var idItem    = row.getAttribute('data-id-item');
-    var qtyInput  = row.querySelector('.terima-qty-input');
-    var idStok    = (row.querySelector('.terima-idstok-select') || {}).value || '';
+    var idItem   = row.getAttribute('data-id-item');
+    var qtyInput = row.querySelector('.terima-langsung-qty');
     if (!qtyInput) return;
     var qty = parseFloat(qtyInput.value) || 0;
     if (qty <= 0) return;
@@ -745,22 +749,12 @@ function submitTerimaPO() {
       showNotification('Qty melebihi sisa untuk item "' + namaItem + '".', 'error');
       hasError = true; return;
     }
-    if (!idStok.trim()) {
-      showNotification('Pilih item stok untuk "' + namaItem + '" — stok wajib dipilih jika qty > 0.', 'error');
-      hasError = true; return;
-    }
-    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok.trim(), idProduk: idStok.trim(),
-      hargaBeli: (_currentPODetail && _currentPODetail.items
-        ? ((_currentPODetail.items.find(function(i) { return i.idItem === idItem; }) || {}).hargaBeli || 0)
-        : 0),
-      satuan: ''
-    });
+    items.push({ idItem: idItem, namaItem: namaItem, qty: qty });
   });
-
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
-  toggleLoader(true, 'Menyimpan penerimaan...');
+  toggleLoader(true, 'Menyimpan penerimaan langsung...');
   google.script.run
     .withSuccessHandler(function(res) {
       toggleLoader(false);
@@ -776,10 +770,29 @@ function submitTerimaPO() {
       toggleLoader(false);
       showNotification('Error: ' + err.message, 'error');
     })
-    .terimaPOItems({
-      noPO: noPO, items: items,
-      namaUser: (_currentUser && _currentUser.nama) || ''
-    });
+    .terimaPOKirimLangsung({ noPO: noPO, items: items, namaUser: (_currentUser && _currentUser.nama) || '' });
+}
+
+function submitPOKeGudang() {
+  if (!_currentPODetail) return;
+  var noPO = _currentPODetail.noPO;
+  toggleLoader(true, 'Mengirim ke gudang...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        document.getElementById('form-terima-po').classList.add('hidden');
+        bukaPODetail(noPO);
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .submitPOKeGudang(noPO, (_currentUser && _currentUser.nama) || '');
 }
 
 // ── Export PDF PO — sama dengan sistem Penawaran/Invoice ──────────────────────

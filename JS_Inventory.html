@@ -34,25 +34,24 @@ function _fmtTglInv(s) {
 function switchInvTab(tab) {
   _invActiveTab = tab;
   document.getElementById('tab-stok').classList.toggle('hidden', tab !== 'stok');
+  document.getElementById('tab-penerimaan').classList.toggle('hidden', tab !== 'penerimaan');
   document.getElementById('tab-mutasi').classList.toggle('hidden', tab !== 'mutasi');
 
-  const btnStok   = document.getElementById('tab-btn-stok');
-  const btnMutasi = document.getElementById('tab-btn-mutasi');
-  if (tab === 'stok') {
-    btnStok.className   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
-    btnMutasi.className = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  } else {
-    btnMutasi.className = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
-    btnStok.className   = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  }
+  var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
+  var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
+  document.getElementById('tab-btn-stok').className        = tab === 'stok'        ? active : inactive;
+  document.getElementById('tab-btn-penerimaan').className  = tab === 'penerimaan'  ? active : inactive;
+  document.getElementById('tab-btn-mutasi').className      = tab === 'mutasi'      ? active : inactive;
+
+  if (tab === 'penerimaan') loadPOMenungguPenerimaan();
 }
 
 // ── Visibility helpers ─────────────────────────────────────────
 
 function _showInvSection(sectionId) {
-  document.getElementById('inv-list-section').classList.add('hidden');
-  document.getElementById('form-penerimaan-tanpa-po').classList.add('hidden');
-  document.getElementById('form-penyesuaian-stok').classList.add('hidden');
+  ['inv-list-section','form-penerimaan-tanpa-po','form-penyesuaian-stok'].forEach(function(id) {
+    document.getElementById(id).classList.add('hidden');
+  });
   document.getElementById(sectionId).classList.remove('hidden');
 }
 
@@ -436,6 +435,132 @@ function submitPenyesuaianStok() {
       idProduk: idProduk, idStok: idProduk, jenis: jenis, qty: qty,
       keterangan: keterangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
+    });
+}
+
+// ── Tab Penerimaan Barang: PO Menunggu Gudang ──────────────────
+
+var _currentPOGudang = null; // { noPO, namaSupplier, items }
+
+function loadPOMenungguPenerimaan() {
+  var tbody = document.getElementById('table-po-gudang');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  google.script.run
+    .withSuccessHandler(function(data) {
+      var list = data || [];
+      document.getElementById('po-gudang-count').innerText = list.length ? list.length + ' PO' : '';
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic">Tidak ada PO yang menunggu penerimaan gudang.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(function(po) {
+        var proyek = po.noWO ? po.noWO : (po.peruntukan || '—');
+        return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
+          '<td class="p-4 font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(po.noPO) + '</td>' +
+          '<td class="p-4 text-sm text-slate-700">' + _escHtmlInv(po.namaSupplier) + '</td>' +
+          '<td class="p-4 text-sm text-slate-500">' + _escHtmlInv(proyek) + '</td>' +
+          '<td class="p-4 text-sm text-slate-500">' + _fmtTglInv(po.tanggal) + '</td>' +
+          '<td class="p-4 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg text-xs font-bold">' + po.jumlahItemPending + ' item</span></td>' +
+          '<td class="p-4 text-center"><button onclick="bukaProsesTerimaPOGudang(' + JSON.stringify(po).replace(/"/g,'&quot;') + ')" class="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition">Proses</button></td>' +
+        '</tr>';
+      }).join('');
+    })
+    .withFailureHandler(function() {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-red-500">Gagal memuat data.</td></tr>';
+    })
+    .getPOMenungguPenerimaan();
+}
+
+function _escHtmlInv(s) {
+  return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function bukaProsesTerimaPOGudang(po) {
+  _currentPOGudang = po;
+  document.getElementById('terima-po-gudang-subtitle').innerText = po.noPO + ' — ' + po.namaSupplier;
+  var tbody = document.getElementById('terima-po-gudang-items');
+
+  // Load stok list for dropdowns
+  google.script.run
+    .withSuccessHandler(function(stokList) {
+      var optHtml = '<option value="">— Pilih Item Stok —</option>' +
+        (stokList || []).map(function(s) {
+          return '<option value="' + _escHtmlInv(s.idStok) + '">' + _escHtmlInv(s.idStok) + ' — ' + _escHtmlInv(s.namaProduk) + ' (' + (s.qtyTersedia || 0) + ' ' + _escHtmlInv(s.satuan) + ')</option>';
+        }).join('');
+
+      tbody.innerHTML = (po.items || []).map(function(it) {
+        var harga = it.hargaBeli ? parseInt(it.hargaBeli).toLocaleString('id-ID') : '—';
+        return '<tr class="border-b border-slate-100" data-id-item="' + _escHtmlInv(it.idItem) + '">' +
+          '<td class="p-3 text-sm font-medium text-slate-800">' + _escHtmlInv(it.namaItem) + '</td>' +
+          '<td class="p-3 text-center text-sm text-slate-500">Rp ' + harga + '</td>' +
+          '<td class="p-3 text-center text-sm font-bold text-amber-700">' + it.qtySisa + '</td>' +
+          '<td class="p-3 text-center"><input type="number" class="pg-gudang-qty w-20 px-2 py-1 text-sm border border-slate-200 rounded-lg text-center focus:outline-none focus:border-teal-400" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '" data-nama="' + _escHtmlInv(it.namaItem) + '" data-harga="' + (it.hargaBeli || 0) + '"></td>' +
+          '<td class="p-3"><select class="pg-gudang-stok w-full min-w-[200px] px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 bg-white">' + optHtml + '</select></td>' +
+        '</tr>';
+      }).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>';
+    })
+    .getStokList();
+
+  document.getElementById('form-terima-po-gudang').classList.remove('hidden');
+}
+
+function tutupModalTerimaPOGudang() {
+  document.getElementById('form-terima-po-gudang').classList.add('hidden');
+  _currentPOGudang = null;
+}
+
+function submitProsesTerimaPOGudang() {
+  if (!_currentPOGudang) return;
+  var rows  = document.querySelectorAll('#terima-po-gudang-items tr[data-id-item]');
+  var items = [];
+  var hasError = false;
+  rows.forEach(function(row) {
+    if (hasError) return;
+    var idItem   = row.getAttribute('data-id-item');
+    var qtyInput = row.querySelector('.pg-gudang-qty');
+    var stokSel  = row.querySelector('.pg-gudang-stok');
+    if (!qtyInput) return;
+    var qty      = parseFloat(qtyInput.value) || 0;
+    if (qty <= 0) return;
+    var namaItem = qtyInput.getAttribute('data-nama') || idItem;
+    var sisa     = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
+    var hargaBeli = parseFloat(qtyInput.getAttribute('data-harga')) || 0;
+    var idStok   = (stokSel && stokSel.value) ? stokSel.value.trim() : '';
+    if (qty > sisa) {
+      showNotification('Qty melebihi sisa untuk "' + namaItem + '" (sisa: ' + sisa + ').', 'error');
+      hasError = true; return;
+    }
+    if (!idStok) {
+      showNotification('Pilih item stok tujuan untuk "' + namaItem + '".', 'error');
+      hasError = true; return;
+    }
+    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok, idProduk: idStok, hargaBeli: hargaBeli, satuan: '' });
+  });
+  if (hasError) return;
+  if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
+
+  toggleLoader(true, 'Menyimpan penerimaan...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        tutupModalTerimaPOGudang();
+        loadPOMenungguPenerimaan();
+        loadInventory();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .terimaPOItems({
+      noPO: _currentPOGudang.noPO,
+      items: items,
+      namaUser: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) || ''
     });
 }
 
