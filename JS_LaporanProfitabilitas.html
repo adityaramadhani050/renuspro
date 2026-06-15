@@ -97,7 +97,7 @@ window.loadLaporanProfitabilitas = function() {
   var params = _lpBuildParams();
 
   document.getElementById('lp-table-profit').innerHTML =
-    '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+    '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   document.getElementById('lp-table-akun').innerHTML =
     '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
@@ -129,7 +129,7 @@ function _renderLaporanProfit(res) {
   var rows = res.rows || [];
   if (rows.length === 0) {
     document.getElementById('lp-table-profit').innerHTML =
-      '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
+      '<tr><td colspan="7" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
   } else {
     var html = '';
     rows.forEach(function(r) {
@@ -137,10 +137,11 @@ function _renderLaporanProfit(res) {
       var rowClass   = overBudget ? 'bg-rose-50 hover:bg-rose-100' : 'hover:bg-slate-50';
       var selisihCls = r.selisih >= 0 ? 'text-emerald-600' : 'text-rose-600';
       html += '<tr class="' + rowClass + ' transition-colors">';
-      html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5">' + _escLP(r.namaProject) + '</div></td>';
-      html += '<td class="p-4 text-xs text-slate-600">' + _escLP(r.namaKlien) + '</td>';
-      html += '<td class="p-4 text-xs text-slate-500">' + r.tanggal + '</td>';
-      html += '<td class="p-4 text-center"><span class="text-xs font-bold px-2 py-0.5 rounded-full ' + (r.status === 'Closed' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700') + '">' + r.status + '</span></td>';
+      html += '<td class="p-4">';
+      html += '<div class="font-bold text-slate-800 text-xs">' + _escLP(r.noWO) + ' · ' + _escLP(r.namaKlien) + '</div>';
+      html += '<div class="text-xs text-slate-600 mt-0.5">' + _escLP(r.namaProject) + '</div>';
+      html += '<div class="text-xs text-slate-400 mt-0.5">' + _escLP(r.tanggal) + '</div>';
+      html += '</td>';
       html += '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(r.nilaiKontrak) + '</td>';
       html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.estimasiHPP) + '</td>';
       html += '<td class="p-4 text-right text-xs font-bold text-slate-800">' + _fmtRpLP(r.realisasiHPP) + '</td>';
@@ -217,11 +218,8 @@ window.exportLaporanProfitPDF = function() {
 
     var tableRows = rows.map(function(r) {
       return [
-        r.noWO,
+        r.noWO + '\n' + (r.namaKlien || '') + '\n' + (r.tanggal || ''),
         r.namaProject,
-        r.namaKlien,
-        r.tanggal,
-        r.status,
         _fmtRpLP(r.nilaiKontrak),
         _fmtRpLP(r.estimasiHPP),
         _fmtRpLP(r.realisasiHPP),
@@ -232,15 +230,18 @@ window.exportLaporanProfitPDF = function() {
 
     doc.autoTable({
       startY:   34,
-      head:     [['No WO','Project','Customer','Tanggal','Status','Kontrak','Est. HPP','Real. HPP','Margin Est.','Margin Real.']],
+      head:     [['No WO / Customer / Tgl', 'Project', 'Kontrak', 'Est. HPP', 'Real. HPP', 'Margin Est.', 'Margin Real.']],
       body:     tableRows,
       styles:   { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [109, 40, 217], fontStyle: 'bold', fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 16 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 },
-        3: { cellWidth: 18 }, 4: { cellWidth: 15 }, 5: { halign: 'right', cellWidth: 25 },
-        6: { halign: 'right', cellWidth: 25 }, 7: { halign: 'right', cellWidth: 25 },
-        8: { halign: 'right', cellWidth: 18 }, 9: { halign: 'right', cellWidth: 18 }
+        0: { cellWidth: 42 },
+        1: { cellWidth: 50 },
+        2: { halign: 'right', cellWidth: 32 },
+        3: { halign: 'right', cellWidth: 32 },
+        4: { halign: 'right', cellWidth: 32 },
+        5: { halign: 'right', cellWidth: 22 },
+        6: { halign: 'right', cellWidth: 22 }
       },
       didParseCell: function(data) {
         var rowIdx = data.row.index;
