@@ -206,65 +206,136 @@ window.resetFilterLP = function() {
 window.exportLaporanProfitPDF = function() {
   if (!_lpData) { showNotification('Muat data terlebih dahulu.', 'error'); return; }
   try {
-    var { jsPDF } = window.jspdf;
-    var doc  = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    var rows = (_lpData.rows || []);
-    var s    = _lpData.summary || {};
-    var now  = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+    var doc  = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    var PW = 297, PH = 210, ML = 14, MR = 14, CW = PW - ML - MR;
+    var DARK   = [30,41,59],  SLATE  = [100,116,139], BLUE  = [30,64,175];
+    var GREEN  = [5,150,105], RED    = [190,30,45],   WHITE = [255,255,255];
+    var VIOLET = [109,40,217];
+    var rp  = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
+    var pct = function(v) { return (v == null || v === undefined) ? '—' : parseFloat(v).toFixed(1) + '%'; };
+
+    var rows     = _lpData.rows      || [];
+    var s        = _lpData.summary   || {};
+    var akunRows = _lpData.rekapAkun || [];
     var periodLabel = document.getElementById('lp-period-label');
-    var periodeStr  = periodLabel ? periodLabel.textContent : '';
+    var periodText  = periodLabel ? periodLabel.textContent : '';
+    var tglCetak    = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
 
-    doc.setFontSize(14); doc.setFont(undefined, 'bold');
-    doc.text('LAPORAN PROFITABILITAS PROJECT', 14, 16);
-    doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.setTextColor(100);
-    doc.text('PT. Renus Global Indonesia  |  Dicetak: ' + now + (periodeStr ? '  |  Periode: ' + periodeStr : ''), 14, 22);
-    doc.setTextColor(0);
+    // ── Dark header ──────────────────────────────────────────────
+    doc.setFillColor(DARK[0], DARK[1], DARK[2]);
+    doc.rect(0, 0, PW, 24, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('LAPORAN PROFIT', ML, 11);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(190,200,220);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(170,195,255);
+    doc.text('Periode:', PW - MR, 10, { align:'right' });
+    doc.setFont('helvetica','normal'); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text(periodText || '-', PW - MR, 15, { align:'right' });
+    doc.setFontSize(7); doc.setTextColor(190,200,220);
+    doc.text('Dicetak: ' + tglCetak, PW - MR, 20, { align:'right' });
 
-    // Summary
-    doc.setFontSize(9); doc.setFont(undefined, 'bold');
-    doc.text('Total Kontrak: ' + _fmtRpLP(s.totalKontrak) +
-             '   |   Total Realisasi HPP: ' + _fmtRpLP(s.totalRealisasiHPP) +
-             '   |   Rata Margin: ' + _fmtPctLP(s.rataMarginRealisasi), 14, 29);
+    var y = 30;
 
-    doc.setFont(undefined, 'normal');
+    // ── KPI boxes ─────────────────────────────────────────────────
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
+    doc.text('RINGKASAN PROFITABILITAS', ML, y); y += 5;
+    var kpiItems = [
+      { label:'Total Nilai Kontrak',    value: rp(s.totalKontrak),         color: DARK  },
+      { label:'Total Realisasi HPP',    value: rp(s.totalRealisasiHPP),    color: RED   },
+      { label:'Rata-rata Margin Real.', value: pct(s.rataMarginRealisasi), color: GREEN }
+    ];
+    var boxW = (CW - 5) / 3, boxH = 14, gap = 2.5;
+    kpiItems.forEach(function(k, i) {
+      var bx = ML + i * (boxW + gap), by = y;
+      doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+      doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
+      doc.text(k.label.toUpperCase(), bx + 3, by + 4.5);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(k.color[0],k.color[1],k.color[2]);
+      doc.text(k.value, bx + 3, by + 10.5);
+    });
+    y += boxH + 8;
 
-    var tableRows = rows.map(function(r) {
+    // ── Tabel profitabilitas ───────────────────────────────────────
+    doc.setFillColor(VIOLET[0],VIOLET[1],VIOLET[2]);
+    doc.roundedRect(ML, y, CW, 8, 1.5, 1.5, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+    doc.text('PROFITABILITAS PER WORK ORDER  (' + rows.length + ' WO)', ML + 3, y + 5.5);
+    y += 10;
+
+    var tableBody = rows.map(function(r) {
       return [
-        r.noWO + '\n' + (r.tanggal || ''),
+        (r.noWO || '') + '\n' + (r.tanggal || ''),
         (r.namaKlien || '') + '\n' + (r.namaProject || '') + (r.namaSales ? '\n' + r.namaSales : ''),
-        _fmtRpLP(r.nilaiKontrak),
-        _fmtRpLP(r.estimasiHPP),
-        _fmtRpLP(r.realisasiHPP),
-        _fmtPctLP(r.marginEstimasi),
-        _fmtPctLP(r.marginRealisasi)
+        rp(r.nilaiKontrak),
+        rp(r.estimasiHPP),
+        rp(r.realisasiHPP),
+        (r.selisih >= 0 ? '+' : '') + rp(r.selisih),
+        pct(r.marginEstimasi),
+        pct(r.marginRealisasi)
       ];
     });
 
     doc.autoTable({
-      startY:   34,
-      head:     [['No WO / Tgl', 'Customer / Project', 'Kontrak', 'Est. HPP', 'Real. HPP', 'Margin Est.', 'Margin Real.']],
-      body:     tableRows,
-      styles:   { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: [109, 40, 217], fontStyle: 'bold', fontSize: 7 },
+      startY: y, margin: { left: ML, right: MR },
+      head: [['No WO / Tgl', 'Customer / Project / Sales', 'Nilai Kontrak', 'Est. HPP', 'Real. HPP', 'Selisih', 'Margin Est.', 'Margin Real.']],
+      body: tableBody,
+      theme: 'grid',
+      styles:     { fontSize: 7, cellPadding: 2, font:'helvetica', textColor: DARK },
+      headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 24 },
-        1: { cellWidth: 60 },
-        2: { halign: 'right', cellWidth: 32 },
-        3: { halign: 'right', cellWidth: 32 },
-        4: { halign: 'right', cellWidth: 32 },
-        5: { halign: 'right', cellWidth: 22 },
-        6: { halign: 'right', cellWidth: 22 }
+        0: { cellWidth: 22 },
+        1: { cellWidth: 52 },
+        2: { halign:'right', cellWidth: 28 },
+        3: { halign:'right', cellWidth: 26 },
+        4: { halign:'right', cellWidth: 26 },
+        5: { halign:'right', cellWidth: 26 },
+        6: { halign:'right', cellWidth: 20 },
+        7: { halign:'right', cellWidth: 20, fontStyle:'bold' }
       },
-      didParseCell: function(data) {
-        var rowIdx = data.row.index;
-        if (data.section === 'body' && rows[rowIdx] && rows[rowIdx].isOverBudget) {
-          data.cell.styles.textColor = [220, 38, 38];
-        }
+      alternateRowStyles: { fillColor: [248,250,252] },
+      didParseCell: function(d) {
+        if (d.section !== 'body') return;
+        var r = rows[d.row.index];
+        if (!r) return;
+        if (d.column.index === 5) d.cell.styles.textColor = r.isOverBudget ? RED : GREEN;
+        if (d.column.index === 7) d.cell.styles.textColor = r.isOverBudget ? RED : GREEN;
       }
     });
+    y = doc.lastAutoTable.finalY + 8;
 
-    var fname = 'LaporanProfitabilitas_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.pdf';
+    // ── Rekap Akun ────────────────────────────────────────────────
+    if (akunRows.length > 0) {
+      if (y > 160) { doc.addPage(); y = 14; }
+      doc.setFillColor(DARK[0],DARK[1],DARK[2]);
+      doc.roundedRect(ML, y, 120, 8, 1.5, 1.5, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+      doc.text('REKAP PENGELUARAN PER AKUN', ML + 3, y + 5.5);
+      y += 10;
+      doc.autoTable({
+        startY: y, margin: { left: ML, right: MR },
+        head: [['Akun Pembayaran', 'Total Pengeluaran']],
+        body: akunRows.map(function(a) { return [a.namaAkun, rp(a.total)]; }),
+        theme: 'grid',
+        styles:     { fontSize: 8, cellPadding: 2.5, font:'helvetica', textColor: DARK },
+        headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 8 },
+        columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+        alternateRowStyles: { fillColor: [248,250,252] },
+        tableWidth: 120
+      });
+    }
+
+    // ── Page numbers ──────────────────────────────────────────────
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
+      doc.text('Halaman ' + p + ' / ' + totalPages, PW / 2, PH - 5, { align:'center' });
+      doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, PH - 5);
+    }
+
+    var fname = 'LaporanProfit_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.pdf';
     doc.save(fname);
     showNotification('PDF berhasil diunduh!');
   } catch(e) {
