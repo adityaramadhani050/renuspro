@@ -64,7 +64,7 @@
         loadInventory();
       }
       if(pageId === 'pengeluaran') loadPengeluaran();
-      if(pageId === 'laporanprofitabilitas') loadLaporanProfitabilitas();
+      if(pageId === 'laporanprofitabilitas') setLPPreset('thisMonth');
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }

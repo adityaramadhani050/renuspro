@@ -3,8 +3,9 @@
 //  LAPORAN PROFITABILITAS PROJECT — JavaScript (Modul 3 Fase 4)
 // ================================================================
 
-var _lpData = null;
+var _lpData      = null;
 var _lpActiveTab = 'profit';
+var _lpFilter    = { mode: 'thisMonth', from: null, to: null };
 
 function _fmtRpLP(n) {
   n = parseFloat(n) || 0;
@@ -16,16 +17,91 @@ function _fmtPctLP(n) {
   return parseFloat(n).toFixed(1) + '%';
 }
 
+// ── Filter preset ────────────────────────────────────────────────
+
+window.setLPPreset = function(mode) {
+  _lpFilter.mode = mode;
+  document.querySelectorAll('.lp-preset-btn').forEach(function(b) {
+    b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+    b.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+  });
+  var active = document.getElementById('lp-preset-' + mode);
+  if (active) {
+    active.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+    active.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
+  }
+  var customRange = document.getElementById('lp-custom-range');
+  if (mode === 'custom') {
+    customRange.classList.remove('hidden');
+    customRange.style.display = 'flex';
+    return;
+  }
+  customRange.classList.add('hidden');
+
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  if (mode === 'thisMonth') {
+    _lpFilter.from = new Date(y, m, 1);
+    _lpFilter.to   = new Date(y, m + 1, 0);
+  } else if (mode === 'lastMonth') {
+    var lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y;
+    _lpFilter.from = new Date(ly, lm, 1);
+    _lpFilter.to   = new Date(ly, lm + 1, 0);
+  } else if (mode === 'thisYear') {
+    _lpFilter.from = new Date(y, 0, 1);
+    _lpFilter.to   = new Date(y, 11, 31);
+  } else { // all
+    _lpFilter.from = null;
+    _lpFilter.to   = null;
+  }
+  _lpUpdatePeriodLabel();
+  loadLaporanProfitabilitas();
+};
+
+window.applyLPCustomFilter = function() {
+  var fromVal = document.getElementById('lp-date-from').value;
+  var toVal   = document.getElementById('lp-date-to').value;
+  if (!fromVal || !toVal) { showNotification('Pilih tanggal mulai dan akhir.', 'error'); return; }
+  _lpFilter.from = new Date(fromVal);
+  _lpFilter.to   = new Date(toVal);
+  _lpFilter.to.setHours(23, 59, 59);
+  _lpUpdatePeriodLabel();
+  loadLaporanProfitabilitas();
+};
+
+function _lpUpdatePeriodLabel() {
+  var el = document.getElementById('lp-period-label');
+  if (!el) return;
+  var f = _lpFilter;
+  if (!f.from && !f.to) { el.textContent = 'Semua Periode'; return; }
+  var opts = { day: '2-digit', month: 'short', year: 'numeric' };
+  var from = f.from ? f.from.toLocaleDateString('id-ID', opts) : '';
+  var to   = f.to   ? f.to.toLocaleDateString('id-ID', opts)   : '';
+  el.textContent = from + (to && to !== from ? ' – ' + to : '');
+}
+
+function _lpBuildParams() {
+  var fmt = function(d) {
+    return d.getFullYear() + '-'
+      + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
+      + ('0' + d.getDate()).slice(-2);
+  };
+  return {
+    tanggalDari:   _lpFilter.from ? fmt(_lpFilter.from) : '',
+    tanggalSampai: _lpFilter.to   ? fmt(_lpFilter.to)   : ''
+  };
+}
+
+// ── Load ─────────────────────────────────────────────────────────
+
 window.loadLaporanProfitabilitas = function() {
-  var dari   = document.getElementById('lp-dari').value;
-  var sampai = document.getElementById('lp-sampai').value;
-  var status = document.getElementById('lp-status').value;
+  var params = _lpBuildParams();
 
   document.getElementById('lp-table-profit').innerHTML =
     '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   document.getElementById('lp-table-akun').innerHTML =
     '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
+  if (typeof google === 'undefined') return;
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res.success) {
@@ -33,12 +109,13 @@ window.loadLaporanProfitabilitas = function() {
         return;
       }
       _lpData = res;
+      _lpUpdatePeriodLabel();
       _renderLaporanProfit(res);
     })
     .withFailureHandler(function(err) {
       showNotification('Error: ' + err.message, 'error');
     })
-    .getLaporanProfitabilitas({ tanggalDari: dari, tanggalSampai: sampai, status: status });
+    .getLaporanProfitabilitas(params);
 };
 
 function _renderLaporanProfit(res) {
@@ -52,7 +129,7 @@ function _renderLaporanProfit(res) {
   var rows = res.rows || [];
   if (rows.length === 0) {
     document.getElementById('lp-table-profit').innerHTML =
-      '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data untuk filter ini.</td></tr>';
+      '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
   } else {
     var html = '';
     rows.forEach(function(r) {
@@ -107,9 +184,7 @@ window.switchLPTab = function(tab) {
 };
 
 window.resetFilterLP = function() {
-  ['lp-dari','lp-sampai'].forEach(function(id) { document.getElementById(id).value = ''; });
-  document.getElementById('lp-status').value = '';
-  loadLaporanProfitabilitas();
+  setLPPreset('thisMonth');
 };
 
 // ── Export PDF ─────────────────────────────────────────────────
@@ -122,12 +197,14 @@ window.exportLaporanProfitPDF = function() {
     var rows = (_lpData.rows || []);
     var s    = _lpData.summary || {};
     var now  = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+    var periodLabel = document.getElementById('lp-period-label');
+    var periodeStr  = periodLabel ? periodLabel.textContent : '';
 
     doc.setFontSize(14); doc.setFont(undefined, 'bold');
     doc.text('LAPORAN PROFITABILITAS PROJECT', 14, 16);
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     doc.setTextColor(100);
-    doc.text('PT. Renus Global Indonesia  |  Dicetak: ' + now, 14, 22);
+    doc.text('PT. Renus Global Indonesia  |  Dicetak: ' + now + (periodeStr ? '  |  Periode: ' + periodeStr : ''), 14, 22);
     doc.setTextColor(0);
 
     // Summary
