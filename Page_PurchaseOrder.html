@@ -18,8 +18,7 @@
               <select id="filter-po-status" onchange="filterPO()"
                 class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
                 <option value="">Semua Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Disetujui">Disetujui</option>
+                <option value="Aktif">Aktif</option>
                 <option value="Diterima Sebagian">Diterima Sebagian</option>
                 <option value="Diterima">Diterima</option>
                 <option value="Selesai">Selesai</option>
@@ -46,7 +45,7 @@
                   </tr>
                 </thead>
                 <tbody id="table-purchaseorder" class="text-sm">
-                  <tr><td colspan="8" class="p-8 text-center text-slate-500">
+                  <tr><td colspan="7" class="p-8 text-center text-slate-500">
                     <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data purchase order...
                   </td></tr>
                 </tbody>
@@ -58,7 +57,7 @@
         <!-- ── Form Buat / Edit PO ── -->
         <div id="form-po-section" class="hidden">
 
-          <!-- Back Button + Title (mirip Penawaran) -->
+          <!-- Back Button + Title -->
           <div class="mb-6">
             <button onclick="tutupFormPO()"
               class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition mb-2">
@@ -76,20 +75,15 @@
                 <h2 class="text-lg font-bold text-slate-900">Informasi Dasar PO</h2>
               </div>
 
-              <!-- Hidden inputs untuk mode edit -->
               <input type="hidden" id="po-no-field">
               <input type="hidden" id="po-edit-nopo">
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <!-- Tanggal -->
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal <span class="text-red-400">*</span></label>
                   <input type="date" id="po-tanggal"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
-
-                <!-- Supplier -->
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supplier <span class="text-red-400">*</span></label>
                   <div id="sd-supplier-po-wrap" class="w-full">
@@ -98,12 +92,9 @@
                     </select>
                   </div>
                 </div>
-
-                <!-- No WO -->
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    No WO
-                    <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span>
+                    No WO <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span>
                   </label>
                   <div id="sd-wo-po-wrap" class="w-full">
                     <select id="sel-wo-po" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
@@ -111,18 +102,15 @@
                     </select>
                   </div>
                 </div>
-
-                <!-- Nama Order -->
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Order</label>
                   <input type="text" id="po-peruntukan" placeholder="Misal: Project Solar Panel..."
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
-
               </div>
             </div>
 
-            <!-- ── Kartu 2: Item Pembelian & Kalkulasi ── -->
+            <!-- ── Kartu 2: Item Pembelian ── -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
               <div class="flex items-center mb-5">
                 <div class="flex items-center gap-3">
@@ -163,26 +151,17 @@
                 </table>
               </div>
 
-              <!-- Kalkulasi + Catatan -->
               <div class="flex flex-col md:flex-row gap-6 justify-end items-start">
-
-                <!-- Catatan (kiri) -->
                 <div class="flex-1">
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan Tambahan</label>
                   <textarea id="po-catatan" rows="7" placeholder="Catatan tambahan untuk PO ini (opsional)..."
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white resize-none"></textarea>
                 </div>
-
-                <!-- Ringkasan (kanan) -->
                 <div class="w-full md:w-96 shrink-0 space-y-3 bg-slate-50 p-5 rounded-xl border border-slate-200">
-
-                  <!-- Subtotal -->
                   <div class="flex justify-between text-sm font-bold text-slate-600">
                     <span>Subtotal</span>
                     <span class="text-slate-900">Rp <span id="po-subtotal">0</span></span>
                   </div>
-
-                  <!-- Diskon -->
                   <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-t border-slate-200 pt-3 text-sm">
                     <span class="text-slate-600 font-bold">Diskon</span>
                     <div class="flex items-center gap-2">
@@ -201,8 +180,6 @@
                       </div>
                     </div>
                   </div>
-
-                  <!-- PPN -->
                   <div class="flex justify-between items-center border-t border-slate-200 pt-3 text-sm gap-4">
                     <span class="text-slate-600 font-bold">PPN</span>
                     <div class="flex items-center gap-3">
@@ -215,16 +192,12 @@
                       <span class="font-bold text-slate-700 min-w-[110px] text-right text-sm">Rp <span id="po-ppn-display">0</span></span>
                     </div>
                   </div>
-
-                  <!-- Grand Total -->
                   <div class="flex justify-between items-center text-base font-extrabold text-orange-700 border-t border-slate-300 pt-4">
                     <span>GRAND TOTAL</span>
                     <span class="text-lg">Rp <span id="po-grandtotal">0</span></span>
                   </div>
-
                 </div>
               </div>
-
             </div>
 
             <!-- ── Submit Bar ── -->
@@ -345,7 +318,6 @@
                   <p class="text-sm font-bold text-teal-700 mb-3 flex items-center gap-2">
                     <i class="fa-solid fa-boxes-stacked"></i> Form Penerimaan Barang
                   </p>
-                  <!-- Toggle Mode -->
                   <div class="flex gap-1 bg-white border border-teal-200 rounded-xl p-1 mb-4 w-fit">
                     <button id="terima-mode-langsung" onclick="_setTerimaPOMode('langsung')"
                       class="px-4 py-2 rounded-lg text-sm font-bold transition bg-teal-600 text-white shadow-sm">
@@ -356,8 +328,6 @@
                       <i class="fa-solid fa-warehouse mr-1.5"></i> Masuk Inventory (Gudang)
                     </button>
                   </div>
-
-                  <!-- Mode: Kirim Langsung -->
                   <div id="terima-panel-langsung">
                     <p class="text-xs text-teal-600 mb-2 italic">Barang dikirim langsung ke klien. Stok inventory tidak akan diperbarui.</p>
                     <div class="overflow-x-auto rounded-xl border border-teal-200 mb-3">
@@ -387,8 +357,6 @@
                       </button>
                     </div>
                   </div>
-
-                  <!-- Mode: Masuk Inventory -->
                   <div id="terima-panel-gudang" class="hidden">
                     <p class="text-xs text-amber-600 mb-2 italic">Barang akan masuk gudang. Warehouse akan menentukan jumlah yang diterima dan item stok tujuan.</p>
                     <div class="overflow-x-auto rounded-xl border border-amber-200 mb-3">
@@ -420,14 +388,95 @@
                 </div>
               </div>
 
-              <!-- ── Section Pembayaran ── -->
+              <!-- ── Form Request Pembayaran ── -->
+              <div id="form-request-bayar-po" class="hidden">
+                <div class="bg-violet-50 border border-violet-100 rounded-xl p-4">
+                  <p class="text-sm font-bold text-violet-700 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Request Pembayaran ke Finance
+                  </p>
+                  <!-- Info sisa tagihan -->
+                  <div class="bg-white rounded-xl border border-violet-100 p-3 mb-4 grid grid-cols-3 gap-3 text-center text-xs">
+                    <div>
+                      <p class="text-slate-400 mb-0.5">Grand Total PO</p>
+                      <p id="req-info-grandtotal" class="font-extrabold text-slate-700">—</p>
+                    </div>
+                    <div>
+                      <p class="text-slate-400 mb-0.5">Sudah Dibayar</p>
+                      <p id="req-info-dibayar" class="font-extrabold text-emerald-600">—</p>
+                    </div>
+                    <div>
+                      <p class="text-slate-400 mb-0.5">Sisa Tagih</p>
+                      <p id="req-info-sisa" class="font-extrabold text-violet-700">—</p>
+                    </div>
+                  </div>
+                  <!-- Input nominal ↔ persentase -->
+                  <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-600 mb-1">Nominal <span class="text-rose-400">*</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                        <input type="text" id="req-jumlah" inputmode="numeric" placeholder="0"
+                          oninput="_onReqJumlahInput(this)"
+                          class="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 text-right font-semibold">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-600 mb-1">Persentase dari Total PO</label>
+                      <div class="relative">
+                        <input type="number" id="req-persen" min="0" max="100" step="0.01" placeholder="0"
+                          oninput="_onReqPersenInput(this)"
+                          class="w-full pl-3 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 text-right font-semibold">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Catatan <span class="text-slate-400 font-normal">(opsional)</span></label>
+                    <input type="text" id="req-catatan" placeholder="Misal: Termin 1 — DP 50%"
+                      class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button onclick="document.getElementById('form-request-bayar-po').classList.add('hidden')"
+                      class="px-4 py-2 text-sm text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold transition border border-slate-200">
+                      Batal
+                    </button>
+                    <button onclick="submitRequestBayarPO()"
+                      class="px-5 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-sm transition flex items-center gap-2">
+                      <i class="fa-solid fa-paper-plane"></i> Kirim ke Finance
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Riwayat Request Pembayaran ── -->
+              <div id="po-detail-payreq-section">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-2">
+                  <i class="fa-solid fa-paper-plane text-violet-500"></i> Riwayat Request Pembayaran
+                </p>
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <th class="px-3 py-2.5">ID Request</th>
+                        <th class="px-3 py-2.5 text-right">Jumlah</th>
+                        <th class="px-3 py-2.5 text-center">%</th>
+                        <th class="px-3 py-2.5">Catatan</th>
+                        <th class="px-3 py-2.5 text-center">Status</th>
+                        <th class="px-3 py-2.5">Akun / Tgl Approve</th>
+                      </tr>
+                    </thead>
+                    <tbody id="po-detail-payreqs" class="text-sm">
+                      <tr><td colspan="6" class="p-4 text-center text-slate-400 italic text-xs">Belum ada request pembayaran.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ── Riwayat Pembayaran ── -->
               <div>
                 <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-3">
                   <i class="fa-solid fa-money-bill-wave text-emerald-500"></i> Riwayat Pembayaran
-                  <span class="text-[10px] font-normal text-slate-400 normal-case">(dicatat melalui Pencatatan Pengeluaran)</span>
                 </p>
-
-                <!-- Tabel Pembayaran (read-only) -->
                 <div class="overflow-x-auto rounded-xl border border-slate-200">
                   <table class="w-full text-left border-collapse">
                     <thead>
@@ -454,10 +503,6 @@
                   class="hidden px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold transition flex items-center gap-2">
                   <i class="fa-solid fa-pen-to-square"></i> Edit
                 </button>
-                <button id="po-detail-btn-status" onclick="ubahStatusPOUI(_currentPODetail && _currentPODetail.noPO, _currentPODetail && _currentPODetail.statusPO)"
-                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-arrows-rotate"></i> Ubah Status
-                </button>
                 <button id="po-detail-btn-terima" onclick="bukaFormTerimaPO()"
                   class="hidden px-4 py-2 text-sm bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl font-bold transition flex items-center gap-2">
                   <i class="fa-solid fa-boxes-stacked"></i> Terima Barang
@@ -466,6 +511,18 @@
                   class="hidden px-4 py-2 text-sm bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-bold flex items-center gap-2">
                   <i class="fa-solid fa-hourglass-half"></i> Menunggu Konfirmasi Gudang
                 </span>
+                <button id="po-detail-btn-request-bayar" onclick="bukaFormRequestBayarPO()"
+                  class="hidden px-4 py-2 text-sm bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-paper-plane"></i> Request Pembayaran
+                </button>
+                <button id="po-detail-btn-selesai" onclick="selesaikanPO(_currentPODetail && _currentPODetail.noPO)"
+                  class="hidden px-4 py-2 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-circle-check"></i> Selesai
+                </button>
+                <button id="po-detail-btn-batal" onclick="batalkanPO(_currentPODetail && _currentPODetail.noPO)"
+                  class="hidden px-4 py-2 text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-ban"></i> Batalkan PO
+                </button>
               </div>
               <div class="flex gap-2">
                 <button onclick="cetakPO(_currentPODetail)"

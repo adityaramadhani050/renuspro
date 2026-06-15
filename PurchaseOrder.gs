@@ -322,7 +322,27 @@ function getPODetail(noPO) {
       }
     }
 
-    return { success: true, po: header, items: items, pembayaran: pembayaran };
+    // Payment Requests
+    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    SpreadsheetApp.flush();
+    var prData  = prSheet.getDataRange().getValues();
+    var paymentRequests = [];
+    for (var pr = 1; pr < prData.length; pr++) {
+      if ((prData[pr][1] || '').toString() !== noPO) continue;
+      paymentRequests.push({
+        idReq:          prData[pr][0]  ? prData[pr][0].toString()  : '',
+        tanggalRequest: prData[pr][5]  ? prData[pr][5].toString()  : '',
+        jumlah:         parseFloat(prData[pr][6]) || 0,
+        persentase:     parseFloat(prData[pr][7]) || 0,
+        catatan:        prData[pr][8]  ? prData[pr][8].toString()  : '',
+        status:         prData[pr][9]  ? prData[pr][9].toString()  : '',
+        dibuatOleh:     prData[pr][10] ? prData[pr][10].toString() : '',
+        namaAkun:       prData[pr][12] ? prData[pr][12].toString() : '',
+        tanggalApprove: prData[pr][14] ? prData[pr][14].toString() : ''
+      });
+    }
+
+    return { success: true, po: header, items: items, pembayaran: pembayaran, paymentRequests: paymentRequests };
   } catch (e) {
     return { success: false, message: e.toString() };
   }
@@ -374,7 +394,7 @@ function simpanPO(payload) {
       payload.namaSupplier   ? payload.namaSupplier.toString()   : '',
       payload.peruntukan     ? payload.peruntukan.toString()     : '',
       payload.noWO           ? payload.noWO.toString()           : '',
-      'Draft',
+      'Aktif',
       subtotal,
       ppnPersen,
       ppnNominal,
@@ -442,8 +462,8 @@ function editPO(payload) {
       }
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
-    if (poData[poRowIdx - 1][6] !== 'Draft') {
-      return { success: false, message: 'Hanya PO berstatus Draft yang dapat diedit.' };
+    if (poData[poRowIdx - 1][6] !== 'Aktif') {
+      return { success: false, message: 'Hanya PO berstatus Aktif yang dapat diedit.' };
     }
 
     var itemSheet = _ensurePOItemSheet(ss);
@@ -551,23 +571,21 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
 
-    // Blokir status "Selesai" jika belum lunas
-    if (statusBaru === 'Selesai' && statusBayar !== 'Lunas') {
-      return { success: false, message: 'PO tidak bisa diselesaikan — status pembayaran belum Lunas (saat ini: "' + statusBayar + '").' };
+    // Status terminal tidak bisa berubah
+    if (statusLama === 'Selesai' || statusLama === 'Batal') {
+      return { success: false, message: 'PO berstatus "' + statusLama + '" tidak bisa diubah lagi.' };
     }
 
-    // Validasi transisi
-    var validTransitions = {
-      'Draft':      ['Disetujui'],
-      'Disetujui':  ['Diterima', 'Batal'],
-      'Diterima':   ['Selesai']
-    };
-    var allowed = validTransitions[statusLama] || [];
-    if (allowed.indexOf(statusBaru) === -1) {
-      return {
-        success: false,
-        message: 'Transisi status dari "' + statusLama + '" ke "' + statusBaru + '" tidak diizinkan.'
-      };
+    // Selesai: hanya dari Diterima dan harus Lunas
+    if (statusBaru === 'Selesai') {
+      if (statusLama !== 'Diterima') {
+        return { success: false, message: 'PO harus berstatus "Diterima" untuk diselesaikan (saat ini: "' + statusLama + '").' };
+      }
+      if (statusBayar !== 'Lunas') {
+        return { success: false, message: 'PO tidak bisa diselesaikan — status pembayaran belum Lunas (saat ini: "' + statusBayar + '").' };
+      }
+    } else if (statusBaru !== 'Batal') {
+      return { success: false, message: 'Status yang bisa diubah secara manual hanya "Selesai" atau "Batal".' };
     }
 
     var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
@@ -598,7 +616,7 @@ function submitPOKeGudang(noPO, namaUser) {
       if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
     }
     if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
     }
     var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
@@ -635,7 +653,7 @@ function terimaPOKirimLangsung(payload) {
       if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
     }
     if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
@@ -714,8 +732,8 @@ function hapusPO(noPO) {
       }
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
-    if (statusPO !== 'Draft') {
-      return { success: false, message: 'Hanya PO berstatus Draft yang dapat dihapus.' };
+    if (statusPO !== 'Aktif') {
+      return { success: false, message: 'Hanya PO berstatus Aktif yang dapat dihapus.' };
     }
 
     // Blokir jika ada pembayaran
@@ -930,6 +948,249 @@ function hapusPembayaranPO(idBayar) {
     invalidatePOCache();
     invalidatePembayaranPOCache();
     return { success: true, message: 'Pembayaran ' + idBayar + ' berhasil dihapus.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ── PO Payment Request ────────────────────────────────────────────────────────
+/*
+ * Sheet PO_PaymentRequest — kolom (0-based):
+ *  0  ID Request
+ *  1  No PO
+ *  2  No WO
+ *  3  Nama Supplier
+ *  4  Grand Total PO
+ *  5  Tanggal Request
+ *  6  Jumlah
+ *  7  Persentase
+ *  8  Catatan
+ *  9  Status          Menunggu | Disetujui | Ditolak
+ * 10  Dibuat Oleh
+ * 11  Dibuat Pada
+ * 12  Nama Akun       (diisi saat approve)
+ * 13  Diapprove Oleh
+ * 14  Tanggal Approve
+ */
+
+function _ensurePOPaymentRequestSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('PO_PaymentRequest');
+  if (!sheet) {
+    sheet = ss.insertSheet('PO_PaymentRequest');
+    sheet.appendRow([
+      'ID Request', 'No PO', 'No WO', 'Nama Supplier', 'Grand Total PO',
+      'Tanggal Request', 'Jumlah', 'Persentase', 'Catatan',
+      'Status', 'Dibuat Oleh', 'Dibuat Pada',
+      'Nama Akun', 'Diapprove Oleh', 'Tanggal Approve'
+    ]);
+  }
+  return sheet;
+}
+
+function _generateIdPayReq(sheet) {
+  SpreadsheetApp.flush();
+  var now = new Date();
+  var month = now.getMonth() + 1;
+  var year  = now.getFullYear();
+  var romanMonth = _toRoman(month);
+  var prefix = '/RGI/PR/' + romanMonth + '/' + year;
+  var maxSeq = 0;
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      var val = ids[i][0] ? ids[i][0].toString() : '';
+      var pattern = new RegExp('^(\\d+)\\/RGI\\/PR\\/' + romanMonth + '\\/' + year + '$');
+      var m = val.match(pattern);
+      if (m) { var seq = parseInt(m[1], 10); if (seq > maxSeq) maxSeq = seq; }
+    }
+  }
+  return String(maxSeq + 1).padStart(3, '0') + prefix;
+}
+
+function requestPembayaranPO(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+
+    var noPO   = (payload.noPO || '').toString().trim();
+    var jumlah = parseFloat(payload.jumlah) || 0;
+    if (!noPO)      return { success: false, message: 'No PO tidak boleh kosong.' };
+    if (jumlah <= 0) return { success: false, message: 'Jumlah request harus lebih dari 0.' };
+
+    var ss = getSpreadsheet();
+    var poSheet = _ensurePOSheet(ss);
+    SpreadsheetApp.flush();
+
+    var poData = poSheet.getDataRange().getValues();
+    var statusPO = '', grandTotal = 0, noWO = '', namaSupplier = '';
+    for (var i = 1; i < poData.length; i++) {
+      if ((poData[i][0] || '').toString() === noPO) {
+        statusPO     = (poData[i][6]  || '').toString();
+        grandTotal   = parseFloat(poData[i][10]) || 0;
+        noWO         = (poData[i][5]  || '').toString().trim();
+        namaSupplier = (poData[i][3]  || '').toString();
+        break;
+      }
+    }
+    if (!statusPO) return { success: false, message: 'No PO tidak ditemukan.' };
+    if (statusPO !== 'Diterima' && statusPO !== 'Diterima Sebagian') {
+      return { success: false, message: 'Request pembayaran hanya bisa dibuat setelah barang diterima (status: "' + statusPO + '").' };
+    }
+
+    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var idReq   = _generateIdPayReq(prSheet);
+    var now     = new Date();
+    var nowStr  = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+    var tanggalReq = payload.tanggalRequest ? payload.tanggalRequest.toString() : _fmtTgl(now);
+    var persentase = grandTotal > 0 ? Math.round(jumlah / grandTotal * 10000) / 100 : 0;
+
+    prSheet.appendRow([
+      idReq, noPO, noWO, namaSupplier, grandTotal,
+      tanggalReq, jumlah, persentase,
+      payload.catatan    ? payload.catatan.toString()    : '',
+      'Menunggu',
+      payload.dibuatOleh ? payload.dibuatOleh.toString() : '',
+      nowStr, '', '', ''
+    ]);
+
+    return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getPaymentRequestList(params) {
+  try {
+    params = params || {};
+    var ss      = getSpreadsheet();
+    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    SpreadsheetApp.flush();
+    var data = prSheet.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      if (!r[0]) continue;
+      var rowStatus = (r[9] || '').toString();
+      if (params.status && rowStatus !== params.status) continue;
+      list.push({
+        idReq:          r[0]  ? r[0].toString()  : '',
+        noPO:           r[1]  ? r[1].toString()  : '',
+        noWO:           r[2]  ? r[2].toString()  : '',
+        namaSupplier:   r[3]  ? r[3].toString()  : '',
+        grandTotalPO:   parseFloat(r[4]) || 0,
+        tanggalRequest: r[5]  ? r[5].toString()  : '',
+        jumlah:         parseFloat(r[6]) || 0,
+        persentase:     parseFloat(r[7]) || 0,
+        catatan:        r[8]  ? r[8].toString()  : '',
+        status:         rowStatus,
+        dibuatOleh:     r[10] ? r[10].toString() : '',
+        dibuatPada:     r[11] ? r[11].toString() : '',
+        namaAkun:       r[12] ? r[12].toString() : '',
+        diapproveOleh:  r[13] ? r[13].toString() : '',
+        tanggalApprove: r[14] ? r[14].toString() : ''
+      });
+    }
+    list.reverse();
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, message: e.toString(), list: [] };
+  }
+}
+
+function approvePembayaranPO(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+
+    var idReq    = (payload.idReq    || '').toString().trim();
+    var namaAkun = (payload.namaAkun || '').toString().trim();
+    if (!idReq)    return { success: false, message: 'ID Request tidak boleh kosong.' };
+    if (!namaAkun) return { success: false, message: 'Akun pembayaran wajib dipilih.' };
+
+    var ss      = getSpreadsheet();
+    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    SpreadsheetApp.flush();
+
+    var prData = prSheet.getDataRange().getValues();
+    var prRowIdx = -1, noPO = '', jumlah = 0, statusReq = '';
+    for (var i = 1; i < prData.length; i++) {
+      if ((prData[i][0] || '').toString() === idReq) {
+        prRowIdx  = i + 1;
+        noPO      = (prData[i][1] || '').toString();
+        jumlah    = parseFloat(prData[i][6]) || 0;
+        statusReq = (prData[i][9] || '').toString();
+        break;
+      }
+    }
+    if (prRowIdx === -1)    return { success: false, message: 'Request tidak ditemukan.' };
+    if (statusReq !== 'Menunggu') {
+      return { success: false, message: 'Request sudah berstatus "' + statusReq + '".' };
+    }
+
+    var now    = new Date();
+    var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+
+    // Update request status
+    prSheet.getRange(prRowIdx, 10).setValue('Disetujui');
+    prSheet.getRange(prRowIdx, 13).setValue(namaAkun);
+    prSheet.getRange(prRowIdx, 14).setValue(payload.approvedBy ? payload.approvedBy.toString() : '');
+    prSheet.getRange(prRowIdx, 15).setValue(nowStr);
+
+    // Buat catatan pembayaran PO otomatis
+    var bayarResult = simpanPembayaranPO({
+      noPO:        noPO,
+      tanggalBayar: payload.tanggalBayar ? payload.tanggalBayar.toString() : _fmtTgl(now),
+      idAkun:      payload.idAkun ? payload.idAkun.toString() : '',
+      namaAkun:    namaAkun,
+      jumlah:      jumlah,
+      catatan:     'Approved dari request ' + idReq + (payload.catatan ? ' — ' + payload.catatan : ''),
+      dibuatOleh:  payload.approvedBy ? payload.approvedBy.toString() : ''
+    });
+
+    if (!bayarResult.success) {
+      // Rollback request
+      prSheet.getRange(prRowIdx, 10).setValue('Menunggu');
+      prSheet.getRange(prRowIdx, 13).setValue('');
+      prSheet.getRange(prRowIdx, 14).setValue('');
+      prSheet.getRange(prRowIdx, 15).setValue('');
+      return { success: false, message: 'Gagal mencatat pembayaran: ' + bayarResult.message };
+    }
+
+    return { success: true, message: 'Pembayaran PO ' + noPO + ' sebesar Rp ' + jumlah.toLocaleString('id-ID') + ' berhasil disetujui dan dicatat.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function tolakRequestPembayaranPO(idReq, namaUser) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss      = getSpreadsheet();
+    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    SpreadsheetApp.flush();
+    var prData = prSheet.getDataRange().getValues();
+    for (var i = 1; i < prData.length; i++) {
+      if ((prData[i][0] || '').toString() === idReq) {
+        if ((prData[i][9] || '').toString() !== 'Menunggu') {
+          return { success: false, message: 'Request sudah berstatus "' + prData[i][9] + '".' };
+        }
+        var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+        prSheet.getRange(i + 1, 10).setValue('Ditolak');
+        prSheet.getRange(i + 1, 14).setValue(namaUser || '');
+        prSheet.getRange(i + 1, 15).setValue(nowStr);
+        return { success: true, message: 'Request ' + idReq + ' ditolak.' };
+      }
+    }
+    return { success: false, message: 'Request tidak ditemukan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
   } finally {

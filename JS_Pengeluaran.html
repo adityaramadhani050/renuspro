@@ -7,6 +7,20 @@ var _expData       = [];
 var _expWOList     = [];
 var _expAkunList   = [];
 var _expEditMode   = false;
+var _expActiveTab  = 'pengeluaran';
+
+// ── Tab Switching ──────────────────────────────────────────────
+
+window.switchExpTab = function(tab) {
+  _expActiveTab = tab;
+  var active   = 'px-5 py-2 rounded-xl text-sm font-bold transition bg-emerald-600 text-white shadow-sm';
+  var inactive = 'px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700';
+  document.getElementById('exp-tab-pengeluaran-btn').className = tab === 'pengeluaran' ? active : inactive;
+  document.getElementById('exp-tab-payreq-btn').className      = tab === 'payreq'      ? active : inactive;
+  document.getElementById('exp-tab-pengeluaran').classList.toggle('hidden', tab !== 'pengeluaran');
+  document.getElementById('exp-tab-payreq').classList.toggle('hidden',      tab !== 'payreq');
+  if (tab === 'payreq') loadPaymentRequestList();
+};
 
 // ── Format helpers ─────────────────────────────────────────────
 
@@ -38,6 +52,7 @@ function _fmtTglExp(s) {
 
 window.loadPengeluaran = function() {
   _loadExpData();
+  loadPaymentRequestList();
   _loadWOOptionsExp('filter-exp-wo', '');
   _loadWOOptionsExp('exp-wo', '');
   _loadAkunOptionsExp('filter-exp-akun', '');
@@ -391,5 +406,167 @@ window.konfirmasiHapusExp = function() {
     })
     .withFailureHandler(function(err) { toggleLoader(false); showNotification('Error: ' + err.message, 'error'); })
     .hapusPengeluaran(id);
+};
+
+// ── Permintaan Pembayaran PO (Tab Finance) ─────────────────────
+
+window.loadPaymentRequestList = function() {
+  if (typeof google === 'undefined') return;
+  var status = '';
+  var selEl = document.getElementById('filter-payreq-status');
+  if (selEl) status = selEl.value;
+  var tbody = document.getElementById('table-payreq');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var list = (res && res.list) ? res.list : [];
+      _renderPaymentRequestList(list);
+      // Update badge count untuk status Menunggu
+      var menungguCount = list.filter(function(r) { return r.status === 'Menunggu'; }).length;
+      var badge = document.getElementById('exp-payreq-badge');
+      if (badge) {
+        if (menungguCount > 0 && status !== 'Menunggu') {
+          badge.textContent = menungguCount;
+          badge.classList.remove('hidden');
+        } else if (status === 'Menunggu') {
+          badge.textContent = list.length;
+          badge.classList.toggle('hidden', list.length === 0);
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+    })
+    .withFailureHandler(function(err) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-rose-400">Gagal memuat: ' + (err.message || '') + '</td></tr>';
+    })
+    .getPaymentRequestList({ status: status });
+};
+
+function _renderPaymentRequestList(list) {
+  var tbody = document.getElementById('table-payreq');
+  if (!tbody) return;
+  if (!list || !list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>';
+    return;
+  }
+  var statusClass = {
+    'Menunggu':  'bg-amber-100 text-amber-700',
+    'Disetujui': 'bg-emerald-100 text-emerald-700',
+    'Ditolak':   'bg-rose-100 text-rose-600'
+  };
+  var html = '';
+  list.forEach(function(r) {
+    var sc = statusClass[r.status] || 'bg-slate-100 text-slate-600';
+    var pct = r.persentase != null ? parseFloat(r.persentase).toFixed(1) + '%' : '—';
+    var aksiHtml = '';
+    if (r.status === 'Menunggu') {
+      aksiHtml =
+        '<button onclick="bukaApprovePayReq(\'' + _esc(r.idReq) + '\',' + (r.jumlah || 0) + ',\'' + _esc(r.noPO) + '\')" ' +
+          'class="px-2.5 py-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold transition">Setujui</button> ' +
+        '<button onclick="tolakPayReq(\'' + _esc(r.idReq) + '\')" ' +
+          'class="px-2.5 py-1 text-xs bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg font-bold transition">Tolak</button>';
+    }
+    html += '<tr class="hover:bg-slate-50 transition-colors">';
+    html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
+    html += '<td class="p-4"><div class="font-mono text-xs font-bold text-slate-700">' + _esc(r.noPO || '') + '</div><div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
+    html += '<td class="p-4 text-xs font-mono text-teal-700">' + _esc(r.noWO || '—') + '</td>';
+    html += '<td class="p-4 text-right text-xs text-slate-600">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
+    html += '<td class="p-4 text-right font-bold text-slate-800 text-sm">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
+    html += '<td class="p-4 text-center text-xs text-slate-500">' + pct + '</td>';
+    html += '<td class="p-4 text-xs text-slate-500 max-w-[140px]"><div class="truncate" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
+    html += '<td class="p-4 text-xs text-slate-500">' + _esc(r.dibuatOleh || '') + '</td>';
+    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span></td>';
+    html += '<td class="p-4 text-center">' + (aksiHtml || '<span class="text-xs text-slate-300">—</span>') + '</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+window.bukaApprovePayReq = function(idReq, jumlah, noPO) {
+  document.getElementById('approve-payreq-id').value     = idReq;
+  document.getElementById('approve-payreq-jumlah').value = jumlah;
+  document.getElementById('approve-payreq-nopo').value   = noPO;
+  document.getElementById('approve-payreq-info').textContent =
+    noPO + ' — Rp ' + Math.round(jumlah).toLocaleString('id-ID');
+  document.getElementById('approve-payreq-akun').value    = '';
+  document.getElementById('approve-payreq-catatan').value = '';
+  document.getElementById('approve-payreq-tanggal').value = new Date().toISOString().slice(0, 10);
+  _loadAkunOptionsExp('approve-payreq-akun', '');
+  document.getElementById('modal-approve-payreq').classList.remove('hidden');
+};
+
+window.submitApprovePayReq = function() {
+  var idReq    = document.getElementById('approve-payreq-id').value;
+  var jumlah   = parseFloat(document.getElementById('approve-payreq-jumlah').value) || 0;
+  var noPO     = document.getElementById('approve-payreq-nopo').value;
+  var idAkun   = document.getElementById('approve-payreq-akun').value;
+  var tglInput = document.getElementById('approve-payreq-tanggal').value;
+  var catatan  = (document.getElementById('approve-payreq-catatan').value || '').trim();
+
+  if (!idAkun) return showNotification('Pilih akun pembayaran.', 'error');
+  if (!tglInput) return showNotification('Tanggal bayar wajib diisi.', 'error');
+
+  var akunSel = document.getElementById('approve-payreq-akun');
+  var namaAkun = akunSel.options[akunSel.selectedIndex]
+    ? (akunSel.options[akunSel.selectedIndex].dataset.nama || akunSel.options[akunSel.selectedIndex].textContent)
+    : '';
+  var tglParts = tglInput.split('-');
+  var tanggalBayar = tglParts[2] + '/' + tglParts[1] + '/' + tglParts[0];
+
+  var payload = {
+    idReq:        idReq,
+    noPO:         noPO,
+    jumlah:       jumlah,
+    idAkun:       idAkun,
+    namaAkun:     namaAkun,
+    tanggalBayar: tanggalBayar,
+    catatan:      catatan,
+    approvedBy:   (_currentUser && _currentUser.nama) || ''
+  };
+
+  document.getElementById('modal-approve-payreq').classList.add('hidden');
+  toggleLoader(true, 'Menyetujui pembayaran...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message || 'Pembayaran disetujui dan dicatat.');
+        loadPaymentRequestList();
+        _loadExpData();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .approvePembayaranPO(payload);
+};
+
+window.tolakPayReq = function(idReq) {
+  if (!idReq) return;
+  if (!confirm('Tolak request pembayaran ' + idReq + '?')) return;
+  var namaUser = (_currentUser && _currentUser.nama) || '';
+  toggleLoader(true, 'Menolak request...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message || 'Request ditolak.');
+        loadPaymentRequestList();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .tolakRequestPembayaranPO(idReq, namaUser);
 };
 </script>

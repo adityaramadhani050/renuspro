@@ -1,119 +1,186 @@
       <section id="page-pengeluaran" class="page-section">
 
-        <!-- ── Header + Actions ── -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Pengeluaran Project</h2>
-            <p class="text-sm text-slate-400 mt-0.5">Seluruh pengeluaran per work order</p>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <button onclick="bukaFormPengeluaranLangsung()"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
-              <i class="fas fa-plus text-xs"></i> Pengeluaran Langsung
-            </button>
-          </div>
+        <!-- ── Tab Bar ── -->
+        <div class="flex gap-1.5 mb-5 bg-white rounded-2xl shadow-sm border border-slate-100 p-1.5 w-fit">
+          <button id="exp-tab-pengeluaran-btn" onclick="switchExpTab('pengeluaran')"
+            class="px-5 py-2 rounded-xl text-sm font-bold transition bg-emerald-600 text-white shadow-sm">
+            <i class="fas fa-receipt mr-1.5"></i> Pengeluaran
+          </button>
+          <button id="exp-tab-payreq-btn" onclick="switchExpTab('payreq')"
+            class="px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700">
+            <i class="fas fa-paper-plane mr-1.5"></i> Permintaan Pembayaran PO
+            <span id="exp-payreq-badge" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold"></span>
+          </button>
         </div>
 
-        <!-- ── Filter Bar ── -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <!-- ══════════ TAB: PENGELUARAN ══════════ -->
+        <div id="exp-tab-pengeluaran">
 
-            <div class="lg:col-span-1">
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Work Order</label>
-              <select id="filter-exp-wo" onchange="filterPengeluaran()"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                <option value="">Semua WO</option>
-              </select>
-            </div>
-
+          <!-- ── Header + Actions ── -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Sumber</label>
-              <select id="filter-exp-sumber" onchange="filterPengeluaran()"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                <option value="">Semua Sumber</option>
-                <option value="Pembayaran PO">Pembayaran PO</option>
-                <option value="Penggunaan Stok">Penggunaan Stok</option>
-                <option value="Langsung">Langsung</option>
-              </select>
+              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Pengeluaran Project</h2>
+              <p class="text-sm text-slate-400 mt-0.5">Seluruh pengeluaran per work order</p>
             </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Akun Pembayaran</label>
-              <select id="filter-exp-akun" onchange="filterPengeluaran()"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                <option value="">Semua Akun</option>
-              </select>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="bukaFormPengeluaranLangsung()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-plus text-xs"></i> Pengeluaran Langsung
+              </button>
             </div>
+          </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Dari Tanggal</label>
-              <input type="date" id="filter-exp-dari" onchange="filterPengeluaran()"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
-            </div>
+          <!-- ── Filter Bar ── -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Sampai Tanggal</label>
-              <input type="date" id="filter-exp-sampai" onchange="filterPengeluaran()"
-                class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Cari No PO / Ref</label>
-              <div class="relative">
-                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" id="filter-exp-nopo" oninput="filterPengeluaran()"
-                  placeholder="No PO..."
-                  class="w-full pl-8 pr-3 text-sm border border-slate-200 rounded-xl py-2 focus:outline-none focus:border-emerald-400">
+              <div class="lg:col-span-1">
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Work Order</label>
+                <select id="filter-exp-wo" onchange="filterPengeluaran()"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
+                  <option value="">Semua WO</option>
+                </select>
               </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Sumber</label>
+                <select id="filter-exp-sumber" onchange="filterPengeluaran()"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
+                  <option value="">Semua Sumber</option>
+                  <option value="Pembayaran PO">Pembayaran PO</option>
+                  <option value="Penggunaan Stok">Penggunaan Stok</option>
+                  <option value="Langsung">Langsung</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Akun Pembayaran</label>
+                <select id="filter-exp-akun" onchange="filterPengeluaran()"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
+                  <option value="">Semua Akun</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Dari Tanggal</label>
+                <input type="date" id="filter-exp-dari" onchange="filterPengeluaran()"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Sampai Tanggal</label>
+                <input type="date" id="filter-exp-sampai" onchange="filterPengeluaran()"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Cari No PO / Ref</label>
+                <div class="relative">
+                  <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                  <input type="text" id="filter-exp-nopo" oninput="filterPengeluaran()"
+                    placeholder="No PO..."
+                    class="w-full pl-8 pr-3 text-sm border border-slate-200 rounded-xl py-2 focus:outline-none focus:border-emerald-400">
+                </div>
+              </div>
+
             </div>
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <p id="exp-total-badge" class="text-xs text-slate-400 font-medium"></p>
+              <button onclick="resetFilterPengeluaran()"
+                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition">
+                <i class="fas fa-rotate-left text-[10px]"></i> Reset Filter
+              </button>
+            </div>
+          </div>
 
+          <!-- ── Tabel Pengeluaran ── -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse" style="min-width:900px">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th class="p-4">ID / Tanggal</th>
+                    <th class="p-4">No WO / Project</th>
+                    <th class="p-4 text-center">Sumber</th>
+                    <th class="p-4">No PO</th>
+                    <th class="p-4">Akun</th>
+                    <th class="p-4">Deskripsi</th>
+                    <th class="p-4 text-right">Qty</th>
+                    <th class="p-4 text-right">Harga</th>
+                    <th class="p-4 text-right">Total</th>
+                    <th class="p-4 text-center" style="width:90px">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="table-pengeluaran" class="text-sm divide-y divide-slate-100">
+                  <tr><td colspan="10" class="p-8 text-center text-slate-400">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data...
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="exp-summary-bar" class="hidden border-t border-slate-100 px-5 py-3 flex justify-end items-center gap-8 text-sm">
+              <span class="text-slate-500 font-medium">Total Ditampilkan:</span>
+              <span id="exp-grand-total" class="text-xl font-extrabold text-slate-800"></span>
+            </div>
           </div>
-          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-            <p id="exp-total-badge" class="text-xs text-slate-400 font-medium"></p>
-            <button onclick="resetFilterPengeluaran()"
-              class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition">
-              <i class="fas fa-rotate-left text-[10px]"></i> Reset Filter
-            </button>
-          </div>
-        </div>
 
-        <!-- ── Tabel Pengeluaran ── -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse" style="min-width:900px">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th class="p-4">ID / Tanggal</th>
-                  <th class="p-4">No WO / Project</th>
-                  <th class="p-4 text-center">Sumber</th>
-                  <th class="p-4">No PO</th>
-                  <th class="p-4">Akun</th>
-                  <th class="p-4">Deskripsi</th>
-                  <th class="p-4 text-right">Qty</th>
-                  <th class="p-4 text-right">Harga</th>
-                  <th class="p-4 text-right">Total</th>
-                  <th class="p-4 text-center" style="width:90px">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="table-pengeluaran" class="text-sm divide-y divide-slate-100">
-                <tr><td colspan="10" class="p-8 text-center text-slate-400">
-                  <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data...
-                </td></tr>
-              </tbody>
-            </table>
+        </div><!-- end exp-tab-pengeluaran -->
+
+        <!-- ══════════ TAB: PERMINTAAN PEMBAYARAN PO ══════════ -->
+        <div id="exp-tab-payreq" class="hidden">
+
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+            <div>
+              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Permintaan Pembayaran PO</h2>
+              <p class="text-sm text-slate-400 mt-0.5">Pengajuan pembayaran dari procurement yang menunggu persetujuan Finance</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <select id="filter-payreq-status" onchange="loadPaymentRequestList()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 bg-white text-slate-600 font-medium">
+                <option value="Menunggu">Menunggu</option>
+                <option value="Disetujui">Disetujui</option>
+                <option value="Ditolak">Ditolak</option>
+                <option value="">Semua</option>
+              </select>
+              <button onclick="loadPaymentRequestList()"
+                class="text-slate-500 hover:text-slate-700 hover:bg-slate-100 p-2.5 rounded-xl transition" title="Refresh">
+                <i class="fas fa-rotate-right text-sm"></i>
+              </button>
+            </div>
           </div>
-          <!-- Summary total -->
-          <div id="exp-summary-bar" class="hidden border-t border-slate-100 px-5 py-3 flex justify-end items-center gap-8 text-sm">
-            <span class="text-slate-500 font-medium">Total Ditampilkan:</span>
-            <span id="exp-grand-total" class="text-xl font-extrabold text-slate-800"></span>
+
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse" style="min-width:860px">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th class="p-4">ID Request / Tanggal</th>
+                    <th class="p-4">No PO / Supplier</th>
+                    <th class="p-4">No WO</th>
+                    <th class="p-4 text-right">Grand Total PO</th>
+                    <th class="p-4 text-right">Jumlah Diminta</th>
+                    <th class="p-4 text-center">%</th>
+                    <th class="p-4">Catatan</th>
+                    <th class="p-4">Diminta Oleh</th>
+                    <th class="p-4 text-center">Status</th>
+                    <th class="p-4 text-center" style="width:110px">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="table-payreq" class="text-sm divide-y divide-slate-100">
+                  <tr><td colspan="10" class="p-8 text-center text-slate-400">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+        </div><!-- end exp-tab-payreq -->
 
         <!-- ── Modal Form Pengeluaran Langsung ── -->
         <div id="modal-exp-langsung" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col border border-slate-100" style="max-height:94vh">
 
-            <!-- Header modal -->
             <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
                 <i class="fas fa-receipt text-sm"></i>
@@ -128,11 +195,9 @@
               </button>
             </div>
 
-            <!-- Body -->
             <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
               <input type="hidden" id="exp-id-field">
 
-              <!-- WO & Tanggal -->
               <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-semibold text-slate-600 mb-1">Work Order <span class="text-rose-500">*</span></label>
@@ -148,7 +213,6 @@
                 </div>
               </div>
 
-              <!-- Akun & No PO -->
               <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-semibold text-slate-600 mb-1">Akun Pembayaran <span class="text-rose-500">*</span></label>
@@ -164,14 +228,12 @@
                 </div>
               </div>
 
-              <!-- Deskripsi -->
               <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Deskripsi <span class="text-rose-500">*</span></label>
                 <input type="text" id="exp-deskripsi" placeholder="Keterangan biaya pengeluaran" required
                   class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
               </div>
 
-              <!-- Qty, Satuan, Harga -->
               <div class="grid grid-cols-3 gap-3">
                 <div>
                   <label class="block text-xs font-semibold text-slate-600 mb-1">Qty <span class="text-rose-500">*</span></label>
@@ -190,13 +252,11 @@
                 </div>
               </div>
 
-              <!-- Total (read-only) -->
               <div class="bg-emerald-50 rounded-xl p-3 flex items-center justify-between">
                 <span class="text-sm font-semibold text-emerald-700">Total</span>
                 <span id="exp-total-display" class="text-xl font-extrabold text-emerald-700">Rp 0</span>
               </div>
 
-              <!-- Catatan -->
               <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Catatan <span class="text-slate-400 font-normal text-[10px]">(opsional)</span></label>
                 <textarea id="exp-catatan" rows="2" placeholder="Keterangan tambahan..."
@@ -204,7 +264,6 @@
               </div>
             </div>
 
-            <!-- Footer -->
             <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
               <button onclick="tutupFormPengeluaranLangsung()"
                 class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
@@ -213,6 +272,64 @@
               <button onclick="submitPengeluaranLangsung()"
                 class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> <span id="exp-submit-label">Simpan</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Modal Approve Pembayaran PO ── -->
+        <div id="modal-approve-payreq" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col border border-slate-100">
+
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-violet-50 text-violet-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fas fa-check-circle text-sm"></i>
+              </span>
+              <div class="flex-1">
+                <h3 class="text-base font-extrabold text-slate-800">Setujui Pembayaran</h3>
+                <p id="approve-payreq-info" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="document.getElementById('modal-approve-payreq').classList.add('hidden')"
+                class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+              <input type="hidden" id="approve-payreq-id">
+              <input type="hidden" id="approve-payreq-jumlah">
+              <input type="hidden" id="approve-payreq-nopo">
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Akun Pembayaran <span class="text-rose-500">*</span></label>
+                <select id="approve-payreq-akun"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 bg-white">
+                  <option value="">-- Pilih Akun --</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Bayar</label>
+                <input type="date" id="approve-payreq-tanggal"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Catatan <span class="text-slate-400 font-normal text-[10px]">(opsional)</span></label>
+                <input type="text" id="approve-payreq-catatan" placeholder="Keterangan persetujuan..."
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+              <button onclick="document.getElementById('modal-approve-payreq').classList.add('hidden')"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitApprovePayReq()"
+                class="px-6 py-2.5 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i> Setujui
               </button>
             </div>
 
