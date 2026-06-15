@@ -610,6 +610,7 @@ function getLaporanProfitabilitas(params) {
         noWO:            noWO2,
         namaProject:     (penData[idx][4] || '').toString(),
         namaKlien:       klienMap[klienId] || klienId,
+        namaSales:       (penData[idx][6] || '').toString(),
         tanggal:         tanggal,
         status:          status,
         nilaiKontrak:    nilaiKontrak,
