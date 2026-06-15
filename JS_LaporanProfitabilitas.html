@@ -284,15 +284,16 @@ window.exportLaporanProfitPDF = function() {
       theme: 'grid',
       styles:     { fontSize: 7, cellPadding: 2, font:'helvetica', textColor: DARK },
       headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
+      tableWidth: CW,
       columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: 52 },
-        2: { halign:'right', cellWidth: 28 },
-        3: { halign:'right', cellWidth: 26 },
-        4: { halign:'right', cellWidth: 26 },
-        5: { halign:'right', cellWidth: 26 },
-        6: { halign:'right', cellWidth: 20 },
-        7: { halign:'right', cellWidth: 20, fontStyle:'bold' }
+        0: { cellWidth: 26 },
+        1: { cellWidth: 71 },
+        2: { halign:'right', cellWidth: 32 },
+        3: { halign:'right', cellWidth: 28 },
+        4: { halign:'right', cellWidth: 28 },
+        5: { halign:'right', cellWidth: 30 },
+        6: { halign:'right', cellWidth: 26 },
+        7: { halign:'right', cellWidth: 28, fontStyle:'bold' }
       },
       alternateRowStyles: { fillColor: [248,250,252] },
       didParseCell: function(d) {
