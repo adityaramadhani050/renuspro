@@ -352,7 +352,7 @@ function _renderPODetail(po, items, pembayaran, paymentRequests) {
   if (btnEdit)         btnEdit.classList.toggle('hidden', !isAktif);
   if (btnTerima)       btnTerima.classList.toggle('hidden', !bisaTerima);
   if (badgeGudang)     badgeGudang.classList.add('hidden');
-  if (btnRequestBayar) btnRequestBayar.classList.toggle('hidden', !(isDiterima && !isLunas));
+  if (btnRequestBayar) btnRequestBayar.classList.toggle('hidden', isTerminal || isLunas);
   if (btnSelesai)      btnSelesai.classList.toggle('hidden', !(isDiterima && isLunas));
   if (btnBatal)        btnBatal.classList.toggle('hidden', isTerminal);
 

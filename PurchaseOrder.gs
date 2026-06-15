@@ -1037,8 +1037,8 @@ function requestPembayaranPO(payload) {
       }
     }
     if (!statusPO) return { success: false, message: 'No PO tidak ditemukan.' };
-    if (statusPO !== 'Diterima' && statusPO !== 'Diterima Sebagian') {
-      return { success: false, message: 'Request pembayaran hanya bisa dibuat setelah barang diterima (status: "' + statusPO + '").' };
+    if (statusPO === 'Selesai' || statusPO === 'Batal') {
+      return { success: false, message: 'Request pembayaran tidak bisa dibuat untuk PO berstatus "' + statusPO + '".' };
     }
 
     var prSheet = _ensurePOPaymentRequestSheet(ss);
