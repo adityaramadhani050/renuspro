@@ -346,22 +346,19 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   if (!anchor) return sheet.getLastRow() + 1;
 
   var anchorRow = anchor.getRow();
-  var NCOLS     = 8;
+  var NCOLS     = 7;  // A–G: No. | Details(B-C) | Unit | Qty | Unit Price | Total
 
   if (!items || items.length === 0) return anchorRow + 1;
 
   var totalRows = items.length;
 
-  // Insert semua baris sekaligus
   sheet.insertRowsAfter(anchorRow, totalRows);
 
-  // Salin format anchor ke zona
   sheet.getRange(anchorRow, 1, 1, NCOLS).copyTo(
     sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS),
     SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
   );
 
-  // Build batch arrays
   var values      = [];
   var backgrounds = [];
   var fontWeights = [];
@@ -370,29 +367,28 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 
   items.forEach(function(item, idx) {
     var row = new Array(NCOLS).fill('');
-    row[0] = idx + 1;
-    row[1] = item.namaItem   || '';
-    row[4] = item.satuan     || '';
-    row[5] = item.qty        || 0;
-    row[6] = item.hargaBeli  || 0;
-    row[7] = item.total      || 0;
+    row[0] = idx + 1;              // A: No.
+    row[1] = item.namaItem || '';  // B  (merged B–C)
+    // row[2] C merged with B
+    row[3] = item.satuan   || '';  // D: Unit
+    row[4] = item.qty      || 0;   // E: Qty
+    row[5] = item.hargaBeli|| 0;   // F: Unit Price
+    row[6] = item.total    || 0;   // G: Total
 
     var bg  = new Array(NCOLS).fill(idx % 2 === 0 ? '#ffffff' : '#f8f8f8');
     var fw  = new Array(NCOLS).fill('normal');
     var fmt = new Array(NCOLS).fill('@');
-    fmt[5] = '#,##0.##';
-    fmt[6] = '#,##0';
-    fmt[7] = '#,##0';
-    var al = ['center','left','left','left','center','center','right','right'];
+    fmt[4] = '#,##0.##';  // E Qty
+    fmt[5] = '#,##0';     // F Unit Price
+    fmt[6] = '#,##0';     // G Total
 
     values.push(row);
     backgrounds.push(bg);
     fontWeights.push(fw);
     numFormats.push(fmt);
-    alignments.push(al);
+    alignments.push(['center','left','left','center','center','right','right']);
   });
 
-  // Batch write
   var zone = sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS);
   zone.setValues(values);
   zone.setBackgrounds(backgrounds);
@@ -402,10 +398,10 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setFontSize(8);
   zone.setVerticalAlignment('middle');
 
-  // Merge deskripsi B-D per baris
+  // Merge B–C per baris untuk kolom Details
   for (var r = 0; r < totalRows; r++) {
     try {
-      sheet.getRange(anchorRow + 1 + r, 2, 1, 3).merge();
+      sheet.getRange(anchorRow + 1 + r, 2, 1, 2).merge();  // B–C
       sheet.getRange(anchorRow + 1 + r, 2)
         .setWrap(true).setHorizontalAlignment('left');
     } catch(e) {}
@@ -416,12 +412,12 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 }
 
 function _sisipkanFooterPO(sheet, startRow, po, tc) {
-  var NCOLS = 8;
+  var NCOLS = 7;  // A–G (sesuai kolom template)
   var row   = startRow;
   var BLUE  = '#003399';
   var WHITE = '#ffffff';
 
-  // ── Summary ──
+  // ── Summary (label di F, value di G) ──
   var summaryLines = [
     { label: 'Subtotal', value: po.subtotal || 0, bold: false, red: false, highlight: false }
   ];
@@ -436,18 +432,18 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   sheet.insertRowsAfter(row - 1, summaryLines.length);
   summaryLines.forEach(function(s) {
     sheet.setRowHeight(row, 22);
-    sheet.getRange(row, 1, 1, 6).setBackground(s.highlight ? '#e8eeff' : WHITE);
-    var labelCell = sheet.getRange(row, 7);
-    var valueCell = sheet.getRange(row, 8);
+    sheet.getRange(row, 1, 1, 5).setBackground(s.highlight ? '#e8eeff' : WHITE);  // A–E blank
     var color = s.red ? '#cc0000' : (s.bold ? BLUE : '#333333');
 
-    labelCell.setValue(s.label)
+    sheet.getRange(row, 6)  // F: label
+      .setValue(s.label)
       .setHorizontalAlignment('right').setFontWeight(s.bold ? 'bold' : 'normal')
       .setFontSize(8).setFontColor(color)
       .setBackground(s.highlight ? '#e8eeff' : WHITE)
       .setBorder(true,true,true,true,false,false, '#dddddd', SpreadsheetApp.BorderStyle.SOLID);
 
-    valueCell.setValue(s.value).setNumberFormat('#,##0')
+    sheet.getRange(row, 7)  // G: value
+      .setValue(s.value).setNumberFormat('#,##0')
       .setHorizontalAlignment('right').setFontWeight(s.bold ? 'bold' : 'normal')
       .setFontSize(8).setFontColor(color)
       .setBackground(s.highlight ? '#e8eeff' : WHITE)
@@ -460,11 +456,11 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   if (catatan) {
     sheet.insertRowsAfter(row - 1, 1);
     var catatanH = Math.max(40, Math.ceil(catatan.length / 90) * 15 + 20);
-    sheet.getRange(row, 1, 1, 4).merge()
+    sheet.getRange(row, 1, 1, 4).merge()  // A–D
       .setValue('Catatan:\n' + catatan)
       .setBackground('#fffce6').setFontColor('#665500').setFontSize(8)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
-    sheet.getRange(row, 5, 1, 4).merge().setBackground(WHITE);
+    sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);  // E–G
     sheet.setRowHeight(row, catatanH);
     row++;
   }
@@ -481,7 +477,6 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   var tcEntries = tcFields.filter(function(f) { return tc[f.key] && tc[f.key] !== '-'; });
 
   if (tcEntries.length > 0) {
-    // T&C header
     sheet.insertRowsAfter(row - 1, 1);
     sheet.getRange(row, 1, 1, NCOLS).merge()
       .setValue('Term & Condition:')
@@ -490,7 +485,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
     sheet.setRowHeight(row, 22);
     row++;
 
-    // T&C rows: 2 items per row (left cols 1-4, right cols 5-8)
+    // 2 TC per baris: kiri A + B–D (3 cols), kanan E + F–G (2 cols)
     var tcPairs = [];
     for (var pi = 0; pi < tcEntries.length; pi += 2) {
       tcPairs.push({ left: tcEntries[pi], right: tcEntries[pi+1] || null });
@@ -499,21 +494,23 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
     sheet.insertRowsAfter(row - 1, tcPairs.length);
     tcPairs.forEach(function(pair, idx) {
       var bg = idx % 2 === 0 ? '#efefef' : '#f5f5f5';
-      sheet.getRange(row, 1, 1, 8).setBackground(bg).setFontSize(8);
+      sheet.getRange(row, 1, 1, NCOLS).setBackground(bg).setFontSize(8);
       sheet.setRowHeight(row, 22);
 
-      sheet.getRange(row, 1).setValue(pair.left.label + ':')
+      sheet.getRange(row, 1)  // A: label kiri
+        .setValue(pair.left.label + ':')
         .setFontWeight('bold').setFontSize(8).setFontColor('#222222').setBackground(bg);
-      sheet.getRange(row, 2, 1, 3).merge()
+      sheet.getRange(row, 2, 1, 3).merge()  // B–D: value kiri
         .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
 
       if (pair.right) {
-        sheet.getRange(row, 5).setValue(pair.right.label + ':')
+        sheet.getRange(row, 5)  // E: label kanan
+          .setValue(pair.right.label + ':')
           .setFontWeight('bold').setFontSize(8).setFontColor('#222222').setBackground(bg);
-        sheet.getRange(row, 6, 1, 3).merge()
+        sheet.getRange(row, 6, 1, 2).merge()  // F–G: value kanan
           .setValue(tc[pair.right.key] || '').setFontSize(8).setBackground(bg);
       } else {
-        sheet.getRange(row, 5, 1, 4).merge().setBackground(bg);
+        sheet.getRange(row, 5, 1, 3).merge().setBackground(bg);  // E–G kosong
       }
       row++;
     });
@@ -528,28 +525,25 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   // ── Tanda Tangan ──
   sheet.insertRowsAfter(row - 1, 3);
 
-  // Labels
-  sheet.getRange(row, 1, 1, 4).merge()
+  sheet.getRange(row, 1, 1, 4).merge()  // A–D: Customer
     .setValue('Customer (PT. RENUS GLOBAL INDONESIA)')
     .setHorizontalAlignment('center').setFontSize(8).setFontColor('#555555').setBackground(WHITE);
-  sheet.getRange(row, 5, 1, 4).merge()
+  sheet.getRange(row, 5, 1, 3).merge()  // E–G: Supplier
     .setValue('Supplier')
     .setHorizontalAlignment('center').setFontSize(8).setFontColor('#555555').setBackground(WHITE);
   sheet.setRowHeight(row, 18);
   row++;
 
-  // Blank space for signature
-  sheet.getRange(row, 1, 1, 4).merge().setBackground(WHITE);
-  sheet.getRange(row, 5, 1, 4).merge().setBackground(WHITE);
+  sheet.getRange(row, 1, 1, 4).merge().setBackground(WHITE);  // A–D
+  sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);  // E–G
   sheet.setRowHeight(row, 50);
   row++;
 
-  // Signer names
   var dibuatOleh = po.dibuatOleh || 'Procurement';
-  sheet.getRange(row, 1, 1, 4).merge()
+  sheet.getRange(row, 1, 1, 4).merge()  // A–D
     .setValue('(  ' + dibuatOleh + '  )')
     .setHorizontalAlignment('center').setFontSize(8).setFontWeight('bold').setBackground(WHITE);
-  sheet.getRange(row, 5, 1, 4).merge()
+  sheet.getRange(row, 5, 1, 3).merge()  // E–G
     .setValue('(                                                   )')
     .setHorizontalAlignment('center').setFontSize(8).setBackground(WHITE);
   sheet.setRowHeight(row, 18);
