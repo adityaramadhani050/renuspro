@@ -130,7 +130,10 @@
             <p class="font-semibold text-slate-700 truncate">${i.namaProject}</p>
           </td>
           <td class="p-4 text-center"><span class="text-[11px] font-bold px-2 py-1 rounded-lg ${_jenisBadge(i.jenis)}">${i.jenis}${i.persen ? ' '+i.persen+'%' : ''}</span></td>
-          <td class="p-4 text-right font-bold text-slate-800 whitespace-nowrap">Rp ${i.total.toLocaleString('id-ID')}</td>
+          <td class="p-4 text-right whitespace-nowrap">
+            <p class="font-bold text-slate-800">Rp ${i.dpp.toLocaleString('id-ID')}</p>
+            ${i.ppnNominal > 0 ? `<p class="text-[10px] text-slate-400">Incl. PPN Rp ${i.total.toLocaleString('id-ID')}</p>` : ''}
+          </td>
           <td class="p-4 text-center">
             ${_isFinanceOrAdmin()
               ? `<select onchange="ubahStatusBayarInvoice('${i.id}', this)"
