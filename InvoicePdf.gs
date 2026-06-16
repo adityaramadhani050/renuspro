@@ -382,7 +382,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
       .setHorizontalAlignment('left')
       .setFontWeight('bold')
       .setFontColor(r.bold ? '#1a3a8f' : '#000000')
-      .setBorder(false, true, false, false, false, false, #ffffff, SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(false, true, false, false, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(row, valueCol)
       .setValue(r.value)
       .setNumberFormat('#,##0')
