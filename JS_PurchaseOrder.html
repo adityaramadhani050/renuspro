@@ -111,11 +111,15 @@ function bukaFormPO() {
   renderItemsPO();
   hitungTotalPO();
 
-  // Populate dropdowns
-  _loadSupplierOptions('sel-supplier-po', '');
-  _loadWOOptions('sel-wo-po', '');
-
   document.getElementById('form-po-section').classList.remove('hidden');
+
+  // Populate dropdowns dengan loading overlay
+  var _poLoadPending = 2;
+  var _poLoadingEl = document.getElementById('po-form-loading');
+  if (_poLoadingEl) _poLoadingEl.classList.remove('hidden');
+  function _poLoadDone() { if (--_poLoadPending <= 0 && _poLoadingEl) _poLoadingEl.classList.add('hidden'); }
+  _loadSupplierOptions('sel-supplier-po', '', _poLoadDone);
+  _loadWOOptions('sel-wo-po', '', _poLoadDone);
   document.getElementById('panel-po-detail').classList.add('hidden');
   document.getElementById('po-list-section').classList.add('hidden');
 }
@@ -463,8 +467,12 @@ function bukaEditPO(noPO) {
       if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = po.diskonNominal ? _fmtRp(po.diskonNominal) : '';
       document.getElementById('po-catatan').value    = po.catatan || '';
 
-      _loadSupplierOptions('sel-supplier-po', po.idSupplier || '');
-      _loadWOOptions('sel-wo-po', po.noWO || '');
+      var _poLoadPendingEdit = 2;
+      var _poLoadingElEdit = document.getElementById('po-form-loading');
+      if (_poLoadingElEdit) _poLoadingElEdit.classList.remove('hidden');
+      function _poLoadDoneEdit() { if (--_poLoadPendingEdit <= 0 && _poLoadingElEdit) _poLoadingElEdit.classList.add('hidden'); }
+      _loadSupplierOptions('sel-supplier-po', po.idSupplier || '', _poLoadDoneEdit);
+      _loadWOOptions('sel-wo-po', po.noWO || '', _poLoadDoneEdit);
 
       renderItemsPO();
       hitungTotalPO();
@@ -480,12 +488,12 @@ function bukaEditPO(noPO) {
     .getPODetail(noPO);
 }
 
-function _loadSupplierOptions(selId, selectedId) {
-  if (typeof google === 'undefined') return;
+function _loadSupplierOptions(selId, selectedId, onDone) {
+  if (typeof google === 'undefined') { if (onDone) onDone(); return; }
   google.script.run
     .withSuccessHandler(function(res) {
       var sel = document.getElementById(selId);
-      if (!sel) return;
+      if (!sel) { if (onDone) onDone(); return; }
       sel.innerHTML = '<option value="">-- Pilih Supplier --</option>';
       (Array.isArray(res) ? res : (res.list || [])).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
         var opt = document.createElement('option');
@@ -496,17 +504,18 @@ function _loadSupplierOptions(selId, selectedId) {
       });
       if (sel.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh(selId);
       else if (typeof initSearchableDropdown === 'function') initSearchableDropdown(selId, { placeholder: '-- Pilih Supplier --' });
+      if (onDone) onDone();
     })
-    .withFailureHandler(function() {})
+    .withFailureHandler(function() { if (onDone) onDone(); })
     .getSupplierList();
 }
 
-function _loadWOOptions(selId, selectedWO) {
-  if (typeof google === 'undefined') return;
+function _loadWOOptions(selId, selectedWO, onDone) {
+  if (typeof google === 'undefined') { if (onDone) onDone(); return; }
   google.script.run
     .withSuccessHandler(function(data) {
       var sel = document.getElementById(selId);
-      if (!sel) return;
+      if (!sel) { if (onDone) onDone(); return; }
       sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
       (data || []).filter(function(w) { return w.status !== 'Closed'; }).forEach(function(w) {
         var opt = document.createElement('option');
@@ -517,8 +526,9 @@ function _loadWOOptions(selId, selectedWO) {
       });
       if (sel.dataset.sdInit === '1' && typeof sdRefresh === 'function') sdRefresh(selId);
       else if (typeof initSearchableDropdown === 'function') initSearchableDropdown(selId, { placeholder: '-- Tidak terikat WO --' });
+      if (onDone) onDone();
     })
-    .withFailureHandler(function() {})
+    .withFailureHandler(function() { if (onDone) onDone(); })
     .getWorkOrderList();
 }
 

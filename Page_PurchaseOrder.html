@@ -55,7 +55,13 @@
         </div>
 
         <!-- ── Form Buat / Edit PO ── -->
-        <div id="form-po-section" class="hidden">
+        <div id="form-po-section" class="hidden relative">
+
+          <!-- Loading Overlay -->
+          <div id="po-form-loading" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center rounded-2xl min-h-[200px]">
+            <div class="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-3"></div>
+            <p class="text-sm font-semibold text-slate-500">Memuat data Supplier & Work Order...</p>
+          </div>
 
           <!-- Back Button + Title -->
           <div class="mb-6">
