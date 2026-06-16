@@ -309,10 +309,10 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
     sheet.getRange(row, 6).setBackground('#ffffff');  // gap
     sheet.getRange(row, 7)
       .setValue(k.label)
-      .setHorizontalAlignment('right')
-      .setFontWeight(k.bold ? 'bold' : 'normal')
+      .setHorizontalAlignment('left')
+      .setFontWeight('bold')
       .setFontColor(k.red ? '#cc0000' : (k.bold ? '#1a3a8f' : null))
-      .setBorder(true, true, true, true, false, false,
+      .setBorder(false, false, false, false, true, false,
                  '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(row, 8)
       .setValue(k.value)
@@ -320,7 +320,7 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
       .setFontWeight(k.bold ? 'bold' : 'normal')
       .setFontColor(k.red ? '#cc0000' : (k.bold ? '#1a3a8f' : null))
       .setHorizontalAlignment('right')
-      .setBorder(true, true, true, true, false, false,
+      .setBorder(false, false, false, false, true, false,
                  '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     row++;
   });
