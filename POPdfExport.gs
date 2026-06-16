@@ -465,7 +465,7 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
       .setHorizontalAlignment('right').setFontWeight(fw)
       .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
   }
-  sheet.getRange(r, 6, 1, 2).setBorder(true, true, true, true, false, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(r, 6, 1, 2).setBorder(false, false, false, false, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
   sheet.setRowHeight(r, 22);
 }
 
