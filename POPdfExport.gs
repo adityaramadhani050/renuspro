@@ -428,38 +428,33 @@ function _getPOTCOptionsForPDF() {
   };
 }
 
-// ── Helper: tulis 1 baris summary (E=label, F="Rp", G=value) ─────────────────
+// ── Helper: tulis 1 baris summary (E=gap, F=label, G=value, gray bg, no border) ─
 
 function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
-  var BLUE  = '#003399';
-  var WHITE = '#ffffff';
-  var color = isBold ? BLUE : '#333333';
-  var bg    = isBold ? '#e8f0ff' : WHITE;
+  var GRAY_BG = '#e8e8e8';
+  var color   = isBold ? '#003399' : '#333333';
+  var fw      = isBold ? 'bold' : 'normal';
 
-  sheet.getRange(r, 5)
-    .setValue(label)
-    .setHorizontalAlignment('left').setFontWeight(isBold ? 'bold' : 'normal')
-    .setFontSize(8).setFontColor(color).setBackground(bg)
-    .setBorder(true, true, true, null, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+  // E (col 5): spacer/gap
+  sheet.getRange(r, 5).setValue('').setBackground(GRAY_BG);
 
+  // F (col 6): label
   sheet.getRange(r, 6)
-    .setValue('Rp')
-    .setHorizontalAlignment('center').setFontWeight(isBold ? 'bold' : 'normal')
-    .setFontSize(8).setFontColor(color).setBackground(bg)
-    .setBorder(true, null, true, null, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+    .setValue(label)
+    .setHorizontalAlignment('left').setFontWeight(fw)
+    .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
 
+  // G (col 7): value
   if (isDash) {
     sheet.getRange(r, 7)
       .setValue('-')
-      .setHorizontalAlignment('right').setFontWeight(isBold ? 'bold' : 'normal')
-      .setFontSize(8).setFontColor(color).setBackground(bg)
-      .setBorder(true, null, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+      .setHorizontalAlignment('right').setFontWeight(fw)
+      .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
   } else {
     sheet.getRange(r, 7)
       .setValue(value).setNumberFormat('#,##0')
-      .setHorizontalAlignment('right').setFontWeight(isBold ? 'bold' : 'normal')
-      .setFontSize(8).setFontColor(color).setBackground(bg)
-      .setBorder(true, null, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+      .setHorizontalAlignment('right').setFontWeight(fw)
+      .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
   }
   sheet.setRowHeight(r, 22);
 }
@@ -467,19 +462,18 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
 // ── Footer utama ──────────────────────────────────────────────────────────────
 
 function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
-  var SC    = 2;    // kolom B
-  var NCOLS = 6;    // B–G
-  var row   = startRow;
-  var BLUE  = '#003399';
-  var WHITE = '#ffffff';
-  var CHK   = '☑';   // ☑
-  var UNCHK = '☐';   // ☐
+  var SC      = 2;          // kolom B
+  var NCOLS   = 6;          // B–G
+  var row     = startRow;
+  var BLUE    = '#003399';
+  var WHITE   = '#ffffff';
+  var GRAY_BG = '#e8e8e8';
 
   tcOptions = tcOptions || {};
 
   // ── Summary lines ──
   var summaryLines = [];
-  summaryLines.push({ label: 'Subtotal',       value: po.subtotal  || 0, isDash: false, isBold: false });
+  summaryLines.push({ label: 'Subtotal', value: po.subtotal || 0, isDash: false, isBold: false });
   if ((po.ppnNominal || 0) > 0) {
     summaryLines.push({ label: 'Taxes (' + (po.ppnPersen || 0) + '%)', value: po.ppnNominal, isDash: false, isBold: false });
   }
@@ -495,9 +489,10 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   var NS = summaryLines.length;  // 3 atau 4 baris
 
   // ── Blok Notes + Summary berdampingan ──────────────────────────────────────
+  // Layout: B–D = Notes | E = gap (abu-abu) | F = label | G = value
   sheet.insertRowsAfter(row - 1, NS);
 
-  // Baris pertama: Notes header (B–D) + Subtotal (E–G)
+  // Baris pertama: Notes header (B–D) + Summary line 0 (F–G via _poSummaryRow)
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('Additional Notes :')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold').setFontSize(8)
@@ -505,7 +500,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   sheet.setRowHeight(row, 20);
   _poSummaryRow(sheet, row, summaryLines[0].label, summaryLines[0].value, summaryLines[0].isDash, summaryLines[0].isBold);
 
-  // Baris 2 dst: Notes content (B–D merged tall) + sisa summary (E–G)
+  // Baris 2 dst: Notes content (B–D merged) + sisa summary (F–G via _poSummaryRow)
   if (NS > 1) {
     var contentRows = NS - 1;
     sheet.getRange(row + 1, SC, contentRows, 3).merge()
@@ -513,6 +508,8 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
       .setBackground(WHITE).setFontColor('#444444').setFontSize(8)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
       .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+    // Set E (col 5) abu-abu untuk baris konten notes
+    sheet.getRange(row + 1, 5, contentRows, 1).setBackground(GRAY_BG);
     for (var si = 1; si < NS; si++) {
       var s = summaryLines[si];
       _poSummaryRow(sheet, row + si, s.label, s.value, s.isDash, s.isBold);
@@ -520,6 +517,12 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   }
 
   row += NS;
+
+  // ── Separator antara Notes/Summary dan T&C ────────────────────────────────
+  sheet.insertRowsAfter(row - 1, 1);
+  sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
+  sheet.setRowHeight(row, 8);
+  row++;
 
   // ── Term & Condition (label : value, 2 item per baris) ────────────────────
   var tcFields = [
@@ -541,7 +544,6 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     sheet.setRowHeight(row, 22);
     row++;
 
-    // Pasangkan 2 TC per baris
     var tcPairs = [];
     for (var pi = 0; pi < tcEntries.length; pi += 2) {
       tcPairs.push({ left: tcEntries[pi], right: tcEntries[pi + 1] || null });
@@ -558,9 +560,9 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
         .setValue(pair.left.label + ':')
         .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
         .setBackground(bg).setWrap(false);
-      // D–E merged: value kiri
+      // D–E merged: value kiri (normal, tidak bold)
       sheet.getRange(row, 4, 1, 2).merge()
-        .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
+        .setValue(tc[pair.left.key] || '').setFontSize(8).setFontWeight('normal').setBackground(bg);
 
       if (pair.right) {
         // F: label kanan
@@ -568,9 +570,9 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
           .setValue(pair.right.label + ':')
           .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
           .setBackground(bg).setWrap(false);
-        // G: value kanan
+        // G: value kanan (normal, tidak bold)
         sheet.getRange(row, 7)
-          .setValue(tc[pair.right.key] || '').setFontSize(8).setBackground(bg);
+          .setValue(tc[pair.right.key] || '').setFontSize(8).setFontWeight('normal').setBackground(bg);
       } else {
         sheet.getRange(row, 6, 1, 2).merge().setBackground(bg);
       }
@@ -578,24 +580,24 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     });
   }
 
-  // ── Spacer ─────────────────────────────────────────────────────────────────
+  // ── Separator antara T&C dan Signature ────────────────────────────────────
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
-  sheet.setRowHeight(row, 8);
+  sheet.setRowHeight(row, 12);
   row++;
 
-  // ── Signature: header biru "Customer | Supplier" ───────────────────────────
+  // ── Signature ─────────────────────────────────────────────────────────────
   sheet.insertRowsAfter(row - 1, 4);
 
-  // Header bar
+  // Header bar: rata kiri
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('Customer')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
-    .setFontSize(9).setHorizontalAlignment('center').setVerticalAlignment('middle');
+    .setFontSize(9).setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.getRange(row, 5, 1, 3).merge()
     .setValue('Supplier')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
-    .setFontSize(9).setHorizontalAlignment('center').setVerticalAlignment('middle');
+    .setFontSize(9).setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.setRowHeight(row, 20);
   row++;
 
@@ -617,17 +619,15 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   sheet.setRowHeight(row, 55);
   row++;
 
-  // Nama dan garis
+  // Nama: tanpa garis border
   var dibuatOleh = po.dibuatOleh || 'Procurement';
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('(' + dibuatOleh + ')')
     .setFontSize(8).setFontWeight('bold').setBackground(WHITE)
-    .setHorizontalAlignment('left').setVerticalAlignment('top')
-    .setBorder(true, null, null, null, false, false, '#333333', SpreadsheetApp.BorderStyle.SOLID);
+    .setHorizontalAlignment('left').setVerticalAlignment('top');
   sheet.getRange(row, 5, 1, 3).merge()
     .setValue('(............................................)')
     .setFontSize(8).setBackground(WHITE)
-    .setHorizontalAlignment('left').setVerticalAlignment('top')
-    .setBorder(true, null, null, null, false, false, '#333333', SpreadsheetApp.BorderStyle.SOLID);
+    .setHorizontalAlignment('left').setVerticalAlignment('top');
   sheet.setRowHeight(row, 18);
 }
