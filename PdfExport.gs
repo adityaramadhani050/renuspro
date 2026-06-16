@@ -284,7 +284,7 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   const netSub = (item.subtotal || 0) - (item.diskon || 0);
 
   const kalkulasi = [
-    { label: 'Subtotal',
+    { label: 'Total',
       value: item.subtotal  || 0, bold: false, red: false, skip: false },
     { label: 'Diskon',
       value: -(item.diskon  || 0), bold: false, red: true,
