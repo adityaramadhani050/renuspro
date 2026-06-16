@@ -187,7 +187,7 @@ function getWorkOrderDashboard() {
         paymentStatus = 'Ditagih';
       }
 
-      sumKontrak += w.grandTotal || 0;
+      sumKontrak += nilaiKontrak;
       sumDitagih += totalDitagihDpp + Math.round(totalDitagihDpp * ppnRate / 100);
       sumLunas   += totalLunasTotal;
 

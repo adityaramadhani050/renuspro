@@ -245,6 +245,9 @@ function getSalesReportData(params) {
       var namaProject   = row[4] || '';
       var klienId       = String(row[5] || '').trim();
       var dibuatOleh    = String(row[6] || '').trim();
+      var subtotal      = parseFloat(row[7]) || 0;
+      var diskon        = parseFloat(row[8]) || 0;
+      var nilaiKontrak  = Math.max(0, subtotal - diskon);
       var grandTotal    = parseFloat(row[10]) || 0;
       var status        = String(row[16] || '').trim();
       var noWO          = row[17] || '';
@@ -286,7 +289,7 @@ function getSalesReportData(params) {
       // Creation-date-based metrics
       if (creationInRange) {
         sd.totalPenawaran++;
-        sd.totalNilaiPenawaran += grandTotal;
+        sd.totalNilaiPenawaran += nilaiKontrak;
         if (status === 'Fail') sd.failCount++;
       }
 
@@ -300,13 +303,13 @@ function getSalesReportData(params) {
       // Deal-date-based metrics
       if (dealInRange) {
         sd.dealCount++;
-        sd.dealRevenue += grandTotal;
+        sd.dealRevenue += nilaiKontrak;
       }
 
       // Pipeline — all time, On-Progress (untuk KPI pipeline saja, tidak masuk daftar penawaran)
       if (status === 'On-Progress') {
         sd.pipelineCount++;
-        sd.pipelineValue += grandTotal;
+        sd.pipelineValue += nilaiKontrak;
       }
     }
 

@@ -90,6 +90,7 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
           klienId:          dataMain[i][5].toString(),
           namaKlien:        klienMap[dataMain[i][5].toString()] || dataMain[i][5].toString(),
           dibuatOleh:       dataMain[i][6].toString(),
+          nilaiKontrak:     Math.max(0, (parseFloat(dataMain[i][7]) || 0) - (parseFloat(dataMain[i][8]) || 0)),
           grandTotal:       parseFloat(dataMain[i][10]) || 0,
           status:           status,
           channelMarketing: dataMain[i][19] ? dataMain[i][19].toString() : ''

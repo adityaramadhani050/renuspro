@@ -348,7 +348,7 @@ function _dbRenderTargetBar(summary, items) {
   (items || []).forEach(function(item) {
     if (item.status !== 'Deal') return;
     var ts = item.tanggalDeal || item.tanggal;
-    if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += item.grandTotal;
+    if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
   });
 
   // Target tahunan = target bulanan × 12 (scope sudah sesuai role: diri sendiri / tim / semua)

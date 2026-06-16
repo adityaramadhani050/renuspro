@@ -50,8 +50,8 @@
             <p class="text-[10px] text-slate-400 mt-0.5">${i.dibuatOleh || ''}</p>
           </td>
           <td class="p-4 text-right whitespace-nowrap">
-            <p class="font-bold text-slate-800">Rp ${rp(i.grandTotal)}</p>
-            <p class="text-[10px] text-slate-400">DPP Rp ${rp(i.nilaiKontrak)}</p>
+            <p class="font-bold text-slate-800">Rp ${rp(i.nilaiKontrak)}</p>
+            <p class="text-[10px] text-slate-400">Inkl. PPN Rp ${rp(i.grandTotal)}</p>
           </td>
           <td class="p-4">
             <div class="flex justify-between text-[10px] text-slate-400 mb-1">
@@ -153,7 +153,7 @@
 
       // Keuangan
       const ditagihTotal = item.totalDitagihDpp + Math.round(item.totalDitagihDpp * (item.ppnRate || 0) / 100);
-      el('wo-fin-kontrak').innerText = rp(item.grandTotal);
+      el('wo-fin-kontrak').innerText = rp(item.nilaiKontrak);
       el('wo-fin-ditagih').innerText = rp(ditagihTotal);
       el('wo-fin-lunas').innerText   = rp(item.totalLunasTotal);
       el('wo-fin-sisa').innerText    = rp(item.sisaDpp > 0 ? item.sisaDpp + Math.round(item.sisaDpp * (item.ppnRate||0)/100) : 0);
