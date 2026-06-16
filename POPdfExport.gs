@@ -483,18 +483,18 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
 
   // ── Summary lines ──
   var summaryLines = [];
-  summaryLines.push({ label: 'Subtotal', value: po.subtotal || 0, isDash: false, isBold: false });
+  summaryLines.push({ label: 'Total', value: po.subtotal || 0, isDash: false, isBold: false });
   var diskonVal = po.diskonNominal || 0;
   summaryLines.push({
-    label:  diskonVal > 0 && (po.diskonPersen || 0) > 0 ? 'Discount (' + po.diskonPersen + '%)' : 'Discount (Rp)',
+    label:  diskonVal > 0 && (po.diskonPersen || 0) > 0 ? 'Diskon (' + po.diskonPersen + '%)' : 'Diskon',
     value:  diskonVal,
     isDash: diskonVal === 0,
     isBold: false
   });
   if ((po.ppnNominal || 0) > 0) {
-    summaryLines.push({ label: 'Taxes (' + (po.ppnPersen || 0) + '%)', value: po.ppnNominal, isDash: false, isBold: false });
+    summaryLines.push({ label: 'PPN ' + (po.ppnPersen || 0) + '%', value: po.ppnNominal, isDash: false, isBold: false });
   }
-  summaryLines.push({ label: 'Total', value: po.grandTotal || 0, isDash: false, isBold: true });
+  summaryLines.push({ label: 'GRAND TOTAL', value: po.grandTotal || 0, isDash: false, isBold: true });
 
   var NS = summaryLines.length;  // 3 atau 4 baris
 
