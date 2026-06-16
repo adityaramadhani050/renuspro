@@ -51,7 +51,7 @@
           </td>
           <td class="p-4 text-right whitespace-nowrap">
             <p class="font-bold text-slate-800">Rp ${rp(i.nilaiKontrak)}</p>
-            <p class="text-[10px] text-slate-400">Inkl. PPN Rp ${rp(i.grandTotal)}</p>
+            ${i.ppnRate > 0 ? `<p class="text-[10px] text-slate-400">Incl. PPN Rp ${rp(i.grandTotal)}</p>` : ''}
           </td>
           <td class="p-4">
             <div class="flex justify-between text-[10px] text-slate-400 mb-1">
