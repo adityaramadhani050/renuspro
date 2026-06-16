@@ -368,7 +368,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   let row = startRow;
 
   const rincian = [
-    { label: 'TOTAL',          value: inv.dpp,        bold: false },
+    { label: 'Total',          value: inv.dpp,        bold: false },
     { label: 'PPN ' + (inv.ppnPersen || 0) + '%', value: inv.ppnNominal, bold: false },
     { label: 'GRAND TOTAL',    value: inv.total,      bold: true }
   ].filter(function(r) { return !r.skip; });
