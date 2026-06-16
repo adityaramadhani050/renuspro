@@ -405,6 +405,19 @@
 
       _renderScopeInvoice(wo);
       onInvoicePersenInput();
+
+      // Auto-fill No. PO dari invoice sebelumnya di WO yang sama (hanya saat buat baru)
+      if (!_invoiceEditId && wo.invoices && wo.invoices.length > 0) {
+        const prevPO = wo.invoices.find(function(inv) {
+          return inv.noPO && inv.noPO !== wo.id;
+        });
+        if (prevPO) {
+          document.getElementById('inv-ada-po').checked = true;
+          document.getElementById('inv-nopo').value  = prevPO.noPO;
+          document.getElementById('inv-tglpo').value = prevPO.tglPO ? _toISO(prevPO.tglPO) : '';
+          onInvoicePOToggle();
+        }
+      }
     }
 
     function onInvoiceJenisChange() {
