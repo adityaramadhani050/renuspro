@@ -64,7 +64,10 @@
                 ${i.channelMarketing ? `<span class="inline-flex items-center mt-1 bg-indigo-50 text-indigo-700 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-indigo-100"><i class="fa-solid fa-bullhorn mr-1 text-[9px]"></i>${i.channelMarketing}</span>` : ''}
               </td>
               <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
-              <td class="p-4 text-right font-bold text-slate-800">Rp ${i.grandTotal.toLocaleString('id-ID')}</td>
+              <td class="p-4 text-right whitespace-nowrap">
+                <p class="font-bold text-slate-800">Rp ${Math.max(0, (i.subtotal||0)-(i.diskon||0)).toLocaleString('id-ID')}</p>
+                ${i.pajak > 0 ? `<p class="text-[10px] text-slate-400">Incl. PPN Rp ${i.grandTotal.toLocaleString('id-ID')}</p>` : ''}
+              </td>
               <td class="p-4 text-right">
                 <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${marginClass}">${parseFloat(i.marginPersen).toFixed(1)}%</span>
               </td>
