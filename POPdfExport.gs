@@ -354,12 +354,15 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 
   var totalRows = items.length;
 
-  sheet.insertRowsAfter(anchorRow, totalRows);
-
-  sheet.getRange(anchorRow, START_COL, 1, NCOLS).copyTo(
-    sheet.getRange(anchorRow + 1, START_COL, totalRows, NCOLS),
-    SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
-  );
+  // Anchor row dipakai langsung sebagai baris item pertama (tidak ada baris kosong).
+  // Hanya insert (totalRows - 1) baris tambahan untuk item ke-2 dst.
+  if (totalRows > 1) {
+    sheet.insertRowsAfter(anchorRow, totalRows - 1);
+    sheet.getRange(anchorRow, START_COL, 1, NCOLS).copyTo(
+      sheet.getRange(anchorRow + 1, START_COL, totalRows - 1, NCOLS),
+      SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
+    );
+  }
 
   var values      = [];
   var backgrounds = [];
@@ -390,7 +393,8 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
     alignments.push(['center', 'left', 'center', 'center', 'right', 'right']);
   });
 
-  var zone = sheet.getRange(anchorRow + 1, START_COL, totalRows, NCOLS);
+  // Tulis data mulai dari anchorRow (bukan anchorRow+1)
+  var zone = sheet.getRange(anchorRow, START_COL, totalRows, NCOLS);
   zone.setValues(values);
   zone.setBackgrounds(backgrounds);
   zone.setFontWeights(fontWeights);
@@ -400,11 +404,11 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setVerticalAlignment('middle');
 
   for (var r = 0; r < totalRows; r++) {
-    sheet.getRange(anchorRow + 1 + r, 3).setWrap(true);  // C: Details wrap
-    sheet.setRowHeight(anchorRow + 1 + r, 22);
+    sheet.getRange(anchorRow + r, 3).setWrap(true);  // C: Details wrap
+    sheet.setRowHeight(anchorRow + r, 22);
   }
 
-  return anchorRow + 1 + totalRows;
+  return anchorRow + totalRows;  // footer mulai tepat setelah item terakhir
 }
 
 // ── Helper: baca TC options dari Script Properties ────────────────────────────
