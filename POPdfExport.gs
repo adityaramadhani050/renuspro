@@ -49,9 +49,17 @@ function exportPODariTemplate(noPO) {
     _isiHeaderPO(cache, po, supplier);
 
     var rowSetelahItem = _sisipkanBarisItemPO(sheet, cache, items);
-    _sisipkanFooterPO(sheet, rowSetelahItem, po, tc, tcOptions);
+    var lastFooterRow  = _sisipkanFooterPO(sheet, rowSetelahItem, po, tc, tcOptions);
 
     SpreadsheetApp.flush();
+
+    // Bersihkan background sisa baris di bawah konten agar tidak muncul di PDF
+    try {
+      var maxR = sheet.getMaxRows();
+      if (lastFooterRow && maxR > lastFooterRow) {
+        sheet.getRange(lastFooterRow + 1, 1, maxR - lastFooterRow, sheet.getMaxColumns()).setBackground(null);
+      }
+    } catch(e) { Logger.log('clear below footer: ' + e); }
 
     var pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
     var safe = function(s) { return (s || '').toString().replace(/\//g, '-'); };
@@ -520,8 +528,11 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
 
   row += NS;
 
-  // ── Separator antara Notes/Summary dan T&C ────────────────────────────────
+  // ── Separator antara Notes/Summary dan T&C (2 baris) ─────────────────────
   sheet.insertRowsAfter(row - 1, 2);
+  sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
+  sheet.setRowHeight(row, 8);
+  row++;
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 8);
   row++;
@@ -582,8 +593,11 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     });
   }
 
-  // ── Separator antara T&C dan Signature ────────────────────────────────────
+  // ── Separator antara T&C dan Signature (2 baris) ─────────────────────────
   sheet.insertRowsAfter(row - 1, 2);
+  sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
+  sheet.setRowHeight(row, 12);
+  row++;
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 12);
   row++;
@@ -632,4 +646,5 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     .setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('top');
   sheet.setRowHeight(row, 18);
+  return row;  // baris terakhir konten, dipakai untuk clear background di bawahnya
 }
