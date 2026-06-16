@@ -475,7 +475,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   var SC      = 2;          // kolom B
   var NCOLS   = 6;          // B–G
   var row     = startRow;
-  var BLUE    = '#1C4587';
+  var BLUE    = '#0b5394';
   var WHITE   = '#ffffff';
   var GRAY_BG = '#f3f3f3';
 
