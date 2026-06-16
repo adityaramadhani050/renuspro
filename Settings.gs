@@ -201,3 +201,45 @@ function hapusAkunPembayaran(id) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
+
+// ── PO T&C Options ───────────────────────────────────────────────────────────
+
+var _TC_PO_FIELDS = [
+  { key: 'po_material_status', label: 'Material Status' },
+  { key: 'po_down_payment',    label: 'Down Payment' },
+  { key: 'po_balance_pay',     label: 'Balance Payment' },
+  { key: 'po_delivery_cond',   label: 'Delivery Condition' },
+  { key: 'po_warranty',        label: 'Warranty' },
+  { key: 'po_documents',       label: 'Documents' }
+];
+
+var _TC_PO_DEFAULTS = {
+  po_material_status: ['Ready Stock', 'Indent 4-6 Weeks After DP', '-'],
+  po_down_payment:    ['50% From PO', 'Cover GIRO 30 Days', '-'],
+  po_balance_pay:     ['Before Shipping', '70% 60 Days After Receive Invoice & BAST', '-'],
+  po_delivery_cond:   ['DDP', 'Franco Jakarta/Surabaya', 'Loco', 'Free On Board'],
+  po_warranty:        ['A Year', 'Back to Back from Manufacture', '-'],
+  po_documents:       ['Datasheet', 'Warranty', 'Datasheet & Warranty', '-']
+};
+
+function getPOTCOptions() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('TC_PO_OPTIONS');
+    var opts = raw ? JSON.parse(raw) : _TC_PO_DEFAULTS;
+    _TC_PO_FIELDS.forEach(function(f) {
+      if (!opts[f.key]) opts[f.key] = _TC_PO_DEFAULTS[f.key] || ['-'];
+    });
+    return { success: true, fields: _TC_PO_FIELDS, options: opts };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+function savePOTCOptions(payload) {
+  try {
+    PropertiesService.getScriptProperties().setProperty('TC_PO_OPTIONS', JSON.stringify(payload));
+    return { success: true, message: 'Syarat & Ketentuan PO berhasil disimpan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}

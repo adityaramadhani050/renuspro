@@ -113,6 +113,16 @@
                   <input type="text" id="po-peruntukan" placeholder="Misal: Project Solar Panel..."
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. Quotation Supplier <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span></label>
+                  <input type="text" id="po-quot-no" placeholder="QT/2026/..."
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Quotation Supplier <span class="text-slate-300 font-normal normal-case ml-1">Opsional</span></label>
+                  <input type="date" id="po-quot-tanggal"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                </div>
               </div>
             </div>
 
@@ -202,6 +212,23 @@
                     <span>GRAND TOTAL</span>
                     <span class="text-lg">Rp <span id="po-grandtotal">0</span></span>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Kartu 3: Term & Condition ── -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                <span class="bg-orange-50 text-orange-600 h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">3</span>
+                <h2 class="text-lg font-bold text-slate-900">Term & Condition</h2>
+              </div>
+              <div class="relative min-h-[80px]">
+                <div id="po-tc-loading" class="hidden absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+                  <div class="w-6 h-6 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin mr-2"></div>
+                  <span class="text-sm text-slate-500">Memuat opsi T&C...</span>
+                </div>
+                <div id="po-tc-fields-wrap" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <p class="text-sm text-slate-400 italic col-span-2">Memuat opsi...</p>
                 </div>
               </div>
             </div>

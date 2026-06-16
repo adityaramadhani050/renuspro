@@ -108,18 +108,21 @@ function bukaFormPO() {
   if (document.getElementById('po-diskon-persen'))  document.getElementById('po-diskon-persen').value  = '0';
   if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = '';
   document.getElementById('po-catatan').value    = '';
+  if (document.getElementById('po-quot-no'))      document.getElementById('po-quot-no').value      = '';
+  if (document.getElementById('po-quot-tanggal')) document.getElementById('po-quot-tanggal').value = '';
   renderItemsPO();
   hitungTotalPO();
 
   document.getElementById('form-po-section').classList.remove('hidden');
 
   // Populate dropdowns dengan loading overlay
-  var _poLoadPending = 2;
+  var _poLoadPending = 3;
   var _poLoadingEl = document.getElementById('po-form-loading');
   if (_poLoadingEl) _poLoadingEl.classList.remove('hidden');
   function _poLoadDone() { if (--_poLoadPending <= 0 && _poLoadingEl) _poLoadingEl.classList.add('hidden'); }
   _loadSupplierOptions('sel-supplier-po', '', _poLoadDone);
   _loadWOOptions('sel-wo-po', '', _poLoadDone);
+  _loadPOTCDropdowns({}, _poLoadDone);
   document.getElementById('panel-po-detail').classList.add('hidden');
   document.getElementById('po-list-section').classList.add('hidden');
 }
@@ -246,6 +249,15 @@ function submitPO() {
     diskonPersen: parseFloat((document.getElementById('po-diskon-persen') || {}).value) || 0,
     diskonNominal: _parseRp((document.getElementById('po-diskon-nominal') || {}).value || ''),
     catatan:      document.getElementById('po-catatan').value.trim(),
+    quotNo:       (document.getElementById('po-quot-no') || {}).value || '',
+    quotTanggal:  (document.getElementById('po-quot-tanggal') || {}).value || '',
+    termConditions: (function() {
+      var tc = {};
+      document.querySelectorAll('[id^="po-tc-"]').forEach(function(el) {
+        tc[el.id.replace('po-tc-', '')] = el.value;
+      });
+      return JSON.stringify(tc);
+    })(),
     items:        _poItems.map(function(it) {
       return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
     }),
@@ -466,13 +478,19 @@ function bukaEditPO(noPO) {
       if (document.getElementById('po-diskon-persen'))  document.getElementById('po-diskon-persen').value  = po.diskonPersen || 0;
       if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = po.diskonNominal ? _fmtRp(po.diskonNominal) : '';
       document.getElementById('po-catatan').value    = po.catatan || '';
+      if (document.getElementById('po-quot-no')) document.getElementById('po-quot-no').value = po.quotNo || '';
+      if (document.getElementById('po-quot-tanggal')) {
+        var quotTglParts = (po.quotTanggal || '').split('/');
+        document.getElementById('po-quot-tanggal').value = quotTglParts.length === 3 ? quotTglParts[2]+'-'+quotTglParts[1]+'-'+quotTglParts[0] : '';
+      }
 
-      var _poLoadPendingEdit = 2;
+      var _poLoadPendingEdit = 3;
       var _poLoadingElEdit = document.getElementById('po-form-loading');
       if (_poLoadingElEdit) _poLoadingElEdit.classList.remove('hidden');
       function _poLoadDoneEdit() { if (--_poLoadPendingEdit <= 0 && _poLoadingElEdit) _poLoadingElEdit.classList.add('hidden'); }
       _loadSupplierOptions('sel-supplier-po', po.idSupplier || '', _poLoadDoneEdit);
       _loadWOOptions('sel-wo-po', po.noWO || '', _poLoadDoneEdit);
+      _loadPOTCDropdowns(po.termConditions, _poLoadDoneEdit);
 
       renderItemsPO();
       hitungTotalPO();
@@ -866,7 +884,7 @@ function submitPOKeGudang() {
 function exportPOPDF(noPO) {
   if (!noPO) return;
   document.getElementById('preview-pdf-title').innerText    = 'Purchase Order — ' + noPO;
-  document.getElementById('preview-pdf-subtitle').innerText = 'Memuat data...';
+  document.getElementById('preview-pdf-subtitle').innerText = 'Memuat PDF...';
   document.getElementById('preview-pdf-loading').classList.remove('hidden');
   document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
   document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
@@ -874,7 +892,7 @@ function exportPOPDF(noPO) {
 
   if (typeof google === 'undefined') {
     document.getElementById('preview-pdf-loading').innerHTML =
-      '<p class="text-sm text-slate-400">Mode lokal — tidak bisa load data.</p>';
+      '<p class="text-sm text-slate-400">Mode lokal — tidak bisa load PDF.</p>';
     return;
   }
   google.script.run
@@ -882,258 +900,65 @@ function exportPOPDF(noPO) {
       if (!res || !res.success) {
         document.getElementById('preview-pdf-loading').innerHTML =
           '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-          '<p class="text-sm text-rose-400 text-center px-4">' + (res ? res.message : 'Gagal') + '</p>' +
+          '<p class="text-sm text-rose-400 text-center px-4">' + (res ? (res.message || 'Gagal export PDF') : 'Gagal') + '</p>' +
           '<button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>';
         return;
       }
-      document.getElementById('preview-pdf-subtitle').innerText =
-        (res.po.namaSupplier || res.po.idSupplier || '') + (res.po.noWO ? ' · ' + res.po.noWO : '');
-      _buatDokumenPOPDF(res.po, res.items || []);
+      _activePdfBase64 = res.pdfBase64;
+      _activePdfName   = res.fileName;
+      renderPDFDariBase64(res.pdfBase64);
     })
     .withFailureHandler(function(err) {
       document.getElementById('preview-pdf-loading').innerHTML =
         '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
         '<p class="text-sm text-rose-400 text-center px-4">Error: ' + (err.message || err) + '</p>';
     })
-    .getPODetail(noPO);
-}
-
-function _buatDokumenPOPDF(po, items) {
-  try {
-    var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
-    if (!jsPDF) {
-      document.getElementById('preview-pdf-loading').innerHTML =
-        '<p class="text-sm text-rose-400">Library jsPDF tidak tersedia.</p>';
-      return;
-    }
-
-    var doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    var PW   = 210;
-    var ML   = 14;
-    var MR   = 14;
-    var CW   = PW - ML - MR;
-    var BLUE = [0, 51, 153];
-    var rpNum = function(v) { return Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
-
-    doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]);
-    doc.rect(ML, 10, 26, 10, 'F');
-    doc.setFillColor(255, 255, 255);
-    var ix = ML + 2.5, iy = 11;
-    doc.triangle(ix, iy+7, ix+3, iy+3.5, ix+3, iy+7, 'F');
-    doc.triangle(ix+2.5, iy+7, ix+5.5, iy+3.5, ix+5.5, iy+7, 'F');
-    doc.rect(ix, iy+4.5, 5.5, 1.2, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(9.5);
-    doc.text('RENUS', ML+16, 16.2, { align:'center' });
-
-    doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(9);
-    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 24);
-
-    doc.setTextColor(50,50,50);
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(7.5);
-    doc.text('Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari', ML, 28);
-    doc.text('Kec. Rungkut, Kota Surabaya 60293', ML, 32);
-    doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
-    doc.text('Email : admin@renergynusantara | renergynusantara@gmail.com', ML, 36);
-    doc.setTextColor(50,50,50);
-    doc.text('Telp : 0895-6059-84308 | 0813-5820-8282', ML, 40);
-
-    doc.setTextColor(100,100,100);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(28);
-    doc.text('Purchase Order', PW - MR, 20, { align:'right' });
-
-    var infoLX = PW - MR - 50, infoRX = PW - MR;
-    [
-      ['Tanggal', po.tanggal || ''],
-      ['No. PO',  po.noPO   || ''],
-      ['Status',  po.statusPO || ''],
-    ].forEach(function(r, idx) {
-      var y = 28 + idx * 5;
-      doc.setFontSize(8);
-      doc.setFont('helvetica','bold');
-      doc.setTextColor(50,50,50);
-      doc.text(r[0], infoLX, y);
-      doc.setFont('helvetica','normal');
-      doc.setTextColor(20,20,20);
-      doc.text(r[1], infoRX, y, { align:'right' });
-    });
-
-    var curY = 45;
-    doc.setFillColor(BLUE[0],BLUE[1],BLUE[2]);
-    doc.rect(ML, curY, CW, 6, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(8);
-    doc.text('Kepada Supplier :', ML+2, curY+4.2);
-    curY += 6;
-
-    doc.setFillColor(248,249,252);
-    doc.rect(ML, curY, CW, 22, 'F');
-    doc.setDrawColor(210,215,230);
-    doc.setLineWidth(0.2);
-    doc.rect(ML, curY, CW, 22);
-
-    var c1L = ML+2, c1V = ML+32, c2L = ML+(CW/2)+2, c2V = PW-MR;
-    var supplierRows = [
-      ['Supplier',    po.namaSupplier || po.idSupplier || '—',  'No. PO',      po.noPO || ''],
-      ['Nama Order',  po.peruntukan || '—',                     'No. WO',      po.noWO || '—'],
-      ['Dibuat Oleh', po.dibuatOleh || '—',                     'Tanggal',     po.tanggal || ''],
-    ];
-    supplierRows.forEach(function(r, idx) {
-      var y = curY + 6 + idx * 5.5;
-      doc.setFontSize(8);
-      doc.setFont('helvetica','bold'); doc.setTextColor(70,70,70); doc.text(r[0], c1L, y);
-      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20); doc.text(r[1], c1V, y);
-      doc.setFont('helvetica','bold'); doc.setTextColor(70,70,70); doc.text(r[2], c2L+5, y);
-      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20); doc.text(r[3], c2V-3, y, { align:'right' });
-    });
-    curY += 25;
-
-    var tableBody = items.map(function(it, i) {
-      return [
-        { content: String(i+1), styles: { halign:'center' } },
-        it.namaItem || '',
-        { content: String(it.qty || 0), styles: { halign:'center' } },
-        { content: it.satuan || '', styles: { halign:'center' } },
-        { content: rpNum(it.hargaBeli), styles: { halign:'right' } },
-        { content: rpNum(it.total),     styles: { halign:'right', fontStyle:'bold' } },
-      ];
-    });
-
-    doc.autoTable({
-      startY: curY,
-      head: [[
-        { content: 'No.',           styles: { halign:'center' } },
-        { content: 'Nama Item',     styles: { halign:'left'   } },
-        { content: 'Qty',           styles: { halign:'center' } },
-        { content: 'Satuan',        styles: { halign:'center' } },
-        { content: 'Harga (IDR)',   styles: { halign:'center' } },
-        { content: 'Total (IDR)',   styles: { halign:'center' } },
-      ]],
-      body: tableBody,
-      theme: 'grid',
-      margin: { left: ML, right: MR },
-      columnStyles: {
-        0: { cellWidth: 10, halign:'center' },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 14, halign:'center' },
-        3: { cellWidth: 16, halign:'center' },
-        4: { cellWidth: 30, halign:'right' },
-        5: { cellWidth: 32, halign:'right' },
-      },
-      headStyles: {
-        fillColor: BLUE, textColor: [255,255,255],
-        fontStyle:'bold', fontSize:8,
-        lineColor:[255,255,255], lineWidth:0.3,
-      },
-      bodyStyles: {
-        fontSize:7.5, textColor:[40,40,40],
-        lineColor:[200,205,220], lineWidth:0.2, cellPadding:1.8,
-      },
-      alternateRowStyles: { fillColor:[255,255,255] },
-      styles: { overflow:'linebreak' },
-    });
-
-    curY = doc.lastAutoTable.finalY + 4;
-
-    var subtotal    = po.subtotal     || 0;
-    var diskonNom   = po.diskonNominal || 0;
-    var diskonPct   = po.diskonPersen  || 0;
-    var ppnNominal  = po.ppnNominal   || 0;
-    var ppnPersen   = po.ppnPersen    || 0;
-    var grandTotal  = po.grandTotal   || 0;
-
-    var summaryLines = [];
-    summaryLines.push({ label:'Subtotal', value:'Rp ' + rpNum(subtotal), bold:false, red:false, highlight:false });
-    if (diskonNom > 0) summaryLines.push({ label:'Diskon (' + diskonPct + '%)', value:'- Rp ' + rpNum(diskonNom), bold:false, red:true, highlight:false });
-    if (ppnNominal > 0) summaryLines.push({ label:'PPN ' + ppnPersen + '%', value:'Rp ' + rpNum(ppnNominal), bold:false, red:false, highlight:false });
-    summaryLines.push({ label:'GRAND TOTAL', value:'Rp ' + rpNum(grandTotal), bold:true, red:false, highlight:true });
-
-    var colLabelX = PW - MR - 60, colValX = PW - MR;
-    var rowH = 6, sy = curY;
-    var summaryBoxW = colValX - colLabelX;
-    var totalSummaryH = summaryLines.length * rowH + 2;
-    doc.setDrawColor(210,215,230); doc.setLineWidth(0.2);
-    doc.rect(colLabelX, sy-1, summaryBoxW, totalSummaryH+1);
-
-    summaryLines.forEach(function(row, idx) {
-      var ry = sy + 1 + idx * rowH;
-      if (row.highlight) {
-        doc.setFillColor(235,240,255);
-        doc.rect(colLabelX, ry-0.5, summaryBoxW, rowH+1, 'F');
-        doc.setDrawColor(180,190,220); doc.setLineWidth(0.3);
-        doc.line(colLabelX, ry-0.5, colLabelX+summaryBoxW, ry-0.5);
-      }
-      doc.setFontSize(8);
-      if (row.bold)      { doc.setFont('helvetica','bold');   doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]); }
-      else if (row.red)  { doc.setFont('helvetica','normal'); doc.setTextColor(180,0,0); }
-      else               { doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); }
-      doc.text(row.label, colLabelX+3, ry+4);
-      doc.text(row.value, colValX-2,   ry+4, { align:'right' });
-    });
-    curY = sy + totalSummaryH + 6;
-
-    if (po.catatan) {
-      if (curY > 248) { doc.addPage(); curY = 15; }
-      var catatanLines = doc.splitTextToSize('Catatan: ' + po.catatan, CW - 4);
-      var catatanH = catatanLines.length * 4.2 + 6;
-      doc.setFillColor(255,252,230);
-      doc.rect(ML, curY, CW, catatanH, 'F');
-      doc.setDrawColor(220,200,100); doc.setLineWidth(0.2);
-      doc.rect(ML, curY, CW, catatanH);
-      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,0);
-      doc.text(catatanLines, ML+2, curY+4.5);
-      curY += catatanH + 6;
-    }
-
-    if (curY > 255) { doc.addPage(); curY = 15; }
-    curY += 4;
-    doc.setDrawColor(210,215,230); doc.setLineWidth(0.3);
-    doc.line(ML, curY, PW-MR, curY);
-    curY += 5;
-
-    var ttW = CW / 2 - 10;
-    var ttCols = [
-      { x: ML+5,       label:'Disiapkan Oleh',  nama: po.dibuatOleh || 'Procurement' },
-      { x: PW-MR-ttW-5, label:'Disetujui Oleh', nama: 'Direktur' },
-    ];
-    ttCols.forEach(function(tt) {
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-      doc.text(tt.label, tt.x + ttW/2, curY, { align:'center' });
-      doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
-      doc.text(tt.nama, tt.x + ttW/2, curY + 18, { align:'center' });
-      var namaW = doc.getTextWidth(tt.nama);
-      doc.setDrawColor(20,20,20); doc.setLineWidth(0.3);
-      doc.line(tt.x + ttW/2 - namaW/2, curY+19, tt.x + ttW/2 + namaW/2, curY+19);
-    });
-
-    var fileName = 'PO_' + (po.noPO || '').replace(/\//g,'-') + '.pdf';
-    _activePdfDoc  = doc;
-    _activePdfName = fileName;
-    _activePdfBase64 = null;
-
-    renderPDFKeCanvas(doc).catch(function(err) {
-      document.getElementById('preview-pdf-loading').innerHTML =
-        '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-        '<p class="text-sm text-rose-400">Gagal render preview: ' + err.message + '</p>';
-    });
-
-  } catch(err) {
-    console.error(err);
-    document.getElementById('preview-pdf-loading').innerHTML =
-      '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-      '<p class="text-sm text-rose-400">Gagal generate PDF: ' + err.message + '</p>';
-  }
+    .exportPODariTemplate(noPO);
 }
 
 function cetakPO(po) {
   if (!po || !po.noPO) return;
   exportPOPDF(po.noPO);
+}
+
+function _loadPOTCDropdowns(selectedTC, onDone) {
+  var tc = {};
+  if (selectedTC) {
+    try { tc = typeof selectedTC === 'string' ? JSON.parse(selectedTC) : selectedTC; } catch(e) {}
+  }
+  var loadEl = document.getElementById('po-tc-loading');
+  if (loadEl) loadEl.classList.remove('hidden');
+  if (typeof google === 'undefined') {
+    if (loadEl) loadEl.classList.add('hidden');
+    if (onDone) onDone();
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (loadEl) loadEl.classList.add('hidden');
+      var wrap = document.getElementById('po-tc-fields-wrap');
+      if (!wrap) { if (onDone) onDone(); return; }
+      if (!res || !res.success) { if (onDone) onDone(); return; }
+      wrap.innerHTML = res.fields.map(function(f) {
+        var opts = res.options[f.key] || ['-'];
+        return '<div>' +
+          '<label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">' + f.label + '</label>' +
+          '<select id="po-tc-' + f.key + '" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">' +
+          opts.map(function(o) {
+            return '<option value="' + (o || '').replace(/"/g,'&quot;') + '"' +
+              (tc[f.key] === o ? ' selected' : '') + '>' +
+              (o || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</option>';
+          }).join('') +
+          '</select></div>';
+      }).join('');
+      if (onDone) onDone();
+    })
+    .withFailureHandler(function() {
+      var el = document.getElementById('po-tc-loading');
+      if (el) el.classList.add('hidden');
+      if (onDone) onDone();
+    })
+    .getPOTCOptions();
 }
 
 if (typeof _escHtml === 'undefined') {

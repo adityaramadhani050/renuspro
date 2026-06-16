@@ -9,7 +9,7 @@
  *  3  Nama Supplier
  *  4  Peruntukan
  *  5  No WO
- *  6  Status PO       Draft | Disetujui | Diterima Sebagian | Diterima | Selesai | Batal
+ *  6  Status PO       Aktif | Diterima Sebagian | Diterima | Selesai | Batal
  *  7  Subtotal
  *  8  PPN Persen
  *  9  PPN Nominal
@@ -21,6 +21,11 @@
  * 15  Dibuat Pada
  * 16  Diubah Oleh
  * 17  Diubah Pada
+ * 18  Diskon Persen
+ * 19  Diskon Nominal
+ * 20  No Quotation
+ * 21  Tanggal Quotation
+ * 22  Term Conditions (JSON)
  *
  * Sheet PO_Item — kolom (0-based):
  *  0  ID Item
@@ -108,6 +113,17 @@ function _ensurePODiskonCols(ss) {
   var lastCol = sheet.getLastColumn();
   if (lastCol < 19) sheet.getRange(1, 19).setValue('Diskon Persen');
   if (lastCol < 20) sheet.getRange(1, 20).setValue('Diskon Nominal');
+  return sheet;
+}
+
+function _ensurePOQuotCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Purchase_Order');
+  if (!sheet) return _ensurePOSheet(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 21) sheet.getRange(1, 21).setValue('No Quotation');
+  if (lastCol < 22) sheet.getRange(1, 22).setValue('Tanggal Quotation');
+  if (lastCol < 23) sheet.getRange(1, 23).setValue('Term Conditions');
   return sheet;
 }
 
@@ -232,7 +248,10 @@ function getPOList() {
         dibuatOleh:    r[14] ? r[14].toString() : '',
         dibuatPada:    _fmtTgl(r[15]),
         diskonPersen:  parseFloat(r[18]) || 0,
-        diskonNominal: parseFloat(r[19]) || 0
+        diskonNominal: parseFloat(r[19]) || 0,
+        quotNo:        r[20] ? r[20].toString() : '',
+        quotTanggal:   r[21] ? r[21].toString() : '',
+        termConditions: r[22] ? r[22].toString() : ''
       });
     }
     return list;
@@ -273,7 +292,10 @@ function getPODetail(noPO) {
           diubahOleh:    r[16] ? r[16].toString() : '',
           diubahPada:    _fmtTgl(r[17]),
           diskonPersen:  parseFloat(r[18]) || 0,
-          diskonNominal: parseFloat(r[19]) || 0
+          diskonNominal: parseFloat(r[19]) || 0,
+          quotNo:        r[20] ? r[20].toString() : '',
+          quotTanggal:   r[21] ? r[21].toString() : '',
+          termConditions: r[22] ? r[22].toString() : ''
         };
         break;
       }
@@ -371,6 +393,7 @@ function simpanPO(payload) {
 
     // Hitung nilai
     _ensurePODiskonCols(ss);
+    _ensurePOQuotCols(ss);
     var subtotal = 0;
     for (var i = 0; i < payload.items.length; i++) {
       var it = payload.items[i];
@@ -407,7 +430,10 @@ function simpanPO(payload) {
       '',
       '',
       diskonPersen,
-      diskonNominal
+      diskonNominal,
+      payload.quotNo         ? payload.quotNo.toString()         : '',
+      payload.quotTanggal    ? payload.quotTanggal.toString()    : '',
+      payload.termConditions ? payload.termConditions.toString() : ''
     ]);
 
     // Tulis item
@@ -478,6 +504,7 @@ function editPO(payload) {
 
     // Hitung ulang nilai
     _ensurePODiskonCols(ss);
+    _ensurePOQuotCols(ss);
     var subtotal = 0;
     for (var k = 0; k < payload.items.length; k++) {
       var it = payload.items[k];
@@ -496,7 +523,7 @@ function editPO(payload) {
     var tanggalStr = payload.tanggal ? payload.tanggal.toString() : _fmtTgl(now);
 
     // Update header row
-    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 20);
+    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 23);
     var existingRow = updateRange.getValues()[0];
     updateRange.setValues([[
       noPO,
@@ -518,7 +545,10 @@ function editPO(payload) {
       payload.diubahOleh ? payload.diubahOleh.toString() : '',
       nowStr,
       diskonPersen,
-      diskonNominal
+      diskonNominal,
+      payload.quotNo         !== undefined ? payload.quotNo.toString()         : (existingRow[20] || ''),
+      payload.quotTanggal    !== undefined ? payload.quotTanggal.toString()    : (existingRow[21] || ''),
+      payload.termConditions !== undefined ? payload.termConditions.toString() : (existingRow[22] || '')
     ]]);
 
     // Tulis item baru
