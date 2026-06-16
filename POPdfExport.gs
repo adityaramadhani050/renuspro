@@ -379,7 +379,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
     row[4] = item.hargaBeli|| 0;    // F: Unit Price
     row[5] = item.total    || 0;    // G: Total
 
-    var bg  = new Array(NCOLS).fill('#e8e8e8');
+    var bg  = new Array(NCOLS).fill('#f3f3f3');
     var fw  = new Array(NCOLS).fill('normal');
     var fmt = new Array(NCOLS).fill('@');
     fmt[3] = '#,##0.##';  // E Qty
@@ -402,7 +402,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setHorizontalAlignments(alignments);
   zone.setFontSize(10);
   zone.setVerticalAlignment('middle');
-  zone.setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+  zone.setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.DOTTED);
 
   for (var r = 0; r < totalRows; r++) {
     sheet.getRange(anchorRow + r, 3).setWrap(true);  // C: Details wrap
@@ -432,7 +432,7 @@ function _getPOTCOptionsForPDF() {
 // ── Helper: tulis 1 baris summary (E=gap, F=label, G=value, gray bg, no border) ─
 
 function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
-  var GRAY_BG = '#e8e8e8';
+  var GRAY_BG = '#f3f3f3';
   var color   = isBold ? '#003399' : '#333333';
   var fw      = isBold ? 'bold' : 'normal';
 
@@ -457,6 +457,7 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
       .setHorizontalAlignment('right').setFontWeight(fw)
       .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
   }
+  sheet.getRange(r, 6, 1, 2).setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.DOTTED);
   sheet.setRowHeight(r, 22);
 }
 
@@ -468,7 +469,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   var row     = startRow;
   var BLUE    = '#003399';
   var WHITE   = '#ffffff';
-  var GRAY_BG = '#e8e8e8';
+  var GRAY_BG = '#f3f3f3';
 
   tcOptions = tcOptions || {};
 
