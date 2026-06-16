@@ -402,7 +402,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setHorizontalAlignments(alignments);
   zone.setFontSize(10);
   zone.setVerticalAlignment('middle');
-  zone.setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.DOTTED);
+  zone.setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
 
   for (var r = 0; r < totalRows; r++) {
     sheet.getRange(anchorRow + r, 3).setWrap(true);  // C: Details wrap
@@ -457,7 +457,7 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
       .setHorizontalAlignment('right').setFontWeight(fw)
       .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
   }
-  sheet.getRange(r, 6, 1, 2).setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.DOTTED);
+  sheet.getRange(r, 6, 1, 2).setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
   sheet.setRowHeight(r, 22);
 }
 
