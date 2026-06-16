@@ -517,7 +517,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
       .setValue(po.catatan || '')
       .setBackground(GRAY_BG).setFontColor('#444444').setFontSize(10)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
-      .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     // Set E (col 5) putih (gap antara notes dan summary)
     sheet.getRange(row + 1, 5, contentRows, 1).setBackground('#ffffff');
     for (var si = 1; si < NS; si++) {
