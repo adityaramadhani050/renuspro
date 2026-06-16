@@ -467,7 +467,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   var SC      = 2;          // kolom B
   var NCOLS   = 6;          // B–G
   var row     = startRow;
-  var BLUE    = '#003399';
+  var BLUE    = '#1C4587';
   var WHITE   = '#ffffff';
   var GRAY_BG = '#f3f3f3';
 
@@ -521,6 +521,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   row += NS;
 
   // ── Separator antara Notes/Summary dan T&C ────────────────────────────────
+  sheet.insertRowsAfter(row - 1, 1);
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 8);
@@ -583,6 +584,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   }
 
   // ── Separator antara T&C dan Signature ────────────────────────────────────
+  sheet.insertRowsAfter(row - 1, 1);
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 12);
