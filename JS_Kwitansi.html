@@ -86,10 +86,16 @@
 
     // ── Form Buat ──
     function bukaModalBuatKwitansi() {
-      toggleLoader(true, 'Memuat invoice...');
+      var loadingEl = document.getElementById('kw-modal-loading');
+      document.getElementById('modal-kwitansi').classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+
       google.script.run.withSuccessHandler(function(res) {
-        toggleLoader(false);
-        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (!res.success) {
+          document.getElementById('modal-kwitansi').classList.add('hidden');
+          showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return;
+        }
         _kwitansiEditId = null;
         _kwitansiInvoiceList = res.invoiceList || [];
         _kwitansiNextNo = res.nextNo || '';
@@ -106,20 +112,25 @@
         document.getElementById('kw-jumlah').value = '';
         document.getElementById('kw-catatan').value = '';
         document.getElementById('kw-terbilang').innerText = '';
-
-        document.getElementById('modal-kwitansi').classList.remove('hidden');
       }).withFailureHandler(function(err) {
-        toggleLoader(false);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        document.getElementById('modal-kwitansi').classList.add('hidden');
         showNotification('Gagal: ' + (err.message || err), 'error');
       }).getKwitansiInitialData();
     }
 
     // ── Form Edit ──
     window.bukaModalEditKwitansi = function(item) {
-      toggleLoader(true, 'Memuat data kwitansi...');
+      var loadingEl = document.getElementById('kw-modal-loading');
+      document.getElementById('modal-kwitansi').classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+
       google.script.run.withSuccessHandler(function(res) {
-        toggleLoader(false);
-        if (!res.success) { showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return; }
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (!res.success) {
+          document.getElementById('modal-kwitansi').classList.add('hidden');
+          showNotification('Gagal memuat data: ' + (res.error || ''), 'error'); return;
+        }
         _kwitansiEditId = item.id;
         _kwitansiInvoiceList = res.invoiceList || [];
 
@@ -135,10 +146,9 @@
         document.getElementById('kw-jumlah').value = formatNominalRupiah(item.jumlah || 0);
         document.getElementById('kw-catatan').value = item.catatan || '';
         onKwitansiJumlahInput();
-
-        document.getElementById('modal-kwitansi').classList.remove('hidden');
       }).withFailureHandler(function(err) {
-        toggleLoader(false);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        document.getElementById('modal-kwitansi').classList.add('hidden');
         showNotification('Gagal: ' + (err.message || err), 'error');
       }).getKwitansiInitialData();
     };
