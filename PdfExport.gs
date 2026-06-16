@@ -312,14 +312,14 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
       .setHorizontalAlignment('left')
       .setFontWeight('bold')
       .setFontColor(k.red ? '#cc0000' : (k.bold ? '#1a3a8f' : null))
-      .setBorder(false, false, false, true, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(false, true, false, true, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(row, 8)
       .setValue(k.value)
       .setNumberFormat('#,##0')
       .setFontWeight(k.bold ? 'bold' : 'normal')
       .setFontColor(k.red ? '#cc0000' : (k.bold ? '#1a3a8f' : null))
       .setHorizontalAlignment('right')
-      .setBorder(false, false, false, true, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(false, true, false, true, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     row++;
   });
 
