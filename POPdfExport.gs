@@ -410,7 +410,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setHorizontalAlignments(alignments);
   zone.setFontSize(10);
   zone.setVerticalAlignment('middle');
-  zone.setBorder(false, false, false, false, false, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+  zone.setBorder(false, false, false, false, true, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
 
   for (var r = 0; r < totalRows; r++) {
     sheet.getRange(anchorRow + r, 3).setWrap(true);  // C: Details wrap
