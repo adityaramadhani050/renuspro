@@ -330,16 +330,24 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   if (catatan) {
     sheet.insertRowsAfter(row - 1, 2);
 
-    sheet.getRange(row, 1, 1, 5)
-      .merge()
-      .setValue('Catatan:\n' + catatan)
-      .setBackground('#fffce6')
-      .setFontColor('#665500')
-      .setWrap(true)
-      .setVerticalAlignment('top')
-      .setHorizontalAlignment('left');
-    sheet.getRange(row, 7, 1, 2).setBackground('#ffffff');
-    sheet.setRowHeight(row, Math.max(48, Math.ceil(catatan.length / 90) * 16 + 28));
+    // Header "Notes :" — gaya sama seperti PO
+    sheet.getRange(row, 1, 1, 6).merge()
+      .setValue('Notes :')
+      .setBackground('#003399').setFontColor('#ffffff')
+      .setFontWeight('bold').setFontSize(10)
+      .setHorizontalAlignment('left').setVerticalAlignment('middle');
+    sheet.getRange(row, 7, 1, 2).merge().setBackground('#ffffff');
+    sheet.setRowHeight(row, 20);
+    row++;
+
+    // Isi catatan — background abu-abu, border putih
+    sheet.getRange(row, 1, 1, 6).merge()
+      .setValue(catatan)
+      .setBackground('#f3f3f3').setFontColor('#444444').setFontSize(10)
+      .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
+      .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(row, 7, 1, 2).merge().setBackground('#ffffff');
+    sheet.setRowHeight(row, Math.max(40, Math.ceil(catatan.length / 90) * 16 + 20));
     row++;
   }
 
