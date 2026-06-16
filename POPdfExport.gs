@@ -330,15 +330,14 @@ function _isiHeaderPO(cache, po, supplier) {
     if (r) r.setValue(value !== null && value !== undefined ? value : '');
     else Logger.log('NR tidak ditemukan: ' + name);
   };
-  set('tpl_po_no',              po.noPO       || '');
-  set('tpl_po_tanggal',         po.tanggal    || '');
-  set('tpl_po_quot_no',         po.quotNo     || '');
-  set('tpl_po_quot_tgl',        po.quotTanggal|| '');
-  set('tpl_po_supplier_nama',   supplier.nama || po.namaSupplier || '');
+  set('tpl_po_no',              po.noPO        || '');
+  set('tpl_po_tanggal',         po.tanggal     || '');
+  set('tpl_po_quot_no',         po.quotNo      || '');
+  set('tpl_po_quot_tgl',        po.quotTanggal || '');
+  set('tpl_po_supplier_nama',   supplier.nama  || po.namaSupplier || '');
   set('tpl_po_supplier_alamat', supplier.alamat || '');
   set('tpl_po_supplier_kontak', [supplier.telepon, supplier.email].filter(Boolean).join(' | '));
-  set('tpl_po_nama_order',      po.peruntukan || '');
-  set('tpl_po_no_wo',           po.noWO       || '—');
+  // tpl_po_no_wo & tpl_po_nama_order tidak ditampilkan di PDF (hanya kebutuhan internal)
 }
 
 function _sisipkanBarisItemPO(sheet, cache, items) {
@@ -346,7 +345,8 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   if (!anchor) return sheet.getLastRow() + 1;
 
   var anchorRow = anchor.getRow();
-  var NCOLS     = 7;  // A–G: No. | Details(B-C) | Unit | Qty | Unit Price | Total
+  var START_COL = 2;   // mulai dari kolom B
+  var NCOLS     = 6;   // B=No. | C=Details | D=Unit | E=Qty | F=Unit Price | G=Total
 
   if (!items || items.length === 0) return anchorRow + 1;
 
@@ -354,8 +354,8 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 
   sheet.insertRowsAfter(anchorRow, totalRows);
 
-  sheet.getRange(anchorRow, 1, 1, NCOLS).copyTo(
-    sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS),
+  sheet.getRange(anchorRow, START_COL, 1, NCOLS).copyTo(
+    sheet.getRange(anchorRow + 1, START_COL, totalRows, NCOLS),
     SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false
   );
 
@@ -367,29 +367,28 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 
   items.forEach(function(item, idx) {
     var row = new Array(NCOLS).fill('');
-    row[0] = idx + 1;              // A: No.
-    row[1] = item.namaItem || '';  // B  (merged B–C)
-    // row[2] C merged with B
-    row[3] = item.satuan   || '';  // D: Unit
-    row[4] = item.qty      || 0;   // E: Qty
-    row[5] = item.hargaBeli|| 0;   // F: Unit Price
-    row[6] = item.total    || 0;   // G: Total
+    row[0] = idx + 1;               // B: No.
+    row[1] = item.namaItem || '';   // C: Details
+    row[2] = item.satuan   || '';   // D: Unit
+    row[3] = item.qty      || 0;    // E: Qty
+    row[4] = item.hargaBeli|| 0;    // F: Unit Price
+    row[5] = item.total    || 0;    // G: Total
 
     var bg  = new Array(NCOLS).fill(idx % 2 === 0 ? '#ffffff' : '#f8f8f8');
     var fw  = new Array(NCOLS).fill('normal');
     var fmt = new Array(NCOLS).fill('@');
-    fmt[4] = '#,##0.##';  // E Qty
-    fmt[5] = '#,##0';     // F Unit Price
-    fmt[6] = '#,##0';     // G Total
+    fmt[3] = '#,##0.##';  // E Qty
+    fmt[4] = '#,##0';     // F Unit Price
+    fmt[5] = '#,##0';     // G Total
 
     values.push(row);
     backgrounds.push(bg);
     fontWeights.push(fw);
     numFormats.push(fmt);
-    alignments.push(['center','left','left','center','center','right','right']);
+    alignments.push(['center', 'left', 'center', 'center', 'right', 'right']);
   });
 
-  var zone = sheet.getRange(anchorRow + 1, 1, totalRows, NCOLS);
+  var zone = sheet.getRange(anchorRow + 1, START_COL, totalRows, NCOLS);
   zone.setValues(values);
   zone.setBackgrounds(backgrounds);
   zone.setFontWeights(fontWeights);
@@ -398,13 +397,8 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setFontSize(8);
   zone.setVerticalAlignment('middle');
 
-  // Merge B–C per baris untuk kolom Details
   for (var r = 0; r < totalRows; r++) {
-    try {
-      sheet.getRange(anchorRow + 1 + r, 2, 1, 2).merge();  // B–C
-      sheet.getRange(anchorRow + 1 + r, 2)
-        .setWrap(true).setHorizontalAlignment('left');
-    } catch(e) {}
+    sheet.getRange(anchorRow + 1 + r, 3).setWrap(true);  // C: Details wrap
     sheet.setRowHeight(anchorRow + 1 + r, 22);
   }
 
@@ -412,12 +406,14 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
 }
 
 function _sisipkanFooterPO(sheet, startRow, po, tc) {
-  var NCOLS = 7;  // A–G (sesuai kolom template)
+  // Konten mulai dari kolom B (2) sampai G (7), sejajar dengan kolom item
+  var SC    = 2;   // start column B
+  var NCOLS = 6;   // B–G
   var row   = startRow;
   var BLUE  = '#003399';
   var WHITE = '#ffffff';
 
-  // ── Summary (label di F, value di G) ──
+  // ── Summary: blank B–E, label F, value G ──
   var summaryLines = [
     { label: 'Subtotal', value: po.subtotal || 0, bold: false, red: false, highlight: false }
   ];
@@ -432,7 +428,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   sheet.insertRowsAfter(row - 1, summaryLines.length);
   summaryLines.forEach(function(s) {
     sheet.setRowHeight(row, 22);
-    sheet.getRange(row, 1, 1, 5).setBackground(s.highlight ? '#e8eeff' : WHITE);  // A–E blank
+    sheet.getRange(row, SC, 1, 4).setBackground(s.highlight ? '#e8eeff' : WHITE);  // B–E blank
     var color = s.red ? '#cc0000' : (s.bold ? BLUE : '#333333');
 
     sheet.getRange(row, 6)  // F: label
@@ -451,12 +447,12 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
     row++;
   });
 
-  // ── Catatan ──
+  // ── Catatan: B–D kiri, E–G kanan ──
   var catatan = po.catatan || '';
   if (catatan) {
     sheet.insertRowsAfter(row - 1, 1);
-    var catatanH = Math.max(40, Math.ceil(catatan.length / 90) * 15 + 20);
-    sheet.getRange(row, 1, 1, 4).merge()  // A–D
+    var catatanH = Math.max(40, Math.ceil(catatan.length / 80) * 15 + 20);
+    sheet.getRange(row, SC, 1, 3).merge()  // B–D
       .setValue('Catatan:\n' + catatan)
       .setBackground('#fffce6').setFontColor('#665500').setFontSize(8)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
@@ -478,14 +474,14 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
 
   if (tcEntries.length > 0) {
     sheet.insertRowsAfter(row - 1, 1);
-    sheet.getRange(row, 1, 1, NCOLS).merge()
+    sheet.getRange(row, SC, 1, NCOLS).merge()  // B–G
       .setValue('Term & Condition:')
       .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
       .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(8);
     sheet.setRowHeight(row, 22);
     row++;
 
-    // 2 TC per baris: kiri A + B–D (3 cols), kanan E + F–G (2 cols)
+    // 2 TC per baris: kiri B(label)+C–D(value), kanan E(label)+F–G(value)
     var tcPairs = [];
     for (var pi = 0; pi < tcEntries.length; pi += 2) {
       tcPairs.push({ left: tcEntries[pi], right: tcEntries[pi+1] || null });
@@ -494,13 +490,13 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
     sheet.insertRowsAfter(row - 1, tcPairs.length);
     tcPairs.forEach(function(pair, idx) {
       var bg = idx % 2 === 0 ? '#efefef' : '#f5f5f5';
-      sheet.getRange(row, 1, 1, NCOLS).setBackground(bg).setFontSize(8);
+      sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(8);
       sheet.setRowHeight(row, 22);
 
-      sheet.getRange(row, 1)  // A: label kiri
+      sheet.getRange(row, SC)  // B: label kiri
         .setValue(pair.left.label + ':')
         .setFontWeight('bold').setFontSize(8).setFontColor('#222222').setBackground(bg);
-      sheet.getRange(row, 2, 1, 3).merge()  // B–D: value kiri
+      sheet.getRange(row, 3, 1, 2).merge()  // C–D: value kiri
         .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
 
       if (pair.right) {
@@ -518,14 +514,14 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
 
   // ── Spacer ──
   sheet.insertRowsAfter(row - 1, 1);
-  sheet.getRange(row, 1, 1, NCOLS).merge().setBackground(WHITE);
+  sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 18);
   row++;
 
-  // ── Tanda Tangan ──
+  // ── Tanda Tangan: Customer B–D, Supplier E–G ──
   sheet.insertRowsAfter(row - 1, 3);
 
-  sheet.getRange(row, 1, 1, 4).merge()  // A–D: Customer
+  sheet.getRange(row, SC, 1, 3).merge()  // B–D: Customer
     .setValue('Customer (PT. RENUS GLOBAL INDONESIA)')
     .setHorizontalAlignment('center').setFontSize(8).setFontColor('#555555').setBackground(WHITE);
   sheet.getRange(row, 5, 1, 3).merge()  // E–G: Supplier
@@ -534,13 +530,13 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   sheet.setRowHeight(row, 18);
   row++;
 
-  sheet.getRange(row, 1, 1, 4).merge().setBackground(WHITE);  // A–D
-  sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);  // E–G
+  sheet.getRange(row, SC, 1, 3).merge().setBackground(WHITE);  // B–D
+  sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);   // E–G
   sheet.setRowHeight(row, 50);
   row++;
 
   var dibuatOleh = po.dibuatOleh || 'Procurement';
-  sheet.getRange(row, 1, 1, 4).merge()  // A–D
+  sheet.getRange(row, SC, 1, 3).merge()  // B–D
     .setValue('(  ' + dibuatOleh + '  )')
     .setHorizontalAlignment('center').setFontSize(8).setFontWeight('bold').setBackground(WHITE);
   sheet.getRange(row, 5, 1, 3).merge()  // E–G
