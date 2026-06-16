@@ -521,8 +521,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   row += NS;
 
   // ── Separator antara Notes/Summary dan T&C ────────────────────────────────
-  sheet.insertRowsAfter(row - 1, 1);
-  sheet.insertRowsAfter(row - 1, 1);
+  sheet.insertRowsAfter(row - 1, 2);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 8);
   row++;
@@ -584,8 +583,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   }
 
   // ── Separator antara T&C dan Signature ────────────────────────────────────
-  sheet.insertRowsAfter(row - 1, 1);
-  sheet.insertRowsAfter(row - 1, 1);
+  sheet.insertRowsAfter(row - 1, 2);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
   sheet.setRowHeight(row, 12);
   row++;
