@@ -517,78 +517,62 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
 
   row += NS;
 
-  // ── T&C header ─────────────────────────────────────────────────────────────
+  // ── Term & Condition (label : value, 2 item per baris) ────────────────────
   var tcFields = [
-    { key: 'po_material_status', label: 'Material status',    num: 1     },
-    { key: 'po_down_payment',    label: 'Down payment',       num: 2     },
-    { key: 'po_balance_pay',     label: 'Balance payment',    num: null  },
-    { key: 'po_delivery_cond',   label: 'Delivery condition', num: 3     },
-    { key: 'po_warranty',        label: 'Warranty',           num: 4     },
-    { key: 'po_documents',       label: 'Documents',          num: 5     }
+    { key: 'po_material_status', label: 'Material Status' },
+    { key: 'po_down_payment',    label: 'Down Payment' },
+    { key: 'po_balance_pay',     label: 'Balance Payment' },
+    { key: 'po_delivery_cond',   label: 'Delivery Condition' },
+    { key: 'po_warranty',        label: 'Warranty' },
+    { key: 'po_documents',       label: 'Documents' }
   ];
+  var tcEntries = tcFields.filter(function(f) { return tc[f.key] && tc[f.key] !== '-'; });
 
-  sheet.insertRowsAfter(row - 1, 1);
-  sheet.getRange(row, SC, 1, NCOLS).merge()
-    .setValue('Term & Condition :')
-    .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
-    .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(9);
-  sheet.setRowHeight(row, 22);
-  row++;
+  if (tcEntries.length > 0) {
+    sheet.insertRowsAfter(row - 1, 1);
+    sheet.getRange(row, SC, 1, NCOLS).merge()
+      .setValue('Term & Condition :')
+      .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
+      .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(9);
+    sheet.setRowHeight(row, 22);
+    row++;
 
-  // ── T&C rows: checkbox style ───────────────────────────────────────────────
-  tcFields.forEach(function(field, fi) {
-    var selected = (tc[field.key] || '').toString().trim();
-    var allOpts  = (tcOptions[field.key] || []).filter(function(o) { return o !== '-'; });
-    if (allOpts.length === 0) allOpts = [selected].filter(Boolean);
-
-    // Pasangkan 2 opsi per baris
-    var pairs = [];
-    for (var pi = 0; pi < allOpts.length; pi += 2) {
-      pairs.push({ opt1: allOpts[pi] || null, opt2: allOpts[pi + 1] || null });
+    // Pasangkan 2 TC per baris
+    var tcPairs = [];
+    for (var pi = 0; pi < tcEntries.length; pi += 2) {
+      tcPairs.push({ left: tcEntries[pi], right: tcEntries[pi + 1] || null });
     }
-    if (pairs.length === 0) pairs.push({ opt1: null, opt2: null });
 
-    var fieldBg = fi % 2 === 0 ? '#f5f5f5' : '#ebebeb';
-
-    sheet.insertRowsAfter(row - 1, pairs.length);
-
-    pairs.forEach(function(pair, pairIdx) {
-      sheet.getRange(row, SC, 1, NCOLS).setBackground(fieldBg).setFontSize(8);
+    sheet.insertRowsAfter(row - 1, tcPairs.length);
+    tcPairs.forEach(function(pair, idx) {
+      var bg = idx % 2 === 0 ? '#efefef' : '#f5f5f5';
+      sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(8);
       sheet.setRowHeight(row, 22);
 
-      // B: nomor (hanya baris pertama field)
-      sheet.getRange(row, SC)
-        .setValue(pairIdx === 0 && field.num !== null ? field.num : '')
-        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
-        .setHorizontalAlignment('center').setVerticalAlignment('middle');
+      // B–C merged: label kiri
+      sheet.getRange(row, SC, 1, 2).merge()
+        .setValue(pair.left.label + ':')
+        .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+        .setBackground(bg).setWrap(false);
+      // D–E merged: value kiri
+      sheet.getRange(row, 4, 1, 2).merge()
+        .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
 
-      // C–D merged: label (hanya baris pertama)
-      sheet.getRange(row, 3, 1, 2).merge()
-        .setValue(pairIdx === 0 ? field.label + ' :' : '')
-        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
-        .setVerticalAlignment('middle').setWrap(false);
-
-      // E–F merged: opsi 1 dengan checkbox
-      var chk1 = pair.opt1
-        ? ((pair.opt1.toLowerCase() === selected.toLowerCase() ? CHK : UNCHK) + '  ' + pair.opt1)
-        : '';
-      sheet.getRange(row, 5, 1, 2).merge()
-        .setValue(chk1)
-        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
-        .setVerticalAlignment('middle').setWrap(true);
-
-      // G: opsi 2 dengan checkbox
-      var chk2 = pair.opt2
-        ? ((pair.opt2.toLowerCase() === selected.toLowerCase() ? CHK : UNCHK) + '  ' + pair.opt2)
-        : '';
-      sheet.getRange(row, 7)
-        .setValue(chk2)
-        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
-        .setVerticalAlignment('middle').setWrap(true);
-
+      if (pair.right) {
+        // F: label kanan
+        sheet.getRange(row, 6)
+          .setValue(pair.right.label + ':')
+          .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+          .setBackground(bg).setWrap(false);
+        // G: value kanan
+        sheet.getRange(row, 7)
+          .setValue(tc[pair.right.key] || '').setFontSize(8).setBackground(bg);
+      } else {
+        sheet.getRange(row, 6, 1, 2).merge().setBackground(bg);
+      }
       row++;
     });
-  });
+  }
 
   // ── Spacer ─────────────────────────────────────────────────────────────────
   sheet.insertRowsAfter(row - 1, 1);
