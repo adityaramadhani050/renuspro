@@ -282,11 +282,13 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   let row = startRow;
 
   const netSub = (item.subtotal || 0) - (item.diskon || 0);
+  const diskonPct = (item.subtotal > 0 && item.diskon > 0)
+    ? Math.round((item.diskon / item.subtotal) * 100) : 0;
 
   const kalkulasi = [
     { label: 'Total',
       value: item.subtotal  || 0, bold: false, red: false, skip: false },
-    { label: 'Diskon',
+    { label: diskonPct > 0 ? 'Diskon ' + diskonPct + '%' : 'Diskon',
       value: -(item.diskon  || 0), bold: false, red: true,
       skip: !(item.diskon > 0) },
     { label: 'PPN ' + _pajakPct(netSub, item.pajak) + '%',
