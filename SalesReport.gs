@@ -280,6 +280,7 @@ function getSalesReportData(params) {
         tanggalDeal:  formatTgl(tanggalDeal),
         namaProject:  namaProject,
         namaKlien:    namaKlien,
+        nilaiKontrak: nilaiKontrak,
         grandTotal:   grandTotal,
         status:       status,
         noWO:         noWO,

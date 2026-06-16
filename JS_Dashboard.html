@@ -136,7 +136,7 @@ function _dbPrevKPI(items, fromMs, toMs) {
     if (item.status !== 'Deal') return;
     var ts = item.tanggalDeal || item.tanggal;
     if (ts && ts >= prevFromMs && ts <= prevToMs) {
-      prevRevenue += item.grandTotal;
+      prevRevenue += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
       prevDeals++;
     }
   });
@@ -411,7 +411,7 @@ function _dbRenderTrend(items) {
     var ts = item.tanggalDeal || item.tanggal;
     if (!ts) return;
     buckets.forEach(function(b) {
-      if (ts >= b.fromMs && ts <= b.toMs) b.rev += item.grandTotal;
+      if (ts >= b.fromMs && ts <= b.toMs) b.rev += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
     });
   });
 
@@ -634,7 +634,7 @@ function _dbRenderDetailAccordion(salesList) {
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">' + _esc(p.id) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.grandTotal) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggal || '—') + '</td>'
           + '<td class="px-3 py-2">' + _statusBadge(p.status) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
@@ -811,7 +811,7 @@ window.exportDashboardPDF = function() {
       doc.autoTable({
         startY: y, margin: { left:ML, right:MR },
         head: [['No Penawaran','Klien','Project','Nilai','Tanggal','Status','Tgl Deal']],
-        body: sales.penawaran.map(function(p) { return [p.id, p.namaKlien||'-', p.namaProject||'-', rp(p.grandTotal), p.tanggal||'-', p.status, p.tanggalDeal||'-']; }),
+        body: sales.penawaran.map(function(p) { return [p.id, p.namaKlien||'-', p.namaProject||'-', rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal), p.tanggal||'-', p.status, p.tanggalDeal||'-']; }),
         theme:'grid',
         headStyles: { fillColor:[51,65,85], textColor:WHITE, fontStyle:'bold', fontSize:6.5, halign:'center' },
         bodyStyles: { fontSize:6.5, textColor:DARK },
