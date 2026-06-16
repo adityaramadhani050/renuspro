@@ -328,7 +328,7 @@ function _isiHeaderPO(cache, po, supplier) {
   var set = function(name, value) {
     var r = cache.get(name);
     if (r) r.setValue(value !== null && value !== undefined ? value : '');
-    else Logger.log('NR tidak ditemukan: ' + name);
+    // tidak log jika tidak ditemukan — named range opsional
   };
   set('tpl_po_no',              po.noPO        || '');
   set('tpl_po_tanggal',         po.tanggal     || '');
@@ -336,7 +336,8 @@ function _isiHeaderPO(cache, po, supplier) {
   set('tpl_po_quot_tgl',        po.quotTanggal || '');
   set('tpl_po_supplier_nama',   supplier.nama  || po.namaSupplier || '');
   set('tpl_po_supplier_alamat', supplier.alamat || '');
-  set('tpl_po_supplier_kontak', [supplier.telepon, supplier.email].filter(Boolean).join(' | '));
+  set('tpl_po_supplier_kontak', supplier.telepon || '');  // nomor telepon saja
+  set('tpl_po_supplier_email',  supplier.email   || '');  // email terpisah
   // tpl_po_no_wo & tpl_po_nama_order tidak ditampilkan di PDF (hanya kebutuhan internal)
 }
 
@@ -426,9 +427,14 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
   summaryLines.push({ label: 'Total', value: po.grandTotal || 0, bold: true, red: false, highlight: true });
 
   sheet.insertRowsAfter(row - 1, summaryLines.length);
-  summaryLines.forEach(function(s) {
+  summaryLines.forEach(function(s, si) {
     sheet.setRowHeight(row, 22);
-    sheet.getRange(row, SC, 1, 4).setBackground(s.highlight ? '#e8eeff' : WHITE);  // B–E blank
+    var blankRange = sheet.getRange(row, SC, 1, 4);  // B–E blank
+    blankRange.setBackground(s.highlight ? '#e8eeff' : WHITE);
+    if (si === 0) {
+      // Garis atas separator antara baris item dan summary
+      blankRange.setBorder(true, null, null, null, null, null, '#bbbbbb', SpreadsheetApp.BorderStyle.SOLID);
+    }
     var color = s.red ? '#cc0000' : (s.bold ? BLUE : '#333333');
 
     sheet.getRange(row, 6)  // F: label
@@ -493,20 +499,26 @@ function _sisipkanFooterPO(sheet, startRow, po, tc) {
       sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(8);
       sheet.setRowHeight(row, 22);
 
-      sheet.getRange(row, SC)  // B: label kiri
+      // B–C merged: label kiri (2 kolom agar cukup lebar untuk teks panjang)
+      sheet.getRange(row, SC, 1, 2).merge()
         .setValue(pair.left.label + ':')
-        .setFontWeight('bold').setFontSize(8).setFontColor('#222222').setBackground(bg);
-      sheet.getRange(row, 3, 1, 2).merge()  // C–D: value kiri
+        .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+        .setBackground(bg).setWrap(false);
+      // D–E merged: value kiri
+      sheet.getRange(row, 4, 1, 2).merge()
         .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
 
       if (pair.right) {
-        sheet.getRange(row, 5)  // E: label kanan
+        // F: label kanan
+        sheet.getRange(row, 6)
           .setValue(pair.right.label + ':')
-          .setFontWeight('bold').setFontSize(8).setFontColor('#222222').setBackground(bg);
-        sheet.getRange(row, 6, 1, 2).merge()  // F–G: value kanan
+          .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+          .setBackground(bg).setWrap(false);
+        // G: value kanan
+        sheet.getRange(row, 7)
           .setValue(tc[pair.right.key] || '').setFontSize(8).setBackground(bg);
       } else {
-        sheet.getRange(row, 5, 1, 3).merge().setBackground(bg);  // E–G kosong
+        sheet.getRange(row, 6, 1, 2).merge().setBackground(bg);  // F–G kosong
       }
       row++;
     });

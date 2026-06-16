@@ -250,7 +250,7 @@ function getPOList() {
         diskonPersen:  parseFloat(r[18]) || 0,
         diskonNominal: parseFloat(r[19]) || 0,
         quotNo:        r[20] ? r[20].toString() : '',
-        quotTanggal:   r[21] ? r[21].toString() : '',
+        quotTanggal:   _fmtTgl(r[21]),
         termConditions: r[22] ? r[22].toString() : ''
       });
     }
@@ -294,7 +294,7 @@ function getPODetail(noPO) {
           diskonPersen:  parseFloat(r[18]) || 0,
           diskonNominal: parseFloat(r[19]) || 0,
           quotNo:        r[20] ? r[20].toString() : '',
-          quotTanggal:   r[21] ? r[21].toString() : '',
+          quotTanggal:   _fmtTgl(r[21]),
           termConditions: r[22] ? r[22].toString() : ''
         };
         break;
