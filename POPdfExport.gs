@@ -38,6 +38,7 @@ function exportPODariTemplate(noPO) {
     var tc = {};
     try { tc = JSON.parse(po.termConditions || '{}'); } catch(e) {}
 
+    var tcOptions = _getPOTCOptionsForPDF();
     var cache = _buildNamedRangeCache(ss);
 
     if (!cache.has('tpl_po_item_zona_start')) {
@@ -48,7 +49,7 @@ function exportPODariTemplate(noPO) {
     _isiHeaderPO(cache, po, supplier);
 
     var rowSetelahItem = _sisipkanBarisItemPO(sheet, cache, items);
-    _sisipkanFooterPO(sheet, rowSetelahItem, po, tc);
+    _sisipkanFooterPO(sheet, rowSetelahItem, po, tc, tcOptions);
 
     SpreadsheetApp.flush();
 
@@ -406,153 +407,239 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   return anchorRow + 1 + totalRows;
 }
 
-function _sisipkanFooterPO(sheet, startRow, po, tc) {
-  // Konten mulai dari kolom B (2) sampai G (7), sejajar dengan kolom item
-  var SC    = 2;   // start column B
-  var NCOLS = 6;   // B–G
+// ── Helper: baca TC options dari Script Properties ────────────────────────────
+
+function _getPOTCOptionsForPDF() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('TC_PO_OPTIONS');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {
+    po_material_status: ['Ready Stock', 'Indent 4-6 Weeks After DP'],
+    po_down_payment:    ['50% From PO', 'Cover GIRO 30 Days'],
+    po_balance_pay:     ['Before Shipping', '70% 60 Days After Receive Invoice & BAST'],
+    po_delivery_cond:   ['DDP', 'Franco Jakarta/Surabaya', 'Loco', 'Free On Board'],
+    po_warranty:        ['A Year', 'Back to Back from Manufacture'],
+    po_documents:       ['Datasheet', 'Warranty', 'Datasheet & Warranty']
+  };
+}
+
+// ── Helper: tulis 1 baris summary (E=label, F="Rp", G=value) ─────────────────
+
+function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
+  var BLUE  = '#003399';
+  var WHITE = '#ffffff';
+  var color = isBold ? BLUE : '#333333';
+  var bg    = isBold ? '#e8f0ff' : WHITE;
+
+  sheet.getRange(r, 5)
+    .setValue(label)
+    .setHorizontalAlignment('left').setFontWeight(isBold ? 'bold' : 'normal')
+    .setFontSize(8).setFontColor(color).setBackground(bg)
+    .setBorder(true, true, true, null, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+
+  sheet.getRange(r, 6)
+    .setValue('Rp')
+    .setHorizontalAlignment('center').setFontWeight(isBold ? 'bold' : 'normal')
+    .setFontSize(8).setFontColor(color).setBackground(bg)
+    .setBorder(true, null, true, null, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+
+  if (isDash) {
+    sheet.getRange(r, 7)
+      .setValue('-')
+      .setHorizontalAlignment('right').setFontWeight(isBold ? 'bold' : 'normal')
+      .setFontSize(8).setFontColor(color).setBackground(bg)
+      .setBorder(true, null, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+  } else {
+    sheet.getRange(r, 7)
+      .setValue(value).setNumberFormat('#,##0')
+      .setHorizontalAlignment('right').setFontWeight(isBold ? 'bold' : 'normal')
+      .setFontSize(8).setFontColor(color).setBackground(bg)
+      .setBorder(true, null, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+  }
+  sheet.setRowHeight(r, 22);
+}
+
+// ── Footer utama ──────────────────────────────────────────────────────────────
+
+function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
+  var SC    = 2;    // kolom B
+  var NCOLS = 6;    // B–G
   var row   = startRow;
   var BLUE  = '#003399';
   var WHITE = '#ffffff';
+  var CHK   = '☑';   // ☑
+  var UNCHK = '☐';   // ☐
 
-  // ── Summary: blank B–E, label F, value G ──
-  var summaryLines = [
-    { label: 'Subtotal', value: po.subtotal || 0, bold: false, red: false, highlight: false }
-  ];
-  if ((po.diskonNominal || 0) > 0) {
-    summaryLines.push({ label: 'Discount (' + (po.diskonPersen || 0) + '%)', value: -(po.diskonNominal || 0), bold: false, red: true, highlight: false });
-  }
+  tcOptions = tcOptions || {};
+
+  // ── Summary lines ──
+  var summaryLines = [];
+  summaryLines.push({ label: 'Subtotal',       value: po.subtotal  || 0, isDash: false, isBold: false });
   if ((po.ppnNominal || 0) > 0) {
-    summaryLines.push({ label: 'Taxes (' + (po.ppnPersen || 0) + '%)', value: po.ppnNominal || 0, bold: false, red: false, highlight: false });
+    summaryLines.push({ label: 'Taxes (' + (po.ppnPersen || 0) + '%)', value: po.ppnNominal, isDash: false, isBold: false });
   }
-  summaryLines.push({ label: 'Total', value: po.grandTotal || 0, bold: true, red: false, highlight: true });
-
-  sheet.insertRowsAfter(row - 1, summaryLines.length);
-  summaryLines.forEach(function(s, si) {
-    sheet.setRowHeight(row, 22);
-    var blankRange = sheet.getRange(row, SC, 1, 4);  // B–E blank
-    blankRange.setBackground(s.highlight ? '#e8eeff' : WHITE);
-    if (si === 0) {
-      // Garis atas separator antara baris item dan summary
-      blankRange.setBorder(true, null, null, null, null, null, '#bbbbbb', SpreadsheetApp.BorderStyle.SOLID);
-    }
-    var color = s.red ? '#cc0000' : (s.bold ? BLUE : '#333333');
-
-    sheet.getRange(row, 6)  // F: label
-      .setValue(s.label)
-      .setHorizontalAlignment('right').setFontWeight(s.bold ? 'bold' : 'normal')
-      .setFontSize(8).setFontColor(color)
-      .setBackground(s.highlight ? '#e8eeff' : WHITE)
-      .setBorder(true,true,true,true,false,false, '#dddddd', SpreadsheetApp.BorderStyle.SOLID);
-
-    sheet.getRange(row, 7)  // G: value
-      .setValue(s.value).setNumberFormat('#,##0')
-      .setHorizontalAlignment('right').setFontWeight(s.bold ? 'bold' : 'normal')
-      .setFontSize(8).setFontColor(color)
-      .setBackground(s.highlight ? '#e8eeff' : WHITE)
-      .setBorder(true,true,true,true,false,false, '#dddddd', SpreadsheetApp.BorderStyle.SOLID);
-    row++;
+  var diskonVal = po.diskonNominal || 0;
+  summaryLines.push({
+    label:  diskonVal > 0 && (po.diskonPersen || 0) > 0 ? 'Discount (' + po.diskonPersen + '%)' : 'Discount (Rp)',
+    value:  diskonVal,
+    isDash: diskonVal === 0,
+    isBold: false
   });
+  summaryLines.push({ label: 'Total', value: po.grandTotal || 0, isDash: false, isBold: true });
 
-  // ── Catatan: B–D kiri, E–G kanan ──
-  var catatan = po.catatan || '';
-  if (catatan) {
-    sheet.insertRowsAfter(row - 1, 1);
-    var catatanH = Math.max(40, Math.ceil(catatan.length / 80) * 15 + 20);
-    sheet.getRange(row, SC, 1, 3).merge()  // B–D
-      .setValue('Catatan:\n' + catatan)
-      .setBackground('#fffce6').setFontColor('#665500').setFontSize(8)
-      .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
-    sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);  // E–G
-    sheet.setRowHeight(row, catatanH);
-    row++;
+  var NS = summaryLines.length;  // 3 atau 4 baris
+
+  // ── Blok Notes + Summary berdampingan ──────────────────────────────────────
+  sheet.insertRowsAfter(row - 1, NS);
+
+  // Baris pertama: Notes header (B–D) + Subtotal (E–G)
+  sheet.getRange(row, SC, 1, 3).merge()
+    .setValue('Additional Notes :')
+    .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold').setFontSize(8)
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 20);
+  _poSummaryRow(sheet, row, summaryLines[0].label, summaryLines[0].value, summaryLines[0].isDash, summaryLines[0].isBold);
+
+  // Baris 2 dst: Notes content (B–D merged tall) + sisa summary (E–G)
+  if (NS > 1) {
+    var contentRows = NS - 1;
+    sheet.getRange(row + 1, SC, contentRows, 3).merge()
+      .setValue(po.catatan || '')
+      .setBackground(WHITE).setFontColor('#444444').setFontSize(8)
+      .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
+      .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+    for (var si = 1; si < NS; si++) {
+      var s = summaryLines[si];
+      _poSummaryRow(sheet, row + si, s.label, s.value, s.isDash, s.isBold);
+    }
   }
 
-  // ── Term & Condition ──
+  row += NS;
+
+  // ── T&C header ─────────────────────────────────────────────────────────────
   var tcFields = [
-    { key: 'po_material_status', label: 'Material Status' },
-    { key: 'po_down_payment',    label: 'Down Payment' },
-    { key: 'po_balance_pay',     label: 'Balance Payment' },
-    { key: 'po_delivery_cond',   label: 'Delivery Condition' },
-    { key: 'po_warranty',        label: 'Warranty' },
-    { key: 'po_documents',       label: 'Documents' }
+    { key: 'po_material_status', label: 'Material status',    num: 1     },
+    { key: 'po_down_payment',    label: 'Down payment',       num: 2     },
+    { key: 'po_balance_pay',     label: 'Balance payment',    num: null  },
+    { key: 'po_delivery_cond',   label: 'Delivery condition', num: 3     },
+    { key: 'po_warranty',        label: 'Warranty',           num: 4     },
+    { key: 'po_documents',       label: 'Documents',          num: 5     }
   ];
-  var tcEntries = tcFields.filter(function(f) { return tc[f.key] && tc[f.key] !== '-'; });
 
-  if (tcEntries.length > 0) {
-    sheet.insertRowsAfter(row - 1, 1);
-    sheet.getRange(row, SC, 1, NCOLS).merge()  // B–G
-      .setValue('Term & Condition:')
-      .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
-      .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(8);
-    sheet.setRowHeight(row, 22);
-    row++;
+  sheet.insertRowsAfter(row - 1, 1);
+  sheet.getRange(row, SC, 1, NCOLS).merge()
+    .setValue('Term & Condition :')
+    .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(9);
+  sheet.setRowHeight(row, 22);
+  row++;
 
-    // 2 TC per baris: kiri B(label)+C–D(value), kanan E(label)+F–G(value)
-    var tcPairs = [];
-    for (var pi = 0; pi < tcEntries.length; pi += 2) {
-      tcPairs.push({ left: tcEntries[pi], right: tcEntries[pi+1] || null });
+  // ── T&C rows: checkbox style ───────────────────────────────────────────────
+  tcFields.forEach(function(field, fi) {
+    var selected = (tc[field.key] || '').toString().trim();
+    var allOpts  = (tcOptions[field.key] || []).filter(function(o) { return o !== '-'; });
+    if (allOpts.length === 0) allOpts = [selected].filter(Boolean);
+
+    // Pasangkan 2 opsi per baris
+    var pairs = [];
+    for (var pi = 0; pi < allOpts.length; pi += 2) {
+      pairs.push({ opt1: allOpts[pi] || null, opt2: allOpts[pi + 1] || null });
     }
+    if (pairs.length === 0) pairs.push({ opt1: null, opt2: null });
 
-    sheet.insertRowsAfter(row - 1, tcPairs.length);
-    tcPairs.forEach(function(pair, idx) {
-      var bg = idx % 2 === 0 ? '#efefef' : '#f5f5f5';
-      sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(8);
+    var fieldBg = fi % 2 === 0 ? '#f5f5f5' : '#ebebeb';
+
+    sheet.insertRowsAfter(row - 1, pairs.length);
+
+    pairs.forEach(function(pair, pairIdx) {
+      sheet.getRange(row, SC, 1, NCOLS).setBackground(fieldBg).setFontSize(8);
       sheet.setRowHeight(row, 22);
 
-      // B–C merged: label kiri (2 kolom agar cukup lebar untuk teks panjang)
-      sheet.getRange(row, SC, 1, 2).merge()
-        .setValue(pair.left.label + ':')
-        .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
-        .setBackground(bg).setWrap(false);
-      // D–E merged: value kiri
-      sheet.getRange(row, 4, 1, 2).merge()
-        .setValue(tc[pair.left.key] || '').setFontSize(8).setBackground(bg);
+      // B: nomor (hanya baris pertama field)
+      sheet.getRange(row, SC)
+        .setValue(pairIdx === 0 && field.num !== null ? field.num : '')
+        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
+        .setHorizontalAlignment('center').setVerticalAlignment('middle');
 
-      if (pair.right) {
-        // F: label kanan
-        sheet.getRange(row, 6)
-          .setValue(pair.right.label + ':')
-          .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
-          .setBackground(bg).setWrap(false);
-        // G: value kanan
-        sheet.getRange(row, 7)
-          .setValue(tc[pair.right.key] || '').setFontSize(8).setBackground(bg);
-      } else {
-        sheet.getRange(row, 6, 1, 2).merge().setBackground(bg);  // F–G kosong
-      }
+      // C–D merged: label (hanya baris pertama)
+      sheet.getRange(row, 3, 1, 2).merge()
+        .setValue(pairIdx === 0 ? field.label + ' :' : '')
+        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
+        .setVerticalAlignment('middle').setWrap(false);
+
+      // E–F merged: opsi 1 dengan checkbox
+      var chk1 = pair.opt1
+        ? ((pair.opt1.toLowerCase() === selected.toLowerCase() ? CHK : UNCHK) + '  ' + pair.opt1)
+        : '';
+      sheet.getRange(row, 5, 1, 2).merge()
+        .setValue(chk1)
+        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
+        .setVerticalAlignment('middle').setWrap(true);
+
+      // G: opsi 2 dengan checkbox
+      var chk2 = pair.opt2
+        ? ((pair.opt2.toLowerCase() === selected.toLowerCase() ? CHK : UNCHK) + '  ' + pair.opt2)
+        : '';
+      sheet.getRange(row, 7)
+        .setValue(chk2)
+        .setFontSize(8).setFontColor('#333333').setBackground(fieldBg)
+        .setVerticalAlignment('middle').setWrap(true);
+
       row++;
     });
-  }
+  });
 
-  // ── Spacer ──
+  // ── Spacer ─────────────────────────────────────────────────────────────────
   sheet.insertRowsAfter(row - 1, 1);
   sheet.getRange(row, SC, 1, NCOLS).merge().setBackground(WHITE);
-  sheet.setRowHeight(row, 18);
+  sheet.setRowHeight(row, 8);
   row++;
 
-  // ── Tanda Tangan: Customer B–D, Supplier E–G ──
-  sheet.insertRowsAfter(row - 1, 3);
+  // ── Signature: header biru "Customer | Supplier" ───────────────────────────
+  sheet.insertRowsAfter(row - 1, 4);
 
-  sheet.getRange(row, SC, 1, 3).merge()  // B–D: Customer
-    .setValue('Customer (PT. RENUS GLOBAL INDONESIA)')
-    .setHorizontalAlignment('center').setFontSize(8).setFontColor('#555555').setBackground(WHITE);
-  sheet.getRange(row, 5, 1, 3).merge()  // E–G: Supplier
+  // Header bar
+  sheet.getRange(row, SC, 1, 3).merge()
+    .setValue('Customer')
+    .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
+    .setFontSize(9).setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange(row, 5, 1, 3).merge()
     .setValue('Supplier')
-    .setHorizontalAlignment('center').setFontSize(8).setFontColor('#555555').setBackground(WHITE);
+    .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
+    .setFontSize(9).setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 20);
+  row++;
+
+  // Nama perusahaan
+  sheet.getRange(row, SC, 1, 3).merge()
+    .setValue('PT. RENUS GLOBAL INDONESIA')
+    .setFontWeight('bold').setFontSize(8).setBackground(WHITE)
+    .setHorizontalAlignment('left').setVerticalAlignment('bottom');
+  sheet.getRange(row, 5, 1, 3).merge()
+    .setValue(po.namaSupplier || '')
+    .setFontWeight('bold').setFontSize(8).setBackground(WHITE)
+    .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.setRowHeight(row, 18);
   row++;
 
-  sheet.getRange(row, SC, 1, 3).merge().setBackground(WHITE);  // B–D
-  sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);   // E–G
-  sheet.setRowHeight(row, 50);
+  // Area tanda tangan (kosong)
+  sheet.getRange(row, SC, 1, 3).merge().setBackground(WHITE);
+  sheet.getRange(row, 5, 1, 3).merge().setBackground(WHITE);
+  sheet.setRowHeight(row, 55);
   row++;
 
+  // Nama dan garis
   var dibuatOleh = po.dibuatOleh || 'Procurement';
-  sheet.getRange(row, SC, 1, 3).merge()  // B–D
-    .setValue('(  ' + dibuatOleh + '  )')
-    .setHorizontalAlignment('center').setFontSize(8).setFontWeight('bold').setBackground(WHITE);
-  sheet.getRange(row, 5, 1, 3).merge()  // E–G
-    .setValue('(                                                   )')
-    .setHorizontalAlignment('center').setFontSize(8).setBackground(WHITE);
+  sheet.getRange(row, SC, 1, 3).merge()
+    .setValue('(' + dibuatOleh + ')')
+    .setFontSize(8).setFontWeight('bold').setBackground(WHITE)
+    .setHorizontalAlignment('left').setVerticalAlignment('top')
+    .setBorder(true, null, null, null, false, false, '#333333', SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(row, 5, 1, 3).merge()
+    .setValue('(............................................)')
+    .setFontSize(8).setBackground(WHITE)
+    .setHorizontalAlignment('left').setVerticalAlignment('top')
+    .setBorder(true, null, null, null, false, false, '#333333', SpreadsheetApp.BorderStyle.SOLID);
   sheet.setRowHeight(row, 18);
 }
