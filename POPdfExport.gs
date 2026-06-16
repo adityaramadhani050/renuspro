@@ -400,7 +400,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setFontWeights(fontWeights);
   zone.setNumberFormats(numFormats);
   zone.setHorizontalAlignments(alignments);
-  zone.setFontSize(8);
+  zone.setFontSize(10);
   zone.setVerticalAlignment('middle');
   zone.setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
 
@@ -443,19 +443,19 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
   sheet.getRange(r, 6)
     .setValue(label)
     .setHorizontalAlignment('left').setFontWeight(fw)
-    .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
+    .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
 
   // G (col 7): value
   if (isDash) {
     sheet.getRange(r, 7)
       .setValue('-')
       .setHorizontalAlignment('right').setFontWeight(fw)
-      .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
+      .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
   } else {
     sheet.getRange(r, 7)
       .setValue(value).setNumberFormat('#,##0')
       .setHorizontalAlignment('right').setFontWeight(fw)
-      .setFontSize(8).setFontColor(color).setBackground(GRAY_BG);
+      .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
   }
   sheet.setRowHeight(r, 22);
 }
@@ -496,7 +496,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   // Baris pertama: Notes header (B–D) + Summary line 0 (F–G via _poSummaryRow)
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('Additional Notes :')
-    .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold').setFontSize(8)
+    .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold').setFontSize(10)
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.setRowHeight(row, 20);
   _poSummaryRow(sheet, row, summaryLines[0].label, summaryLines[0].value, summaryLines[0].isDash, summaryLines[0].isBold);
@@ -506,7 +506,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     var contentRows = NS - 1;
     sheet.getRange(row + 1, SC, contentRows, 3).merge()
       .setValue(po.catatan || '')
-      .setBackground(GRAY_BG).setFontColor('#444444').setFontSize(8)
+      .setBackground(GRAY_BG).setFontColor('#444444').setFontSize(10)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
       .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     // Set E (col 5) putih (gap antara notes dan summary)
@@ -541,7 +541,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     sheet.getRange(row, SC, 1, NCOLS).merge()
       .setValue('Term & Condition :')
       .setBackground('#d9d9d9').setFontColor('#000000').setFontWeight('bold')
-      .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(9);
+      .setHorizontalAlignment('left').setVerticalAlignment('middle').setFontSize(10);
     sheet.setRowHeight(row, 22);
     row++;
 
@@ -553,27 +553,27 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     sheet.insertRowsAfter(row - 1, tcPairs.length);
     tcPairs.forEach(function(pair, idx) {
       var bg = idx % 2 === 0 ? '#efefef' : '#f5f5f5';
-      sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(8);
+      sheet.getRange(row, SC, 1, NCOLS).setBackground(bg).setFontSize(10);
       sheet.setRowHeight(row, 22);
 
       // B–C merged: label kiri
       sheet.getRange(row, SC, 1, 2).merge()
         .setValue(pair.left.label + ':')
-        .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+        .setFontWeight('bold').setFontSize(10).setFontColor('#222222')
         .setBackground(bg).setWrap(false);
       // D–E merged: value kiri (normal, tidak bold)
       sheet.getRange(row, 4, 1, 2).merge()
-        .setValue(tc[pair.left.key] || '').setFontSize(8).setFontWeight('normal').setBackground(bg);
+        .setValue(tc[pair.left.key] || '').setFontSize(10).setFontWeight('normal').setBackground(bg);
 
       if (pair.right) {
         // F: label kanan
         sheet.getRange(row, 6)
           .setValue(pair.right.label + ':')
-          .setFontWeight('bold').setFontSize(8).setFontColor('#222222')
+          .setFontWeight('bold').setFontSize(10).setFontColor('#222222')
           .setBackground(bg).setWrap(false);
         // G: value kanan (normal, tidak bold)
         sheet.getRange(row, 7)
-          .setValue(tc[pair.right.key] || '').setFontSize(8).setFontWeight('normal').setBackground(bg);
+          .setValue(tc[pair.right.key] || '').setFontSize(10).setFontWeight('normal').setBackground(bg);
       } else {
         sheet.getRange(row, 6, 1, 2).merge().setBackground(bg);
       }
@@ -594,22 +594,22 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('Customer')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
-    .setFontSize(9).setHorizontalAlignment('left').setVerticalAlignment('middle');
+    .setFontSize(10).setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.getRange(row, 5, 1, 3).merge()
     .setValue('Supplier')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold')
-    .setFontSize(9).setHorizontalAlignment('left').setVerticalAlignment('middle');
+    .setFontSize(10).setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.setRowHeight(row, 20);
   row++;
 
   // Nama perusahaan
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('PT. RENUS GLOBAL INDONESIA')
-    .setFontWeight('bold').setFontSize(8).setBackground(WHITE)
+    .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.getRange(row, 5, 1, 3).merge()
     .setValue(po.namaSupplier || '')
-    .setFontWeight('bold').setFontSize(8).setBackground(WHITE)
+    .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.setRowHeight(row, 18);
   row++;
@@ -624,11 +624,11 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
   var dibuatOleh = po.dibuatOleh || 'Procurement';
   sheet.getRange(row, SC, 1, 3).merge()
     .setValue('(' + dibuatOleh + ')')
-    .setFontSize(8).setFontWeight('bold').setBackground(WHITE)
+    .setFontSize(10).setFontWeight('bold').setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('top');
   sheet.getRange(row, 5, 1, 3).merge()
     .setValue('(............................................)')
-    .setFontSize(8).setBackground(WHITE)
+    .setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('top');
   sheet.setRowHeight(row, 18);
 }
