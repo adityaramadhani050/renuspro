@@ -504,7 +504,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
 
   // Baris pertama: Notes header (B–D) + Summary line 0 (F–G via _poSummaryRow)
   sheet.getRange(row, SC, 1, 3).merge()
-    .setValue('Additional Notes :')
+    .setValue('Notes :')
     .setBackground(BLUE).setFontColor(WHITE).setFontWeight('bold').setFontSize(10)
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
   sheet.setRowHeight(row, 20);
