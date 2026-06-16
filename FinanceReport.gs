@@ -153,7 +153,7 @@ function getFinanceReportData(filter) {
         noPenawaran: w.id,
         namaKlien:   w.namaKlien,
         namaProject: w.namaProject,
-        nilaiKontrak: nilaiKontrakBruto,
+        nilaiKontrak: nilaiKontrak,
         ppnRate:     ppnRate,
         invoices:    invoices,
         tagihan:     tagihan,

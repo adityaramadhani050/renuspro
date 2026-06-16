@@ -415,12 +415,12 @@ function getSalesReportData(params) {
 
       var tanggalDeal2 = parseTgl(row2[18]) || parseTgl(row2[2]);
       if (!tanggalDeal2) continue;
-      var grandTotal2 = parseFloat(row2[10]) || 0;
+      var nilaiKontrak2 = Math.max(0, (parseFloat(row2[7]) || 0) - (parseFloat(row2[8]) || 0));
       var dealKey = getMonthKey(tanggalDeal2);
 
       for (var mi = 0; mi < months.length; mi++) {
         if (months[mi].key === dealKey) {
-          trendValues[mi] += grandTotal2;
+          trendValues[mi] += nilaiKontrak2;
           break;
         }
       }
