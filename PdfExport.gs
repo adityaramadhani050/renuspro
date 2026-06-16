@@ -329,7 +329,7 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   // Baris 1: header "Notes :"
   sheet.getRange(notesStartRow, 1, 1, 5).merge()
     .setValue('Notes :')
-    .setBackground('#003399').setFontColor('#ffffff')
+    .setBackground('#0b5394').setFontColor('#ffffff')
     .setFontWeight('bold').setFontSize(10)
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
   // Baris 2..NS: isi catatan (merged)
