@@ -450,7 +450,7 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
   // F (col 6): label
   sheet.getRange(r, 6)
     .setValue(label)
-    .setHorizontalAlignment('left').setFontWeight(fw)
+    .setHorizontalAlignment('left').setFontWeight('bold')
     .setFontSize(10).setFontColor(color).setBackground(GRAY_BG);
 
   // G (col 7): value
