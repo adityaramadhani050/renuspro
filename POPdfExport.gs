@@ -436,8 +436,8 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
   var color   = isBold ? '#003399' : '#333333';
   var fw      = isBold ? 'bold' : 'normal';
 
-  // E (col 5): spacer/gap
-  sheet.getRange(r, 5).setValue('').setBackground(GRAY_BG);
+  // E (col 5): spacer/gap (putih)
+  sheet.getRange(r, 5).setValue('').setBackground('#ffffff');
 
   // F (col 6): label
   sheet.getRange(r, 6)
@@ -509,8 +509,8 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
       .setBackground(GRAY_BG).setFontColor('#444444').setFontSize(8)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
       .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
-    // Set E (col 5) abu-abu untuk baris konten notes
-    sheet.getRange(row + 1, 5, contentRows, 1).setBackground(GRAY_BG);
+    // Set E (col 5) putih (gap antara notes dan summary)
+    sheet.getRange(row + 1, 5, contentRows, 1).setBackground('#ffffff');
     for (var si = 1; si < NS; si++) {
       var s = summaryLines[si];
       _poSummaryRow(sheet, row + si, s.label, s.value, s.isDash, s.isBold);
