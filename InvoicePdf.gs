@@ -394,7 +394,7 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
 
   // ── Note | Bank Account (dua kolom) ──
   const mid    = Math.ceil(NCOLS / 2);
-  const leftW  = mid;
+  const leftW  = mid - 1;
   const rightW = NCOLS - mid;
   const noteVal = (inv.catatan || '').toString();
   const bankVal = (inv.bankAccount || '').toString();
