@@ -295,26 +295,26 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
       value: item.grandTotal || 0, bold: true,  red: false, skip: false },
   ].filter(function(k) { return !k.skip; });
 
-  // ── Kalkulasi (insert semua baris sekaligus) ──
-  sheet.insertRowsAfter(row - 1, kalkulasi.length);
+  // ── Notes + Summary berdampingan (layout sama seperti PO) ──
+  // Cols 1-5 = Notes | Col 6 = gap putih | Cols 7-8 = Summary
+  const catatan = tc.catatan || '';
+  const NS = kalkulasi.length;
 
+  sheet.insertRowsAfter(row - 1, NS);
+  const notesStartRow = row;
+
+  // Tulis summary (cols 7-8) dan gap (col 6) untuk setiap baris
   kalkulasi.forEach(function(k) {
-    sheet.setRowHeight(row, 22)
-    const labelRange = sheet.getRange(row, 7);
-    const valueRange = sheet.getRange(row, 8);
-    const leftRange  = sheet.getRange(row, 1, 1, 6);
-
-    leftRange.setBackground('#ffffff');
-
-    labelRange
+    sheet.setRowHeight(row, 22);
+    sheet.getRange(row, 6).setBackground('#ffffff');  // gap
+    sheet.getRange(row, 7)
       .setValue(k.label)
       .setHorizontalAlignment('right')
       .setFontWeight(k.bold ? 'bold' : 'normal')
       .setFontColor(k.red ? '#cc0000' : (k.bold ? '#1a3a8f' : null))
       .setBorder(true, true, true, true, false, false,
                  '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
-
-    valueRange
+    sheet.getRange(row, 8)
       .setValue(k.value)
       .setNumberFormat('#,##0')
       .setFontWeight(k.bold ? 'bold' : 'normal')
@@ -325,30 +325,20 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
     row++;
   });
 
-  // ── Catatan ──
-  const catatan = tc.catatan || '';
-  if (catatan) {
-    sheet.insertRowsAfter(row - 1, 2);
-
-    // Header "Notes :" — gaya sama seperti PO
-    sheet.getRange(row, 1, 1, 6).merge()
-      .setValue('Notes :')
-      .setBackground('#003399').setFontColor('#ffffff')
-      .setFontWeight('bold').setFontSize(10)
-      .setHorizontalAlignment('left').setVerticalAlignment('middle');
-    sheet.getRange(row, 7, 1, 2).merge().setBackground('#ffffff');
-    sheet.setRowHeight(row, 20);
-    row++;
-
-    // Isi catatan — background abu-abu, border putih
-    sheet.getRange(row, 1, 1, 6).merge()
+  // Tulis Notes di sisi kiri (cols 1-5) pada baris yang sama dengan summary
+  // Baris 1: header "Notes :"
+  sheet.getRange(notesStartRow, 1, 1, 5).merge()
+    .setValue('Notes :')
+    .setBackground('#003399').setFontColor('#ffffff')
+    .setFontWeight('bold').setFontSize(10)
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+  // Baris 2..NS: isi catatan (merged)
+  if (NS > 1) {
+    sheet.getRange(notesStartRow + 1, 1, NS - 1, 5).merge()
       .setValue(catatan)
       .setBackground('#f3f3f3').setFontColor('#444444').setFontSize(10)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
       .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
-    sheet.getRange(row, 7, 1, 2).merge().setBackground('#ffffff');
-    sheet.setRowHeight(row, Math.max(40, Math.ceil(catatan.length / 90) * 16 + 20));
-    row++;
   }
 
   sheet.getRange(row, 1, 1, 8).merge().setBackground('#ffffff');
