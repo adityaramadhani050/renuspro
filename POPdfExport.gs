@@ -379,7 +379,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
     row[4] = item.hargaBeli|| 0;    // F: Unit Price
     row[5] = item.total    || 0;    // G: Total
 
-    var bg  = new Array(NCOLS).fill(idx % 2 === 0 ? '#ffffff' : '#f8f8f8');
+    var bg  = new Array(NCOLS).fill('#e8e8e8');
     var fw  = new Array(NCOLS).fill('normal');
     var fmt = new Array(NCOLS).fill('@');
     fmt[3] = '#,##0.##';  // E Qty
@@ -402,6 +402,7 @@ function _sisipkanBarisItemPO(sheet, cache, items) {
   zone.setHorizontalAlignments(alignments);
   zone.setFontSize(8);
   zone.setVerticalAlignment('middle');
+  zone.setBorder(true, true, true, true, true, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
 
   for (var r = 0; r < totalRows; r++) {
     sheet.getRange(anchorRow + r, 3).setWrap(true);  // C: Details wrap
@@ -505,9 +506,9 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     var contentRows = NS - 1;
     sheet.getRange(row + 1, SC, contentRows, 3).merge()
       .setValue(po.catatan || '')
-      .setBackground(WHITE).setFontColor('#444444').setFontSize(8)
+      .setBackground(GRAY_BG).setFontColor('#444444').setFontSize(8)
       .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left')
-      .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+      .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
     // Set E (col 5) abu-abu untuk baris konten notes
     sheet.getRange(row + 1, 5, contentRows, 1).setBackground(GRAY_BG);
     for (var si = 1; si < NS; si++) {
