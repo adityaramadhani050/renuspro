@@ -52,6 +52,42 @@ function _ensurePenerimaanTanpaPOSheet(ss) {
 
 // ── ID Generator ─────────────────────────────────────────────────────────────
 
+function _ensurePenerimaanPOLogSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Penerimaan_PO_Log');
+  if (!sheet) {
+    sheet = ss.insertSheet('Penerimaan_PO_Log');
+    sheet.appendRow([
+      'ID Log', 'No PO', 'Tanggal', 'Mode',
+      'Jumlah Item', 'Detail Item (JSON)',
+      'Dibuat Oleh', 'Dibuat Pada'
+    ]);
+  }
+  return sheet;
+}
+
+function _generateIdPenerimaanPOLog(sheet) {
+  SpreadsheetApp.flush();
+  var lastRow = sheet.getLastRow();
+  return 'RCV-' + new Date().getTime() + '-' + lastRow;
+}
+
+function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser) {
+  var sheet = _ensurePenerimaanPOLogSheet(ss);
+  var tz     = Session.getScriptTimeZone();
+  var now    = new Date();
+  var tglStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+  var nowStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
+  var detail = itemsDiterima.map(function(it) {
+    return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '' };
+  });
+  sheet.appendRow([
+    _generateIdPenerimaanPOLog(sheet), noPO, tglStr, mode,
+    detail.length, JSON.stringify(detail),
+    namaUser || '', nowStr
+  ]);
+}
+
 function _generateIdStok(sheet) {
   var data   = sheet.getDataRange().getValues();
   var maxSeq = 0;
@@ -617,6 +653,9 @@ function terimaPOItems(payload) {
     var newStatus = allDiterima ? 'Diterima' : (adaDiterima ? 'Diterima Sebagian' : statusPO);
     poSheet.getRange(poRowIdx + 1, 7).setValue(newStatus);
     poSheet.getRange(poRowIdx + 1, 17).setValue(nowStr); // Diubah Pada
+
+    var itemsDiterimaLog = items.filter(function(it) { return (Number(it.qty) || 0) > 0; });
+    if (itemsDiterimaLog.length) _catatPenerimaanPOLog(ss, noPO, 'Gudang', itemsDiterimaLog, namaUser);
 
     SpreadsheetApp.flush();
     invalidateStokCache();

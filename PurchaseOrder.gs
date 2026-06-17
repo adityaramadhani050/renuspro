@@ -415,9 +415,40 @@ function getPODetail(noPO) {
       });
     }
 
-    return { success: true, po: header, items: items, pembayaran: pembayaran, paymentRequests: paymentRequests };
+    // Riwayat Penerimaan Barang
+    var riwayatPenerimaan = getRiwayatPenerimaanPO(noPO);
+
+    return { success: true, po: header, items: items, pembayaran: pembayaran, paymentRequests: paymentRequests, riwayatPenerimaan: riwayatPenerimaan };
   } catch (e) {
     return { success: false, message: e.toString() };
+  }
+}
+
+function getRiwayatPenerimaanPO(noPO) {
+  try {
+    var ss = getSpreadsheet();
+    var logSheet = _ensurePenerimaanPOLogSheet(ss);
+    var logData  = logSheet.getDataRange().getValues();
+    var riwayat = [];
+    for (var i = 1; i < logData.length; i++) {
+      var lr = logData[i];
+      if ((lr[1] || '').toString().trim() !== noPO) continue;
+      var detailItem = [];
+      try { detailItem = JSON.parse(lr[5] || '[]'); } catch (eParse) { detailItem = []; }
+      riwayat.push({
+        idLog:      lr[0] ? lr[0].toString() : '',
+        noPO:       lr[1] ? lr[1].toString() : '',
+        tanggal:    _fmtTgl(lr[2]),
+        mode:       lr[3] ? lr[3].toString() : '',
+        jumlahItem: parseFloat(lr[4]) || 0,
+        items:      detailItem,
+        dibuatOleh: lr[6] ? lr[6].toString() : '',
+        dibuatPada: _fmtTgl(lr[7])
+      });
+    }
+    return riwayat;
+  } catch (e) {
+    return [];
   }
 }
 
@@ -800,6 +831,9 @@ function terimaPOKirimLangsung(payload) {
     poSheet.getRange(poRowIdx, 7).setValue(statusBaru);
     poSheet.getRange(poRowIdx, 17).setValue((payload.namaUser || '').toString());
     poSheet.getRange(poRowIdx, 18).setValue(nowStr2);
+
+    var itemsDiterimaLog2 = items.filter(function(it) { return (Number(it.qty) || 0) > 0; });
+    if (itemsDiterimaLog2.length) _catatPenerimaanPOLog(ss, noPO, 'Langsung', itemsDiterimaLog2, payload.namaUser);
 
     invalidatePOCache();
     return { success: true, message: 'Penerimaan langsung berhasil. Status PO: ' + statusBaru + '.' };
