@@ -69,6 +69,7 @@ window.loadPurchaseOrder = function() {
       _pgState.purchaseorder.page = 1;
       _injectPgBar('purchaseorder', '#table-purchaseorder');
       _pgRender('purchaseorder');
+      _renderPOKPI(_cachedPOData);
     })
     .withFailureHandler(function() {
       document.getElementById('table-purchaseorder').innerHTML =
@@ -92,7 +93,41 @@ window.filterPO = function() {
   _pgState.purchaseorder.data = filtered;
   _pgState.purchaseorder.page = 1;
   _pgRender('purchaseorder');
+  _renderPOKPI(filtered);
 };
+
+// ── KPI Cards ──────────────────────────────────────────────────────────────
+function _renderPOKPI(list) {
+  list = list || [];
+  var totalNilai    = 0;
+  var outstanding   = 0;
+  var jumlahAktif   = 0;
+  var penerimaanCount = 0;
+  var penerimaanTotal = 0;
+
+  list.forEach(function(po) {
+    var statusPO    = po.statusPO    || '';
+    var statusBayar = po.statusBayar || '';
+    var grandTotal  = po.grandTotal  || 0;
+    var totalDibayar = po.totalDibayar || 0;
+
+    if (statusPO !== 'Batal') totalNilai += grandTotal;
+    if (statusBayar === 'Belum Dibayar' || statusBayar === 'Dibayar Sebagian') {
+      outstanding += Math.max(0, grandTotal - totalDibayar);
+    }
+    if (statusPO !== 'Selesai' && statusPO !== 'Batal') jumlahAktif++;
+    if (statusPO === 'Menunggu Penerimaan Gudang' || statusPO === 'Diterima Sebagian') {
+      penerimaanCount++;
+      penerimaanTotal += grandTotal;
+    }
+  });
+
+  document.getElementById('kpi-po-total').textContent             = 'Rp ' + totalNilai.toLocaleString('id-ID');
+  document.getElementById('kpi-po-outstanding').textContent       = 'Rp ' + outstanding.toLocaleString('id-ID');
+  document.getElementById('kpi-po-aktif').textContent              = jumlahAktif;
+  document.getElementById('kpi-po-penerimaan-count').textContent  = penerimaanCount;
+  document.getElementById('kpi-po-penerimaan-total').textContent  = 'Rp ' + penerimaanTotal.toLocaleString('id-ID');
+}
 
 // ── Form Buat/Edit PO ────────────────────────────────────────────────────────
 function bukaFormPO() {
