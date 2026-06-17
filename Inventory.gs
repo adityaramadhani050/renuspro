@@ -407,7 +407,7 @@ function getPOItemsUntukPenerimaan(noPO) {
       }
     }
     if (!statusPO) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
@@ -498,7 +498,7 @@ function terimaPOItems(payload) {
       }
     }
     if (poRowIdx < 0) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Disetujui' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
