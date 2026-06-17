@@ -485,9 +485,8 @@ function getRealisasiHPP(noWO) {
       if (poSheet) {
         var poData = poSheet.getDataRange().getValues();
         for (var q = 1; q < poData.length; q++) {
-          var pPeruntukan = (poData[q][4] || '').toString();
-          var pNoWO2      = (poData[q][5] || '').toString().trim();
-          if (pPeruntukan !== 'Work Order' || pNoWO2 !== noWO) continue;
+          var pNoWO2 = (poData[q][5] || '').toString().trim();
+          if (pNoWO2 !== noWO) continue;
           var grandTotal  = parseFloat(poData[q][10]) || 0;
           var totalBayar  = parseFloat(poData[q][13]) || 0;
           poTerkait.push({

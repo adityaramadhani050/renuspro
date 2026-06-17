@@ -815,14 +815,12 @@ function simpanPembayaranPO(payload) {
     var poData = poSheet.getDataRange().getValues();
     var poRowIdx    = -1;
     var grandTotal  = 0;
-    var peruntukan  = '';
     var noWOPO      = '';
     var namaSupplier = '';
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
         poRowIdx     = i + 1;
         grandTotal   = parseFloat(poData[i][10]) || 0;
-        peruntukan   = (poData[i][4] || '').toString();
         noWOPO       = (poData[i][5] || '').toString().trim();
         namaSupplier = (poData[i][3] || '').toString();
         break;
@@ -830,8 +828,8 @@ function simpanPembayaranPO(payload) {
     }
     if (poRowIdx === -1) return { success: false, message: 'No PO tidak ditemukan.' };
 
-    // Blokir pembayaran jika PO peruntukan Work Order dan WO sudah Closed
-    if (peruntukan === 'Work Order' && noWOPO) {
+    // Blokir pembayaran jika PO terikat Work Order dan WO sudah Closed
+    if (noWOPO) {
       try {
         var statusWOCek = _getStatusWO(noWOPO);
         if (statusWOCek === 'Closed') {
@@ -872,8 +870,8 @@ function simpanPembayaranPO(payload) {
     poSheet.getRange(poRowIdx, 13).setValue(statusBayar);   // col 12 = col 13
     poSheet.getRange(poRowIdx, 14).setValue(totalDibayar);  // col 13 = col 14
 
-    // Hook Pengeluaran: jika PO peruntukan Work Order, buat entry pengeluaran otomatis
-    if (peruntukan === 'Work Order' && noWOPO) {
+    // Hook Pengeluaran: jika PO terikat Work Order, buat entry pengeluaran otomatis
+    if (noWOPO) {
       try {
         _buatPengeluaranOtomatis({
           noWO:        noWOPO,
@@ -927,14 +925,14 @@ function hapusPembayaranPO(idBayar) {
     }
     if (bayarRowIdx === -1) return { success: false, message: 'ID Pembayaran tidak ditemukan.' };
 
-    // Cek apakah PO ini peruntukan Work Order (untuk hook pengeluaran)
-    var peruntukanHapus = '';
+    // Cek apakah PO ini terikat Work Order (untuk hook pengeluaran)
+    var noWOHapus = '';
     try {
       var poSheetHapus = _ensurePOSheet(ss);
       var poDataHapus  = poSheetHapus.getDataRange().getValues();
       for (var ph = 1; ph < poDataHapus.length; ph++) {
         if ((poDataHapus[ph][0] || '').toString() === noPO) {
-          peruntukanHapus = (poDataHapus[ph][4] || '').toString();
+          noWOHapus = (poDataHapus[ph][5] || '').toString().trim();
           break;
         }
       }
@@ -966,8 +964,8 @@ function hapusPembayaranPO(idBayar) {
       }
     }
 
-    // Hook Pengeluaran: hapus entry pengeluaran otomatis jika PO peruntukan Work Order
-    if (peruntukanHapus === 'Work Order') {
+    // Hook Pengeluaran: hapus entry pengeluaran otomatis jika PO terikat Work Order
+    if (noWOHapus) {
       try {
         _hapusPengeluaranByReferensi(idBayar);
       } catch(eHook2) {
