@@ -353,7 +353,7 @@ function getPODetail(noPO) {
       if ((prData[pr][1] || '').toString() !== noPO) continue;
       paymentRequests.push({
         idReq:          prData[pr][0]  ? prData[pr][0].toString()  : '',
-        tanggalRequest: prData[pr][5]  ? prData[pr][5].toString()  : '',
+        tanggalRequest: prData[pr][5]  ? _fmtTgl(prData[pr][5]) : '',
         jumlah:         parseFloat(prData[pr][6]) || 0,
         persentase:     parseFloat(prData[pr][7]) || 0,
         catatan:        prData[pr][8]  ? prData[pr][8].toString()  : '',
@@ -1114,7 +1114,7 @@ function getPaymentRequestList(params) {
         noWO:           r[2]  ? r[2].toString()  : '',
         namaSupplier:   r[3]  ? r[3].toString()  : '',
         grandTotalPO:   parseFloat(r[4]) || 0,
-        tanggalRequest: r[5]  ? r[5].toString()  : '',
+        tanggalRequest: r[5]  ? _fmtTgl(r[5]) : '',
         jumlah:         parseFloat(r[6]) || 0,
         persentase:     parseFloat(r[7]) || 0,
         catatan:        r[8]  ? r[8].toString()  : '',
