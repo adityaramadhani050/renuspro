@@ -590,12 +590,13 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
 
     var poData = poSheet.getDataRange().getValues();
     var poRowIdx = -1;
-    var statusLama = '', statusBayar = '';
+    var statusLama = '', statusBayar = '', totalDibayar = 0;
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
-        poRowIdx    = i + 1;
-        statusLama  = poData[i][6]  ? poData[i][6].toString()  : '';
-        statusBayar = poData[i][12] ? poData[i][12].toString() : '';
+        poRowIdx     = i + 1;
+        statusLama   = poData[i][6]  ? poData[i][6].toString()  : '';
+        statusBayar  = poData[i][12] ? poData[i][12].toString() : '';
+        totalDibayar = parseFloat(poData[i][13]) || 0;
         break;
       }
     }
@@ -614,7 +615,15 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
       if (statusBayar !== 'Lunas') {
         return { success: false, message: 'PO tidak bisa diselesaikan — status pembayaran belum Lunas (saat ini: "' + statusBayar + '").' };
       }
-    } else if (statusBaru !== 'Batal') {
+    } else if (statusBaru === 'Batal') {
+      // Batal hanya untuk PO yang belum dikirim ke gudang/diterima dan belum ada pembayaran
+      if (statusLama !== 'Aktif') {
+        return { success: false, message: 'PO berstatus "' + statusLama + '" tidak bisa dibatalkan — barang sudah dalam proses penerimaan.' };
+      }
+      if (totalDibayar > 0) {
+        return { success: false, message: 'PO tidak bisa dibatalkan — sudah ada pembayaran sebesar Rp ' + totalDibayar.toLocaleString('id-ID') + '.' };
+      }
+    } else {
       return { success: false, message: 'Status yang bisa diubah secara manual hanya "Selesai" atau "Batal".' };
     }
 
