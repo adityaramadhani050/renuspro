@@ -53,11 +53,25 @@ function _fmtTglExp(s) {
 window.loadPengeluaran = function() {
   _loadExpData();
   loadPaymentRequestList();
+  _loadPendingApprovalKPI();
   _loadWOOptionsExp('filter-exp-wo', '');
   _loadWOOptionsExp('exp-wo', '');
   _loadAkunOptionsExp('filter-exp-akun', '');
   _loadAkunOptionsExp('exp-akun', '');
 };
+
+function _loadPendingApprovalKPI() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var list  = (res && res.list) ? res.list : [];
+      var total = list.reduce(function(sum, r) { return sum + (r.jumlah || 0); }, 0);
+      document.getElementById('kpi-exp-pending-count').textContent = list.length;
+      document.getElementById('kpi-exp-pending-total').textContent = _fmtRpExp(total) + ' menunggu disetujui';
+    })
+    .withFailureHandler(function() {})
+    .getPaymentRequestList({ status: 'Menunggu' });
+}
 
 function _loadExpData() {
   if (typeof google === 'undefined') return;
@@ -126,6 +140,8 @@ function _loadAkunOptionsExp(selId, selectedVal) {
 
 function _renderPengeluaran(list) {
   var tbody = document.getElementById('table-pengeluaran');
+  _renderExpKPI(list);
+
   if (!list || list.length === 0) {
     tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Belum ada data pengeluaran.</td></tr>';
     document.getElementById('exp-summary-bar').classList.add('hidden');
@@ -166,6 +182,20 @@ function _renderPengeluaran(list) {
   document.getElementById('exp-total-badge').textContent = list.length + ' entri';
   document.getElementById('exp-grand-total').textContent = _fmtRpExp(grandTotal);
   document.getElementById('exp-summary-bar').classList.remove('hidden');
+}
+
+function _renderExpKPI(list) {
+  list = list || [];
+  var total = 0, perSumber = { 'Pembayaran PO': 0, 'Penggunaan Stok': 0, 'Langsung': 0 };
+  list.forEach(function(r) {
+    total += r.total || 0;
+    if (perSumber.hasOwnProperty(r.sumber)) perSumber[r.sumber] += r.total || 0;
+  });
+  document.getElementById('kpi-exp-total').textContent          = _fmtRpExp(total);
+  document.getElementById('kpi-exp-count').textContent           = list.length;
+  document.getElementById('kpi-exp-sumber-po').textContent       = _fmtRpExp(perSumber['Pembayaran PO']);
+  document.getElementById('kpi-exp-sumber-stok').textContent     = _fmtRpExp(perSumber['Penggunaan Stok']);
+  document.getElementById('kpi-exp-sumber-langsung').textContent = _fmtRpExp(perSumber['Langsung']);
 }
 
 function _sumberBadge(sumber) {
@@ -536,6 +566,7 @@ window.submitApprovePayReq = function() {
         showNotification(res.message || 'Pembayaran disetujui dan dicatat.');
         loadPaymentRequestList();
         _loadExpData();
+        _loadPendingApprovalKPI();
       } else {
         showNotification(res.message, 'error');
       }
@@ -559,6 +590,7 @@ window.tolakPayReq = function(idReq) {
       if (res.success) {
         showNotification(res.message || 'Request ditolak.');
         loadPaymentRequestList();
+        _loadPendingApprovalKPI();
       } else {
         showNotification(res.message, 'error');
       }
