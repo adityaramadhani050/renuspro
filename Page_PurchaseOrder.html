@@ -152,6 +152,15 @@
                   <input type="date" id="po-quot-tanggal"
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
                 </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">File Penawaran Supplier <span class="text-slate-300 font-normal normal-case ml-1">Opsional, PDF/Gambar</span></label>
+                  <input type="file" id="po-quot-file" accept=".pdf,image/*" onchange="handlePOQuotFileChange(this)"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                  <input type="hidden" id="po-quot-file-id">
+                  <input type="hidden" id="po-quot-file-url">
+                  <input type="hidden" id="po-quot-file-name">
+                  <div id="po-quot-file-status" class="mt-2 text-xs text-slate-500"></div>
+                </div>
               </div>
             </div>
 
@@ -327,6 +336,21 @@
                   <p class="text-emerald-600 mb-0.5">Total Dibayar</p>
                   <p id="po-detail-total-dibayar" class="font-extrabold text-emerald-700">Rp 0</p>
                 </div>
+              </div>
+
+              <!-- File Penawaran Supplier -->
+              <div id="po-detail-quotfile-wrap" class="hidden bg-slate-50 rounded-xl p-3 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <i class="fa-solid fa-file-pdf text-rose-500 text-lg shrink-0"></i>
+                  <div class="min-w-0">
+                    <p class="text-slate-400 text-xs mb-0.5">File Penawaran Supplier</p>
+                    <p id="po-detail-quotfile-name" class="font-bold text-slate-700 text-xs truncate">—</p>
+                  </div>
+                </div>
+                <a id="po-detail-quotfile-link" href="#" target="_blank" rel="noopener"
+                  class="text-xs font-bold text-orange-600 hover:text-orange-700 px-3 py-1.5 rounded-lg border border-orange-200 hover:bg-orange-50 transition shrink-0">
+                  <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Lihat / Unduh
+                </a>
               </div>
 
               <!-- Tabel Item PO -->

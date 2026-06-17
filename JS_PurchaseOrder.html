@@ -145,6 +145,7 @@ function bukaFormPO() {
   document.getElementById('po-catatan').value    = '';
   if (document.getElementById('po-quot-no'))      document.getElementById('po-quot-no').value      = '';
   if (document.getElementById('po-quot-tanggal')) document.getElementById('po-quot-tanggal').value = '';
+  _resetPOQuotFileField();
   renderItemsPO();
   hitungTotalPO();
 
@@ -160,6 +161,59 @@ function bukaFormPO() {
   _loadPOTCDropdowns({}, _poLoadDone);
   document.getElementById('panel-po-detail').classList.add('hidden');
   document.getElementById('po-list-section').classList.add('hidden');
+}
+
+function _resetPOQuotFileField() {
+  if (document.getElementById('po-quot-file'))         document.getElementById('po-quot-file').value         = '';
+  if (document.getElementById('po-quot-file-id'))       document.getElementById('po-quot-file-id').value       = '';
+  if (document.getElementById('po-quot-file-url'))      document.getElementById('po-quot-file-url').value      = '';
+  if (document.getElementById('po-quot-file-name'))     document.getElementById('po-quot-file-name').value     = '';
+  if (document.getElementById('po-quot-file-status'))   document.getElementById('po-quot-file-status').innerHTML = '';
+}
+
+function handlePOQuotFileChange(input) {
+  var file = input.files && input.files[0];
+  var statusEl = document.getElementById('po-quot-file-status');
+  if (!file) return;
+
+  var maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    showNotification('Ukuran file maksimal 10MB.', 'error');
+    input.value = '';
+    return;
+  }
+
+  if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Mengunggah ' + _escHtml(file.name) + '...';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64Data = e.target.result.split(',')[1];
+    if (typeof google === 'undefined') return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          document.getElementById('po-quot-file-id').value   = res.fileId;
+          document.getElementById('po-quot-file-url').value  = res.fileUrl;
+          document.getElementById('po-quot-file-name').value = res.fileName;
+          if (statusEl) statusEl.innerHTML = '<i class="fas fa-check text-emerald-500 mr-1"></i>' + _escHtml(res.fileName) + ' berhasil diunggah.';
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
+          showNotification((res && res.message) || 'Gagal mengunggah file.', 'error');
+          input.value = '';
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
+        showNotification(err.message || 'Gagal mengunggah file.', 'error');
+        input.value = '';
+      })
+      .uploadFilePOQuotationSupplier({
+        base64Data: base64Data,
+        fileName:   file.name,
+        mimeType:   file.type
+      });
+  };
+  reader.readAsDataURL(file);
 }
 
 function tutupFormPO() {
@@ -286,6 +340,9 @@ function submitPO() {
     catatan:      document.getElementById('po-catatan').value.trim(),
     quotNo:       (document.getElementById('po-quot-no') || {}).value || '',
     quotTanggal:  (document.getElementById('po-quot-tanggal') || {}).value || '',
+    quotFileId:   (document.getElementById('po-quot-file-id')   || {}).value || '',
+    quotFileUrl:  (document.getElementById('po-quot-file-url')  || {}).value || '',
+    quotFileName: (document.getElementById('po-quot-file-name') || {}).value || '',
     termConditions: (function() {
       var tc = {};
       document.querySelectorAll('[id^="po-tc-"]').forEach(function(el) {
@@ -386,6 +443,17 @@ function _renderPODetail(po, items, paymentRequests) {
   bayarBadge.innerText = po.statusBayar || '—';
 
   document.getElementById('po-detail-total-dibayar').innerText = 'Rp ' + ((po.totalDibayar || 0).toLocaleString('id-ID'));
+
+  var quotFileWrap = document.getElementById('po-detail-quotfile-wrap');
+  if (quotFileWrap) {
+    if (po.quotFileUrl) {
+      quotFileWrap.classList.remove('hidden');
+      document.getElementById('po-detail-quotfile-name').innerText = po.quotFileName || 'File Penawaran';
+      document.getElementById('po-detail-quotfile-link').href      = po.quotFileUrl;
+    } else {
+      quotFileWrap.classList.add('hidden');
+    }
+  }
 
   var isTerminal   = po.statusPO === 'Selesai' || po.statusPO === 'Batal';
   var isAktif      = po.statusPO === 'Aktif';
@@ -500,6 +568,14 @@ function bukaEditPO(noPO) {
       if (document.getElementById('po-quot-tanggal')) {
         var quotTglParts = (po.quotTanggal || '').split('/');
         document.getElementById('po-quot-tanggal').value = quotTglParts.length === 3 ? quotTglParts[2]+'-'+quotTglParts[1]+'-'+quotTglParts[0] : '';
+      }
+      _resetPOQuotFileField();
+      if (po.quotFileId) {
+        document.getElementById('po-quot-file-id').value   = po.quotFileId;
+        document.getElementById('po-quot-file-url').value   = po.quotFileUrl || '';
+        document.getElementById('po-quot-file-name').value  = po.quotFileName || '';
+        document.getElementById('po-quot-file-status').innerHTML =
+          '<i class="fas fa-paperclip mr-1"></i>File saat ini: <a href="' + po.quotFileUrl + '" target="_blank" rel="noopener" class="text-orange-600 font-bold hover:underline">' + _escHtml(po.quotFileName || 'Lihat file') + '</a> (pilih file baru untuk mengganti)';
       }
 
       var _poLoadPendingEdit = 3;

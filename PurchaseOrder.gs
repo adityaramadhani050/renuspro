@@ -127,6 +127,51 @@ function _ensurePOQuotCols(ss) {
   return sheet;
 }
 
+function _ensurePOFileCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Purchase_Order');
+  if (!sheet) return _ensurePOSheet(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 24) sheet.getRange(1, 24).setValue('Quot File Id');
+  if (lastCol < 25) sheet.getRange(1, 25).setValue('Quot File Url');
+  if (lastCol < 26) sheet.getRange(1, 26).setValue('Quot File Nama');
+  return sheet;
+}
+
+function _getPOQuotationFolder() {
+  var ssFile = DriveApp.getFileById(getSpreadsheet().getId());
+  var parents = ssFile.getParents();
+  var rootFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  var folderName = 'RenusPro - File Penawaran Supplier (PO)';
+  var existing = rootFolder.getFoldersByName(folderName);
+  if (existing.hasNext()) return existing.next();
+  return rootFolder.createFolder(folderName);
+}
+
+function uploadFilePOQuotationSupplier(payload) {
+  try {
+    var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    var fileName   = payload.fileName   ? payload.fileName.toString()   : 'penawaran-supplier';
+    var mimeType   = payload.mimeType   ? payload.mimeType.toString()   : 'application/octet-stream';
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob  = Utilities.newBlob(bytes, mimeType, fileName);
+    var folder = _getPOQuotationFolder();
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return {
+      success: true,
+      fileId:   file.getId(),
+      fileUrl:  file.getUrl(),
+      fileName: fileName
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
 function _ensurePembayaranPOSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('Pembayaran_PO');
@@ -251,7 +296,10 @@ function getPOList() {
         diskonNominal: parseFloat(r[19]) || 0,
         quotNo:        r[20] ? r[20].toString() : '',
         quotTanggal:   _fmtTgl(r[21]),
-        termConditions: r[22] ? r[22].toString() : ''
+        termConditions: r[22] ? r[22].toString() : '',
+        quotFileId:    r[23] ? r[23].toString() : '',
+        quotFileUrl:   r[24] ? r[24].toString() : '',
+        quotFileName:  r[25] ? r[25].toString() : ''
       });
     }
     return list;
@@ -295,7 +343,10 @@ function getPODetail(noPO) {
           diskonNominal: parseFloat(r[19]) || 0,
           quotNo:        r[20] ? r[20].toString() : '',
           quotTanggal:   _fmtTgl(r[21]),
-          termConditions: r[22] ? r[22].toString() : ''
+          termConditions: r[22] ? r[22].toString() : '',
+          quotFileId:    r[23] ? r[23].toString() : '',
+          quotFileUrl:   r[24] ? r[24].toString() : '',
+          quotFileName:  r[25] ? r[25].toString() : ''
         };
         break;
       }
@@ -394,6 +445,7 @@ function simpanPO(payload) {
     // Hitung nilai
     _ensurePODiskonCols(ss);
     _ensurePOQuotCols(ss);
+    _ensurePOFileCols(ss);
     var subtotal = 0;
     for (var i = 0; i < payload.items.length; i++) {
       var it = payload.items[i];
@@ -433,7 +485,10 @@ function simpanPO(payload) {
       diskonNominal,
       payload.quotNo         ? payload.quotNo.toString()         : '',
       payload.quotTanggal    ? payload.quotTanggal.toString()    : '',
-      payload.termConditions ? payload.termConditions.toString() : ''
+      payload.termConditions ? payload.termConditions.toString() : '',
+      payload.quotFileId     ? payload.quotFileId.toString()     : '',
+      payload.quotFileUrl    ? payload.quotFileUrl.toString()    : '',
+      payload.quotFileName   ? payload.quotFileName.toString()   : ''
     ]);
 
     // Tulis item
@@ -505,6 +560,7 @@ function editPO(payload) {
     // Hitung ulang nilai
     _ensurePODiskonCols(ss);
     _ensurePOQuotCols(ss);
+    _ensurePOFileCols(ss);
     var subtotal = 0;
     for (var k = 0; k < payload.items.length; k++) {
       var it = payload.items[k];
@@ -523,7 +579,7 @@ function editPO(payload) {
     var tanggalStr = payload.tanggal ? payload.tanggal.toString() : _fmtTgl(now);
 
     // Update header row
-    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 23);
+    var updateRange = poSheet.getRange(poRowIdx, 1, 1, 26);
     var existingRow = updateRange.getValues()[0];
     updateRange.setValues([[
       noPO,
@@ -548,7 +604,10 @@ function editPO(payload) {
       diskonNominal,
       payload.quotNo         !== undefined ? payload.quotNo.toString()         : (existingRow[20] || ''),
       payload.quotTanggal    !== undefined ? payload.quotTanggal.toString()    : (existingRow[21] || ''),
-      payload.termConditions !== undefined ? payload.termConditions.toString() : (existingRow[22] || '')
+      payload.termConditions !== undefined ? payload.termConditions.toString() : (existingRow[22] || ''),
+      payload.quotFileId     !== undefined ? payload.quotFileId.toString()     : (existingRow[23] || ''),
+      payload.quotFileUrl    !== undefined ? payload.quotFileUrl.toString()    : (existingRow[24] || ''),
+      payload.quotFileName   !== undefined ? payload.quotFileName.toString()   : (existingRow[25] || '')
     ]]);
 
     // Tulis item baru
