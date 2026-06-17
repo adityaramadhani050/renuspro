@@ -360,7 +360,7 @@ function getPODetail(noPO) {
         status:         prData[pr][9]  ? prData[pr][9].toString()  : '',
         dibuatOleh:     prData[pr][10] ? prData[pr][10].toString() : '',
         namaAkun:       prData[pr][12] ? prData[pr][12].toString() : '',
-        tanggalApprove: prData[pr][14] ? prData[pr][14].toString() : ''
+        tanggalApprove: prData[pr][14] ? _fmtTgl(prData[pr][14]) : ''
       });
     }
 
@@ -1123,7 +1123,7 @@ function getPaymentRequestList(params) {
         dibuatPada:     r[11] ? r[11].toString() : '',
         namaAkun:       r[12] ? r[12].toString() : '',
         diapproveOleh:  r[13] ? r[13].toString() : '',
-        tanggalApprove: r[14] ? r[14].toString() : ''
+        tanggalApprove: r[14] ? _fmtTgl(r[14]) : ''
       });
     }
     list.reverse();
