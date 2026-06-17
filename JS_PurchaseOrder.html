@@ -302,7 +302,7 @@ function bukaPODetail(noPO) {
       if (!res || !res.success) { showNotification(res.message || 'Gagal memuat detail.', 'error'); return; }
       _currentPODetail = res.po;
       _currentPODetail.items = res.items || [];
-      _renderPODetail(res.po, res.items || [], res.pembayaran || [], res.paymentRequests || []);
+      _renderPODetail(res.po, res.items || [], res.paymentRequests || []);
       document.getElementById('form-terima-po').classList.add('hidden');
       document.getElementById('form-request-bayar-po').classList.add('hidden');
       document.getElementById('panel-po-detail').classList.remove('hidden');
@@ -321,7 +321,7 @@ function tutupPanelPO() {
   document.getElementById('form-request-bayar-po').classList.add('hidden');
 }
 
-function _renderPODetail(po, items, pembayaran, paymentRequests) {
+function _renderPODetail(po, items, paymentRequests) {
   var statusPOClass = {
     'Aktif': 'bg-blue-100 text-blue-700',
     'Diterima Sebagian': 'bg-amber-100 text-amber-700',
@@ -405,24 +405,7 @@ function _renderPODetail(po, items, pembayaran, paymentRequests) {
     if (document.getElementById('po-detail-diskon-nominal')) document.getElementById('po-detail-diskon-nominal').innerText = (po.diskonNominal || 0).toLocaleString('id-ID');
   }
 
-  _renderPembayaranPO(pembayaran);
   _renderPayReqs(paymentRequests);
-}
-
-function _renderPembayaranPO(pembayaran) {
-  var tbody = document.getElementById('po-detail-payments');
-  if (!pembayaran || !pembayaran.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400 italic">Belum ada riwayat pembayaran.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = pembayaran.map(function(p) {
-    return '<tr class="border-b border-slate-100">' +
-      '<td class="px-3 py-2 text-slate-600">' + (p.tanggalBayar || '') + '</td>' +
-      '<td class="px-3 py-2 font-medium text-slate-700">' + _escHtml(p.namaAkun || p.idAkun || '') + '</td>' +
-      '<td class="px-3 py-2 text-right font-bold text-emerald-700">Rp ' + ((p.jumlah || 0).toLocaleString('id-ID')) + '</td>' +
-      '<td class="px-3 py-2 text-slate-400 text-xs">' + _escHtml(p.catatan || '') + '</td>' +
-    '</tr>';
-  }).join('');
 }
 
 function _renderPayReqs(list) {
@@ -577,29 +560,6 @@ function _loadAkunPembayaranOptions(selId) {
       if (sel) sel.innerHTML = '<option value="" disabled>Gagal memuat akun</option>';
     })
     .getAkunPembayaranList();
-}
-
-function hapusPembayaranPOUI(idBayar) {
-  if (!confirm('Hapus riwayat pembayaran ini?')) return;
-  var noPO = _currentPODetail ? _currentPODetail.noPO : null;
-  toggleLoader(true, 'Menghapus pembayaran...');
-  if (typeof google === 'undefined') { toggleLoader(false); return; }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message);
-        if (noPO) bukaPODetail(noPO);
-        loadPurchaseOrder();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) {
-      toggleLoader(false);
-      showNotification(err.message || 'Gagal menghapus pembayaran.', 'error');
-    })
-    .hapusPembayaranPO(idBayar);
 }
 
 // ── Request Pembayaran PO ─────────────────────────────────────────────────────
