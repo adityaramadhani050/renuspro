@@ -1,6 +1,10 @@
 <script>
         // --- RIWAYAT REVISI ---
+    let _riwayatNoPenawaran = '';
+    let _riwayatLatestRev   = 0;
+
     function bukaRiwayatRevisi(noPenawaran, namaProject) {
+      _riwayatNoPenawaran = noPenawaran;
       document.getElementById('riwayat-subtitle').innerText = noPenawaran + ' — ' + namaProject;
       document.getElementById('riwayat-list').innerHTML =
         '<p class="text-xs text-slate-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat...</p>';
@@ -21,6 +25,7 @@
 
     function renderRiwayatList(data) {
       const container = document.getElementById('riwayat-list');
+      _riwayatLatestRev = (data && data.length) ? parseInt(data[0].rev) : 0;
       if (!data || data.length === 0) {
         container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Tidak ada data revisi.</p>';
         return;
@@ -103,6 +108,13 @@
         itemsHtml = '<p class="text-xs text-slate-400">Data item tidak tersedia.</p>';
       }
 
+      const isLatestSelected = parseInt(item.rev) === _riwayatLatestRev;
+      const restoreBtnHtml = isLatestSelected ? '' : `
+            <button onclick='restoreRevisiDariRiwayat(${item.rev})'
+              class="text-xs font-bold px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition flex items-center gap-1.5">
+              <i class="fa-solid fa-clock-rotate-left"></i> Gunakan Revisi Ini
+            </button>`;
+
       document.getElementById('riwayat-detail').innerHTML = `
         <div class="space-y-4">
           <!-- Header info rev -->
@@ -118,6 +130,7 @@
               <span class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md ${mClass}">
                 ${parseFloat(item.marginPersen).toFixed(1)}%
               </span>
+              ${restoreBtnHtml}
             </div>
           </div>
 
@@ -167,6 +180,30 @@
           </div>
         </div>`;
     }
+    function restoreRevisiDariRiwayat(rev) {
+      if (!_riwayatNoPenawaran) return;
+      if (!confirm(`Gunakan Revisi ${rev} sebagai revisi terbaru? Tindakan ini akan membuat revisi baru berdasarkan data Revisi ${rev}.`)) return;
+
+      const namaUser = window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive';
+      toggleLoader(true, 'Memulihkan revisi...');
+      google.script.run
+        .withSuccessHandler(res => {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            document.getElementById('modal-riwayat-revisi').classList.add('hidden');
+            loadPenawaran();
+          } else {
+            showNotification(res.message, 'error');
+          }
+        })
+        .withFailureHandler(err => {
+          toggleLoader(false);
+          showNotification(err.message || err, 'error');
+        })
+        .restoreRevisiPenawaran(_riwayatNoPenawaran, rev, namaUser);
+    }
+
     // Reset search saat data di-reload
     function resetSearch(tipe) {
       const el = document.getElementById('search-' + tipe);

@@ -495,3 +495,47 @@ function editPenawaran(payload) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
+
+function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+    const sheetMain = getSpreadsheet().getSheetByName('Penawaran_Main');
+    if (!sheetMain) return { success: false, message: "Sheet tidak ditemukan." };
+    const data = sheetMain.getDataRange().getValues();
+
+    let maxRev = -1, currentStatus = '', targetRowIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0].toString() !== noPenawaran) continue;
+      const r = parseInt(data[i][1]) || 0;
+      if (r > maxRev) { maxRev = r; currentStatus = data[i][16] ? data[i][16].toString() : ''; }
+      if (r.toString() === rev.toString()) targetRowIdx = i;
+    }
+    if (targetRowIdx === -1) return { success: false, message: "Revisi tidak ditemukan." };
+    if (currentStatus === 'Deal') {
+      return { success: false, message: "Penawaran berstatus Deal tidak dapat direvisi/restore." };
+    }
+    if (parseInt(rev) === maxRev) {
+      return { success: false, message: "Revisi ini sudah menjadi revisi terbaru." };
+    }
+
+    const newRev = maxRev + 1;
+    const old = data[targetRowIdx];
+
+    sheetMain.appendRow([
+      noPenawaran, newRev, old[2], old[3], old[4],
+      old[5], namaUser || (old[6] ? old[6].toString() : 'Sales Executive'),
+      old[7], old[8], old[9], old[10],
+      old[11], old[12], old[13], old[14],
+      old[15], 'On-Progress', '', '',
+      old[19] || ''
+    ]);
+
+    invalidatePenawaranCache();
+    return { success: true, message: `Rev${rev} berhasil dipulihkan sebagai revisi terbaru → Rev${newRev}!`, newRev: newRev };
+  } catch(e) {
+    return { success: false, message: "Gagal: " + e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
