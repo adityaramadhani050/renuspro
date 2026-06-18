@@ -351,8 +351,8 @@ function _dbRenderTargetBar(summary, items) {
     if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
   });
 
-  // Target tahunan = target bulanan × 12 (scope sudah sesuai role: diri sendiri / tim / semua)
-  var targetTahunan = target * 12;
+  // Target tahunan (fixed company-wide target)
+  var targetTahunan = 25000000000;
   var ytdPct    = targetTahunan > 0 ? (ytdRev / targetTahunan * 100) : 0;
   var ytdBarPct = Math.min(ytdPct, 100);
 
@@ -417,7 +417,7 @@ function _dbRenderTrend(items) {
 
   var divisor = isAdmin ? 1e9 : 1e6;
   var unit    = isAdmin ? 'M' : 'Jt';
-  var target  = isAdmin ? 1200000000 : 300000000;
+  var target  = isAdmin ? 2000000000 : 300000000;
 
   _dbTrendChart = new Chart(canvas, {
     type: 'line',
