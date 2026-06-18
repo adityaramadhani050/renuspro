@@ -61,6 +61,7 @@ window.loadInventory = function() {
   _showInvSection('inv-list-section');
   switchInvTab('stok');
   _loadStok();
+  loadPOMenungguPenerimaan();
 };
 
 function _loadStok() {
@@ -375,6 +376,11 @@ function loadPOMenungguPenerimaan() {
     .withSuccessHandler(function(data) {
       var list = data || [];
       document.getElementById('po-gudang-count').innerText = list.length ? list.length + ' PO' : '';
+      var badge = document.getElementById('inv-penerimaan-badge');
+      if (badge) {
+        badge.textContent = list.length;
+        badge.classList.toggle('hidden', list.length === 0);
+      }
       if (!list.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Tidak ada PO yang menunggu penerimaan gudang.</td></tr>';
         return;
