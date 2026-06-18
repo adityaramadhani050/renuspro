@@ -495,16 +495,16 @@ function _renderPaymentRequestList(list) {
     }
     html += '<tr class="hover:bg-slate-50 transition-colors">';
     var invoiceHtml = r.invoiceFileUrl
-      ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="text-rose-500 hover:text-rose-600" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i> Invoice</a>'
+      ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-rose-500 hover:text-rose-600 font-semibold" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i> Invoice</a>'
       : '<span class="text-slate-300">Tanpa invoice</span>';
-    html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div><div class="text-[10px] mt-1">' + invoiceHtml + '</div></td>';
+    html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
     html += '<td class="p-4"><div class="font-mono text-xs font-bold text-slate-700">' + _esc(r.noPO || '') + '</div><div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
     html += '<td class="p-4 text-xs font-mono text-teal-700">' + _esc(r.noWO || '—') + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
     html += '<td class="p-4 text-right font-bold text-slate-800 text-sm">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
     html += '<td class="p-4 text-center text-xs text-slate-500">' + pct + '</td>';
     html += '<td class="p-4 text-xs text-slate-500 max-w-[140px]"><div class="truncate" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
-    html += '<td class="p-4 text-xs text-slate-500">' + _esc(r.dibuatOleh || '') + '</td>';
+    html += '<td class="p-4 text-xs">' + invoiceHtml + '</td>';
     html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span></td>';
     html += '<td class="p-4 text-center">' + (aksiHtml || '<span class="text-xs text-slate-300">—</span>') + '</td>';
     html += '</tr>';
