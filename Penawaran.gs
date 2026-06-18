@@ -3,6 +3,20 @@
  * Modul Penawaran: list, riwayat, simpan, revisi, status, hapus.
  */
 
+/**
+ * Cek apakah suatu tanggal masih berada di bulan & tahun yang sama dengan sekarang.
+ * Dipakai untuk membatasi revisi penawaran Deal: hanya boleh direvisi selama
+ * masih bulan yang sama saat deal dibuat, agar laporan deal bulan sebelumnya
+ * tidak berubah.
+ */
+function _isSameMonthDate(dateVal) {
+  if (!dateVal) return false;
+  const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
 function getPenawaranList() {
   try {
     const ss = getSpreadsheet();
@@ -450,17 +464,21 @@ function editPenawaran(payload) {
 
     let currentStatus = '';
     let maxRevCheck = -1;
+    let currentNoWO = '';
+    let currentTanggalDeal = null;
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() === payload.noPenawaran) {
         const rev = parseInt(data[i][1]) || 0;
         if (rev > maxRevCheck) {
           maxRevCheck = rev;
           currentStatus = data[i][16] ? data[i][16].toString() : '';
+          currentNoWO = data[i][17] ? data[i][17].toString() : '';
+          currentTanggalDeal = data[i][18] || null;
         }
       }
     }
-    if (currentStatus === 'Deal') {
-      return { success: false, message: "Penawaran berstatus Deal tidak dapat direvisi." };
+    if (currentStatus === 'Deal' && !_isSameMonthDate(currentTanggalDeal)) {
+      return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah." };
     }
 
     const newRev = maxRevCheck + 1;
@@ -478,11 +496,17 @@ function editPenawaran(payload) {
     ['hppTotalGabungan','estimasiProfitBersih','marginPersenInternal',
      'diskonPersen','diskonNominal','pajakPersen','pajakNominal'].forEach(k => delete cleanTC[k]);
 
+    // Jika sebelumnya sudah Deal (direvisi dalam bulan yang sama), pertahankan
+    // status Deal, No WO, dan Tanggal Deal — jangan generate No WO baru.
+    const statusBaru      = currentStatus === 'Deal' ? 'Deal' : (payload.status || "On-Progress");
+    const noWOBaru         = currentStatus === 'Deal' ? currentNoWO : '';
+    const tanggalDealBaru  = currentStatus === 'Deal' ? currentTanggalDeal : '';
+
     sheetMain.appendRow([
       payload.noPenawaran, newRev, payload.tanggal, payload.validUntil, payload.namaProject,
       payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,
       totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTC),
-      JSON.stringify(payload.items), payload.status || "On-Progress", '', '',
+      JSON.stringify(payload.items), statusBaru, noWOBaru, tanggalDealBaru,
       payload.channelMarketing || ''
     ]);
 
@@ -504,16 +528,21 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
     if (!sheetMain) return { success: false, message: "Sheet tidak ditemukan." };
     const data = sheetMain.getDataRange().getValues();
 
-    let maxRev = -1, currentStatus = '', targetRowIdx = -1;
+    let maxRev = -1, currentStatus = '', targetRowIdx = -1, currentNoWO = '', currentTanggalDeal = null;
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() !== noPenawaran) continue;
       const r = parseInt(data[i][1]) || 0;
-      if (r > maxRev) { maxRev = r; currentStatus = data[i][16] ? data[i][16].toString() : ''; }
+      if (r > maxRev) {
+        maxRev = r;
+        currentStatus = data[i][16] ? data[i][16].toString() : '';
+        currentNoWO = data[i][17] ? data[i][17].toString() : '';
+        currentTanggalDeal = data[i][18] || null;
+      }
       if (r.toString() === rev.toString()) targetRowIdx = i;
     }
     if (targetRowIdx === -1) return { success: false, message: "Revisi tidak ditemukan." };
-    if (currentStatus === 'Deal') {
-      return { success: false, message: "Penawaran berstatus Deal tidak dapat direvisi/restore." };
+    if (currentStatus === 'Deal' && !_isSameMonthDate(currentTanggalDeal)) {
+      return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi/restore lagi, agar laporan deal bulan lalu tidak berubah." };
     }
     if (parseInt(rev) === maxRev) {
       return { success: false, message: "Revisi ini sudah menjadi revisi terbaru." };
@@ -522,12 +551,18 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
     const newRev = maxRev + 1;
     const old = data[targetRowIdx];
 
+    // Jika sebelumnya sudah Deal (restore dalam bulan yang sama), pertahankan
+    // status Deal, No WO, dan Tanggal Deal — jangan generate No WO baru.
+    const statusBaru      = currentStatus === 'Deal' ? 'Deal' : 'On-Progress';
+    const noWOBaru         = currentStatus === 'Deal' ? currentNoWO : '';
+    const tanggalDealBaru  = currentStatus === 'Deal' ? currentTanggalDeal : '';
+
     sheetMain.appendRow([
       noPenawaran, newRev, old[2], old[3], old[4],
       old[5], namaUser || (old[6] ? old[6].toString() : 'Sales Executive'),
       old[7], old[8], old[9], old[10],
       old[11], old[12], old[13], old[14],
-      old[15], 'On-Progress', '', '',
+      old[15], statusBaru, noWOBaru, tanggalDealBaru,
       old[19] || ''
     ]);
 

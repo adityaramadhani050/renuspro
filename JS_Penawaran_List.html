@@ -1,6 +1,18 @@
 <script>
     // ── Data cache untuk filter penawaran ──────────────────────────
     let _cachedPenawaranData = [];
+
+    // Penawaran Deal hanya boleh direvisi selama tanggal deal masih di bulan
+    // & tahun yang sama dengan sekarang — agar laporan deal bulan lalu tidak berubah.
+    function _isDealEditableBulanIni(item) {
+      if (item.status !== 'Deal') return true;
+      if (!item.tanggalDeal) return false;
+      const p = item.tanggalDeal.split('/'); // dd/MM/yyyy
+      if (p.length !== 3) return false;
+      const d = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
     function _isiDropdownFilterPenawaran(data) {
       const isAdmin = _currentUser && _currentUser.role === 'admin';      
       const salesSet = new Set();
@@ -100,12 +112,13 @@
                   class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export Quotation PDF">
                   <i class="fa-solid fa-file-pdf"></i>
                 </button>
-                  ${i.status === 'Deal'
-                    ? `<span class="text-slate-300 p-1.5 cursor-not-allowed" title="Tidak dapat direvisi — status Deal">
+                  ${i.status === 'Deal' && !_isDealEditableBulanIni(i)
+                    ? `<span class="text-slate-300 p-1.5 cursor-not-allowed" title="Tidak dapat direvisi — Deal sudah melewati bulan ini">
                         <i class="fa-solid fa-lock text-xs"></i>
                       </span>`
                     : `<button onclick='muatPenawaranKeForm(${JSON.stringify(i).replace(/'/g,"&#39;")})'
-                        class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit / Revisi">
+                        class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition"
+                        title="${i.status === 'Deal' ? 'Edit Revisi (Deal bulan ini, WO tidak berubah)' : 'Edit / Revisi'}">
                         <i class="fa-solid fa-pen-to-square"></i>
                       </button>`
                   }

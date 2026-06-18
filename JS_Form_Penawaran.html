@@ -843,8 +843,8 @@
 
       // --- MUAT DATA PENAWARAN KE FORM UNTUK DIEDIT ---
     function muatPenawaranKeForm(item) {
-      if (item.status === 'Deal') {
-        showNotification("Penawaran berstatus Deal tidak dapat direvisi.", "error");
+      if (item.status === 'Deal' && !_isDealEditableBulanIni(item)) {
+        showNotification("Penawaran Deal sudah melewati bulan ini, tidak dapat direvisi lagi agar laporan deal bulan lalu tidak berubah.", "error");
         return;
       }
       navigate('penawaran');
