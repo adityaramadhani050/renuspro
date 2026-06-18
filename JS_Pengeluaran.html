@@ -504,7 +504,7 @@ function _renderPaymentRequestList(list) {
     html += '<td class="p-4 text-right font-bold text-slate-800 text-sm">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
     html += '<td class="p-4 text-center text-xs text-slate-500">' + pct + '</td>';
     html += '<td class="p-4 text-xs text-slate-500 max-w-[140px]"><div class="truncate" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
-    html += '<td class="p-4 text-xs">' + invoiceHtml + '</td>';
+    html += '<td class="p-4 text-xs text-center">' + invoiceHtml + '</td>';
     var catatanTolakHtml = (r.status === 'Ditolak' && r.catatanTolak)
       ? '<div class="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate" title="' + _esc(r.catatanTolak) + '">' + _esc(r.catatanTolak) + '</div>'
       : '';
