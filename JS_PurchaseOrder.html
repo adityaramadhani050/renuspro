@@ -854,6 +854,10 @@ function bukaFormTerimaPO() {
   formDiv.classList.remove('hidden');
   _setTerimaPOMode('langsung');
 
+  document.getElementById('terima-po-langsung-biaya').value = '';
+  document.getElementById('terima-po-langsung-ket-biaya').value = '';
+  _loadAkunPembayaranOptions('terima-po-langsung-akun');
+
   var tbodyL = document.getElementById('form-terima-items-langsung');
   var tbodyG = document.getElementById('form-terima-items-gudang');
   tbodyL.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
@@ -944,6 +948,15 @@ function submitTerimaPOKirimLangsung() {
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
+  var biayaKirim = _parseRp(document.getElementById('terima-po-langsung-biaya').value);
+  var akunSel    = document.getElementById('terima-po-langsung-akun');
+  var idAkunBiaya = akunSel.value || '';
+  var namaAkunBiaya = idAkunBiaya ? (akunSel.options[akunSel.selectedIndex].getAttribute('data-nama') || '') : '';
+  var keteranganBiaya = (document.getElementById('terima-po-langsung-ket-biaya').value || '').trim();
+  if (biayaKirim > 0 && !idAkunBiaya) {
+    return showNotification('Pilih akun pembayaran untuk biaya pengiriman ke klien.', 'error');
+  }
+
   toggleLoader(true, 'Menyimpan penerimaan langsung...');
   google.script.run
     .withSuccessHandler(function(res) {
@@ -960,7 +973,15 @@ function submitTerimaPOKirimLangsung() {
       toggleLoader(false);
       showNotification('Error: ' + err.message, 'error');
     })
-    .terimaPOKirimLangsung({ noPO: noPO, items: items, namaUser: (_currentUser && _currentUser.nama) || '' });
+    .terimaPOKirimLangsung({
+      noPO: noPO,
+      items: items,
+      namaUser: (_currentUser && _currentUser.nama) || '',
+      biayaKirim: biayaKirim,
+      idAkunBiaya: idAkunBiaya,
+      namaAkunBiaya: namaAkunBiaya,
+      keteranganBiaya: keteranganBiaya
+    });
 }
 
 function submitPOKeGudang() {

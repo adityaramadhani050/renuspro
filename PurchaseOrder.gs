@@ -777,13 +777,23 @@ function terimaPOKirimLangsung(payload) {
     SpreadsheetApp.flush();
 
     var poData = poSheet.getDataRange().getValues();
-    var poRowIdx = -1, statusPO = '';
+    var poRowIdx = -1, statusPO = '', noWOPO = '', namaSupplier = '';
     for (var i = 1; i < poData.length; i++) {
-      if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
+      if ((poData[i][0] || '').toString() === noPO) {
+        poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString();
+        noWOPO = (poData[i][5] || '').toString().trim();
+        namaSupplier = (poData[i][3] || '').toString();
+        break;
+      }
     }
     if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
     if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
+    }
+
+    var biayaKirim = Number(payload.biayaKirim) || 0;
+    if (biayaKirim > 0 && !payload.idAkunBiaya) {
+      return { success: false, message: 'Pilih akun pembayaran untuk biaya pengiriman ke klien.' };
     }
 
     var itData = itSheet.getDataRange().getValues();
@@ -836,6 +846,30 @@ function terimaPOKirimLangsung(payload) {
       return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
     });
     if (itemsDiterimaLog2.length) _catatPenerimaanPOLog(ss, noPO, 'Langsung', itemsDiterimaLog2, payload.namaUser);
+
+    // Hook Pengeluaran: catat biaya pengiriman langsung ke klien jika PO terikat Work Order
+    if (biayaKirim > 0 && noWOPO) {
+      try {
+        _buatPengeluaranOtomatis({
+          noWO:        noWOPO,
+          tanggal:     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy'),
+          sumber:      'Biaya Pengiriman',
+          noPO:        noPO,
+          idReferensi: 'BKL-' + noPO + '-' + new Date().getTime(),
+          idAkun:      payload.idAkunBiaya   ? payload.idAkunBiaya.toString()   : '',
+          namaAkun:    payload.namaAkunBiaya ? payload.namaAkunBiaya.toString() : '',
+          deskripsi:   'Biaya pengiriman langsung ke klien PO ' + noPO + ' — ' + namaSupplier,
+          qty:         1,
+          satuan:      '',
+          hargaSatuan: biayaKirim,
+          total:       biayaKirim,
+          catatan:     payload.keteranganBiaya ? payload.keteranganBiaya.toString() : '',
+          dibuatOleh:  (payload.namaUser || '').toString()
+        });
+      } catch (eHookKirim) {
+        Logger.log('Hook pengeluaran biaya pengiriman langsung gagal: ' + eHookKirim.toString());
+      }
+    }
 
     invalidatePOCache();
     return { success: true, message: 'Penerimaan langsung berhasil. Status PO: ' + statusBaru + '.' };
