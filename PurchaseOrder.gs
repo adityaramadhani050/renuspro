@@ -1156,6 +1156,40 @@ function _ensurePOPaymentRequestSheet(ss) {
   return sheet;
 }
 
+function _ensurePOPaymentRequestInvoiceCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = _ensurePOPaymentRequestSheet(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 16) sheet.getRange(1, 16).setValue('Invoice File Id');
+  if (lastCol < 17) sheet.getRange(1, 17).setValue('Invoice File Url');
+  if (lastCol < 18) sheet.getRange(1, 18).setValue('Invoice File Nama');
+  return sheet;
+}
+
+function uploadFileInvoiceSupplierPO(payload) {
+  try {
+    var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    var fileName   = payload.fileName   ? payload.fileName.toString()   : 'invoice-supplier';
+    var mimeType   = payload.mimeType   ? payload.mimeType.toString()   : 'application/octet-stream';
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob  = Utilities.newBlob(bytes, mimeType, fileName);
+    var folder = _getPOQuotationFolder();
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return {
+      success: true,
+      fileId:   file.getId(),
+      fileUrl:  file.getUrl(),
+      fileName: fileName
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
 function _generateIdPayReq(sheet) {
   SpreadsheetApp.flush();
   var now = new Date();
@@ -1182,10 +1216,14 @@ function requestPembayaranPO(payload) {
   try {
     lock.waitLock(15000);
 
-    var noPO   = (payload.noPO || '').toString().trim();
-    var jumlah = parseFloat(payload.jumlah) || 0;
+    var noPO       = (payload.noPO || '').toString().trim();
+    var jumlah     = parseFloat(payload.jumlah) || 0;
+    var invFileUrl = (payload.invoiceFileUrl  || '').toString().trim();
+    var invFileId  = (payload.invoiceFileId   || '').toString().trim();
+    var invFileName = (payload.invoiceFileName || '').toString().trim();
     if (!noPO)      return { success: false, message: 'No PO tidak boleh kosong.' };
     if (jumlah <= 0) return { success: false, message: 'Jumlah request harus lebih dari 0.' };
+    if (!invFileUrl) return { success: false, message: 'Invoice dari supplier wajib dilampirkan.' };
 
     var ss = getSpreadsheet();
     var poSheet = _ensurePOSheet(ss);
@@ -1207,7 +1245,7 @@ function requestPembayaranPO(payload) {
       return { success: false, message: 'Request pembayaran tidak bisa dibuat untuk PO berstatus "' + statusPO + '".' };
     }
 
-    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
     var idReq   = _generateIdPayReq(prSheet);
     var now     = new Date();
     var nowStr  = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
@@ -1220,7 +1258,8 @@ function requestPembayaranPO(payload) {
       payload.catatan    ? payload.catatan.toString()    : '',
       'Menunggu',
       payload.dibuatOleh ? payload.dibuatOleh.toString() : '',
-      nowStr, '', '', ''
+      nowStr, '', '', '',
+      invFileId, invFileUrl, invFileName
     ]);
 
     return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
@@ -1235,7 +1274,7 @@ function getPaymentRequestList(params) {
   try {
     params = params || {};
     var ss      = getSpreadsheet();
-    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
     SpreadsheetApp.flush();
     var data = prSheet.getDataRange().getValues();
     var list = [];
@@ -1259,7 +1298,10 @@ function getPaymentRequestList(params) {
         dibuatPada:     r[11] ? r[11].toString() : '',
         namaAkun:       r[12] ? r[12].toString() : '',
         diapproveOleh:  r[13] ? r[13].toString() : '',
-        tanggalApprove: r[14] ? _fmtTgl(r[14]) : ''
+        tanggalApprove: r[14] ? _fmtTgl(r[14]) : '',
+        invoiceFileId:   r[15] ? r[15].toString() : '',
+        invoiceFileUrl:  r[16] ? r[16].toString() : '',
+        invoiceFileName: r[17] ? r[17].toString() : ''
       });
     }
     list.reverse();

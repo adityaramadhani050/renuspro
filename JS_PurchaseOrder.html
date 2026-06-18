@@ -216,6 +216,59 @@ function handlePOQuotFileChange(input) {
   reader.readAsDataURL(file);
 }
 
+function _resetPOInvoiceFileField() {
+  if (document.getElementById('po-invoice-file'))       document.getElementById('po-invoice-file').value       = '';
+  if (document.getElementById('po-invoice-file-id'))     document.getElementById('po-invoice-file-id').value     = '';
+  if (document.getElementById('po-invoice-file-url'))    document.getElementById('po-invoice-file-url').value    = '';
+  if (document.getElementById('po-invoice-file-name'))   document.getElementById('po-invoice-file-name').value   = '';
+  if (document.getElementById('po-invoice-file-status')) document.getElementById('po-invoice-file-status').innerHTML = '';
+}
+
+function handlePOInvoiceFileChange(input) {
+  var file = input.files && input.files[0];
+  var statusEl = document.getElementById('po-invoice-file-status');
+  if (!file) return;
+
+  var maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    showNotification('Ukuran file maksimal 10MB.', 'error');
+    input.value = '';
+    return;
+  }
+
+  if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Mengunggah ' + _escHtml(file.name) + '...';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64Data = e.target.result.split(',')[1];
+    if (typeof google === 'undefined') return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          document.getElementById('po-invoice-file-id').value   = res.fileId;
+          document.getElementById('po-invoice-file-url').value  = res.fileUrl;
+          document.getElementById('po-invoice-file-name').value = res.fileName;
+          if (statusEl) statusEl.innerHTML = '<i class="fas fa-check text-emerald-500 mr-1"></i>' + _escHtml(res.fileName) + ' berhasil diunggah.';
+        } else {
+          if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
+          showNotification((res && res.message) || 'Gagal mengunggah file.', 'error');
+          input.value = '';
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
+        showNotification(err.message || 'Gagal mengunggah file.', 'error');
+        input.value = '';
+      })
+      .uploadFileInvoiceSupplierPO({
+        base64Data: base64Data,
+        fileName:   file.name,
+        mimeType:   file.type
+      });
+  };
+  reader.readAsDataURL(file);
+}
+
 function tutupFormPO() {
   document.getElementById('form-po-section').classList.add('hidden');
   document.getElementById('po-list-section').classList.remove('hidden');
@@ -718,6 +771,7 @@ function bukaFormRequestBayarPO() {
   el('req-jumlah').value  = '';
   el('req-persen').value  = '';
   el('req-catatan').value = '';
+  _resetPOInvoiceFileField();
 
   el('form-request-bayar-po').classList.remove('hidden');
   el('form-request-bayar-po').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -747,13 +801,20 @@ window.submitRequestBayarPO = function() {
   if (!_currentPODetail) return;
   var jumlah  = _parseRp(document.getElementById('req-jumlah').value);
   var catatan = (document.getElementById('req-catatan').value || '').trim();
+  var invoiceFileUrl  = (document.getElementById('po-invoice-file-url')  ? document.getElementById('po-invoice-file-url').value  : '').trim();
+  var invoiceFileId   = (document.getElementById('po-invoice-file-id')   ? document.getElementById('po-invoice-file-id').value   : '').trim();
+  var invoiceFileName = (document.getElementById('po-invoice-file-name') ? document.getElementById('po-invoice-file-name').value : '').trim();
   if (!jumlah || jumlah <= 0) return showNotification('Masukkan nominal pembayaran.', 'error');
+  if (!invoiceFileUrl) return showNotification('Lampirkan invoice dari supplier terlebih dahulu.', 'error');
 
   var payload = {
-    noPO:       _currentPODetail.noPO,
-    jumlah:     jumlah,
-    catatan:    catatan,
-    dibuatOleh: _currentUser ? _currentUser.nama : ''
+    noPO:            _currentPODetail.noPO,
+    jumlah:          jumlah,
+    catatan:         catatan,
+    dibuatOleh:      _currentUser ? _currentUser.nama : '',
+    invoiceFileUrl:  invoiceFileUrl,
+    invoiceFileId:   invoiceFileId,
+    invoiceFileName: invoiceFileName
   };
 
   toggleLoader(true, 'Mengirim request pembayaran...');

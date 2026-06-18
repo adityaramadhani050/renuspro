@@ -494,7 +494,10 @@ function _renderPaymentRequestList(list) {
           'class="px-2.5 py-1 text-xs bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg font-bold transition">Tolak</button>';
     }
     html += '<tr class="hover:bg-slate-50 transition-colors">';
-    html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
+    var invoiceHtml = r.invoiceFileUrl
+      ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="text-rose-500 hover:text-rose-600" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i> Invoice</a>'
+      : '<span class="text-slate-300">Tanpa invoice</span>';
+    html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div><div class="text-[10px] mt-1">' + invoiceHtml + '</div></td>';
     html += '<td class="p-4"><div class="font-mono text-xs font-bold text-slate-700">' + _esc(r.noPO || '') + '</div><div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
     html += '<td class="p-4 text-xs font-mono text-teal-700">' + _esc(r.noWO || '—') + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
