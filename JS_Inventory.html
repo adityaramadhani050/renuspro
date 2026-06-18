@@ -434,12 +434,12 @@ function bukaProsesTerimaPOGudang(po) {
       tbody.innerHTML = (po.items || []).map(function(it) {
         var harga = it.hargaBeli ? parseInt(it.hargaBeli).toLocaleString('id-ID') : '—';
         return '<tr class="border-b border-slate-100" data-id-item="' + _escHtmlInv(it.idItem) + '">' +
-          '<td class="p-3 text-sm font-medium text-slate-800">' + _escHtmlInv(it.namaItem) + '</td>' +
-          '<td class="p-3 text-center text-sm text-slate-500">Rp ' + harga + '</td>' +
-          '<td class="p-3 text-center text-sm font-bold text-amber-700">' + it.qtySisa + '</td>' +
-          '<td class="p-3 text-center"><input type="number" class="pg-gudang-qty w-20 px-2 py-1 text-sm border border-slate-200 rounded-lg text-center focus:outline-none focus:border-teal-400" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '" data-nama="' + _escHtmlInv(it.namaItem) + '" data-harga="' + (it.hargaBeli || 0) + '"></td>' +
-          '<td class="p-3"><select class="pg-gudang-stok w-full min-w-[200px] px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 bg-white">' + optHtml + '</select></td>' +
-          '<td class="p-3"><input type="text" class="pg-gudang-catatan w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-rose-400" placeholder="cth: 1 unit rusak, retur ke supplier"></td>' +
+          '<td class="p-4 text-sm font-medium text-slate-800">' + _escHtmlInv(it.namaItem) + '</td>' +
+          '<td class="p-4 text-center text-sm text-slate-500">Rp ' + harga + '</td>' +
+          '<td class="p-4 text-center text-sm font-bold text-amber-700">' + it.qtySisa + '</td>' +
+          '<td class="p-4 text-center"><input type="number" class="pg-gudang-qty w-24 px-3 py-2.5 text-sm border border-slate-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-400" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '" data-nama="' + _escHtmlInv(it.namaItem) + '" data-harga="' + (it.hargaBeli || 0) + '"></td>' +
+          '<td class="p-4"><select class="pg-gudang-stok w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-400 bg-white">' + optHtml + '</select></td>' +
+          '<td class="p-4"><input type="text" class="pg-gudang-catatan w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400" placeholder="cth: 1 unit rusak, retur ke supplier"></td>' +
         '</tr>';
       }).join('') || '<tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>';
     })
