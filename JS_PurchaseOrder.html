@@ -514,7 +514,6 @@ function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
 
 function _renderRiwayatPenerimaan(list) {
   var tbody = document.getElementById('po-detail-penerimaan');
-  _renderKomplainBanner(list);
   if (!tbody) return;
   if (!list || !list.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic text-xs">Belum ada penerimaan barang.</td></tr>';
@@ -527,42 +526,18 @@ function _renderRiwayatPenerimaan(list) {
   tbody.innerHTML = list.map(function(r) {
     var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
     var itemList = (r.items || []).map(function(it) {
-      var catatan = (it.catatan || '').toString().trim();
-      var html = _escHtml(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtml(it.satuan) : '') + ')';
-      if (catatan) {
-        html += '<br><span class="text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i> ' + _escHtml(catatan) + '</span>';
-      }
-      return html;
+      return _escHtml(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtml(it.satuan) : '') + ')';
     }).join('<br>');
+    var catatanList = (r.items || []).map(function(it) {
+      return (it.catatan || '').toString().trim();
+    }).filter(function(c) { return c; }).join('<br>');
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _escHtml(r.tanggal || '') + '</td>' +
       '<td class="px-3 py-2 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + mc + '">' + _escHtml(r.mode || '') + '</span></td>' +
       '<td class="px-3 py-2 text-xs text-slate-600">' + (itemList || '—') + '</td>' +
-      '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + _escHtml(r.dibuatOleh || '') + '</td>' +
+      '<td class="px-3 py-2 text-xs text-rose-600">' + (catatanList || '<span class="text-slate-400">—</span>') + '</td>' +
     '</tr>';
   }).join('');
-}
-
-function _renderKomplainBanner(list) {
-  var banner = document.getElementById('po-detail-komplain-banner');
-  var ul      = document.getElementById('po-detail-komplain-list');
-  if (!banner || !ul) return;
-  var entries = [];
-  (list || []).forEach(function(r) {
-    (r.items || []).forEach(function(it) {
-      var catatan = (it.catatan || '').toString().trim();
-      if (catatan) {
-        entries.push('<li>[' + _escHtml(r.tanggal || '') + '] <strong>' + _escHtml(it.namaItem || '') + '</strong> — ' + _escHtml(catatan) + '</li>');
-      }
-    });
-  });
-  if (entries.length) {
-    ul.innerHTML = entries.join('');
-    banner.classList.remove('hidden');
-  } else {
-    ul.innerHTML = '';
-    banner.classList.add('hidden');
-  }
 }
 
 function _renderPayReqs(list) {
