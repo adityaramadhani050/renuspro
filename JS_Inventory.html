@@ -124,7 +124,7 @@ function _pgRenderStok(data) {
     var idStok = d.idStok || d.idProduk;
     var aksiBtn = '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
       'class="text-teal-600 hover:text-teal-800 transition mr-2" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>' +
-      '<button onclick="bukaRincianLot(' + JSON.stringify(idStok) + ', ' + JSON.stringify(d.namaProduk) + ')" ' +
+      '<button onclick=\'bukaRincianLot(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
       'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(idStok) + '</td>' +
@@ -251,7 +251,7 @@ function _pgRenderMutasi(data) {
     var aksiBtn =
       '<button onclick=\'bukaFormEditMutasi(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
         'class="text-slate-500 hover:text-slate-800 transition mr-2" title="Edit Keterangan"><i class="fa-solid fa-pen"></i></button>' +
-      '<button onclick="hapusMutasi(' + JSON.stringify(d.idMutasi) + ')" ' +
+      '<button onclick=\'hapusMutasi(' + JSON.stringify(d.idMutasi).replace(/'/g, "&#39;") + ')\' ' +
         'class="text-red-500 hover:text-red-700 transition" title="Hapus"><i class="fa-solid fa-trash"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
       '<td class="p-3">' +
