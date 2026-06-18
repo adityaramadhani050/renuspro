@@ -46,7 +46,8 @@ const _ROLE_NAV = {
   sales:       ['penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
   procurement: ['workorder','purchaseorder','supplier'],
-  warehouse:   ['workorder','inventory']
+  warehouse:   ['workorder','inventory'],
+  owner:       ['dashboard','workorder']
 };
 const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',
@@ -54,9 +55,10 @@ const _ROLE_BADGE = {
   sales:       'bg-emerald-100 text-emerald-700',
   leadsales:   'bg-orange-100 text-orange-700',
   procurement: 'bg-amber-100 text-amber-700',
-  warehouse:   'bg-cyan-100 text-cyan-700'
+  warehouse:   'bg-cyan-100 text-cyan-700',
+  owner:       'bg-rose-100 text-rose-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', owner: 'OWNER' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {

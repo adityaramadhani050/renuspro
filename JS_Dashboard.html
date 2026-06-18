@@ -83,7 +83,7 @@ function _dbGetPeriodParams() {
     to   = _htmlDateToObj(document.getElementById('db-date-to').value);
     if (!from || !to) return null;
   }
-  var isAdmin = _currentUser && _currentUser.role === 'admin';
+  var isAdmin = _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'owner');
   return {
     dateFrom: _fmtDate(from),
     dateTo:   _fmtDate(to),
@@ -187,7 +187,7 @@ function _dbLoad() {
 
   // Attach user context
   if (typeof _currentUser !== 'undefined' && _currentUser) {
-    params.isAdmin  = _currentUser.role === 'admin';
+    params.isAdmin  = (_currentUser.role === 'admin' || _currentUser.role === 'owner');
     params.namaUser = _currentUser.nama  || '';
     params.role     = _currentUser.role  || 'sales';
     params.userId   = _currentUser.id    || '';
@@ -228,7 +228,7 @@ function _dbShowError(msg) {
 
 // ── Main render ────────────────────────────────────────────────
 function _dbRenderAll(rawData, salesData) {
-  var isAdmin = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin');
+  var isAdmin = (typeof _currentUser !== 'undefined' && _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'owner'));
   var isLeadSales = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'leadsales');
 
   // Dashboard title
@@ -391,7 +391,7 @@ function _dbRenderTrend(items) {
   if (!canvas) return;
   if (_dbTrendChart) { _dbTrendChart.destroy(); _dbTrendChart = null; }
 
-  var isAdmin = _currentUser && _currentUser.role === 'admin';
+  var isAdmin = _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'owner');
   var now = new Date();
   var mon = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   var buckets = [];
