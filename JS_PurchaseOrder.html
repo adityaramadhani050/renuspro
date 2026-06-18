@@ -163,17 +163,62 @@ function bukaFormPO() {
   document.getElementById('po-list-section').classList.add('hidden');
 }
 
-function _resetPOQuotFileField() {
-  if (document.getElementById('po-quot-file'))         document.getElementById('po-quot-file').value         = '';
-  if (document.getElementById('po-quot-file-id'))       document.getElementById('po-quot-file-id').value       = '';
-  if (document.getElementById('po-quot-file-url'))      document.getElementById('po-quot-file-url').value      = '';
-  if (document.getElementById('po-quot-file-name'))     document.getElementById('po-quot-file-name').value     = '';
-  if (document.getElementById('po-quot-file-status'))   document.getElementById('po-quot-file-status').innerHTML = '';
+// ── Dropzone file-upload field (dipakai oleh File Penawaran Supplier & Invoice Supplier) ──
+function _renderFileFieldState(prefix, state, data, accent) {
+  accent = accent || 'orange';
+  var dropEl   = document.getElementById(prefix + '-drop');
+  var statusEl = document.getElementById(prefix + '-status');
+  if (!dropEl || !statusEl) return;
+
+  if (state === 'empty' || state === 'error') {
+    dropEl.classList.remove('hidden');
+    statusEl.classList.add('hidden');
+    statusEl.innerHTML = '';
+    return;
+  }
+
+  dropEl.classList.add('hidden');
+  statusEl.classList.remove('hidden');
+
+  if (state === 'uploading') {
+    statusEl.innerHTML =
+      '<div class="flex items-center gap-3 px-4 py-3.5 border border-slate-200 rounded-xl bg-slate-50">' +
+        '<div class="w-10 h-10 rounded-full bg-' + accent + '-100 text-' + accent + '-500 flex items-center justify-center flex-shrink-0">' +
+          '<i class="fa-solid fa-spinner fa-spin"></i>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-semibold text-slate-600 truncate">' + _escHtml(data.fileName || '') + '</p>' +
+          '<p class="text-xs text-slate-400">Mengunggah...</p>' +
+        '</div>' +
+      '</div>';
+  } else if (state === 'success') {
+    statusEl.innerHTML =
+      '<div class="flex items-center gap-3 px-4 py-3.5 border border-' + accent + '-200 rounded-xl bg-' + accent + '-50/60">' +
+        '<div class="w-10 h-10 rounded-full bg-' + accent + '-100 text-' + accent + '-600 flex items-center justify-center flex-shrink-0">' +
+          '<i class="fa-solid fa-file-circle-check"></i>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-semibold text-slate-700 truncate">' + _escHtml(data.fileName || '') + '</p>' +
+          '<a href="' + _escHtml(data.fileUrl || '#') + '" target="_blank" class="text-xs text-' + accent + '-600 hover:underline font-medium">Lihat file</a>' +
+        '</div>' +
+        '<button type="button" onclick="_removeFileField(\'' + prefix + '\')" ' +
+          'class="w-7 h-7 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-colors flex-shrink-0" title="Hapus file">' +
+          '<i class="fa-solid fa-xmark"></i>' +
+        '</button>' +
+      '</div>';
+  }
 }
 
-function handlePOQuotFileChange(input) {
+function _removeFileField(prefix) {
+  if (document.getElementById(prefix))           document.getElementById(prefix).value           = '';
+  if (document.getElementById(prefix + '-id'))    document.getElementById(prefix + '-id').value    = '';
+  if (document.getElementById(prefix + '-url'))   document.getElementById(prefix + '-url').value   = '';
+  if (document.getElementById(prefix + '-name'))  document.getElementById(prefix + '-name').value  = '';
+  _renderFileFieldState(prefix, 'empty');
+}
+
+function _uploadSupplierFile(prefix, input, serverFnName, accent) {
   var file = input.files && input.files[0];
-  var statusEl = document.getElementById('po-quot-file-status');
   if (!file) return;
 
   var maxSize = 10 * 1024 * 1024; // 10MB
@@ -183,7 +228,7 @@ function handlePOQuotFileChange(input) {
     return;
   }
 
-  if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Mengunggah ' + _escHtml(file.name) + '...';
+  _renderFileFieldState(prefix, 'uploading', { fileName: file.name }, accent);
 
   var reader = new FileReader();
   reader.onload = function(e) {
@@ -192,22 +237,22 @@ function handlePOQuotFileChange(input) {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) {
-          document.getElementById('po-quot-file-id').value   = res.fileId;
-          document.getElementById('po-quot-file-url').value  = res.fileUrl;
-          document.getElementById('po-quot-file-name').value = res.fileName;
-          if (statusEl) statusEl.innerHTML = '<i class="fas fa-check text-emerald-500 mr-1"></i>' + _escHtml(res.fileName) + ' berhasil diunggah.';
+          document.getElementById(prefix + '-id').value   = res.fileId;
+          document.getElementById(prefix + '-url').value  = res.fileUrl;
+          document.getElementById(prefix + '-name').value = res.fileName;
+          _renderFileFieldState(prefix, 'success', res, accent);
         } else {
-          if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
           showNotification((res && res.message) || 'Gagal mengunggah file.', 'error');
           input.value = '';
+          _renderFileFieldState(prefix, 'error');
         }
       })
       .withFailureHandler(function(err) {
-        if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
         showNotification(err.message || 'Gagal mengunggah file.', 'error');
         input.value = '';
+        _renderFileFieldState(prefix, 'error');
       })
-      .uploadFilePOQuotationSupplier({
+      [serverFnName]({
         base64Data: base64Data,
         fileName:   file.name,
         mimeType:   file.type
@@ -216,58 +261,11 @@ function handlePOQuotFileChange(input) {
   reader.readAsDataURL(file);
 }
 
-function _resetPOInvoiceFileField() {
-  if (document.getElementById('po-invoice-file'))       document.getElementById('po-invoice-file').value       = '';
-  if (document.getElementById('po-invoice-file-id'))     document.getElementById('po-invoice-file-id').value     = '';
-  if (document.getElementById('po-invoice-file-url'))    document.getElementById('po-invoice-file-url').value    = '';
-  if (document.getElementById('po-invoice-file-name'))   document.getElementById('po-invoice-file-name').value   = '';
-  if (document.getElementById('po-invoice-file-status')) document.getElementById('po-invoice-file-status').innerHTML = '';
-}
+function _resetPOQuotFileField() { _removeFileField('po-quot-file'); }
+function handlePOQuotFileChange(input) { _uploadSupplierFile('po-quot-file', input, 'uploadFilePOQuotationSupplier', 'orange'); }
 
-function handlePOInvoiceFileChange(input) {
-  var file = input.files && input.files[0];
-  var statusEl = document.getElementById('po-invoice-file-status');
-  if (!file) return;
-
-  var maxSize = 10 * 1024 * 1024; // 10MB
-  if (file.size > maxSize) {
-    showNotification('Ukuran file maksimal 10MB.', 'error');
-    input.value = '';
-    return;
-  }
-
-  if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Mengunggah ' + _escHtml(file.name) + '...';
-
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var base64Data = e.target.result.split(',')[1];
-    if (typeof google === 'undefined') return;
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (res && res.success) {
-          document.getElementById('po-invoice-file-id').value   = res.fileId;
-          document.getElementById('po-invoice-file-url').value  = res.fileUrl;
-          document.getElementById('po-invoice-file-name').value = res.fileName;
-          if (statusEl) statusEl.innerHTML = '<i class="fas fa-check text-emerald-500 mr-1"></i>' + _escHtml(res.fileName) + ' berhasil diunggah.';
-        } else {
-          if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
-          showNotification((res && res.message) || 'Gagal mengunggah file.', 'error');
-          input.value = '';
-        }
-      })
-      .withFailureHandler(function(err) {
-        if (statusEl) statusEl.innerHTML = '<span class="text-rose-500">Gagal mengunggah file.</span>';
-        showNotification(err.message || 'Gagal mengunggah file.', 'error');
-        input.value = '';
-      })
-      .uploadFileInvoiceSupplierPO({
-        base64Data: base64Data,
-        fileName:   file.name,
-        mimeType:   file.type
-      });
-  };
-  reader.readAsDataURL(file);
-}
+function _resetPOInvoiceFileField() { _removeFileField('po-invoice-file'); }
+function handlePOInvoiceFileChange(input) { _uploadSupplierFile('po-invoice-file', input, 'uploadFileInvoiceSupplierPO', 'violet'); }
 
 function tutupFormPO() {
   document.getElementById('form-po-section').classList.add('hidden');
