@@ -154,7 +154,7 @@ function _renderPengeluaran(list) {
     var isOtomatis  = (r.sumber === 'Pembayaran PO' || r.sumber === 'Penggunaan Stok');
     html += '<tr class="hover:bg-slate-50 transition-colors">';
     html += '<td class="p-4"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
-    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + (r.noWO || '—') + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || (!r.noWO ? 'Pembelian Stok' : '—')) + '</div></td>';
+    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
     html += '<td class="p-4 text-center">' + sumberBadge + '</td>';
     html += '<td class="p-4 text-xs text-slate-600">' + (r.noPO || '—') + '</td>';
     html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';

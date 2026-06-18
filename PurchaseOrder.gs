@@ -942,8 +942,6 @@ function simpanPembayaranPO(payload) {
       } catch(eWO) { /* lanjut jika WO tidak ditemukan — biarkan PO bayar tetap jalan */ }
     }
 
-    var peruntukanPO = (poData[poRowIdx - 1][4] || '').toString().trim();
-
     var idBayar  = _generateIdPembayaranPO(bayarSheet);
     var now      = new Date();
     var nowStr   = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
@@ -976,28 +974,28 @@ function simpanPembayaranPO(payload) {
     poSheet.getRange(poRowIdx, 13).setValue(statusBayar);   // col 12 = col 13
     poSheet.getRange(poRowIdx, 14).setValue(totalDibayar);  // col 13 = col 14
 
-    // Hook Pengeluaran: setiap pembayaran PO dicatat sebagai pengeluaran.
-    // PO peruntukan WO → tercatat sebagai pengeluaran project WO tersebut.
-    // PO peruntukan Stok → tetap tercatat (tanpa No WO) agar kas keluar tetap terlihat di list Pengeluaran.
-    try {
-      _buatPengeluaranOtomatis({
-        noWO:        noWOPO,
-        tanggal:     tanggalBayarStr,
-        sumber:      'Pembayaran PO',
-        noPO:        noPO,
-        idReferensi: idBayar,
-        idAkun:      payload.idAkun   ? payload.idAkun.toString()   : '',
-        namaAkun:    payload.namaAkun ? payload.namaAkun.toString() : '',
-        deskripsi:   'Pembayaran PO ' + noPO + ' — ' + namaSupplier + (!noWOPO && peruntukanPO ? ' (' + peruntukanPO + ')' : ''),
-        qty:         1,
-        satuan:      '',
-        hargaSatuan: jumlah,
-        total:       jumlah,
-        catatan:     payload.catatan  ? payload.catatan.toString()  : '',
-        dibuatOleh:  payload.dibuatOleh ? payload.dibuatOleh.toString() : ''
-      });
-    } catch(eHook) {
-      Logger.log('Hook pengeluaran PO gagal: ' + eHook.toString());
+    // Hook Pengeluaran: jika PO terikat Work Order, buat entry pengeluaran otomatis
+    if (noWOPO) {
+      try {
+        _buatPengeluaranOtomatis({
+          noWO:        noWOPO,
+          tanggal:     tanggalBayarStr,
+          sumber:      'Pembayaran PO',
+          noPO:        noPO,
+          idReferensi: idBayar,
+          idAkun:      payload.idAkun   ? payload.idAkun.toString()   : '',
+          namaAkun:    payload.namaAkun ? payload.namaAkun.toString() : '',
+          deskripsi:   'Pembayaran PO ' + noPO + ' — ' + namaSupplier,
+          qty:         1,
+          satuan:      '',
+          hargaSatuan: jumlah,
+          total:       jumlah,
+          catatan:     payload.catatan  ? payload.catatan.toString()  : '',
+          dibuatOleh:  payload.dibuatOleh ? payload.dibuatOleh.toString() : ''
+        });
+      } catch(eHook) {
+        Logger.log('Hook pengeluaran PO gagal: ' + eHook.toString());
+      }
     }
 
     invalidatePOCache();
@@ -1031,6 +1029,19 @@ function hapusPembayaranPO(idBayar) {
     }
     if (bayarRowIdx === -1) return { success: false, message: 'ID Pembayaran tidak ditemukan.' };
 
+    // Cek apakah PO ini terikat Work Order (untuk hook pengeluaran)
+    var noWOHapus = '';
+    try {
+      var poSheetHapus = _ensurePOSheet(ss);
+      var poDataHapus  = poSheetHapus.getDataRange().getValues();
+      for (var ph = 1; ph < poDataHapus.length; ph++) {
+        if ((poDataHapus[ph][0] || '').toString() === noPO) {
+          noWOHapus = (poDataHapus[ph][5] || '').toString().trim();
+          break;
+        }
+      }
+    } catch(ePH) {}
+
     bayarSheet.deleteRow(bayarRowIdx);
 
     // Hitung ulang totalDibayar
@@ -1057,11 +1068,13 @@ function hapusPembayaranPO(idBayar) {
       }
     }
 
-    // Hook Pengeluaran: hapus entry pengeluaran otomatis terkait pembayaran ini
-    try {
-      _hapusPengeluaranByReferensi(idBayar);
-    } catch(eHook2) {
-      Logger.log('Hook hapus pengeluaran PO gagal: ' + eHook2.toString());
+    // Hook Pengeluaran: hapus entry pengeluaran otomatis jika PO terikat Work Order
+    if (noWOHapus) {
+      try {
+        _hapusPengeluaranByReferensi(idBayar);
+      } catch(eHook2) {
+        Logger.log('Hook hapus pengeluaran PO gagal: ' + eHook2.toString());
+      }
     }
 
     invalidatePOCache();
