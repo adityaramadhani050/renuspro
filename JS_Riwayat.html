@@ -182,26 +182,33 @@
     }
     function restoreRevisiDariRiwayat(rev) {
       if (!_riwayatNoPenawaran) return;
-      if (!confirm(`Gunakan Revisi ${rev} sebagai revisi terbaru? Tindakan ini akan membuat revisi baru berdasarkan data Revisi ${rev}.`)) return;
-
-      const namaUser = window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive';
-      toggleLoader(true, 'Memulihkan revisi...');
-      google.script.run
-        .withSuccessHandler(res => {
-          toggleLoader(false);
-          if (res.success) {
-            showNotification(res.message);
-            document.getElementById('modal-riwayat-revisi').classList.add('hidden');
-            loadPenawaran();
-          } else {
-            showNotification(res.message, 'error');
-          }
-        })
-        .withFailureHandler(err => {
-          toggleLoader(false);
-          showNotification(err.message || err, 'error');
-        })
-        .restoreRevisiPenawaran(_riwayatNoPenawaran, rev, namaUser);
+      showConfirm({
+        type: 'info',
+        icon: 'fa-rotate-left',
+        title: 'Gunakan Revisi Ini?',
+        message: `Gunakan Revisi ${rev} sebagai revisi terbaru? Tindakan ini akan membuat revisi baru berdasarkan data Revisi ${rev}.`,
+        confirmText: 'Ya, Gunakan',
+        onConfirm: function() {
+          const namaUser = window._getCurrentUserNama ? window._getCurrentUserNama() : 'Sales Executive';
+          toggleLoader(true, 'Memulihkan revisi...');
+          google.script.run
+            .withSuccessHandler(res => {
+              toggleLoader(false);
+              if (res.success) {
+                showNotification(res.message);
+                document.getElementById('modal-riwayat-revisi').classList.add('hidden');
+                loadPenawaran();
+              } else {
+                showNotification(res.message, 'error');
+              }
+            })
+            .withFailureHandler(err => {
+              toggleLoader(false);
+              showNotification(err.message || err, 'error');
+            })
+            .restoreRevisiPenawaran(_riwayatNoPenawaran, rev, namaUser);
+        }
+      });
     }
 
     // Reset search saat data di-reload

@@ -255,25 +255,31 @@ function submitEditMutasi() {
 }
 
 function hapusMutasi(idMutasi) {
-  if (!confirm('Hapus riwayat mutasi ' + idMutasi + '? Saldo stok akan dihitung ulang dari riwayat yang tersisa.')) return;
-
-  toggleLoader(true, 'Menghapus riwayat mutasi...');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message, 'success');
-        _loadMutasi();
-        _loadStok();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) {
-      toggleLoader(false);
-      showNotification('Error: ' + err.message, 'error');
-    })
-    .hapusMutasiStok(idMutasi);
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Riwayat Mutasi?',
+    message: 'Hapus riwayat mutasi ' + idMutasi + '? Saldo stok akan dihitung ulang dari riwayat yang tersisa.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      toggleLoader(true, 'Menghapus riwayat mutasi...');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message, 'success');
+            _loadMutasi();
+            _loadStok();
+          } else {
+            showNotification(res.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification('Error: ' + err.message, 'error');
+        })
+        .hapusMutasiStok(idMutasi);
+    }
+  });
 }
 
 // ── Filter ─────────────────────────────────────────────────────

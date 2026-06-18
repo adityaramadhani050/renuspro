@@ -779,48 +779,63 @@ window.submitRequestBayarPO = function() {
 // ── Selesaikan / Batalkan PO ──────────────────────────────────────────────────
 window.selesaikanPO = function(noPO) {
   if (!noPO) return;
-  if (!confirm('Tandai PO ' + noPO + ' sebagai Selesai?')) return;
-  toggleLoader(true, 'Menyelesaikan PO...');
-  if (typeof google === 'undefined') { toggleLoader(false); return; }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message);
-        loadPurchaseOrder();
-        bukaPODetail(noPO);
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) {
-      toggleLoader(false);
-      showNotification(err.message || 'Gagal menyelesaikan PO.', 'error');
-    })
-    .ubahStatusPO(noPO, 'Selesai', _currentUser ? _currentUser.nama : '');
+  showConfirm({
+    type: 'info',
+    icon: 'fa-circle-check',
+    title: 'Selesaikan PO?',
+    message: 'Tandai PO ' + noPO + ' sebagai Selesai?',
+    confirmText: 'Ya, Selesaikan',
+    onConfirm: function() {
+      toggleLoader(true, 'Menyelesaikan PO...');
+      if (typeof google === 'undefined') { toggleLoader(false); return; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            loadPurchaseOrder();
+            bukaPODetail(noPO);
+          } else {
+            showNotification(res.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification(err.message || 'Gagal menyelesaikan PO.', 'error');
+        })
+        .ubahStatusPO(noPO, 'Selesai', _currentUser ? _currentUser.nama : '');
+    }
+  });
 };
 
 window.batalkanPO = function(noPO) {
   if (!noPO) return;
-  if (!confirm('Batalkan PO ' + noPO + '? Tindakan ini tidak bisa dibatalkan.')) return;
-  toggleLoader(true, 'Membatalkan PO...');
-  if (typeof google === 'undefined') { toggleLoader(false); return; }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message);
-        loadPurchaseOrder();
-        tutupPanelPO();
-      } else {
-        showNotification(res.message, 'error');
-      }
-    })
-    .withFailureHandler(function(err) {
-      toggleLoader(false);
-      showNotification(err.message || 'Gagal membatalkan PO.', 'error');
-    })
-    .ubahStatusPO(noPO, 'Batal', _currentUser ? _currentUser.nama : '');
+  showConfirm({
+    type: 'danger',
+    title: 'Batalkan PO?',
+    message: 'Batalkan PO ' + noPO + '? Tindakan ini tidak bisa dibatalkan.',
+    confirmText: 'Ya, Batalkan',
+    onConfirm: function() {
+      toggleLoader(true, 'Membatalkan PO...');
+      if (typeof google === 'undefined') { toggleLoader(false); return; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (res.success) {
+            showNotification(res.message);
+            loadPurchaseOrder();
+            tutupPanelPO();
+          } else {
+            showNotification(res.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification(err.message || 'Gagal membatalkan PO.', 'error');
+        })
+        .ubahStatusPO(noPO, 'Batal', _currentUser ? _currentUser.nama : '');
+    }
+  });
 };
 
 // ── Terima Barang dari PO ────────────────────────────────────────────────────

@@ -275,9 +275,16 @@ function saveBankAccount() {
 }
 
 function deleteBankAccount(idx) {
-  if (!confirm('Hapus bank account "' + (_bankData[idx] && _bankData[idx].label) + '"?')) return;
-  _bankData.splice(idx, 1);
-  _persistBankAccounts();
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Bank Account?',
+    message: 'Hapus bank account "' + (_bankData[idx] && _bankData[idx].label) + '"?',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      _bankData.splice(idx, 1);
+      _persistBankAccounts();
+    }
+  });
 }
 
 function _persistBankAccounts() {
@@ -330,18 +337,25 @@ window.onSignFileChange = function(event) {
 };
 
 window.clearSignature = function() {
-  if (!confirm('Hapus gambar tanda tangan?')) return;
-  _signBase64Pending = null;
-  var wrap   = document.getElementById('sign-preview-wrap');
-  var img    = document.getElementById('sign-preview');
-  var clrBtn = document.getElementById('sign-clear-btn');
-  if (wrap)   { wrap.classList.add('hidden'); wrap.style.display = ''; }
-  if (img)    img.src = '';
-  if (clrBtn) { clrBtn.classList.add('hidden'); clrBtn.style.display = ''; }
-  document.getElementById('sign-file-input').value = '';
-  google.script.run
-    .withSuccessHandler(function() { showToast('Tanda tangan dihapus.', 'success'); })
-    .clearSignatureImage();
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Tanda Tangan?',
+    message: 'Hapus gambar tanda tangan?',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      _signBase64Pending = null;
+      var wrap   = document.getElementById('sign-preview-wrap');
+      var img    = document.getElementById('sign-preview');
+      var clrBtn = document.getElementById('sign-clear-btn');
+      if (wrap)   { wrap.classList.add('hidden'); wrap.style.display = ''; }
+      if (img)    img.src = '';
+      if (clrBtn) { clrBtn.classList.add('hidden'); clrBtn.style.display = ''; }
+      document.getElementById('sign-file-input').value = '';
+      google.script.run
+        .withSuccessHandler(function() { showToast('Tanda tangan dihapus.', 'success'); })
+        .clearSignatureImage();
+    }
+  });
 };
 
 // ═══════════════════════════════════════════════════════
@@ -445,20 +459,27 @@ function simpanAkunPembayaranModal() {
 
 function hapusAkunPembayaranUI(id) {
   var akun = _akunPembayaranData.find(function(a){ return a.id === id; });
-  if (!confirm('Hapus akun "' + (akun ? akun.namaAkun : id) + '"?')) return;
-  toggleLoader(true, 'Menghapus akun...');
-  if (typeof google === 'undefined') { toggleLoader(false); return; }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      showToast((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
-      if (res && res.success) _loadAkunPembayaranList();
-    })
-    .withFailureHandler(function(e) {
-      toggleLoader(false);
-      showToast('Error: ' + e.message, 'error');
-    })
-    .hapusAkunPembayaran(id);
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Akun Pembayaran?',
+    message: 'Hapus akun "' + (akun ? akun.namaAkun : id) + '"?',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      toggleLoader(true, 'Menghapus akun...');
+      if (typeof google === 'undefined') { toggleLoader(false); return; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          showToast((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
+          if (res && res.success) _loadAkunPembayaranList();
+        })
+        .withFailureHandler(function(e) {
+          toggleLoader(false);
+          showToast('Error: ' + e.message, 'error');
+        })
+        .hapusAkunPembayaran(id);
+    }
+  });
 }
 
 window.simpanDocSign = function() {
