@@ -505,7 +505,10 @@ function _renderPaymentRequestList(list) {
     html += '<td class="p-4 text-center text-xs text-slate-500">' + pct + '</td>';
     html += '<td class="p-4 text-xs text-slate-500 max-w-[140px]"><div class="truncate" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
     html += '<td class="p-4 text-xs">' + invoiceHtml + '</td>';
-    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span></td>';
+    var catatanTolakHtml = (r.status === 'Ditolak' && r.catatanTolak)
+      ? '<div class="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate" title="' + _esc(r.catatanTolak) + '">' + _esc(r.catatanTolak) + '</div>'
+      : '';
+    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span>' + catatanTolakHtml + '</td>';
     html += '<td class="p-4 text-center">' + (aksiHtml || '<span class="text-xs text-slate-300">—</span>') + '</td>';
     html += '</tr>';
   });
@@ -578,33 +581,36 @@ window.submitApprovePayReq = function() {
 
 window.tolakPayReq = function(idReq) {
   if (!idReq) return;
-  showConfirm({
-    type: 'danger',
-    icon: 'fa-ban',
-    title: 'Tolak Request Pembayaran?',
-    message: 'Tolak request pembayaran ' + idReq + '?',
-    confirmText: 'Ya, Tolak',
-    onConfirm: function() {
-      var namaUser = (_currentUser && _currentUser.nama) || '';
-      toggleLoader(true, 'Menolak request...');
-      if (typeof google === 'undefined') { toggleLoader(false); return; }
-      google.script.run
-        .withSuccessHandler(function(res) {
-          toggleLoader(false);
-          if (res.success) {
-            showNotification(res.message || 'Request ditolak.');
-            loadPaymentRequestList();
-            _loadPendingApprovalKPI();
-          } else {
-            showNotification(res.message, 'error');
-          }
-        })
-        .withFailureHandler(function(err) {
-          toggleLoader(false);
-          showNotification('Error: ' + err.message, 'error');
-        })
-        .tolakRequestPembayaranPO(idReq, namaUser);
-    }
-  });
+  document.getElementById('tolak-payreq-id').value      = idReq;
+  document.getElementById('tolak-payreq-info').textContent = idReq;
+  document.getElementById('tolak-payreq-catatan').value  = '';
+  document.getElementById('modal-tolak-payreq').classList.remove('hidden');
+};
+
+window.submitTolakPayReq = function() {
+  var idReq   = document.getElementById('tolak-payreq-id').value;
+  var catatan = (document.getElementById('tolak-payreq-catatan').value || '').trim();
+  if (!catatan) return showNotification('Catatan penolakan wajib diisi.', 'error');
+
+  var namaUser = (_currentUser && _currentUser.nama) || '';
+  document.getElementById('modal-tolak-payreq').classList.add('hidden');
+  toggleLoader(true, 'Menolak request...');
+  if (typeof google === 'undefined') { toggleLoader(false); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message || 'Request ditolak.');
+        loadPaymentRequestList();
+        _loadPendingApprovalKPI();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .tolakRequestPembayaranPO(idReq, namaUser, catatan);
 };
 </script>

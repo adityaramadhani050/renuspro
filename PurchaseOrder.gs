@@ -1163,6 +1163,7 @@ function _ensurePOPaymentRequestInvoiceCols(ss) {
   if (lastCol < 16) sheet.getRange(1, 16).setValue('Invoice File Id');
   if (lastCol < 17) sheet.getRange(1, 17).setValue('Invoice File Url');
   if (lastCol < 18) sheet.getRange(1, 18).setValue('Invoice File Nama');
+  if (lastCol < 19) sheet.getRange(1, 19).setValue('Catatan Tolak');
   return sheet;
 }
 
@@ -1301,7 +1302,8 @@ function getPaymentRequestList(params) {
         tanggalApprove: r[14] ? _fmtTgl(r[14]) : '',
         invoiceFileId:   r[15] ? r[15].toString() : '',
         invoiceFileUrl:  r[16] ? r[16].toString() : '',
-        invoiceFileName: r[17] ? r[17].toString() : ''
+        invoiceFileName: r[17] ? r[17].toString() : '',
+        catatanTolak:    r[18] ? r[18].toString() : ''
       });
     }
     list.reverse();
@@ -1378,12 +1380,15 @@ function approvePembayaranPO(payload) {
   }
 }
 
-function tolakRequestPembayaranPO(idReq, namaUser) {
+function tolakRequestPembayaranPO(idReq, namaUser, catatanTolak) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
+    if (!catatanTolak || !catatanTolak.toString().trim()) {
+      return { success: false, message: 'Catatan penolakan wajib diisi.' };
+    }
     var ss      = getSpreadsheet();
-    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
     SpreadsheetApp.flush();
     var prData = prSheet.getDataRange().getValues();
     for (var i = 1; i < prData.length; i++) {
@@ -1395,6 +1400,7 @@ function tolakRequestPembayaranPO(idReq, namaUser) {
         prSheet.getRange(i + 1, 10).setValue('Ditolak');
         prSheet.getRange(i + 1, 14).setValue(namaUser || '');
         prSheet.getRange(i + 1, 15).setValue(nowStr);
+        prSheet.getRange(i + 1, 19).setValue(catatanTolak.toString().trim());
         return { success: true, message: 'Request ' + idReq + ' ditolak.' };
       }
     }
