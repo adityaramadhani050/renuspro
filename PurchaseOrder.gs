@@ -832,7 +832,9 @@ function terimaPOKirimLangsung(payload) {
     poSheet.getRange(poRowIdx, 17).setValue((payload.namaUser || '').toString());
     poSheet.getRange(poRowIdx, 18).setValue(nowStr2);
 
-    var itemsDiterimaLog2 = items.filter(function(it) { return (Number(it.qty) || 0) > 0; });
+    var itemsDiterimaLog2 = items.filter(function(it) {
+      return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
+    });
     if (itemsDiterimaLog2.length) _catatPenerimaanPOLog(ss, noPO, 'Langsung', itemsDiterimaLog2, payload.namaUser);
 
     invalidatePOCache();

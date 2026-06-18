@@ -79,7 +79,7 @@ function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser) {
   var tglStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
   var nowStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
   var detail = itemsDiterima.map(function(it) {
-    return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '' };
+    return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '', catatan: (it.catatan || '').toString().trim() };
   });
   sheet.appendRow([
     _generateIdPenerimaanPOLog(sheet), noPO, tglStr, mode,
@@ -654,7 +654,9 @@ function terimaPOItems(payload) {
     poSheet.getRange(poRowIdx + 1, 7).setValue(newStatus);
     poSheet.getRange(poRowIdx + 1, 17).setValue(nowStr); // Diubah Pada
 
-    var itemsDiterimaLog = items.filter(function(it) { return (Number(it.qty) || 0) > 0; });
+    var itemsDiterimaLog = items.filter(function(it) {
+      return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
+    });
     if (itemsDiterimaLog.length) _catatPenerimaanPOLog(ss, noPO, 'Gudang', itemsDiterimaLog, namaUser);
 
     SpreadsheetApp.flush();

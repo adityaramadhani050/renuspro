@@ -426,10 +426,11 @@
                             <th class="px-3 py-2.5 text-center">Sdh Diterima</th>
                             <th class="px-3 py-2.5 text-center">Sisa</th>
                             <th class="px-3 py-2.5 text-center" style="min-width:110px">Terima Skrg</th>
+                            <th class="px-3 py-2.5" style="min-width:160px">Catatan Kendala</th>
                           </tr>
                         </thead>
                         <tbody id="form-terima-items-langsung" class="text-sm bg-white">
-                          <tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Memuat item...</td></tr>
+                          <tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Memuat item...</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -533,6 +534,14 @@
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <!-- ── Notifikasi Kendala Penerimaan ── -->
+              <div id="po-detail-komplain-banner" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-3">
+                <p class="text-xs font-bold text-rose-700 flex items-center gap-2 mb-2">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Ada Kendala Saat Penerimaan Barang — Perlu Tindak Lanjut Komplain/Retur
+                </p>
+                <ul id="po-detail-komplain-list" class="text-xs text-rose-600 space-y-1 list-disc pl-4"></ul>
               </div>
 
               <!-- ── Riwayat Penerimaan Barang ── -->

@@ -433,8 +433,9 @@ function bukaProsesTerimaPOGudang(po) {
           '<td class="p-3 text-center text-sm font-bold text-amber-700">' + it.qtySisa + '</td>' +
           '<td class="p-3 text-center"><input type="number" class="pg-gudang-qty w-20 px-2 py-1 text-sm border border-slate-200 rounded-lg text-center focus:outline-none focus:border-teal-400" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '" data-nama="' + _escHtmlInv(it.namaItem) + '" data-harga="' + (it.hargaBeli || 0) + '"></td>' +
           '<td class="p-3"><select class="pg-gudang-stok w-full min-w-[200px] px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-teal-400 bg-white">' + optHtml + '</select></td>' +
+          '<td class="p-3"><input type="text" class="pg-gudang-catatan w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-rose-400" placeholder="cth: 1 unit rusak, retur ke supplier"></td>' +
         '</tr>';
-      }).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>';
+      }).join('') || '<tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Tidak ada item.</td></tr>';
     })
     .getStokList();
 
@@ -456,9 +457,11 @@ function submitProsesTerimaPOGudang() {
     var idItem   = row.getAttribute('data-id-item');
     var qtyInput = row.querySelector('.pg-gudang-qty');
     var stokSel  = row.querySelector('.pg-gudang-stok');
+    var catatanInput = row.querySelector('.pg-gudang-catatan');
     if (!qtyInput) return;
     var qty      = parseFloat(qtyInput.value) || 0;
-    if (qty <= 0) return;
+    var catatan  = (catatanInput && catatanInput.value.trim()) || '';
+    if (qty <= 0 && !catatan) return;
     var namaItem = qtyInput.getAttribute('data-nama') || idItem;
     var sisa     = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
     var hargaBeli = parseFloat(qtyInput.getAttribute('data-harga')) || 0;
@@ -467,7 +470,7 @@ function submitProsesTerimaPOGudang() {
       showNotification('Qty melebihi sisa untuk "' + namaItem + '" (sisa: ' + sisa + ').', 'error');
       hasError = true; return;
     }
-    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok, idProduk: idStok, hargaBeli: hargaBeli, satuan: '' });
+    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, idStok: idStok, idProduk: idStok, hargaBeli: hargaBeli, satuan: '', catatan: catatan });
   });
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');

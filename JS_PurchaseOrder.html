@@ -514,6 +514,7 @@ function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
 
 function _renderRiwayatPenerimaan(list) {
   var tbody = document.getElementById('po-detail-penerimaan');
+  _renderKomplainBanner(list);
   if (!tbody) return;
   if (!list || !list.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic text-xs">Belum ada penerimaan barang.</td></tr>';
@@ -526,8 +527,13 @@ function _renderRiwayatPenerimaan(list) {
   tbody.innerHTML = list.map(function(r) {
     var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
     var itemList = (r.items || []).map(function(it) {
-      return _escHtml(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtml(it.satuan) : '') + ')';
-    }).join(', ');
+      var catatan = (it.catatan || '').toString().trim();
+      var html = _escHtml(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtml(it.satuan) : '') + ')';
+      if (catatan) {
+        html += '<br><span class="text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i> ' + _escHtml(catatan) + '</span>';
+      }
+      return html;
+    }).join('<br>');
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _escHtml(r.tanggal || '') + '</td>' +
       '<td class="px-3 py-2 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + mc + '">' + _escHtml(r.mode || '') + '</span></td>' +
@@ -535,6 +541,28 @@ function _renderRiwayatPenerimaan(list) {
       '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + _escHtml(r.dibuatOleh || '') + '</td>' +
     '</tr>';
   }).join('');
+}
+
+function _renderKomplainBanner(list) {
+  var banner = document.getElementById('po-detail-komplain-banner');
+  var ul      = document.getElementById('po-detail-komplain-list');
+  if (!banner || !ul) return;
+  var entries = [];
+  (list || []).forEach(function(r) {
+    (r.items || []).forEach(function(it) {
+      var catatan = (it.catatan || '').toString().trim();
+      if (catatan) {
+        entries.push('<li>[' + _escHtml(r.tanggal || '') + '] <strong>' + _escHtml(it.namaItem || '') + '</strong> — ' + _escHtml(catatan) + '</li>');
+      }
+    });
+  });
+  if (entries.length) {
+    ul.innerHTML = entries.join('');
+    banner.classList.remove('hidden');
+  } else {
+    ul.innerHTML = '';
+    banner.classList.add('hidden');
+  }
 }
 
 function _renderPayReqs(list) {
@@ -877,7 +905,7 @@ function bukaFormTerimaPO() {
 
 function _renderFormTerimaLangsung(tbody, items) {
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
     return;
   }
   tbody.innerHTML = items.map(function(it) {
@@ -891,6 +919,9 @@ function _renderFormTerimaLangsung(tbody, items) {
         (it.qtySisa > 0
           ? '<input type="number" class="terima-langsung-qty w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
           : '<span class="text-xs text-slate-300">Penuh</span>') +
+      '</td>' +
+      '<td class="px-3 py-2">' +
+        '<input type="text" class="terima-langsung-catatan w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-rose-400" placeholder="cth: 1 unit rusak, retur ke supplier">' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -920,18 +951,20 @@ function submitTerimaPOKirimLangsung() {
   var hasError = false;
   rows.forEach(function(row) {
     if (hasError) return;
-    var idItem   = row.getAttribute('data-id-item');
-    var qtyInput = row.querySelector('.terima-langsung-qty');
+    var idItem      = row.getAttribute('data-id-item');
+    var qtyInput    = row.querySelector('.terima-langsung-qty');
+    var catatanInput = row.querySelector('.terima-langsung-catatan');
     if (!qtyInput) return;
-    var qty = parseFloat(qtyInput.value) || 0;
-    if (qty <= 0) return;
+    var qty     = parseFloat(qtyInput.value) || 0;
+    var catatan = (catatanInput && catatanInput.value.trim()) || '';
+    if (qty <= 0 && !catatan) return;
     var namaItem = (row.querySelector('td:first-child') || {}).innerText || idItem;
     var sisa = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
     if (qty > sisa) {
       showNotification('Qty melebihi sisa untuk item "' + namaItem + '".', 'error');
       hasError = true; return;
     }
-    items.push({ idItem: idItem, namaItem: namaItem, qty: qty });
+    items.push({ idItem: idItem, namaItem: namaItem, qty: qty, catatan: catatan });
   });
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
