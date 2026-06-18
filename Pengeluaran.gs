@@ -404,15 +404,18 @@ function getRealisasiHPP(noWO) {
     for (var k = 1; k < klienData.length; k++) {
       if (klienData[k][0]) klienMap[klienData[k][0].toString()] = (klienData[k][1] || '').toString();
     }
+    var maxRevPen = -1;
     for (var p = 1; p < penData.length; p++) {
       var pNoWO = (penData[p][17] != null && penData[p][17] !== '') ? penData[p][17].toString().trim() : '';
       if (pNoWO !== noWO) continue;
+      var pRev = parseInt(penData[p][1]) || 0;
+      if (pRev <= maxRevPen) continue; // ambil revisi tertinggi (terbaru) per No WO
+      maxRevPen = pRev;
       nilaiKontrak = Math.max(0, (parseFloat(penData[p][7]) || 0) - (parseFloat(penData[p][8]) || 0));
       estimasiHPP  = parseFloat(penData[p][11]) || 0;
       namaProject  = (penData[p][4] || '').toString();
       var klienId  = penData[p][5] ? penData[p][5].toString() : '';
       namaKlien    = klienMap[klienId] || klienId;
-      break;
     }
 
     // Baca pengeluaran WO
