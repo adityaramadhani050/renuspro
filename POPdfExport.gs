@@ -65,7 +65,7 @@ function exportPODariTemplate(noPO) {
     var safe = function(s) { return (s || '').toString().replace(/\//g, '-'); };
 
     var fileNameParts = [safe(po.noPO)];
-    if (po.namaProject) fileNameParts.push(safe(po.namaProject));
+    if (po.peruntukan) fileNameParts.push(safe(po.peruntukan));
     if (po.namaSupplier) fileNameParts.push(safe(po.namaSupplier));
 
     return {
