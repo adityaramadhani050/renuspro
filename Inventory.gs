@@ -358,6 +358,79 @@ function getMutasiStokList(params) {
   } catch(e) { return []; }
 }
 
+/**
+ * Edit keterangan riwayat mutasi. Hanya field Keterangan yang bisa diubah
+ * agar tidak merusak konsistensi saldo/qty yang sudah terhitung.
+ */
+function editMutasiStok(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureMutasiStokSheet(ss);
+    var idMutasi = (payload.idMutasi || '').toString().trim();
+    if (!idMutasi) return { success: false, message: 'ID Mutasi wajib diisi.' };
+    var keterangan = (payload.keterangan || '').toString();
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === idMutasi) {
+        sheet.getRange(i + 1, 11).setValue(keterangan);
+        invalidateMutasiStokCache();
+        return { success: true, message: 'Keterangan mutasi ' + idMutasi + ' berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'ID Mutasi tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Hapus satu baris riwayat mutasi, lalu rekalkulasi ulang saldo stok
+ * dari seluruh riwayat yang tersisa agar Qty Tersedia tetap konsisten.
+ */
+function hapusMutasiStok(idMutasi) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureMutasiStokSheet(ss);
+    idMutasi = (idMutasi || '').toString().trim();
+    if (!idMutasi) return { success: false, message: 'ID Mutasi wajib diisi.' };
+    var data = sheet.getDataRange().getValues();
+    var idProduk = '';
+    var rowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === idMutasi) {
+        idProduk = (data[i][2] || '').toString().trim();
+        rowIdx = i;
+        break;
+      }
+    }
+    if (rowIdx === -1) return { success: false, message: 'ID Mutasi tidak ditemukan.' };
+    sheet.deleteRow(rowIdx + 1);
+
+    var hasil = rekalkulasiSaldoDariMutasi();
+    if (!hasil.success) return hasil;
+
+    if (idProduk) {
+      var stokList = getStokList();
+      var found = null;
+      for (var k = 0; k < stokList.length; k++) {
+        if (stokList[k].idStok === idProduk) { found = stokList[k]; break; }
+      }
+      _syncQtyTersediaProduk(ss, idProduk, found ? found.qtyTersedia : 0);
+    }
+    return { success: true, message: 'Riwayat mutasi ' + idMutasi + ' berhasil dihapus & saldo stok disesuaikan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ── Rekalkulasi Saldo dari Mutasi ────────────────────────────────────────────
 
 function rekalkulasiSaldoDariMutasi() {

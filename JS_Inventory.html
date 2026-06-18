@@ -81,7 +81,7 @@ function _loadStok() {
 function _loadMutasi() {
   if (typeof google === 'undefined') return;
   document.getElementById('table-mutasi').innerHTML =
-    '<tr><td colspan="10" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+    '<tr><td colspan="9" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   google.script.run.withSuccessHandler(function(data) {
     _cachedMutasiData = data || [];
     _populateMutasiProdukFilter(data);
@@ -121,9 +121,11 @@ function _pgRenderStok(data) {
   tbody.innerHTML = data.map(function(d) {
     var lowStock = d.qtyTersedia === 0;
     var qtyClass = lowStock ? 'text-red-600 font-extrabold' : (d.qtyTersedia <= 5 ? 'text-amber-600 font-bold' : 'font-bold text-slate-800');
-    var aksiBtn = '<span class="text-xs text-slate-300">—</span>';
+    var idStok = d.idStok || d.idProduk;
+    var aksiBtn = '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
+      'class="text-teal-600 hover:text-teal-800 transition" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
-      '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(d.idStok || d.idProduk) + '</td>' +
+      '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(idStok) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800">' + _escHtml(d.namaProduk) + '</td>' +
       '<td class="p-4 text-right ' + qtyClass + '">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
@@ -136,10 +138,50 @@ function _pgRenderStok(data) {
   }).join('');
 }
 
+// ── Edit Item Stok ───────────────────────────────────────────────
+
+function bukaFormEditStok(d) {
+  document.getElementById('edit-stok-idstok').value = d.idStok || d.idProduk || '';
+  document.getElementById('edit-stok-id').innerText  = d.idStok || d.idProduk || '';
+  document.getElementById('edit-stok-nama').value    = d.namaProduk || '';
+  document.getElementById('edit-stok-satuan').value  = d.satuan || '';
+  document.getElementById('form-edit-stok').classList.remove('hidden');
+}
+
+function tutupFormEditStok() {
+  document.getElementById('form-edit-stok').classList.add('hidden');
+}
+
+function submitEditStok() {
+  var idStok = document.getElementById('edit-stok-idstok').value;
+  var nama   = (document.getElementById('edit-stok-nama').value || '').trim();
+  var satuan = (document.getElementById('edit-stok-satuan').value || '').trim();
+  if (!nama)   return showNotification('Nama item wajib diisi.', 'error');
+  if (!satuan) return showNotification('Satuan wajib diisi.', 'error');
+
+  toggleLoader(true, 'Menyimpan perubahan...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        tutupFormEditStok();
+        _loadStok();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .editItemStok({ idStok: idStok, nama: nama, satuan: satuan });
+}
+
 function _pgRenderMutasi(data) {
   const tbody = document.getElementById('table-mutasi');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Tidak ada riwayat mutasi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400 italic">Tidak ada riwayat mutasi.</td></tr>';
     return;
   }
   const jenisBadge = {
@@ -151,6 +193,11 @@ function _pgRenderMutasi(data) {
   };
   tbody.innerHTML = data.map(function(d) {
     var badge = jenisBadge[d.jenisMutasi] || 'bg-slate-100 text-slate-600';
+    var aksiBtn =
+      '<button onclick=\'bukaFormEditMutasi(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
+        'class="text-slate-500 hover:text-slate-800 transition mr-2" title="Edit Keterangan"><i class="fa-solid fa-pen"></i></button>' +
+      '<button onclick="hapusMutasi(' + JSON.stringify(d.idMutasi) + ')" ' +
+        'class="text-red-500 hover:text-red-700 transition" title="Hapus"><i class="fa-solid fa-trash"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
       '<td class="p-3">' +
         '<div class="font-mono font-bold text-slate-700">' + _escHtml(d.idMutasi) + '</div>' +
@@ -166,8 +213,67 @@ function _pgRenderMutasi(data) {
       '<td class="p-3 text-right text-slate-600">Rp ' + (d.hargaSatuan || 0).toLocaleString('id-ID') + '</td>' +
       '<td class="p-3 text-right font-bold text-slate-800">' + (d.saldoSetelah || 0).toLocaleString('id-ID') + '</td>' +
       '<td class="p-3 text-slate-500 max-w-xs truncate">' + _escHtml(d.keterangan || '—') + '</td>' +
+      '<td class="p-3 text-center whitespace-nowrap">' + aksiBtn + '</td>' +
       '</tr>';
   }).join('');
+}
+
+// ── Edit / Hapus Riwayat Mutasi ──────────────────────────────────
+
+function bukaFormEditMutasi(d) {
+  document.getElementById('edit-mutasi-idmutasi').value   = d.idMutasi || '';
+  document.getElementById('edit-mutasi-id').innerText      = d.idMutasi || '';
+  document.getElementById('edit-mutasi-keterangan').value  = d.keterangan || '';
+  document.getElementById('form-edit-mutasi').classList.remove('hidden');
+}
+
+function tutupFormEditMutasi() {
+  document.getElementById('form-edit-mutasi').classList.add('hidden');
+}
+
+function submitEditMutasi() {
+  var idMutasi   = document.getElementById('edit-mutasi-idmutasi').value;
+  var keterangan = (document.getElementById('edit-mutasi-keterangan').value || '').trim();
+
+  toggleLoader(true, 'Menyimpan perubahan...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        tutupFormEditMutasi();
+        _loadMutasi();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .editMutasiStok({ idMutasi: idMutasi, keterangan: keterangan });
+}
+
+function hapusMutasi(idMutasi) {
+  if (!confirm('Hapus riwayat mutasi ' + idMutasi + '? Saldo stok akan dihitung ulang dari riwayat yang tersisa.')) return;
+
+  toggleLoader(true, 'Menghapus riwayat mutasi...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res.success) {
+        showNotification(res.message, 'success');
+        _loadMutasi();
+        _loadStok();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      toggleLoader(false);
+      showNotification('Error: ' + err.message, 'error');
+    })
+    .hapusMutasiStok(idMutasi);
 }
 
 // ── Filter ─────────────────────────────────────────────────────

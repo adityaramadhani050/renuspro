@@ -147,10 +147,11 @@
                       <th class="p-4 text-right">Harga Satuan</th>
                       <th class="p-4 text-right">Stok Akhir</th>
                       <th class="p-4">Keterangan</th>
+                      <th class="p-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody id="table-mutasi" class="text-sm">
-                    <tr><td colspan="10" class="p-8 text-center text-slate-500">
+                    <tr><td colspan="9" class="p-8 text-center text-slate-500">
                       <i class="fas fa-spinner fa-spin mr-2"></i> Memuat riwayat mutasi...
                     </td></tr>
                   </tbody>
@@ -382,6 +383,98 @@
               <button onclick="submitPenggunaanStok()"
                 class="px-6 py-2.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Penggunaan
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Modal Edit Item Stok ── -->
+        <div id="form-edit-stok" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100" style="max-height:92vh">
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <span class="bg-teal-50 text-teal-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-pen"></i>
+              </span>
+              <div class="flex-1">
+                <h3 class="text-base font-extrabold text-slate-800">Edit Item Stok</h3>
+                <p id="edit-stok-id" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="tutupFormEditStok()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <input type="hidden" id="edit-stok-idstok">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Item <span class="text-red-400">*</span></label>
+                <input type="text" id="edit-stok-nama" placeholder="Nama item stok..."
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Satuan <span class="text-red-400">*</span></label>
+                <input type="text" id="edit-stok-satuan" placeholder="unit, pcs, meter, kg..."
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onclick="tutupFormEditStok()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitEditStok()"
+                class="px-6 py-2.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Modal Edit Keterangan Mutasi ── -->
+        <div id="form-edit-mutasi" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100" style="max-height:92vh">
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <span class="bg-slate-100 text-slate-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-pen"></i>
+              </span>
+              <div class="flex-1">
+                <h3 class="text-base font-extrabold text-slate-800">Edit Keterangan Mutasi</h3>
+                <p id="edit-mutasi-id" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="tutupFormEditMutasi()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+                <i class="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <input type="hidden" id="edit-mutasi-idmutasi">
+              <p class="text-xs text-slate-400">Qty, harga, dan jenis mutasi tidak dapat diubah agar saldo stok tetap konsisten. Hanya keterangan yang dapat disunting.</p>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan</label>
+                <textarea id="edit-mutasi-keterangan" rows="3" placeholder="Keterangan..."
+                  class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 bg-white resize-none"></textarea>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onclick="tutupFormEditMutasi()"
+                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+                Batal
+              </button>
+              <button onclick="submitEditMutasi()"
+                class="px-6 py-2.5 text-sm bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan
               </button>
             </div>
 
