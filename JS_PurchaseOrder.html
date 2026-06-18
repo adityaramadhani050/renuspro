@@ -606,7 +606,9 @@ function _renderPayReqs(list) {
     var sc = statusClass[r.status] || 'bg-slate-100 text-slate-600';
     var approveInfo = r.status === 'Disetujui'
       ? _escHtml((r.namaAkun || '') + (r.tanggalApprove ? ' · ' + r.tanggalApprove : ''))
-      : (r.status === 'Ditolak' ? '<span class="text-rose-400 text-[10px] font-bold">Ditolak</span>' : '—');
+      : (r.status === 'Ditolak'
+          ? (r.catatanTolak ? '<span class="text-rose-500">' + _escHtml(r.catatanTolak) + '</span>' : '<span class="text-rose-400 text-[10px] font-bold">Ditolak</span>')
+          : '—');
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 font-mono text-xs text-slate-600">' + _escHtml(r.idReq || '') + '</td>' +
       '<td class="px-3 py-2 text-right font-bold text-slate-700 text-xs">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>' +

@@ -396,7 +396,7 @@ function getPODetail(noPO) {
     }
 
     // Payment Requests
-    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
     SpreadsheetApp.flush();
     var prData  = prSheet.getDataRange().getValues();
     var paymentRequests = [];
@@ -411,7 +411,8 @@ function getPODetail(noPO) {
         status:         prData[pr][9]  ? prData[pr][9].toString()  : '',
         dibuatOleh:     prData[pr][10] ? prData[pr][10].toString() : '',
         namaAkun:       prData[pr][12] ? prData[pr][12].toString() : '',
-        tanggalApprove: prData[pr][14] ? _fmtTgl(prData[pr][14]) : ''
+        tanggalApprove: prData[pr][14] ? _fmtTgl(prData[pr][14]) : '',
+        catatanTolak:   prData[pr][18] ? prData[pr][18].toString() : ''
       });
     }
 
