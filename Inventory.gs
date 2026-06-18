@@ -252,18 +252,19 @@ function _syncQtyTersediaProduk(ss, idStok, qtyBaru) {
  * qtyDelta: + untuk masuk, - untuk keluar
  * Mengembalikan saldo baru.
  */
-function _updateStokEntry(ss, idProduk, namaProduk, satuan, qtyDelta, hargaBeli) {
+function _updateStokEntry(ss, idProduk, namaProduk, satuan, qtyDelta, hargaBeli, nilaiDelta) {
   var sheet = _ensureStokSheet(ss);
   var data  = sheet.getDataRange().getValues();
   var now   = new Date();
   var tz    = Session.getScriptTimeZone();
   var tgl   = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm');
+  nilaiDelta = Number(nilaiDelta) || 0;
 
   for (var i = 1; i < data.length; i++) {
     if ((data[i][0] || '').toString().trim() === idProduk.toString().trim()) {
       var newQty   = (Number(data[i][3]) || 0) + qtyDelta;
       var newHarga = hargaBeli !== null ? hargaBeli : (Number(data[i][4]) || 0);
-      var nilaiStok = newQty * newHarga;
+      var nilaiStok = Math.max(0, (Number(data[i][5]) || 0) + nilaiDelta);
       sheet.getRange(i + 1, 4, 1, 4).setValues([[newQty, newHarga, nilaiStok, tgl]]);
       return newQty;
     }
@@ -271,9 +272,116 @@ function _updateStokEntry(ss, idProduk, namaProduk, satuan, qtyDelta, hargaBeli)
   // Produk belum ada di Stok — buat baris baru
   var newQty    = qtyDelta;
   var newHarga  = hargaBeli !== null ? hargaBeli : 0;
-  var nilaiStok = newQty * newHarga;
+  var nilaiStok = Math.max(0, nilaiDelta);
   sheet.appendRow([idProduk, namaProduk, satuan, newQty, newHarga, nilaiStok, tgl]);
   return newQty;
+}
+
+/**
+ * ── FIFO Lot Helpers ──
+ * Lot biaya per produk diturunkan (derive) dari riwayat Mutasi_Stok yang sudah
+ * append-only & urut kronologis — bukan disimpan terpisah — agar tidak ada
+ * sumber data ganda yang bisa tidak sinkron.
+ *
+ * rows: array [qtyMasuk, qtyKeluar, hargaSatuan] urut kronologis untuk satu produk.
+ */
+function _replayLotsFromRows(rows) {
+  var lots = [];
+  var hargaTerakhir = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var masuk = rows[i][0], keluar = rows[i][1], harga = rows[i][2];
+    if (masuk > 0) {
+      lots.push({ qty: masuk, harga: harga });
+      if (harga > 0) hargaTerakhir = harga;
+    } else if (keluar > 0) {
+      var sisa = keluar;
+      while (sisa > 0 && lots.length > 0) {
+        var lot = lots[0];
+        if (lot.qty <= sisa) { sisa -= lot.qty; lots.shift(); }
+        else { lot.qty -= sisa; sisa = 0; }
+      }
+    }
+  }
+  return { lots: lots, hargaTerakhir: hargaTerakhir };
+}
+
+/**
+ * Ambil lot FIFO (yang masih tersisa) untuk satu produk, langsung dari sheet
+ * Mutasi_Stok (live, bukan cache) — dipakai sebelum mengeluarkan stok.
+ */
+function _deriveLotsUntukProduk(ss, idProduk) {
+  idProduk = idProduk.toString().trim();
+  var mSheet = _ensureMutasiStokSheet(ss);
+  var mData  = mSheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < mData.length; i++) {
+    if ((mData[i][2] || '').toString().trim() !== idProduk) continue;
+    rows.push([Number(mData[i][6]) || 0, Number(mData[i][7]) || 0, Number(mData[i][8]) || 0]);
+  }
+  return _replayLotsFromRows(rows).lots;
+}
+
+/**
+ * Bangun map lot FIFO untuk SEMUA produk sekaligus dalam satu pass —
+ * dipakai oleh rekalkulasiSaldoDariMutasi agar tidak perlu N pass terpisah.
+ * Mengembalikan { idProduk: { lots, hargaTerakhir, nama } }.
+ */
+function _buildLotsMapFromMutasi(mData) {
+  var grouped = {};
+  for (var i = 1; i < mData.length; i++) {
+    var idP = (mData[i][2] || '').toString().trim();
+    if (!idP) continue;
+    if (!grouped[idP]) grouped[idP] = { rows: [], nama: '' };
+    var nama = (mData[i][3] || '').toString();
+    if (nama) grouped[idP].nama = nama;
+    grouped[idP].rows.push([Number(mData[i][6]) || 0, Number(mData[i][7]) || 0, Number(mData[i][8]) || 0]);
+  }
+  var map = {};
+  for (var idP2 in grouped) {
+    var replay = _replayLotsFromRows(grouped[idP2].rows);
+    map[idP2] = { lots: replay.lots, hargaTerakhir: replay.hargaTerakhir, nama: grouped[idP2].nama };
+  }
+  return map;
+}
+
+/**
+ * Hitung biaya FIFO untuk mengeluarkan qtyButuh dari lots (tidak memodifikasi lots asli).
+ * Mengembalikan { totalQty, totalCost, hargaRataRata } atau null jika lot tidak cukup.
+ */
+function _hitungBiayaFIFO(lots, qtyButuh) {
+  var totalTersedia = 0;
+  for (var i = 0; i < lots.length; i++) totalTersedia += lots[i].qty;
+  if (totalTersedia < qtyButuh) return null;
+  var sisa = qtyButuh, totalCost = 0;
+  for (var j = 0; j < lots.length && sisa > 0; j++) {
+    var ambil = Math.min(lots[j].qty, sisa);
+    totalCost += ambil * lots[j].harga;
+    sisa -= ambil;
+  }
+  return {
+    totalQty:      qtyButuh,
+    totalCost:     totalCost,
+    hargaRataRata: qtyButuh > 0 ? (totalCost / qtyButuh) : 0
+  };
+}
+
+/**
+ * Rincian lot FIFO produk tertentu untuk ditampilkan di UI ("Lihat Rincian Lot").
+ */
+function getRincianLotProduk(idProduk) {
+  try {
+    var ss   = getSpreadsheet();
+    var lots = _deriveLotsUntukProduk(ss, (idProduk || '').toString().trim());
+    var qtyTotal = 0, nilaiTotal = 0;
+    var rincian = lots.map(function(lot) {
+      qtyTotal   += lot.qty;
+      nilaiTotal += lot.qty * lot.harga;
+      return { qty: lot.qty, harga: lot.harga, nilai: lot.qty * lot.harga };
+    });
+    return { success: true, lots: rincian, qtyTotal: qtyTotal, nilaiTotal: nilaiTotal };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
 }
 
 /**
@@ -316,7 +424,7 @@ function getStokList() {
         satuan:          data[i][2].toString(),
         qtyTersedia:     qty,
         hargaBeliTerakhir: harga,
-        nilaiStok:       qty * harga,
+        nilaiStok:       Number(data[i][5]) || 0,
         terakhirDiubah:  data[i][6] ? data[i][6].toString() : ''
       });
     }
@@ -440,21 +548,9 @@ function rekalkulasiSaldoDariMutasi() {
     var sSheet = _ensureStokSheet(ss);
     var mData  = mSheet.getDataRange().getValues();
 
-    // Akumulasi per produk
-    var saldo  = {}; // idProduk → { qty, hargaTerakhir, nama, satuan }
-
-    for (var i = 1; i < mData.length; i++) {
-      var idP   = (mData[i][2] || '').toString().trim();
-      var nama  = (mData[i][3] || '').toString();
-      var masuk = Number(mData[i][6]) || 0;
-      var keluar= Number(mData[i][7]) || 0;
-      var harga = Number(mData[i][8]) || 0;
-
-      if (!idP) continue;
-      if (!saldo[idP]) saldo[idP] = { qty: 0, hargaTerakhir: 0, nama: nama, satuan: '' };
-      saldo[idP].qty += masuk - keluar;
-      if (masuk > 0 && harga > 0) saldo[idP].hargaTerakhir = harga;
-    }
+    // Replay seluruh riwayat sebagai lot FIFO per produk (qty & nilai stok jadi akurat
+    // per-batch, bukan qty total dikali harga terakhir).
+    var lotsMap = _buildLotsMapFromMutasi(mData); // idProduk → { lots, hargaTerakhir, nama }
 
     // Baca satuan dari Stok sheet existing atau Master_Produk
     var stokData   = sSheet.getDataRange().getValues();
@@ -474,12 +570,13 @@ function rekalkulasiSaldoDariMutasi() {
     // Rebuild sheet Stok
     var tz  = Session.getScriptTimeZone();
     var now = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
-    var ids = Object.keys(saldo).sort();
+    var ids = Object.keys(lotsMap).sort();
     var newRows = [['ID Produk','Nama Produk','Satuan','Qty Tersedia','Harga Beli Terakhir','Nilai Stok','Terakhir Diubah Pada']];
     ids.forEach(function(id) {
-      var s  = saldo[id];
-      var qt = Math.max(0, s.qty);
-      newRows.push([id, s.nama, satuanMap[id] || '', qt, s.hargaTerakhir, qt * s.hargaTerakhir, now]);
+      var info = lotsMap[id];
+      var qtyTotal = 0, nilaiTotal = 0;
+      info.lots.forEach(function(lot) { qtyTotal += lot.qty; nilaiTotal += lot.qty * lot.harga; });
+      newRows.push([id, info.nama || id, satuanMap[id] || '', qtyTotal, info.hargaTerakhir, nilaiTotal, now]);
     });
 
     sSheet.clearContents();
@@ -695,7 +792,7 @@ function terimaPOItems(payload) {
         idStokItem = autoId;
       }
       if (idStokItem) {
-        var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2);
+        var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2, qtyTerima2 * harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
         var keteranganMutasi = 'Penerimaan dari PO ' + noPO +
           ' (harga incl. PPN' + (biayaPerUnit > 0 ? ' + biaya tambahan' : '') + ')';
@@ -840,7 +937,7 @@ function simpanPenerimaanTanpaPO(payload) {
     var updateHarga = !payload.janganhUpdateHarga;
     var hargaUntukStok = updateHarga ? harga : null;
 
-    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qty, hargaUntukStok);
+    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qty, hargaUntukStok, qty * harga);
 
     var idMutasi = _generateIdMutasi(mSheet);
     mSheet.appendRow([
@@ -918,8 +1015,18 @@ function simpanPenyesuaianStok(payload) {
       return { success: false, message: 'Stok tidak cukup. Saldo saat ini: ' + saldoSaat + ' ' + satuanProduk };
     }
 
-    var qtyDelta  = jenis === '+' ? qty : -qty;
-    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qtyDelta, null);
+    var saldoBaru;
+    if (jenis === '+') {
+      saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qty, null, qty * hargaTerakhir);
+    } else {
+      var lotsAdj  = _deriveLotsUntukProduk(ss, idProduk);
+      var biayaAdj = _hitungBiayaFIFO(lotsAdj, qty);
+      if (!biayaAdj) {
+        return { success: false, message: 'Stok tidak cukup untuk penyesuaian. Saldo saat ini: ' + saldoSaat + ' ' + satuanProduk };
+      }
+      hargaTerakhir = Math.round(biayaAdj.hargaRataRata);
+      saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, -qty, null, -biayaAdj.totalCost);
+    }
 
     var jenisMutasi = jenis === '+' ? 'Penyesuaian +' : 'Penyesuaian -';
     var idMutasi    = _generateIdMutasi(mSheet);
@@ -988,11 +1095,18 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
       } catch(eWOStok) { /* lanjut jika WO tidak ditemukan */ }
     }
 
+    var lots  = _deriveLotsUntukProduk(ss, idProduk);
+    var biaya = _hitungBiayaFIFO(lots, qty);
+    if (!biaya) {
+      return { success: false, message: 'Stok "' + namaProduk + '" tidak cukup. Tersedia: ' + saldoSaat + ' ' + satuanProduk };
+    }
+    var hargaPakai = Math.round(biaya.hargaRataRata);
+
     var tz     = Session.getScriptTimeZone();
     var nowStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
     var tglStr = tanggal || Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
 
-    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, -qty, null);
+    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, -qty, null, -biaya.totalCost);
     var idMutasi  = _generateIdMutasi(mSheet);
     var jenisMutasi = noWO ? 'Penggunaan WO' : 'Penggunaan';
     var referensi   = noWO || '';
@@ -1000,7 +1114,7 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
     mSheet.appendRow([
       idMutasi, tglStr, idProduk, namaProduk,
       jenisMutasi, referensi,
-      0, qty, hargaTerakhir, saldoBaru,
+      0, qty, hargaPakai, saldoBaru,
       keterangan || defaultKet,
       namaUser, nowStr
     ]);
@@ -1023,8 +1137,8 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
           deskripsi:   'Penggunaan stok: ' + namaProduk,
           qty:         qty,
           satuan:      satuanProduk,
-          hargaSatuan: hargaTerakhir,
-          total:       qty * hargaTerakhir,
+          hargaSatuan: hargaPakai,
+          total:       biaya.totalCost,
           catatan:     keterangan || defaultKet,
           dibuatOleh:  namaUser || ''
         });
@@ -1036,8 +1150,8 @@ function gunakanStok(noWO, idProduk, qty, tanggal, keterangan, namaUser) {
     return {
       success:      true,
       idMutasi:     idMutasi,
-      hargaSatuan:  hargaTerakhir,
-      total:        qty * hargaTerakhir,
+      hargaSatuan:  hargaPakai,
+      total:        biaya.totalCost,
       message:      'Stok berhasil digunakan. Saldo: ' + saldoBaru + ' ' + satuanProduk
     };
   } catch(e) {
@@ -1080,7 +1194,7 @@ function batalkanPenggunaanStok(idMutasi, namaUser) {
     var nowStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
     var tglStr = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
 
-    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qty, null);
+    var saldoBaru = _updateStokEntry(ss, idProduk, namaProduk, satuanProduk, qty, harga, qty * harga);
     var idMutasiBaru = _generateIdMutasi(mSheet);
     mSheet.appendRow([
       idMutasiBaru, tglStr, idProduk, namaProduk,

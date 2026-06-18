@@ -123,7 +123,9 @@ function _pgRenderStok(data) {
     var qtyClass = lowStock ? 'text-red-600 font-extrabold' : (d.qtyTersedia <= 5 ? 'text-amber-600 font-bold' : 'font-bold text-slate-800');
     var idStok = d.idStok || d.idProduk;
     var aksiBtn = '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
-      'class="text-teal-600 hover:text-teal-800 transition" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>';
+      'class="text-teal-600 hover:text-teal-800 transition mr-2" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>' +
+      '<button onclick="bukaRincianLot(' + JSON.stringify(idStok) + ', ' + JSON.stringify(d.namaProduk) + ')" ' +
+      'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(idStok) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800">' + _escHtml(d.namaProduk) + '</td>' +
@@ -176,6 +178,59 @@ function submitEditStok() {
       showNotification('Error: ' + err.message, 'error');
     })
     .editItemStok({ idStok: idStok, nama: nama, satuan: satuan });
+}
+
+// ── Rincian Lot FIFO ─────────────────────────────────────────────
+
+function bukaRincianLot(idStok, namaProduk) {
+  document.getElementById('rincian-lot-nama').innerText = idStok + ' — ' + (namaProduk || '');
+  document.getElementById('rincian-lot-list').innerHTML =
+    '<p class="text-xs text-slate-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat...</p>';
+  document.getElementById('rincian-lot-total').innerHTML = '';
+  document.getElementById('modal-rincian-lot').classList.remove('hidden');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        document.getElementById('rincian-lot-list').innerHTML =
+          '<p class="text-xs text-rose-500 text-center py-4">Gagal memuat rincian lot.</p>';
+        return;
+      }
+      _renderRincianLot(res);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('rincian-lot-list').innerHTML =
+        '<p class="text-xs text-rose-500 text-center py-4">' + (err && err.message ? err.message : err) + '</p>';
+    })
+    .getRincianLotProduk(idStok);
+}
+
+function _renderRincianLot(res) {
+  var listEl = document.getElementById('rincian-lot-list');
+  if (!res.lots || !res.lots.length) {
+    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Tidak ada lot tersisa (stok kosong).</p>';
+    document.getElementById('rincian-lot-total').innerHTML = '';
+    return;
+  }
+  listEl.innerHTML = res.lots.map(function(lot, idx) {
+    var isOldest = idx === 0;
+    return '<div class="flex items-center justify-between border rounded-xl px-3 py-2.5 ' +
+      (isOldest ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white') + '">' +
+      '<div>' +
+        '<span class="text-xs font-extrabold text-slate-700">Lot ' + (idx + 1) + '</span>' +
+        (isOldest ? ' <span class="text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-md ml-1">Dipakai Duluan</span>' : '') +
+        '<p class="text-[11px] text-slate-400 mt-0.5">' + lot.qty.toLocaleString('id-ID') + ' unit @ Rp ' + lot.harga.toLocaleString('id-ID') + '</p>' +
+      '</div>' +
+      '<div class="text-sm font-bold text-teal-700">Rp ' + lot.nilai.toLocaleString('id-ID') + '</div>' +
+      '</div>';
+  }).join('');
+  document.getElementById('rincian-lot-total').innerHTML =
+    '<span>Total ' + (res.qtyTotal || 0).toLocaleString('id-ID') + ' unit</span>' +
+    '<span>Rp ' + (res.nilaiTotal || 0).toLocaleString('id-ID') + '</span>';
+}
+
+function tutupRincianLot() {
+  document.getElementById('modal-rincian-lot').classList.add('hidden');
 }
 
 function _pgRenderMutasi(data) {
