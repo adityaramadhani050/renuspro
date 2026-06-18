@@ -406,6 +406,22 @@
         infoRight.forEach((r, i) => { const yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.text(r[0], PW / 2, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0],DARK[1],DARK[2]); doc.text(': ' + r[1], PW / 2 + 26, yy); });
         y += 18;
 
+        const catatanCust = (item.catatanCustomer || '').trim();
+        if (catatanCust) {
+          const AMBER_BG = [255,247,224], AMBER_LINE = [217,119,6];
+          const boxFullW = PW - ML - MR;
+          const custLines = doc.splitTextToSize(catatanCust, boxFullW - 10);
+          const headH = 5.5, bodyH = custLines.length * 4.2 + 3.5;
+          doc.setFillColor(AMBER_BG[0],AMBER_BG[1],AMBER_BG[2]); doc.setDrawColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.setLineWidth(0.3);
+          doc.rect(ML, y, boxFullW, headH + bodyH, 'FD');
+          doc.setFillColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.rect(ML, y, 1.5, headH + bodyH, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(146,64,14);
+          doc.text('CATATAN DARI CUSTOMER', ML + 5, y + 4.2);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(60,50,40);
+          doc.text(custLines, ML + 5, y + headH + 3.2);
+          y += headH + bodyH + 5;
+        }
+
         const body = [];
         kelompokList.forEach((k, ki) => {
           const letter = k.kelompok || String.fromCharCode(65 + ki);
@@ -482,23 +498,6 @@
           doc.setFont('helvetica', 'normal'); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]); doc.setFontSize(7.5);
           tcPairs.forEach(p => { doc.text('• ' + p[0] + ': ' + p[1], ML, ly); ly += 4.5; });
           if (catatan) { const lines = doc.splitTextToSize(catatan, boxX - ML - 6); doc.text(lines, ML, ly); ly += lines.length * 4.5; }
-        }
-
-        const catatanCust = (item.catatanCustomer || '').trim();
-        if (catatanCust) {
-          const AMBER_BG = [255,247,224], AMBER_LINE = [217,119,6];
-          const boxCW = boxX - ML - 4;
-          const custLines = doc.splitTextToSize(catatanCust, boxCW - 8);
-          const headH = 6, bodyH = custLines.length * 4.2 + 4;
-          let cy = ly + 4;
-          if (cy + headH + bodyH > PH - 12) { doc.addPage(); cy = 20; }
-          doc.setFillColor(AMBER_BG[0],AMBER_BG[1],AMBER_BG[2]); doc.setDrawColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.setLineWidth(0.3);
-          doc.rect(ML, cy, boxCW, headH + bodyH, 'FD');
-          doc.setFillColor(AMBER_LINE[0],AMBER_LINE[1],AMBER_LINE[2]); doc.rect(ML, cy, 1.5, headH + bodyH, 'F');
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(146,64,14);
-          doc.text('CATATAN DARI CUSTOMER', ML + 5, cy + 4.2);
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(60,50,40);
-          doc.text(custLines, ML + 5, cy + headH + 2);
         }
 
         doc.setFontSize(7); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
