@@ -144,20 +144,17 @@ function _renderPengeluaran(list) {
 
   if (!list || list.length === 0) {
     tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Belum ada data pengeluaran.</td></tr>';
-    document.getElementById('exp-summary-bar').classList.add('hidden');
     document.getElementById('exp-total-badge').textContent = '0 entri';
     return;
   }
 
-  var grandTotal = 0;
   var html = '';
   list.forEach(function(r) {
-    grandTotal += r.total;
     var sumberBadge = _sumberBadge(r.sumber);
     var isOtomatis  = (r.sumber === 'Pembayaran PO' || r.sumber === 'Penggunaan Stok');
     html += '<tr class="hover:bg-slate-50 transition-colors">';
     html += '<td class="p-4"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
-    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
+    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + (r.noWO || '—') + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || (!r.noWO ? 'Pembelian Stok' : '—')) + '</div></td>';
     html += '<td class="p-4 text-center">' + sumberBadge + '</td>';
     html += '<td class="p-4 text-xs text-slate-600">' + (r.noPO || '—') + '</td>';
     html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';
@@ -180,8 +177,6 @@ function _renderPengeluaran(list) {
 
   tbody.innerHTML = html;
   document.getElementById('exp-total-badge').textContent = list.length + ' entri';
-  document.getElementById('exp-grand-total').textContent = _fmtRpExp(grandTotal);
-  document.getElementById('exp-summary-bar').classList.remove('hidden');
 }
 
 function _renderExpKPI(list) {
