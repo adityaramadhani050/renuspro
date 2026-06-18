@@ -526,7 +526,11 @@ function _escHtmlInv(s) {
 
 function bukaProsesTerimaPOGudang(po) {
   _currentPOGudang = po;
-  document.getElementById('terima-po-gudang-subtitle').innerText = po.noPO + ' — ' + po.namaSupplier;
+  document.getElementById('terima-po-gudang-subtitle').innerText = po.noPO + ' — ' + po.namaSupplier +
+    (po.ppnPersen ? ' (PPN ' + po.ppnPersen + '%)' : '');
+  document.getElementById('terima-po-gudang-biaya').value = '';
+  document.getElementById('terima-po-gudang-ket-biaya').value = '';
+  _loadAkunPembayaranOptions('terima-po-gudang-akun');
   var tbody = document.getElementById('terima-po-gudang-items');
 
   // Load stok list for dropdowns
@@ -587,6 +591,15 @@ function submitProsesTerimaPOGudang() {
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
+  var biayaTambahan = _parseCurrencyInv(document.getElementById('terima-po-gudang-biaya').value);
+  var akunSel = document.getElementById('terima-po-gudang-akun');
+  var idAkunBiaya = akunSel.value || '';
+  var namaAkunBiaya = idAkunBiaya ? (akunSel.options[akunSel.selectedIndex].getAttribute('data-nama') || '') : '';
+  var keteranganBiaya = (document.getElementById('terima-po-gudang-ket-biaya').value || '').trim();
+  if (biayaTambahan > 0 && !idAkunBiaya) {
+    return showNotification('Pilih akun pembayaran untuk biaya tambahan penerimaan.', 'error');
+  }
+
   toggleLoader(true, 'Menyimpan penerimaan...');
   google.script.run
     .withSuccessHandler(function(res) {
@@ -607,7 +620,11 @@ function submitProsesTerimaPOGudang() {
     .terimaPOItems({
       noPO: _currentPOGudang.noPO,
       items: items,
-      namaUser: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) || ''
+      namaUser: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) || '',
+      biayaTambahan: biayaTambahan,
+      idAkunBiaya: idAkunBiaya,
+      namaAkunBiaya: namaAkunBiaya,
+      keteranganBiaya: keteranganBiaya
     });
 }
 

@@ -610,6 +610,17 @@ function terimaPOItems(payload) {
     if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
+    var ppnPersenPO  = parseFloat(poData[poRowIdx][8]) || 0;
+    var noWOPO       = (poData[poRowIdx][5] || '').toString().trim();
+    var namaSupplier = (poData[poRowIdx][3] || '').toString();
+
+    // Biaya tambahan penerimaan (ongkir, handling, manpower, dll) dibagi rata per unit
+    var biayaTambahan = Number(payload.biayaTambahan) || 0;
+    var totalQtyDiterima = 0;
+    for (var iq = 0; iq < items.length; iq++) {
+      totalQtyDiterima += Number(items[iq].qty) || 0;
+    }
+    var biayaPerUnit = (biayaTambahan > 0 && totalQtyDiterima > 0) ? (biayaTambahan / totalQtyDiterima) : 0;
 
     var itData = itSheet.getDataRange().getValues();
     var itRowMap = {}; // idItem → rowIndex di itData
@@ -661,7 +672,8 @@ function terimaPOItems(payload) {
       var it2      = items[ii2];
       var qtyTerima2 = Number(it2.qty) || 0;
       if (qtyTerima2 <= 0) continue;
-      var harga2   = Number(it2.hargaBeli) || 0;
+      var hargaAsli2 = Number(it2.hargaBeli) || 0;
+      var harga2   = Math.round(hargaAsli2 * (1 + ppnPersenPO / 100) + biayaPerUnit);
 
       // Cari info produk untuk nama & satuan
       var namaProduk = it2.namaItem;
@@ -685,11 +697,13 @@ function terimaPOItems(payload) {
       if (idStokItem) {
         var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
+        var keteranganMutasi = 'Penerimaan dari PO ' + noPO +
+          ' (harga incl. PPN' + (biayaPerUnit > 0 ? ' + biaya tambahan' : '') + ')';
         mSheet.appendRow([
           idMutasi, tglStr, idStokItem, namaProduk,
           'Penerimaan PO', noPO,
           qtyTerima2, 0, harga2, saldoBaru,
-          'Penerimaan dari PO ' + noPO,
+          keteranganMutasi,
           namaUser, nowStr
         ]);
         _syncQtyTersediaProduk(ss, idStokItem, saldoBaru);
@@ -731,6 +745,30 @@ function terimaPOItems(payload) {
       return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
     });
     if (itemsDiterimaLog.length) _catatPenerimaanPOLog(ss, noPO, 'Gudang', itemsDiterimaLog, namaUser);
+
+    // Hook Pengeluaran: catat biaya tambahan penerimaan (ongkir/handling/dll) jika PO terikat Work Order
+    if (biayaTambahan > 0 && noWOPO) {
+      try {
+        _buatPengeluaranOtomatis({
+          noWO:        noWOPO,
+          tanggal:     tglStr,
+          sumber:      'Biaya Penerimaan',
+          noPO:        noPO,
+          idReferensi: 'BTP-' + noPO + '-' + now.getTime(),
+          idAkun:      payload.idAkunBiaya   ? payload.idAkunBiaya.toString()   : '',
+          namaAkun:    payload.namaAkunBiaya ? payload.namaAkunBiaya.toString() : '',
+          deskripsi:   'Biaya tambahan penerimaan PO ' + noPO + ' — ' + namaSupplier,
+          qty:         1,
+          satuan:      '',
+          hargaSatuan: biayaTambahan,
+          total:       biayaTambahan,
+          catatan:     payload.keteranganBiaya ? payload.keteranganBiaya.toString() : '',
+          dibuatOleh:  namaUser
+        });
+      } catch(eHookBiaya) {
+        Logger.log('Hook pengeluaran biaya penerimaan gagal: ' + eHookBiaya.toString());
+      }
+    }
 
     SpreadsheetApp.flush();
     invalidateStokCache();
@@ -1125,6 +1163,7 @@ function getPOMenungguPenerimaan() {
         peruntukan:        (poData[i][4] || '').toString(),
         noWO:              noWO3,
         namaProject:       noWO3 ? (woNamaMap[noWO3] || '') : '',
+        ppnPersen:         parseFloat(poData[i][8]) || 0,
         jumlahItemPending: (itemsByPO[noPO2] || []).length,
         items:             itemsByPO[noPO2] || []
       });
