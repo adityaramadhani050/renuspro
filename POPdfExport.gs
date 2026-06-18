@@ -64,10 +64,14 @@ function exportPODariTemplate(noPO) {
     var pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
     var safe = function(s) { return (s || '').toString().replace(/\//g, '-'); };
 
+    var fileNameParts = [safe(po.noPO)];
+    if (po.namaProject) fileNameParts.push(safe(po.namaProject));
+    if (po.namaSupplier) fileNameParts.push(safe(po.namaSupplier));
+
     return {
       success:   true,
       pdfBase64: pdfBase64,
-      fileName:  'PO_' + safe(po.noPO) + '.pdf'
+      fileName:  fileNameParts.join('_') + '.pdf'
     };
 
   } catch(e) {
