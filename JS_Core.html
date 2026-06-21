@@ -62,7 +62,7 @@
     // --- NAVIGASI DASHBOARD ---
     function navigate(pageId) {
       // Tutup semua modal floating sebelum pindah halaman
-      ['panel-po-detail','form-po-section','form-penerimaan-tanpa-po','form-penyesuaian-stok','form-penggunaan-stok','modal-exp-langsung','modal-exp-hapus'].forEach(function(id) {
+      ['panel-po-detail','form-po-section','form-penerimaan-tanpa-po','form-penyesuaian-stok','form-penggunaan-stok','form-terima-po-gudang','modal-exp-langsung','modal-exp-hapus'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });

@@ -1215,3 +1215,75 @@ function batalkanPenggunaanStok(idMutasi, namaUser) {
   }
 }
 
+function getPOMenungguPenerimaan() {
+  try {
+    var ss = getSpreadsheet();
+    var poSheet = ss.getSheetByName('Purchase_Order');
+    var itSheet = ss.getSheetByName('PO_Item');
+    if (!poSheet || !itSheet) return [];
+
+    var poData = poSheet.getDataRange().getValues();
+    var itData = itSheet.getDataRange().getValues();
+
+    // Build item map by noPO
+    var itemsByPO = {};
+    for (var j = 1; j < itData.length; j++) {
+      var row = itData[j];
+      var noPO = (row[1] || '').toString().trim();
+      if (!noPO) continue;
+      if (!itemsByPO[noPO]) itemsByPO[noPO] = [];
+      var qtyPesan    = Number(row[3]) || 0;
+      var qtyDiterima = Number(row[8]) || 0;
+      var qtySisa     = qtyPesan - qtyDiterima;
+      if (qtySisa <= 0) continue; // skip item sudah penuh
+      itemsByPO[noPO].push({
+        idItem:      (row[0] || '').toString(),
+        namaItem:    (row[2] || '').toString(),
+        satuan:      (row[4] || '').toString(),
+        hargaBeli:   Number(row[5]) || 0,
+        qtyPesan:    qtyPesan,
+        qtyDiterima: qtyDiterima,
+        qtySisa:     qtySisa
+      });
+    }
+
+    // Build noWO → namaProject map from Penawaran_Main
+    var woNamaMap = {};
+    try {
+      var penData = _cachedPenawaran();
+      for (var p = 1; p < penData.length; p++) {
+        var wNo = penData[p][17] != null ? penData[p][17].toString().trim() : '';
+        var wNm = penData[p][4]  ? penData[p][4].toString().trim() : '';
+        if (wNo && wNm) woNamaMap[wNo] = wNm;
+      }
+    } catch(ep) { /* ignore */ }
+
+    var tz = Session.getScriptTimeZone();
+    var result = [];
+    for (var i = 1; i < poData.length; i++) {
+      var status = (poData[i][6] || '').toString();
+      if (status !== 'Menunggu Penerimaan Gudang') continue;
+      var noPO2 = (poData[i][0] || '').toString().trim();
+      var noWO3 = (poData[i][5] || '').toString();
+      var tgl   = poData[i][1]
+        ? (poData[i][1] instanceof Date
+            ? Utilities.formatDate(poData[i][1], tz, 'dd/MM/yyyy')
+            : poData[i][1].toString())
+        : '';
+      result.push({
+        noPO:              noPO2,
+        tanggal:           tgl,
+        namaSupplier:      (poData[i][3] || '').toString(),
+        peruntukan:        (poData[i][4] || '').toString(),
+        noWO:              noWO3,
+        namaProject:       noWO3 ? (woNamaMap[noWO3] || '') : '',
+        ppnPersen:         parseFloat(poData[i][8]) || 0,
+        jumlahItemPending: (itemsByPO[noPO2] || []).length,
+        items:             itemsByPO[noPO2] || []
+      });
+    }
+    return result;
+  } catch(e) {
+    return [];
+  }
+}
