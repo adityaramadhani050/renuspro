@@ -35,15 +35,18 @@ function switchInvTab(tab) {
   _invActiveTab = tab;
   document.getElementById('tab-stok').classList.toggle('hidden', tab !== 'stok');
   document.getElementById('tab-penerimaan').classList.toggle('hidden', tab !== 'penerimaan');
+  document.getElementById('tab-riwayat-penerimaan').classList.toggle('hidden', tab !== 'riwayat-penerimaan');
   document.getElementById('tab-mutasi').classList.toggle('hidden', tab !== 'mutasi');
 
   var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
   var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  document.getElementById('tab-btn-stok').className        = tab === 'stok'        ? active : inactive;
-  document.getElementById('tab-btn-penerimaan').className  = tab === 'penerimaan'  ? active : inactive;
-  document.getElementById('tab-btn-mutasi').className      = tab === 'mutasi'      ? active : inactive;
+  document.getElementById('tab-btn-stok').className               = tab === 'stok'               ? active : inactive;
+  document.getElementById('tab-btn-penerimaan').className         = tab === 'penerimaan'          ? active : inactive;
+  document.getElementById('tab-btn-riwayat-penerimaan').className = tab === 'riwayat-penerimaan'  ? active : inactive;
+  document.getElementById('tab-btn-mutasi').className             = tab === 'mutasi'              ? active : inactive;
 
   if (tab === 'penerimaan') loadPOMenungguPenerimaan();
+  if (tab === 'riwayat-penerimaan') loadRiwayatPenerimaanInv();
 }
 
 // ── Visibility helpers ─────────────────────────────────────────
@@ -583,6 +586,46 @@ function loadPOMenungguPenerimaan() {
 
 function _escHtmlInv(s) {
   return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadRiwayatPenerimaanInv() {
+  var tbody = document.getElementById('table-riwayat-penerimaan');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  var modeClass = {
+    'Langsung': 'bg-blue-100 text-blue-700',
+    'Gudang':   'bg-amber-100 text-amber-700'
+  };
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var list = (res && res.list) || [];
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400 italic">Belum ada riwayat penerimaan barang.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(function(r) {
+        var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
+        var itemList = (r.items || []).map(function(it) {
+          return _escHtmlInv(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtmlInv(it.satuan) : '') + ')';
+        }).join('<br>');
+        var catatanList = (r.items || []).map(function(it) {
+          return (it.catatan || '').toString().trim();
+        }).filter(function(c) { return c; }).join('<br>');
+        return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
+          '<td class="p-4"><div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(r.noPO) + '</div><div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(r.tanggal) + '</div></td>' +
+          '<td class="p-4"><div class="text-sm font-medium text-slate-800">' + _escHtmlInv(r.peruntukan || r.namaSupplier || '—') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(r.namaSupplier) + '</div></td>' +
+          '<td class="p-4 text-xs font-mono text-teal-700">' + (r.noWO ? _escHtmlInv(r.noWO) : '<span class="text-slate-400">—</span>') + '</td>' +
+          '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + mc + '">' + _escHtmlInv(r.mode || '') + '</span></td>' +
+          '<td class="p-4 text-xs text-slate-600">' + (itemList || '—') + '</td>' +
+          '<td class="p-4 text-xs text-rose-600">' + (catatanList || '<span class="text-slate-400">—</span>') + '</td>' +
+          '<td class="p-4 text-xs text-slate-500">' + _escHtmlInv(r.dibuatOleh) + '</td>' +
+        '</tr>';
+      }).join('');
+    })
+    .withFailureHandler(function(err) {
+      tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat: ' + (err.message || '') + '</td></tr>';
+    })
+    .getRiwayatPenerimaanList({});
 }
 
 function bukaProsesTerimaPOGudang(po) {

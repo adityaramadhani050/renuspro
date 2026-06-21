@@ -35,6 +35,10 @@
               <i class="fas fa-truck-ramp-box mr-1.5"></i> Penerimaan Barang
               <span id="inv-penerimaan-badge" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold"></span>
             </button>
+            <button id="tab-btn-riwayat-penerimaan" onclick="switchInvTab('riwayat-penerimaan')"
+              class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
+              <i class="fas fa-box-open mr-1.5"></i> Riwayat Penerimaan
+            </button>
             <button id="tab-btn-mutasi" onclick="switchInvTab('mutasi')"
               class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
               <i class="fas fa-list-ul mr-1.5"></i> Riwayat Mutasi
@@ -105,6 +109,32 @@
                   <tbody id="table-po-gudang" class="text-sm">
                     <tr><td colspan="5" class="p-8 text-center text-slate-400 italic">
                       <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Tab Riwayat Penerimaan PO ── -->
+          <div id="tab-riwayat-penerimaan" class="hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <th class="p-4">No PO / Tanggal</th>
+                      <th class="p-4">Supplier / Peruntukan</th>
+                      <th class="p-4">No WO</th>
+                      <th class="p-4 text-center">Mode</th>
+                      <th class="p-4">Item Diterima</th>
+                      <th class="p-4">Catatan Kendala</th>
+                      <th class="p-4">Dibuat Oleh</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-riwayat-penerimaan" class="text-sm">
+                    <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat riwayat penerimaan...
                     </td></tr>
                   </tbody>
                 </table>

@@ -88,6 +88,64 @@ function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser) {
   ]);
 }
 
+/**
+ * Riwayat penerimaan barang dari PO (lintas-PO), untuk ditampilkan
+ * di menu Inventory agar warehouse bisa melihat riwayat tanpa harus
+ * membuka detail Purchase Order.
+ */
+function getRiwayatPenerimaanList(params) {
+  try {
+    params = params || {};
+    var ss = getSpreadsheet();
+
+    // Map noPO -> info supplier/peruntukan/noWO
+    var poInfoMap = {};
+    var poSheet = ss.getSheetByName('Purchase_Order');
+    if (poSheet) {
+      var poData = poSheet.getDataRange().getValues();
+      for (var p = 1; p < poData.length; p++) {
+        var noPOKey = (poData[p][0] || '').toString().trim();
+        if (!noPOKey) continue;
+        poInfoMap[noPOKey] = {
+          namaSupplier: poData[p][3] ? poData[p][3].toString() : '',
+          peruntukan:   poData[p][4] ? poData[p][4].toString() : '',
+          noWO:         poData[p][5] ? poData[p][5].toString() : ''
+        };
+      }
+    }
+
+    var logSheet = _ensurePenerimaanPOLogSheet(ss);
+    var logData  = logSheet.getDataRange().getValues();
+    var riwayat  = [];
+    for (var i = 1; i < logData.length; i++) {
+      var lr = logData[i];
+      var noPO = lr[1] ? lr[1].toString().trim() : '';
+      if (!noPO) continue;
+      if (params.noPO && noPO !== params.noPO) continue;
+      var detailItem = [];
+      try { detailItem = JSON.parse(lr[5] || '[]'); } catch (eParse) { detailItem = []; }
+      var info = poInfoMap[noPO] || {};
+      riwayat.push({
+        idLog:        lr[0] ? lr[0].toString() : '',
+        noPO:         noPO,
+        namaSupplier: info.namaSupplier || '',
+        peruntukan:   info.peruntukan || '',
+        noWO:         info.noWO || '',
+        tanggal:      _fmtTgl(lr[2]),
+        mode:         lr[3] ? lr[3].toString() : '',
+        jumlahItem:   parseFloat(lr[4]) || 0,
+        items:        detailItem,
+        dibuatOleh:   lr[6] ? lr[6].toString() : '',
+        dibuatPada:   lr[7] ? lr[7].toString() : ''
+      });
+    }
+    riwayat.reverse();
+    return { success: true, list: riwayat };
+  } catch (e) {
+    return { success: false, message: e.toString(), list: [] };
+  }
+}
+
 function _generateIdStok(sheet) {
   var data   = sheet.getDataRange().getValues();
   var maxSeq = 0;
