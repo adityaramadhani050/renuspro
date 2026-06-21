@@ -13,6 +13,10 @@
                 class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-arrow-right-from-bracket text-xs"></i> Catat Penggunaan
               </button>
+              <button onclick="bukaFormPenerimaanTanpaPO()"
+                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
+              </button>
               <button onclick="bukaFormPenyesuaian()"
                 class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-sliders text-xs"></i> Penyesuaian
@@ -80,12 +84,6 @@
 
           <!-- ── Tab Penerimaan Barang ── -->
           <div id="tab-penerimaan" class="hidden">
-            <div class="flex justify-between items-center mb-3">
-              <button onclick="bukaFormPenerimaanTanpaPO()"
-                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl font-bold shadow-sm transition flex items-center gap-2 text-sm">
-                <i class="fas fa-plus text-xs"></i> Terima Tanpa PO
-              </button>
-            </div>
             <!-- List PO Menunggu Gudang -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden mb-4">
               <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
