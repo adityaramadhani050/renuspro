@@ -35,10 +35,6 @@
               <i class="fas fa-truck-ramp-box mr-1.5"></i> Penerimaan Barang
               <span id="inv-penerimaan-badge" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold"></span>
             </button>
-            <button id="tab-btn-riwayat-penerimaan" onclick="switchInvTab('riwayat-penerimaan')"
-              class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
-              <i class="fas fa-box-open mr-1.5"></i> Riwayat Penerimaan
-            </button>
             <button id="tab-btn-mutasi" onclick="switchInvTab('mutasi')"
               class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
               <i class="fas fa-list-ul mr-1.5"></i> Riwayat Mutasi
@@ -114,11 +110,13 @@
                 </table>
               </div>
             </div>
-          </div>
 
-          <!-- ── Tab Riwayat Penerimaan PO ── -->
-          <div id="tab-riwayat-penerimaan" class="hidden">
+            <!-- Riwayat Penerimaan PO -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                <i class="fas fa-box-open text-teal-500"></i>
+                <span class="text-sm font-bold text-slate-700">Riwayat Penerimaan Barang</span>
+              </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                   <thead>

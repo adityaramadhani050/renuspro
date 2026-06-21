@@ -35,18 +35,18 @@ function switchInvTab(tab) {
   _invActiveTab = tab;
   document.getElementById('tab-stok').classList.toggle('hidden', tab !== 'stok');
   document.getElementById('tab-penerimaan').classList.toggle('hidden', tab !== 'penerimaan');
-  document.getElementById('tab-riwayat-penerimaan').classList.toggle('hidden', tab !== 'riwayat-penerimaan');
   document.getElementById('tab-mutasi').classList.toggle('hidden', tab !== 'mutasi');
 
   var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
   var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  document.getElementById('tab-btn-stok').className               = tab === 'stok'               ? active : inactive;
-  document.getElementById('tab-btn-penerimaan').className         = tab === 'penerimaan'          ? active : inactive;
-  document.getElementById('tab-btn-riwayat-penerimaan').className = tab === 'riwayat-penerimaan'  ? active : inactive;
-  document.getElementById('tab-btn-mutasi').className             = tab === 'mutasi'              ? active : inactive;
+  document.getElementById('tab-btn-stok').className        = tab === 'stok'        ? active : inactive;
+  document.getElementById('tab-btn-penerimaan').className  = tab === 'penerimaan'  ? active : inactive;
+  document.getElementById('tab-btn-mutasi').className      = tab === 'mutasi'      ? active : inactive;
 
-  if (tab === 'penerimaan') loadPOMenungguPenerimaan();
-  if (tab === 'riwayat-penerimaan') loadRiwayatPenerimaanInv();
+  if (tab === 'penerimaan') {
+    loadPOMenungguPenerimaan();
+    loadRiwayatPenerimaanInv();
+  }
 }
 
 // ── Visibility helpers ─────────────────────────────────────────
