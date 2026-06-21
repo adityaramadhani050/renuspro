@@ -733,35 +733,6 @@ function ubahStatusPO(noPO, statusBaru, namaUser) {
 }
 
 // Kirim PO ke gudang untuk diterima oleh warehouse
-function submitPOKeGudang(noPO, namaUser) {
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(15000);
-    var ss      = getSpreadsheet();
-    var poSheet = _ensurePOSheet(ss);
-    SpreadsheetApp.flush();
-    var poData = poSheet.getDataRange().getValues();
-    var poRowIdx = -1, statusPO = '';
-    for (var i = 1; i < poData.length; i++) {
-      if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
-    }
-    if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') {
-      return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
-    }
-    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
-    poSheet.getRange(poRowIdx, 7).setValue('Menunggu Penerimaan Gudang');
-    poSheet.getRange(poRowIdx, 17).setValue(namaUser || '');
-    poSheet.getRange(poRowIdx, 18).setValue(nowStr);
-    invalidatePOCache();
-    return { success: true, message: 'PO ' + noPO + ' berhasil dikirim ke gudang.' };
-  } catch (e) {
-    return { success: false, message: e.toString() };
-  } finally {
-    lock.releaseLock();
-  }
-}
-
 // Terima barang langsung ke klien (tidak masuk inventory)
 function terimaPOKirimLangsung(payload) {
   var lock = LockService.getScriptLock();
