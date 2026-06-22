@@ -226,6 +226,7 @@ function getSalesReportData(params) {
           totalNilaiPenawaran: 0,
           dealCount: 0,
           dealRevenue: 0,
+          dealHpp: 0,
           pipelineCount: 0,
           pipelineValue: 0,
           failCount: 0,
@@ -311,6 +312,7 @@ function getSalesReportData(params) {
       if (dealInRange) {
         sd.dealCount++;
         sd.dealRevenue += nilaiKontrak;
+        sd.dealHpp += totalHpp;
       }
 
       // Pipeline — all time, On-Progress (untuk KPI pipeline saja, tidak masuk daftar penawaran)
@@ -351,6 +353,7 @@ function getSalesReportData(params) {
         totalNilaiPenawaran: sd.totalNilaiPenawaran,
         dealCount:           sd.dealCount,
         dealRevenue:         sd.dealRevenue,
+        dealHpp:             sd.dealHpp,
         pipelineCount:       sd.pipelineCount,
         pipelineValue:       sd.pipelineValue,
         failCount:           sd.failCount,
@@ -369,6 +372,7 @@ function getSalesReportData(params) {
 
     // --- Step 4: Team summary ---
     var teamRevenue      = 0;
+    var teamHppDeal      = 0;
     var teamTarget       = 0;
     var teamPenawaran    = 0;
     var teamDealCount    = 0;
@@ -379,12 +383,17 @@ function getSalesReportData(params) {
     for (var si = 0; si < salesList.length; si++) {
       var s = salesList[si];
       teamRevenue        += s.dealRevenue;
+      teamHppDeal         += s.dealHpp;
       teamPenawaran      += s.totalPenawaran;
       teamDealCount      += s.dealCount;
       teamFailCount      += s.failCount;
       teamPipelineValue  += s.pipelineValue;
       teamPipelineCount  += s.pipelineCount;
     }
+
+    var teamAvgMarginDeal = teamRevenue > 0
+      ? ((teamRevenue - teamHppDeal) / teamRevenue) * 100
+      : 0;
 
     // teamTarget = sum of targets sesuai scope
     if (isAdmin) {
@@ -479,7 +488,8 @@ function getSalesReportData(params) {
         teamDealCount:     teamDealCount,
         teamWinRate:       teamWinRate,
         teamPipelineValue: teamPipelineValue,
-        teamPipelineCount: teamPipelineCount
+        teamPipelineCount: teamPipelineCount,
+        teamAvgMarginDeal: teamAvgMarginDeal
       },
       trend:        trend,
       salesList:    salesList,

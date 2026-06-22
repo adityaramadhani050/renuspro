@@ -377,6 +377,8 @@ function _dbRenderKonversi(summary) {
   if (wrEl) wrEl.textContent = _pct(winRate);
   var avgEl = document.getElementById('db-stat-avgdeal');
   if (avgEl) avgEl.textContent = avgDeal > 0 ? _rp(avgDeal) : '—';
+  var avgMarginEl = document.getElementById('db-stat-avgmargin');
+  if (avgMarginEl) avgMarginEl.textContent = dealCount > 0 ? _pct(summary.teamAvgMarginDeal) : '—';
   var pipEl = document.getElementById('db-stat-pipeline-count');
   if (pipEl) pipEl.textContent = pipeline;
   var pctEl = document.getElementById('db-stat-winrate-pct');
