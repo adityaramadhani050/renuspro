@@ -423,19 +423,21 @@ function _srRenderDetail(salesList) {
     let tableRows = '';
     if (s.penawaran && s.penawaran.length > 0) {
       s.penawaran.forEach(function(p) {
+        const marginClass = p.marginPersen < 25 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
         tableRows += `
           <tr class="hover:bg-slate-50 transition">
             <td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">${_esc(p.id)}</td>
             <td class="px-3 py-2 text-xs text-slate-700">${_esc(p.namaKlien)}</td>
             <td class="px-3 py-2 text-xs text-slate-700">${_esc(p.namaProject)}</td>
             <td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">${_rp(p.grandTotal)}</td>
+            <td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${marginClass}">${_pct(p.marginPersen)}</span></td>
             <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${p.tanggal || '—'}</td>
             <td class="px-3 py-2">${_statusBadge(p.status)}</td>
             <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${p.tanggalDeal || '—'}</td>
           </tr>`;
       });
     } else {
-      tableRows = `<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>`;
+      tableRows = `<tr><td colspan="8" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>`;
     }
 
     html += `
@@ -498,6 +500,7 @@ function _srRenderDetail(salesList) {
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>
+                  <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal</th>
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>
                   <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal</th>

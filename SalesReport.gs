@@ -249,6 +249,9 @@ function getSalesReportData(params) {
       var diskon        = parseFloat(row[8]) || 0;
       var nilaiKontrak  = Math.max(0, subtotal - diskon);
       var grandTotal    = parseFloat(row[10]) || 0;
+      var totalHpp      = parseFloat(row[11]) || 0;
+      var estimasiProfit = parseFloat(row[12]) || 0;
+      var marginPersen  = parseFloat(row[13]) || 0;
       var status        = String(row[16] || '').trim();
       var noWO          = row[17] || '';
       var tanggalDeal   = parseTgl(row[18]);
@@ -282,6 +285,9 @@ function getSalesReportData(params) {
         namaKlien:    namaKlien,
         nilaiKontrak: nilaiKontrak,
         grandTotal:   grandTotal,
+        totalHpp:     totalHpp,
+        estimasiProfit: estimasiProfit,
+        marginPersen: marginPersen,
         status:       status,
         noWO:         noWO,
         dealInPeriod: dealInRange && !creationInRange  // penawaran dibuat di luar periode tapi deal dalam periode
