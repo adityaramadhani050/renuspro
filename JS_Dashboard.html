@@ -632,18 +632,17 @@ function _dbRenderDetailAccordion(salesList) {
       tableRows = s.penawaran.map(function(p) {
         var marginClass = p.marginPersen < 25 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
         return '<tr class="hover:bg-slate-50 transition' + (p.dealInPeriod ? ' bg-emerald-50/30' : '') + '">'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap font-mono">' + _esc(p.id) + '</td>'
+          + '<td class="px-3 py-2 text-xs whitespace-nowrap"><div class="font-mono text-slate-600">' + _esc(p.id) + '</div><div class="text-slate-400 mt-0.5">' + (p.tanggal || '—') + '</div></td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
           + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
-          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggal || '—') + '</td>'
           + '<td class="px-3 py-2">' + _statusBadge(p.status) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
           + '</tr>';
       }).join('');
     } else {
-      tableRows = '<tr><td colspan="8" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
+      tableRows = '<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
     }
 
     return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
@@ -676,7 +675,6 @@ function _dbRenderDetailAccordion(salesList) {
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal</th>'
       + '</tr></thead>'
