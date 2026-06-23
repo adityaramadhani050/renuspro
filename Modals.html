@@ -226,6 +226,33 @@
       </div>
     </div>
 
+<!-- MODAL CATATAN FAIL -->
+    <div id="modal-catatan-fail" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+        <div class="px-6 pt-6 pb-2 text-center">
+          <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-circle-xmark text-rose-600 text-2xl"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mb-1">Penawaran Fail</h3>
+          <p id="catatan-fail-subtitle" class="text-sm text-slate-500">Masukkan catatan alasan penawaran ini fail.</p>
+        </div>
+        <div class="px-6 pb-2">
+          <textarea id="input-catatan-fail" rows="3" placeholder="Contoh: Klien memilih vendor lain karena harga"
+            class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-rose-200 resize-none"></textarea>
+        </div>
+        <div class="flex gap-3 px-6 pt-3 pb-6">
+          <button onclick="batalCatatanFail()"
+            class="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button id="btn-konfirmasi-catatan-fail" onclick="simpanCatatanFail()"
+            class="flex-1 px-4 py-2.5 text-sm bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
 <!-- MODAL RIWAYAT REVISI -->
 <div id="modal-riwayat-revisi" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
   <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-3xl max-h-[90vh] flex flex-col">

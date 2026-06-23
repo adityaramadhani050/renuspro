@@ -84,7 +84,8 @@
                 <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${marginClass}">${parseFloat(i.marginPersen).toFixed(1)}%</span>
               </td>
               <td class="p-4 text-center">
-                <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)"
+                <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)" data-prev-status="${i.status}"
+                  ${i.status==='Fail' && i.catatanFail ? `title="Catatan Fail: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
                   class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusClass}">
                   <option value="On-Progress" ${i.status==='On-Progress'?'selected':''}>On-Progress</option>
                   <option value="Deal"        ${i.status==='Deal'?'selected':''}>Deal</option>

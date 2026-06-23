@@ -79,7 +79,8 @@ function getPenawaranList() {
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
           noWO:              data[i][17] ? data[i][17].toString() : '',
           tanggalDeal:       data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : ''),
-          channelMarketing:  data[i][19] ? data[i][19].toString() : ''
+          channelMarketing:  data[i][19] ? data[i][19].toString() : '',
+          catatanFail:       data[i][20] ? data[i][20].toString() : ''
         };
       }
     }
@@ -330,7 +331,7 @@ function simpanPenawaranKeSheet(payload) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
-function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
+function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -340,6 +341,9 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
+
+        // Kolom 21 = Catatan Fail (hanya diisi saat status Fail, dikosongkan untuk status lain)
+        sheet.getRange(i + 1, 21).setValue(statusBaru === 'Fail' ? (catatanFail || '') : '');
 
         // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
