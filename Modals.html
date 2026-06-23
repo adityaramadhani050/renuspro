@@ -253,6 +253,47 @@
       </div>
     </div>
 
+<!-- MODAL BUKTI BAYAR INVOICE (LUNAS) -->
+    <div id="modal-bukti-bayar-invoice" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+        <div class="px-6 pt-6 pb-2 text-center">
+          <div class="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-receipt text-emerald-600 text-2xl"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mb-1">Invoice Lunas</h3>
+          <p id="bukti-bayar-invoice-subtitle" class="text-sm text-slate-500">Lampirkan bukti transaksi pembayaran dari klien.</p>
+        </div>
+        <div class="px-6 pb-2">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Bukti Transaksi <span class="text-rose-500">* Wajib, PDF/Gambar</span></label>
+          <input type="file" id="invoice-bukti-file" accept=".pdf,image/*" onchange="handleInvoiceBuktiFileChange(this)" class="hidden">
+          <input type="hidden" id="invoice-bukti-file-id">
+          <input type="hidden" id="invoice-bukti-file-url">
+          <input type="hidden" id="invoice-bukti-file-name">
+          <div id="invoice-bukti-file-drop" onclick="document.getElementById('invoice-bukti-file').click()"
+            class="cursor-pointer flex items-center gap-3 px-4 py-3.5 border-2 border-dashed border-emerald-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition-colors group bg-white">
+            <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
+              <i class="fa-solid fa-receipt"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-slate-600">Klik untuk pilih bukti pembayaran</p>
+              <p class="text-xs text-slate-400">PDF atau gambar, maks. 10MB</p>
+            </div>
+          </div>
+          <div id="invoice-bukti-file-status" class="hidden"></div>
+        </div>
+        <div class="flex gap-3 px-6 pt-3 pb-6">
+          <button onclick="batalBuktiBayarInvoice()"
+            class="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button id="btn-konfirmasi-bukti-bayar-invoice" onclick="simpanBuktiBayarInvoice()"
+            class="flex-1 px-4 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check"></i> Konfirmasi Lunas
+          </button>
+        </div>
+      </div>
+    </div>
+
 <!-- MODAL RIWAYAT REVISI -->
 <div id="modal-riwayat-revisi" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
   <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-3xl max-h-[90vh] flex flex-col">

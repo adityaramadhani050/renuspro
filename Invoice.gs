@@ -32,6 +32,9 @@
  * 18 catatan         (Note)
  * 19 dibuatOleh
  * 20 bankAccount     (rekening tujuan, multi-baris)
+ * 21 buktiFileId     (bukti transaksi pembayaran, diisi saat Lunas)
+ * 22 buktiFileUrl
+ * 23 buktiFileNama
  */
 
 function buatSheetInvoiceDefault(ss) {
@@ -41,9 +44,54 @@ function buatSheetInvoiceDefault(ss) {
     'No Invoice', 'No WO', 'No Penawaran', 'Tanggal', 'Jenis', 'Persen',
     'No PO', 'Tgl PO', 'Klien ID', 'Nama Klien', 'Nama Project',
     'DPP', 'PPN (%)', 'PPN Nominal', 'Total', 'Rincian Item (JSON)',
-    'Status Bayar', 'Catatan', 'Dibuat Oleh', 'Bank Account'
+    'Status Bayar', 'Catatan', 'Dibuat Oleh', 'Bank Account',
+    'Bukti Bayar File Id', 'Bukti Bayar File Url', 'Bukti Bayar File Nama'
   ]);
   return sheet;
+}
+
+function _ensureInvoiceBuktiBayarCols(ss) {
+  ss = ss || getSpreadsheet();
+  const sheet = ss.getSheetByName('Invoice_Main') || buatSheetInvoiceDefault(ss);
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 21) sheet.getRange(1, 21).setValue('Bukti Bayar File Id');
+  if (lastCol < 22) sheet.getRange(1, 22).setValue('Bukti Bayar File Url');
+  if (lastCol < 23) sheet.getRange(1, 23).setValue('Bukti Bayar File Nama');
+  return sheet;
+}
+
+function uploadFileBuktiBayarInvoice(payload) {
+  try {
+    const base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    const fileName    = payload.fileName   ? payload.fileName.toString()   : 'bukti-bayar-invoice';
+    const mimeType     = payload.mimeType   ? payload.mimeType.toString()   : 'application/octet-stream';
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    const bytes = Utilities.base64Decode(base64Data);
+    const blob  = Utilities.newBlob(bytes, mimeType, fileName);
+    const folder = _getBuktiBayarInvoiceFolder();
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return {
+      success: true,
+      fileId:   file.getId(),
+      fileUrl:  file.getUrl(),
+      fileName: fileName
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+function _getBuktiBayarInvoiceFolder() {
+  const ssFile = DriveApp.getFileById(getSpreadsheet().getId());
+  const parents = ssFile.getParents();
+  const rootFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  const folderName = 'RenusPro - Bukti Bayar Invoice';
+  const existing = rootFolder.getFoldersByName(folderName);
+  if (existing.hasNext()) return existing.next();
+  return rootFolder.createFolder(folderName);
 }
 
 // ── Generate No Invoice berikutnya (urut global, terkunci) ──────────────────
@@ -479,6 +527,9 @@ function getInvoiceList() {
         catatan:     data[i][17] ? data[i][17].toString() : '',
         dibuatOleh:  data[i][18] ? data[i][18].toString() : '',
         bankAccount: data[i][19] ? data[i][19].toString() : '',
+        buktiFileId:   data[i][20] ? data[i][20].toString() : '',
+        buktiFileUrl:  data[i][21] ? data[i][21].toString() : '',
+        buktiFileName: data[i][22] ? data[i][22].toString() : '',
         kwitansiId:  kwMap[data[i][0].toString()] || ''
       });
     }
@@ -504,13 +555,21 @@ function _getKwitansiInvoiceMap(ss) {
 }
 
 // ── Update status bayar invoice + auto-generate kwitansi saat Lunas ──────────
-function updateStatusBayarInvoice(idInvoice, statusBaru) {
+function updateStatusBayarInvoice(idInvoice, statusBaru, bukti) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
     const ss = getSpreadsheet();
     const sheet = ss.getSheetByName('Invoice_Main');
     if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+
+    bukti = bukti || {};
+    const buktiFileId   = (bukti.buktiFileId   || '').toString().trim();
+    const buktiFileUrl  = (bukti.buktiFileUrl  || '').toString().trim();
+    const buktiFileName = (bukti.buktiFileName || '').toString().trim();
+    if (statusBaru === 'Lunas' && !buktiFileUrl) {
+      return { success: false, message: 'Bukti transaksi pembayaran wajib dilampirkan.' };
+    }
 
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
@@ -519,6 +578,10 @@ function updateStatusBayarInvoice(idInvoice, statusBaru) {
       sheet.getRange(i + 1, 17).setValue(statusBaru);
       if (statusBaru === 'Lunas') {
         catatTanggalBayar(idInvoice);
+        _ensureInvoiceBuktiBayarCols(ss);
+        sheet.getRange(i + 1, 21).setValue(buktiFileId);
+        sheet.getRange(i + 1, 22).setValue(buktiFileUrl);
+        sheet.getRange(i + 1, 23).setValue(buktiFileName);
       }
       SpreadsheetApp.flush();
 
