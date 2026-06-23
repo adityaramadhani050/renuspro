@@ -60,10 +60,45 @@ function _ensurePenerimaanPOLogSheet(ss) {
     sheet.appendRow([
       'ID Log', 'No PO', 'Tanggal', 'Mode',
       'Jumlah Item', 'Detail Item (JSON)',
-      'Dibuat Oleh', 'Dibuat Pada'
+      'Dibuat Oleh', 'Dibuat Pada',
+      'Bukti File Id', 'Bukti File Url', 'Bukti File Nama'
     ]);
   }
   return sheet;
+}
+
+function _ensurePenerimaanPOLogBuktiCols(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = _ensurePenerimaanPOLogSheet(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 9)  sheet.getRange(1, 9).setValue('Bukti File Id');
+  if (lastCol < 10) sheet.getRange(1, 10).setValue('Bukti File Url');
+  if (lastCol < 11) sheet.getRange(1, 11).setValue('Bukti File Nama');
+  return sheet;
+}
+
+function _getPOPenerimaanBuktiFolder() {
+  var root = DriveApp.getRootFolder();
+  var folders = root.getFoldersByName('RenusPro - Bukti Penerimaan Barang (PO)');
+  return folders.hasNext() ? folders.next() : root.createFolder('RenusPro - Bukti Penerimaan Barang (PO)');
+}
+
+function uploadFileBuktiPenerimaanPO(payload) {
+  try {
+    var base64Data = (payload.base64Data || '').toString();
+    var fileName   = (payload.fileName   || 'bukti-penerimaan').toString();
+    var mimeType   = (payload.mimeType   || 'application/octet-stream').toString();
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    var blob   = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+    var folder = _getPOPenerimaanBuktiFolder();
+    var file   = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return { success: true, fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
 }
 
 function _generateIdPenerimaanPOLog(sheet) {
@@ -72,8 +107,8 @@ function _generateIdPenerimaanPOLog(sheet) {
   return 'RCV-' + new Date().getTime() + '-' + lastRow;
 }
 
-function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser) {
-  var sheet = _ensurePenerimaanPOLogSheet(ss);
+function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser, bukti) {
+  var sheet = _ensurePenerimaanPOLogBuktiCols(ss);
   var tz     = Session.getScriptTimeZone();
   var now    = new Date();
   var tglStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
@@ -81,10 +116,12 @@ function _catatPenerimaanPOLog(ss, noPO, mode, itemsDiterima, namaUser) {
   var detail = itemsDiterima.map(function(it) {
     return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '', catatan: (it.catatan || '').toString().trim() };
   });
+  bukti = bukti || {};
   sheet.appendRow([
     _generateIdPenerimaanPOLog(sheet), noPO, tglStr, mode,
     detail.length, JSON.stringify(detail),
-    namaUser || '', nowStr
+    namaUser || '', nowStr,
+    bukti.fileId || '', bukti.fileUrl || '', bukti.fileName || ''
   ]);
 }
 
@@ -114,7 +151,7 @@ function getRiwayatPenerimaanList(params) {
       }
     }
 
-    var logSheet = _ensurePenerimaanPOLogSheet(ss);
+    var logSheet = _ensurePenerimaanPOLogBuktiCols(ss);
     var logData  = logSheet.getDataRange().getValues();
     var riwayat  = [];
     for (var i = 1; i < logData.length; i++) {
@@ -136,7 +173,10 @@ function getRiwayatPenerimaanList(params) {
         jumlahItem:   parseFloat(lr[4]) || 0,
         items:        detailItem,
         dibuatOleh:   lr[6] ? lr[6].toString() : '',
-        dibuatPada:   lr[7] ? lr[7].toString() : ''
+        dibuatPada:   lr[7] ? lr[7].toString() : '',
+        buktiFileId:   lr[8]  ? lr[8].toString()  : '',
+        buktiFileUrl:  lr[9]  ? lr[9].toString()  : '',
+        buktiFileName: lr[10] ? lr[10].toString() : ''
       });
     }
     riwayat.reverse();
@@ -750,6 +790,11 @@ function terimaPOItems(payload) {
 
     if (!items.length) return { success: false, message: 'Tidak ada item yang diterima.' };
 
+    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();
+    if (!buktiFileUrl) {
+      return { success: false, message: 'Bukti barang diterima inventory wajib dilampirkan.' };
+    }
+
     // ── VALIDASI PENUH ──
     var poData   = poSheet.getDataRange().getValues();
     var poRowIdx = -1;
@@ -899,7 +944,13 @@ function terimaPOItems(payload) {
     var itemsDiterimaLog = items.filter(function(it) {
       return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
     });
-    if (itemsDiterimaLog.length) _catatPenerimaanPOLog(ss, noPO, 'Gudang', itemsDiterimaLog, namaUser);
+    if (itemsDiterimaLog.length) {
+      _catatPenerimaanPOLog(ss, noPO, 'Gudang', itemsDiterimaLog, namaUser, {
+        fileId:   payload.buktiFileId   ? payload.buktiFileId.toString()   : '',
+        fileUrl:  buktiFileUrl,
+        fileName: payload.buktiFileName ? payload.buktiFileName.toString() : ''
+      });
+    }
 
     // Hook Pengeluaran: catat biaya tambahan penerimaan (ongkir/handling/dll) jika PO terikat Work Order
     if (biayaTambahan > 0 && noWOPO) {

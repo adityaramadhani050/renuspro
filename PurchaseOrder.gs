@@ -448,7 +448,10 @@ function getRiwayatPenerimaanPO(noPO) {
         jumlahItem: parseFloat(lr[4]) || 0,
         items:      detailItem,
         dibuatOleh: lr[6] ? lr[6].toString() : '',
-        dibuatPada: _fmtTgl(lr[7])
+        dibuatPada: _fmtTgl(lr[7]),
+        buktiFileId:   lr[8] ? lr[8].toString() : '',
+        buktiFileUrl:  lr[9] ? lr[9].toString() : '',
+        buktiFileName: lr[10] ? lr[10].toString() : ''
       });
     }
     return riwayat;
@@ -782,12 +785,10 @@ function terimaPOKirimLangsung(payload) {
     SpreadsheetApp.flush();
 
     var poData = poSheet.getDataRange().getValues();
-    var poRowIdx = -1, statusPO = '', noWOPO = '', namaSupplier = '';
+    var poRowIdx = -1, statusPO = '';
     for (var i = 1; i < poData.length; i++) {
       if ((poData[i][0] || '').toString() === noPO) {
         poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString();
-        noWOPO = (poData[i][5] || '').toString().trim();
-        namaSupplier = (poData[i][3] || '').toString();
         break;
       }
     }
@@ -796,9 +797,9 @@ function terimaPOKirimLangsung(payload) {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
-    var biayaKirim = Number(payload.biayaKirim) || 0;
-    if (biayaKirim > 0 && !payload.idAkunBiaya) {
-      return { success: false, message: 'Pilih akun pembayaran untuk biaya pengiriman ke klien.' };
+    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();
+    if (!buktiFileUrl) {
+      return { success: false, message: 'Bukti barang diterima klien wajib dilampirkan.' };
     }
 
     var itData = itSheet.getDataRange().getValues();
@@ -850,30 +851,12 @@ function terimaPOKirimLangsung(payload) {
     var itemsDiterimaLog2 = items.filter(function(it) {
       return (Number(it.qty) || 0) > 0 || (it.catatan && it.catatan.toString().trim());
     });
-    if (itemsDiterimaLog2.length) _catatPenerimaanPOLog(ss, noPO, 'Langsung', itemsDiterimaLog2, payload.namaUser);
-
-    // Hook Pengeluaran: catat biaya pengiriman langsung ke klien jika PO terikat Work Order
-    if (biayaKirim > 0 && noWOPO) {
-      try {
-        _buatPengeluaranOtomatis({
-          noWO:        noWOPO,
-          tanggal:     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy'),
-          sumber:      'Biaya Pengiriman',
-          noPO:        noPO,
-          idReferensi: 'BKL-' + noPO + '-' + new Date().getTime(),
-          idAkun:      payload.idAkunBiaya   ? payload.idAkunBiaya.toString()   : '',
-          namaAkun:    payload.namaAkunBiaya ? payload.namaAkunBiaya.toString() : '',
-          deskripsi:   'Biaya pengiriman langsung ke klien PO ' + noPO + ' — ' + namaSupplier,
-          qty:         1,
-          satuan:      '',
-          hargaSatuan: biayaKirim,
-          total:       biayaKirim,
-          catatan:     payload.keteranganBiaya ? payload.keteranganBiaya.toString() : '',
-          dibuatOleh:  (payload.namaUser || '').toString()
-        });
-      } catch (eHookKirim) {
-        Logger.log('Hook pengeluaran biaya pengiriman langsung gagal: ' + eHookKirim.toString());
-      }
+    if (itemsDiterimaLog2.length) {
+      _catatPenerimaanPOLog(ss, noPO, 'Langsung', itemsDiterimaLog2, payload.namaUser, {
+        fileId:   payload.buktiFileId   ? payload.buktiFileId.toString()   : '',
+        fileUrl:  buktiFileUrl,
+        fileName: payload.buktiFileName ? payload.buktiFileName.toString() : ''
+      });
     }
 
     invalidatePOCache();

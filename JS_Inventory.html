@@ -591,7 +591,7 @@ function _escHtmlInv(s) {
 function loadRiwayatPenerimaanInv() {
   var tbody = document.getElementById('table-riwayat-penerimaan');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   var modeClass = {
     'Langsung': 'bg-blue-100 text-blue-700',
     'Gudang':   'bg-amber-100 text-amber-700'
@@ -600,7 +600,7 @@ function loadRiwayatPenerimaanInv() {
     .withSuccessHandler(function(res) {
       var list = (res && res.list) || [];
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400 italic">Belum ada riwayat penerimaan barang.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Belum ada riwayat penerimaan barang.</td></tr>';
         return;
       }
       tbody.innerHTML = list.map(function(r) {
@@ -611,6 +611,9 @@ function loadRiwayatPenerimaanInv() {
         var catatanList = (r.items || []).map(function(it) {
           return (it.catatan || '').toString().trim();
         }).filter(function(c) { return c; }).join('<br>');
+        var buktiHtml = r.buktiFileUrl
+          ? '<a href="' + _escHtmlInv(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold" title="Lihat bukti barang diterima"><i class="fa-solid fa-image"></i> Lihat</a>'
+          : '<span class="text-slate-300">—</span>';
         return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
           '<td class="p-4"><div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(r.noPO) + '</div><div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(r.tanggal) + '</div></td>' +
           '<td class="p-4"><div class="text-sm font-medium text-slate-800">' + _escHtmlInv(r.peruntukan || r.namaSupplier || '—') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(r.namaSupplier) + '</div></td>' +
@@ -619,14 +622,18 @@ function loadRiwayatPenerimaanInv() {
           '<td class="p-4 text-xs text-slate-600">' + (itemList || '—') + '</td>' +
           '<td class="p-4 text-xs text-rose-600">' + (catatanList || '<span class="text-slate-400">—</span>') + '</td>' +
           '<td class="p-4 text-xs text-slate-500">' + _escHtmlInv(r.dibuatOleh) + '</td>' +
+          '<td class="p-4 text-center">' + buktiHtml + '</td>' +
         '</tr>';
       }).join('');
     })
     .withFailureHandler(function(err) {
-      tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat: ' + (err.message || '') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-rose-400">Gagal memuat: ' + (err.message || '') + '</td></tr>';
     })
     .getRiwayatPenerimaanList({});
 }
+
+function _resetTerimaGudangBuktiFileField() { _removeFileField('terima-gudang-bukti-file'); }
+function handleTerimaGudangBuktiFileChange(input) { _uploadSupplierFile('terima-gudang-bukti-file', input, 'uploadFileBuktiPenerimaanPO', 'teal'); }
 
 function bukaProsesTerimaPOGudang(po) {
   _currentPOGudang = po;
@@ -634,6 +641,7 @@ function bukaProsesTerimaPOGudang(po) {
     (po.ppnPersen ? ' (PPN ' + po.ppnPersen + '%)' : '');
   document.getElementById('terima-po-gudang-biaya').value = '';
   document.getElementById('terima-po-gudang-ket-biaya').value = '';
+  _resetTerimaGudangBuktiFileField();
   _loadAkunPembayaranOptions('terima-po-gudang-akun');
   var tbody = document.getElementById('terima-po-gudang-items');
 
@@ -704,6 +712,11 @@ function submitProsesTerimaPOGudang() {
     return showNotification('Pilih akun pembayaran untuk biaya tambahan penerimaan.', 'error');
   }
 
+  var buktiFileUrl = document.getElementById('terima-gudang-bukti-file-url').value;
+  if (!buktiFileUrl) return showNotification('Bukti barang diterima inventory wajib dilampirkan.', 'error');
+  var buktiFileId   = document.getElementById('terima-gudang-bukti-file-id').value;
+  var buktiFileName = document.getElementById('terima-gudang-bukti-file-name').value;
+
   toggleLoader(true, 'Menyimpan penerimaan...');
   google.script.run
     .withSuccessHandler(function(res) {
@@ -728,7 +741,10 @@ function submitProsesTerimaPOGudang() {
       biayaTambahan: biayaTambahan,
       idAkunBiaya: idAkunBiaya,
       namaAkunBiaya: namaAkunBiaya,
-      keteranganBiaya: keteranganBiaya
+      keteranganBiaya: keteranganBiaya,
+      buktiFileId: buktiFileId,
+      buktiFileUrl: buktiFileUrl,
+      buktiFileName: buktiFileName
     });
 }
 

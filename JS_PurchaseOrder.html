@@ -267,6 +267,9 @@ function handlePOQuotFileChange(input) { _uploadSupplierFile('po-quot-file', inp
 function _resetPOInvoiceFileField() { _removeFileField('po-invoice-file'); }
 function handlePOInvoiceFileChange(input) { _uploadSupplierFile('po-invoice-file', input, 'uploadFileInvoiceSupplierPO', 'violet'); }
 
+function _resetTerimaLangsungBuktiFileField() { _removeFileField('terima-langsung-bukti-file'); }
+function handleTerimaLangsungBuktiFileChange(input) { _uploadSupplierFile('terima-langsung-bukti-file', input, 'uploadFileBuktiPenerimaanPO', 'amber'); }
+
 function tutupFormPO() {
   document.getElementById('form-po-section').classList.add('hidden');
   document.getElementById('po-list-section').classList.remove('hidden');
@@ -567,7 +570,7 @@ function _renderRiwayatPenerimaan(list) {
   var tbody = document.getElementById('po-detail-penerimaan');
   if (!tbody) return;
   if (!list || !list.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic text-xs">Belum ada penerimaan barang.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 italic text-xs">Belum ada penerimaan barang.</td></tr>';
     return;
   }
   var modeClass = {
@@ -582,11 +585,15 @@ function _renderRiwayatPenerimaan(list) {
     var catatanList = (r.items || []).map(function(it) {
       return (it.catatan || '').toString().trim();
     }).filter(function(c) { return c; }).join('<br>');
+    var buktiHtml = r.buktiFileUrl
+      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold" title="Lihat bukti barang diterima"><i class="fa-solid fa-image"></i> Lihat</a>'
+      : '<span class="text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _escHtml(r.tanggal || '') + '</td>' +
       '<td class="px-3 py-2 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + mc + '">' + _escHtml(r.mode || '') + '</span></td>' +
       '<td class="px-3 py-2 text-xs text-slate-600">' + (itemList || '—') + '</td>' +
       '<td class="px-3 py-2 text-xs text-rose-600">' + (catatanList || '<span class="text-slate-400">—</span>') + '</td>' +
+      '<td class="px-3 py-2 text-center">' + buktiHtml + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -934,9 +941,7 @@ function bukaFormTerimaPO() {
   formDiv.classList.remove('hidden');
   _setTerimaPOMode('langsung');
 
-  document.getElementById('terima-po-langsung-biaya').value = '';
-  document.getElementById('terima-po-langsung-ket-biaya').value = '';
-  _loadAkunPembayaranOptions('terima-po-langsung-akun');
+  _resetTerimaLangsungBuktiFileField();
 
   var tbodyL = document.getElementById('form-terima-items-langsung');
   var tbodyG = document.getElementById('form-terima-items-gudang');
@@ -1028,14 +1033,10 @@ function submitTerimaPOKirimLangsung() {
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
-  var biayaKirim = _parseRp(document.getElementById('terima-po-langsung-biaya').value);
-  var akunSel    = document.getElementById('terima-po-langsung-akun');
-  var idAkunBiaya = akunSel.value || '';
-  var namaAkunBiaya = idAkunBiaya ? (akunSel.options[akunSel.selectedIndex].getAttribute('data-nama') || '') : '';
-  var keteranganBiaya = (document.getElementById('terima-po-langsung-ket-biaya').value || '').trim();
-  if (biayaKirim > 0 && !idAkunBiaya) {
-    return showNotification('Pilih akun pembayaran untuk biaya pengiriman ke klien.', 'error');
-  }
+  var buktiFileUrl  = document.getElementById('terima-langsung-bukti-file-url').value;
+  if (!buktiFileUrl) return showNotification('Bukti barang diterima klien wajib dilampirkan.', 'error');
+  var buktiFileId   = document.getElementById('terima-langsung-bukti-file-id').value;
+  var buktiFileName = document.getElementById('terima-langsung-bukti-file-name').value;
 
   toggleLoader(true, 'Menyimpan penerimaan langsung...');
   google.script.run
@@ -1057,10 +1058,9 @@ function submitTerimaPOKirimLangsung() {
       noPO: noPO,
       items: items,
       namaUser: (_currentUser && _currentUser.nama) || '',
-      biayaKirim: biayaKirim,
-      idAkunBiaya: idAkunBiaya,
-      namaAkunBiaya: namaAkunBiaya,
-      keteranganBiaya: keteranganBiaya
+      buktiFileId: buktiFileId,
+      buktiFileUrl: buktiFileUrl,
+      buktiFileName: buktiFileName
     });
 }
 
