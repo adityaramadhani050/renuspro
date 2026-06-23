@@ -508,12 +508,18 @@ function _renderPaymentRequestList(list) {
     var catatanTolakHtml = (r.status === 'Ditolak' && r.catatanTolak)
       ? '<div class="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate" title="' + _esc(r.catatanTolak) + '">' + _esc(r.catatanTolak) + '</div>'
       : '';
-    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span>' + catatanTolakHtml + '</td>';
+    var buktiHtml = (r.status === 'Disetujui' && r.buktiFileUrl)
+      ? '<a href="' + _esc(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold text-[10px] mt-1" title="Lihat bukti transaksi"><i class="fa-solid fa-receipt"></i> Bukti Bayar</a>'
+      : '';
+    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span>' + catatanTolakHtml + (buktiHtml ? '<div>' + buktiHtml + '</div>' : '') + '</td>';
     html += '<td class="p-4 text-center">' + (aksiHtml || '<span class="text-xs text-slate-300">—</span>') + '</td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
 }
+
+function _resetApproveBuktiFileField() { _removeFileField('approve-bukti-file'); }
+function handleApproveBuktiFileChange(input) { _uploadSupplierFile('approve-bukti-file', input, 'uploadFileBuktiBayarPO', 'violet'); }
 
 window.bukaApprovePayReq = function(idReq, jumlah, noPO) {
   document.getElementById('approve-payreq-id').value     = idReq;
@@ -524,6 +530,7 @@ window.bukaApprovePayReq = function(idReq, jumlah, noPO) {
   document.getElementById('approve-payreq-akun').value    = '';
   document.getElementById('approve-payreq-catatan').value = '';
   document.getElementById('approve-payreq-tanggal').value = new Date().toISOString().slice(0, 10);
+  _resetApproveBuktiFileField();
   _loadAkunOptionsExp('approve-payreq-akun', '');
   document.getElementById('modal-approve-payreq').classList.remove('hidden');
 };
@@ -535,9 +542,13 @@ window.submitApprovePayReq = function() {
   var idAkun   = document.getElementById('approve-payreq-akun').value;
   var tglInput = document.getElementById('approve-payreq-tanggal').value;
   var catatan  = (document.getElementById('approve-payreq-catatan').value || '').trim();
+  var buktiFileId   = document.getElementById('approve-bukti-file-id').value;
+  var buktiFileUrl  = document.getElementById('approve-bukti-file-url').value;
+  var buktiFileName = document.getElementById('approve-bukti-file-name').value;
 
   if (!idAkun) return showNotification('Pilih akun pembayaran.', 'error');
   if (!tglInput) return showNotification('Tanggal bayar wajib diisi.', 'error');
+  if (!buktiFileUrl) return showNotification('Bukti transaksi pembayaran wajib dilampirkan.', 'error');
 
   var akunSel = document.getElementById('approve-payreq-akun');
   var namaAkun = akunSel.options[akunSel.selectedIndex]
@@ -547,14 +558,17 @@ window.submitApprovePayReq = function() {
   var tanggalBayar = tglParts[2] + '/' + tglParts[1] + '/' + tglParts[0];
 
   var payload = {
-    idReq:        idReq,
-    noPO:         noPO,
-    jumlah:       jumlah,
-    idAkun:       idAkun,
-    namaAkun:     namaAkun,
-    tanggalBayar: tanggalBayar,
-    catatan:      catatan,
-    approvedBy:   (_currentUser && _currentUser.nama) || ''
+    idReq:          idReq,
+    noPO:           noPO,
+    jumlah:         jumlah,
+    idAkun:         idAkun,
+    namaAkun:       namaAkun,
+    tanggalBayar:   tanggalBayar,
+    catatan:        catatan,
+    approvedBy:     (_currentUser && _currentUser.nama) || '',
+    buktiFileId:    buktiFileId,
+    buktiFileUrl:   buktiFileUrl,
+    buktiFileName:  buktiFileName
   };
 
   document.getElementById('modal-approve-payreq').classList.add('hidden');

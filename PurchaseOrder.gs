@@ -412,7 +412,11 @@ function getPODetail(noPO) {
         dibuatOleh:     prData[pr][10] ? prData[pr][10].toString() : '',
         namaAkun:       prData[pr][12] ? prData[pr][12].toString() : '',
         tanggalApprove: prData[pr][14] ? _fmtTgl(prData[pr][14]) : '',
-        catatanTolak:   prData[pr][18] ? prData[pr][18].toString() : ''
+        invoiceFileUrl:  prData[pr][16] ? prData[pr][16].toString() : '',
+        invoiceFileName: prData[pr][17] ? prData[pr][17].toString() : '',
+        catatanTolak:   prData[pr][18] ? prData[pr][18].toString() : '',
+        buktiFileUrl:   prData[pr][20] ? prData[pr][20].toString() : '',
+        buktiFileName:  prData[pr][21] ? prData[pr][21].toString() : ''
       });
     }
 
@@ -1165,6 +1169,9 @@ function _ensurePOPaymentRequestInvoiceCols(ss) {
   if (lastCol < 17) sheet.getRange(1, 17).setValue('Invoice File Url');
   if (lastCol < 18) sheet.getRange(1, 18).setValue('Invoice File Nama');
   if (lastCol < 19) sheet.getRange(1, 19).setValue('Catatan Tolak');
+  if (lastCol < 20) sheet.getRange(1, 20).setValue('Bukti Bayar File Id');
+  if (lastCol < 21) sheet.getRange(1, 21).setValue('Bukti Bayar File Url');
+  if (lastCol < 22) sheet.getRange(1, 22).setValue('Bukti Bayar File Nama');
   return sheet;
 }
 
@@ -1172,6 +1179,30 @@ function uploadFileInvoiceSupplierPO(payload) {
   try {
     var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
     var fileName   = payload.fileName   ? payload.fileName.toString()   : 'invoice-supplier';
+    var mimeType   = payload.mimeType   ? payload.mimeType.toString()   : 'application/octet-stream';
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob  = Utilities.newBlob(bytes, mimeType, fileName);
+    var folder = _getPOQuotationFolder();
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return {
+      success: true,
+      fileId:   file.getId(),
+      fileUrl:  file.getUrl(),
+      fileName: fileName
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+function uploadFileBuktiBayarPO(payload) {
+  try {
+    var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    var fileName   = payload.fileName   ? payload.fileName.toString()   : 'bukti-bayar';
     var mimeType   = payload.mimeType   ? payload.mimeType.toString()   : 'application/octet-stream';
     if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
 
@@ -1304,7 +1335,10 @@ function getPaymentRequestList(params) {
         invoiceFileId:   r[15] ? r[15].toString() : '',
         invoiceFileUrl:  r[16] ? r[16].toString() : '',
         invoiceFileName: r[17] ? r[17].toString() : '',
-        catatanTolak:    r[18] ? r[18].toString() : ''
+        catatanTolak:    r[18] ? r[18].toString() : '',
+        buktiFileId:     r[19] ? r[19].toString() : '',
+        buktiFileUrl:    r[20] ? r[20].toString() : '',
+        buktiFileName:   r[21] ? r[21].toString() : ''
       });
     }
     list.reverse();
@@ -1319,13 +1353,17 @@ function approvePembayaranPO(payload) {
   try {
     lock.waitLock(15000);
 
-    var idReq    = (payload.idReq    || '').toString().trim();
-    var namaAkun = (payload.namaAkun || '').toString().trim();
+    var idReq       = (payload.idReq       || '').toString().trim();
+    var namaAkun    = (payload.namaAkun    || '').toString().trim();
+    var buktiFileId   = (payload.buktiFileId   || '').toString().trim();
+    var buktiFileUrl  = (payload.buktiFileUrl  || '').toString().trim();
+    var buktiFileName = (payload.buktiFileName || '').toString().trim();
     if (!idReq)    return { success: false, message: 'ID Request tidak boleh kosong.' };
     if (!namaAkun) return { success: false, message: 'Akun pembayaran wajib dipilih.' };
+    if (!buktiFileUrl) return { success: false, message: 'Bukti transaksi pembayaran wajib dilampirkan.' };
 
     var ss      = getSpreadsheet();
-    var prSheet = _ensurePOPaymentRequestSheet(ss);
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
     SpreadsheetApp.flush();
 
     var prData = prSheet.getDataRange().getValues();
@@ -1352,6 +1390,9 @@ function approvePembayaranPO(payload) {
     prSheet.getRange(prRowIdx, 13).setValue(namaAkun);
     prSheet.getRange(prRowIdx, 14).setValue(payload.approvedBy ? payload.approvedBy.toString() : '');
     prSheet.getRange(prRowIdx, 15).setValue(nowStr);
+    prSheet.getRange(prRowIdx, 20).setValue(buktiFileId);
+    prSheet.getRange(prRowIdx, 21).setValue(buktiFileUrl);
+    prSheet.getRange(prRowIdx, 22).setValue(buktiFileName);
 
     // Buat catatan pembayaran PO otomatis
     var bayarResult = simpanPembayaranPO({
@@ -1370,6 +1411,9 @@ function approvePembayaranPO(payload) {
       prSheet.getRange(prRowIdx, 13).setValue('');
       prSheet.getRange(prRowIdx, 14).setValue('');
       prSheet.getRange(prRowIdx, 15).setValue('');
+      prSheet.getRange(prRowIdx, 20).setValue('');
+      prSheet.getRange(prRowIdx, 21).setValue('');
+      prSheet.getRange(prRowIdx, 22).setValue('');
       return { success: false, message: 'Gagal mencatat pembayaran: ' + bayarResult.message };
     }
 

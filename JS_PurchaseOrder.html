@@ -594,7 +594,7 @@ function _renderRiwayatPenerimaan(list) {
 function _renderPayReqs(list) {
   var tbody = document.getElementById('po-detail-payreqs');
   if (!list || !list.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic text-xs">Belum ada request pembayaran.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400 italic text-xs">Belum ada request pembayaran.</td></tr>';
     return;
   }
   var statusClass = {
@@ -609,6 +609,9 @@ function _renderPayReqs(list) {
       : (r.status === 'Ditolak'
           ? (r.catatanTolak ? '<span class="text-rose-500">' + _escHtml(r.catatanTolak) + '</span>' : '<span class="text-rose-400 text-[10px] font-bold">Ditolak</span>')
           : '—');
+    var buktiHtml = (r.status === 'Disetujui' && r.buktiFileUrl)
+      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold" title="Unduh bukti transaksi pembayaran"><i class="fa-solid fa-receipt"></i> Lihat</a>'
+      : '<span class="text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 font-mono text-xs text-slate-600">' + _escHtml(r.idReq || '') + '</td>' +
       '<td class="px-3 py-2 text-right font-bold text-slate-700 text-xs">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>' +
@@ -616,6 +619,7 @@ function _renderPayReqs(list) {
       '<td class="px-3 py-2 text-xs text-slate-500">' + _escHtml(r.catatan || '') + '</td>' +
       '<td class="px-3 py-2 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _escHtml(r.status || '') + '</span></td>' +
       '<td class="px-3 py-2 text-xs text-slate-500">' + approveInfo + '</td>' +
+      '<td class="px-3 py-2 text-xs text-center">' + buktiHtml + '</td>' +
     '</tr>';
   }).join('');
 }
