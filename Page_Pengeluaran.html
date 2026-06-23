@@ -236,10 +236,10 @@
 
               <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2 sm:col-span-1">
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Work Order <span class="text-rose-500">*</span></label>
-                  <select id="exp-wo" required
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Work Order <span class="text-slate-400 font-normal text-[10px]">(kosongkan jika non-project)</span></label>
+                  <select id="exp-wo" onchange="_onExpWOChange()"
                     class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
-                    <option value="">-- Pilih Work Order --</option>
+                    <option value="">-- Tanpa Project (Operasional) --</option>
                   </select>
                 </div>
                 <div class="col-span-2 sm:col-span-1">
@@ -247,6 +247,20 @@
                   <input type="date" id="exp-tanggal" required
                     class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
                 </div>
+              </div>
+
+              <div id="exp-kategori-wrap" class="hidden">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Kategori Pengeluaran <span class="text-rose-500">*</span></label>
+                <select id="exp-kategori"
+                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                  <option value="">-- Pilih Kategori --</option>
+                  <option value="Operasional Kantor">Operasional Kantor</option>
+                  <option value="Gaji & Tunjangan">Gaji & Tunjangan</option>
+                  <option value="Sewa">Sewa</option>
+                  <option value="Utilitas (listrik/internet/air)">Utilitas (listrik/internet/air)</option>
+                  <option value="Marketing & Promosi">Marketing & Promosi</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
               </div>
 
               <div class="grid grid-cols-2 gap-4">

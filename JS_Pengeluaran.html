@@ -96,7 +96,7 @@ function _loadWOOptionsExp(selId, selectedVal) {
       var sel = document.getElementById(selId);
       if (!sel) return;
       var isFilter = selId.startsWith('filter-');
-      var placeholder = isFilter ? '<option value="">Semua WO</option>' : '<option value="">-- Pilih Work Order --</option>';
+      var placeholder = isFilter ? '<option value="">Semua WO</option>' : '<option value="">-- Tanpa Project (Operasional) --</option>';
       sel.innerHTML = placeholder;
       _expWOList = (data || []).filter(function(w) { return w.status === 'Deal'; });
       _expWOList.forEach(function(w) {
@@ -154,7 +154,11 @@ function _renderPengeluaran(list) {
     var isOtomatis  = (r.sumber === 'Pembayaran PO' || r.sumber === 'Penggunaan Stok');
     html += '<tr class="hover:bg-slate-50 transition-colors">';
     html += '<td class="p-4"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
-    html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
+    if (r.noWO) {
+      html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
+    } else {
+      html += '<td class="p-4"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700"><i class="fas fa-building text-[10px]"></i>Non-Project</span><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.kategori || '—') + '</div></td>';
+    }
     html += '<td class="p-4 text-center">' + sumberBadge + '</td>';
     html += '<td class="p-4 text-xs text-slate-600">' + (r.noPO || '—') + '</td>';
     html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';
@@ -270,11 +274,18 @@ window.bukaFormPengeluaranLangsung = function(preNoWO) {
   document.getElementById('exp-harga').value       = '';
   document.getElementById('exp-catatan').value     = '';
   document.getElementById('exp-total-display').textContent = 'Rp 0';
+  document.getElementById('exp-kategori').value    = '';
 
   _loadWOOptionsExp('exp-wo', preNoWO || '');
   _loadAkunOptionsExp('exp-akun', '');
+  _onExpWOChange();
   document.getElementById('modal-exp-langsung').classList.remove('hidden');
 };
+
+function _onExpWOChange() {
+  var noWO = document.getElementById('exp-wo').value;
+  document.getElementById('exp-kategori-wrap').classList.toggle('hidden', !!noWO);
+}
 
 window.tutupFormPengeluaranLangsung = function() {
   document.getElementById('modal-exp-langsung').classList.add('hidden');
@@ -300,13 +311,14 @@ window.submitPengeluaranLangsung = function() {
   var satuan  = document.getElementById('exp-satuan').value.trim();
   var harga   = _parseCurrencyExp(document.getElementById('exp-harga').value);
   var catatan = document.getElementById('exp-catatan').value.trim();
+  var kategori = document.getElementById('exp-kategori').value;
 
-  if (!noWO)   return showNotification('Work Order wajib dipilih.', 'error');
   if (!tanggal) return showNotification('Tanggal wajib diisi.', 'error');
   if (!idAkun)  return showNotification('Akun pembayaran wajib dipilih.', 'error');
   if (!desk)    return showNotification('Deskripsi wajib diisi.', 'error');
   if (qty <= 0) return showNotification('Qty harus lebih dari 0.', 'error');
   if (harga <= 0) return showNotification('Harga satuan harus lebih dari 0.', 'error');
+  if (!noWO && !kategori) return showNotification('Kategori pengeluaran wajib dipilih untuk pengeluaran non-project.', 'error');
 
   // Ambil namaAkun dari option
   var akunSel = document.getElementById('exp-akun');
@@ -327,6 +339,7 @@ window.submitPengeluaranLangsung = function() {
     satuan:      satuan,
     hargaSatuan: harga,
     catatan:     catatan,
+    kategori:    noWO ? '' : kategori,
     dibuatOleh:  (_currentUser && _currentUser.nama) || ''
   };
 
@@ -387,9 +400,11 @@ window.editPengeluaran = function(id) {
   document.getElementById('exp-harga').value       = r.hargaSatuan ? r.hargaSatuan.toLocaleString('id-ID') : '';
   document.getElementById('exp-catatan').value     = r.catatan || '';
   document.getElementById('exp-total-display').textContent = _fmtRpExp(r.total);
+  document.getElementById('exp-kategori').value    = r.kategori || '';
 
   _loadWOOptionsExp('exp-wo', r.noWO);
   _loadAkunOptionsExp('exp-akun', r.idAkun);
+  _onExpWOChange();
   document.getElementById('modal-exp-langsung').classList.remove('hidden');
 };
 

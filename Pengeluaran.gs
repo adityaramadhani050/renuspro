@@ -20,6 +20,7 @@
  * 15  Dibuat Pada
  * 16  Diubah Oleh
  * 17  Diubah Pada
+ * 18  Kategori          (hanya untuk pengeluaran non-project, kosong No Work Order)
  */
 
 // ── Sheet bootstrap ───────────────────────────────────────────────────────────
@@ -33,9 +34,16 @@ function _ensurePengeluaranSheet(ss) {
       'ID Pengeluaran', 'No Work Order', 'Tanggal', 'Sumber', 'No PO',
       'ID Referensi', 'ID Akun Pembayaran', 'Nama Akun', 'Deskripsi',
       'Qty', 'Satuan', 'Harga Satuan', 'Total', 'Catatan',
-      'Dibuat Oleh', 'Dibuat Pada', 'Diubah Oleh', 'Diubah Pada'
+      'Dibuat Oleh', 'Dibuat Pada', 'Diubah Oleh', 'Diubah Pada', 'Kategori'
     ]);
   }
+  return sheet;
+}
+
+function _ensurePengeluaranKategoriCol(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = _ensurePengeluaranSheet(ss);
+  if (sheet.getLastColumn() < 19) sheet.getRange(1, 19).setValue('Kategori');
   return sheet;
 }
 
@@ -156,7 +164,8 @@ function getPengeluaranList(params) {
         dibuatOleh:  r[14] ? r[14].toString()  : '',
         dibuatPada:  r[15] ? r[15].toString()  : '',
         diubahOleh:  r[16] ? r[16].toString()  : '',
-        diubahPada:  r[17] ? r[17].toString()  : ''
+        diubahPada:  r[17] ? r[17].toString()  : '',
+        kategori:    r[18] ? r[18].toString()  : ''
       });
     }
 
@@ -174,8 +183,9 @@ function simpanPengeluaranLangsung(payload) {
   try {
     lock.waitLock(15000);
 
-    var noWO = (payload.noWO || '').toString().trim();
-    if (!noWO)                  return { success: false, message: 'No Work Order wajib diisi.' };
+    var noWO     = (payload.noWO || '').toString().trim();
+    var kategori = (payload.kategori || '').toString().trim();
+    if (!noWO && !kategori)     return { success: false, message: 'Kategori pengeluaran wajib dipilih untuk pengeluaran non-project.' };
     if (!payload.deskripsi)     return { success: false, message: 'Deskripsi wajib diisi.' };
     if (!payload.idAkun)        return { success: false, message: 'Akun pembayaran wajib dipilih.' };
     if (payload.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih untuk pengeluaran langsung.' };
@@ -185,12 +195,14 @@ function simpanPengeluaranLangsung(payload) {
     if (qty <= 0)         return { success: false, message: 'Qty harus lebih dari 0.' };
     if (hargaSatuan <= 0) return { success: false, message: 'Harga satuan harus lebih dari 0.' };
 
-    var statusWO = _getStatusWO(noWO);
-    if (!statusWO)          return { success: false, message: 'Work Order tidak ditemukan.' };
-    if (statusWO === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa menambah pengeluaran.' };
+    if (noWO) {
+      var statusWO = _getStatusWO(noWO);
+      if (!statusWO)          return { success: false, message: 'Work Order tidak ditemukan.' };
+      if (statusWO === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa menambah pengeluaran.' };
+    }
 
     var ss    = getSpreadsheet();
-    var sheet = _ensurePengeluaranSheet(ss);
+    var sheet = _ensurePengeluaranKategoriCol(ss);
     var id    = _generateIdPengeluaran(sheet);
     var tz    = Session.getScriptTimeZone();
     var now   = new Date();
@@ -210,7 +222,8 @@ function simpanPengeluaranLangsung(payload) {
       qty * hargaSatuan,
       payload.catatan  ? payload.catatan.toString()  : '',
       payload.dibuatOleh ? payload.dibuatOleh.toString() : '',
-      nowStr, '', ''
+      nowStr, '', '',
+      noWO ? '' : kategori
     ]);
 
     invalidatePengeluaranCache();
@@ -238,8 +251,10 @@ function editPengeluaranLangsung(payload) {
     if (!payload.idAkun)    return { success: false, message: 'Akun pembayaran wajib dipilih.' };
     if (payload.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih untuk pengeluaran langsung.' };
 
+    var kategoriBaru = (payload.kategori || '').toString().trim();
+
     var ss    = getSpreadsheet();
-    var sheet = _ensurePengeluaranSheet(ss);
+    var sheet = _ensurePengeluaranKategoriCol(ss);
     SpreadsheetApp.flush();
 
     var data   = sheet.getDataRange().getValues();
@@ -255,15 +270,19 @@ function editPengeluaranLangsung(payload) {
     }
 
     var noWO     = (data[rowIdx - 1][1] || '').toString();
-    var statusWO = _getStatusWO(noWO);
-    if (statusWO === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa mengedit pengeluaran.' };
+    if (noWO) {
+      var statusWO = _getStatusWO(noWO);
+      if (statusWO === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa mengedit pengeluaran.' };
+    } else if (!kategoriBaru) {
+      return { success: false, message: 'Kategori pengeluaran wajib dipilih untuk pengeluaran non-project.' };
+    }
 
     var tz      = Session.getScriptTimeZone();
     var nowStr  = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm:ss');
     var tanggal = payload.tanggal || (data[rowIdx - 1][2] ? _fmtTgl(data[rowIdx - 1][2]) : '');
 
-    // Update cols 3–18 (tanggal s.d. diubah Pada), preserve ID Referensi & dibuat Oleh/Pada
-    sheet.getRange(rowIdx, 3, 1, 16).setValues([[
+    // Update cols 3–19 (tanggal s.d. kategori), preserve ID Referensi & dibuat Oleh/Pada
+    sheet.getRange(rowIdx, 3, 1, 17).setValues([[
       tanggal,
       'Langsung',
       payload.noPO     ? payload.noPO.toString()     : '',
@@ -279,7 +298,8 @@ function editPengeluaranLangsung(payload) {
       data[rowIdx - 1][14] || '',                          // Dibuat Oleh
       data[rowIdx - 1][15] || '',                          // Dibuat Pada
       payload.diubahOleh ? payload.diubahOleh.toString() : '',
-      nowStr
+      nowStr,
+      noWO ? '' : kategoriBaru
     ]]);
 
     invalidatePengeluaranCache();
@@ -649,6 +669,104 @@ function getLaporanProfitabilitas(params) {
         rataMarginRealisasi: countMarg > 0 ? sumMargReal / countMarg : null
       },
       rekapAkun: rekapAkun
+    };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ── Laporan Keuntungan Bulanan (perusahaan, exclude PPN) ──────────────────────
+// Keuntungan = nilai invoice ditagihkan (DPP, by tanggal terbit) - pengeluaran project - pengeluaran non-project
+
+var _LP_BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli',
+  'Agustus','September','Oktober','November','Desember'];
+
+function getLaporanKeuntunganBulanan(params) {
+  try {
+    params = params || {};
+    var tahun = parseInt(params.tahun, 10) || new Date().getFullYear();
+
+    var bulanData = [];
+    for (var b = 0; b < 12; b++) {
+      bulanData.push({
+        bulan:               _LP_BULAN[b],
+        bulanIdx:            b + 1,
+        invoiceDPP:          0,
+        pengeluaranProject:  0,
+        pengeluaranNonProject: 0
+      });
+    }
+
+    // Invoice DPP per bulan (berdasarkan tanggal terbit invoice)
+    var invData = _cachedInvoice();
+    for (var i = 1; i < invData.length; i++) {
+      var rowInv = invData[i];
+      if (!rowInv[0]) continue;
+      var tglInv = _fmtTgl(rowInv[3]);
+      var tp = tglInv.split('/');
+      if (tp.length !== 3) continue;
+      var y = parseInt(tp[2], 10), m = parseInt(tp[1], 10);
+      if (y !== tahun) continue;
+      var dpp = parseFloat(rowInv[11]) || 0;
+      bulanData[m - 1].invoiceDPP += dpp;
+    }
+
+    // Pengeluaran per bulan (project & non-project), + breakdown kategori non-project
+    var kategoriTotal = {};
+    var ss    = getSpreadsheet();
+    var sheet = _ensurePengeluaranKategoriCol(ss);
+    var expData = sheet.getDataRange().getValues();
+    for (var j = 1; j < expData.length; j++) {
+      var rowExp = expData[j];
+      if (!rowExp[0]) continue;
+      var tglExp = _fmtTgl(rowExp[2]);
+      var tpe = tglExp.split('/');
+      if (tpe.length !== 3) continue;
+      var ye = parseInt(tpe[2], 10), me = parseInt(tpe[1], 10);
+      if (ye !== tahun) continue;
+      var totalExp = parseFloat(rowExp[12]) || 0;
+      var noWOExp  = (rowExp[1] || '').toString().trim();
+      if (noWOExp) {
+        bulanData[me - 1].pengeluaranProject += totalExp;
+      } else {
+        bulanData[me - 1].pengeluaranNonProject += totalExp;
+        var kat = (rowExp[18] || 'Lainnya').toString();
+        kategoriTotal[kat] = (kategoriTotal[kat] || 0) + totalExp;
+      }
+    }
+
+    var totalInvoiceDPP = 0, totalPengeluaranProject = 0, totalPengeluaranNonProject = 0;
+    var rows = bulanData.map(function(d) {
+      var keuntungan = d.invoiceDPP - d.pengeluaranProject - d.pengeluaranNonProject;
+      totalInvoiceDPP            += d.invoiceDPP;
+      totalPengeluaranProject    += d.pengeluaranProject;
+      totalPengeluaranNonProject += d.pengeluaranNonProject;
+      return {
+        bulan:                 d.bulan,
+        bulanIdx:               d.bulanIdx,
+        invoiceDPP:             d.invoiceDPP,
+        pengeluaranProject:     d.pengeluaranProject,
+        pengeluaranNonProject:  d.pengeluaranNonProject,
+        keuntungan:             keuntungan
+      };
+    });
+
+    var kategoriBreakdown = Object.keys(kategoriTotal).map(function(k) {
+      return { kategori: k, total: kategoriTotal[k] };
+    }).sort(function(a, b) { return b.total - a.total; });
+
+    return {
+      success: true,
+      tahun:   tahun,
+      rows:    rows,
+      summary: {
+        totalInvoiceDPP:            totalInvoiceDPP,
+        totalPengeluaranProject:    totalPengeluaranProject,
+        totalPengeluaranNonProject: totalPengeluaranNonProject,
+        totalPengeluaran:           totalPengeluaranProject + totalPengeluaranNonProject,
+        totalKeuntungan:            totalInvoiceDPP - totalPengeluaranProject - totalPengeluaranNonProject
+      },
+      kategoriBreakdown: kategoriBreakdown
     };
   } catch(e) {
     return { success: false, message: e.toString() };
