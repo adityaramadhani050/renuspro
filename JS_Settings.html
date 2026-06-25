@@ -8,6 +8,7 @@ var _bankData  = [];   // [ { id, label, detail }, ... ]
 
 function loadSettings() {
   _loadWAConfig();
+  _loadWAReminderSchedule();
   _loadTCOptions();
   _loadBankAccounts();
   _loadDocSign();
@@ -85,6 +86,47 @@ function testWAConfig() {
       showToast('Error: ' + e.message, 'error');
     })
     .testWANotif({ endpoint: endpoint, target: target });
+}
+
+function _populateReminderHourOptions() {
+  var sel = document.getElementById('wa-reminder-hour');
+  if (!sel || sel.options.length) return;
+  for (var h = 0; h < 24; h++) {
+    var opt = document.createElement('option');
+    opt.value = h;
+    opt.textContent = (h < 10 ? '0' + h : h) + ':00';
+    sel.appendChild(opt);
+  }
+}
+
+function _loadWAReminderSchedule() {
+  _populateReminderHourOptions();
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) return;
+      document.getElementById('wa-reminder-hour').value     = r.jam;
+      document.getElementById('wa-reminder-interval').value = r.intervalHari;
+    })
+    .withFailureHandler(function() {})
+    .getWAReminderScheduleConfig();
+}
+
+function simpanJadwalReminder() {
+  var jam          = parseInt(document.getElementById('wa-reminder-hour').value, 10);
+  var intervalHari = parseInt(document.getElementById('wa-reminder-interval').value, 10);
+  if (isNaN(intervalHari) || intervalHari < 1) { showToast('Selang hari reminder ulang minimal 1.', 'error'); return; }
+  var btn = document.getElementById('wa-jadwal-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-clock text-xs"></i> Simpan Jadwal Reminder'; }
+      showToast((r && r.message) || (r && r.success ? 'Tersimpan.' : 'Gagal.'), r && r.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-clock text-xs"></i> Simpan Jadwal Reminder'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .saveWAReminderScheduleConfig({ jam: jam, intervalHari: intervalHari });
 }
 
 function kirimReminderManual() {

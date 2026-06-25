@@ -102,14 +102,17 @@ function _waFmtRp(n) {
 }
 
 // ── Reminder Penawaran Expired ───────────────────────────────────────────────
-// Kolom Penawaran_Main, 0-indexed: 3=Valid Hingga, 16=Status, 21=Reminder Expired Terkirim
-function cekReminderPenawaranExpired() {
+// Kolom Penawaran_Main, 0-indexed: 3=Valid Hingga, 16=Status, 21=Reminder Expired Terakhir Dikirim (timestamp)
+function _cekReminderPenawaranExpiredCore(forceAll) {
   try {
     var ss    = getSpreadsheet();
     var sheet = ss.getSheetByName('Penawaran_Main');
     if (!sheet) return { success: false, message: 'Sheet Penawaran_Main tidak ditemukan.', count: 0 };
     var data = sheet.getDataRange().getValues();
     if (data.length < 2) return { success: true, message: 'Tidak ada penawaran expired yang perlu direminder.', count: 0 };
+
+    var props        = PropertiesService.getScriptProperties();
+    var intervalHari = parseInt(props.getProperty('WA_REMINDER_INTERVAL_HARI')) || 3;
 
     var tz    = Session.getScriptTimeZone();
     var today = new Date();
@@ -130,6 +133,13 @@ function cekReminderPenawaranExpired() {
       }
       var d2 = new Date(s);
       return isNaN(d2) ? null : d2;
+    }
+
+    function parseLastSent(raw) {
+      if (raw instanceof Date) return isNaN(raw) ? null : raw;
+      if (!raw) return null;
+      var d = new Date(raw.toString().trim());
+      return isNaN(d) ? null : d;
     }
 
     // Dedupe: simpan baris dengan rev TERTINGGI per No Penawaran
@@ -159,11 +169,16 @@ function cekReminderPenawaranExpired() {
       var status = row[16] ? row[16].toString() : 'On-Progress';
       if (status !== 'On-Progress') continue;
 
-      var sudahKirim = row[21] ? row[21].toString().trim().toUpperCase() : '';
-      if (sudahKirim === '1' || sudahKirim === 'TRUE') continue;
-
       var validDate = parseTgl(row[3]);
       if (!validDate || validDate >= today) continue;
+
+      if (!forceAll) {
+        var lastSent = parseLastSent(row[21]);
+        if (lastSent) {
+          var diffHari = Math.floor((today - lastSent) / 86400000);
+          if (diffHari < intervalHari) continue;
+        }
+      }
 
       var klienId = row[5] ? row[5].toString() : '';
       expiredList.push({
@@ -187,8 +202,9 @@ function cekReminderPenawaranExpired() {
 
     sendWANotif(_waMsgReminderExpired(expiredList));
 
+    var now = new Date();
     expiredList.forEach(function(it) {
-      sheet.getRange(it.rowIndex + 1, 22).setValue('1');
+      sheet.getRange(it.rowIndex + 1, 22).setValue(now);
     });
     SpreadsheetApp.flush();
 
@@ -199,9 +215,14 @@ function cekReminderPenawaranExpired() {
   }
 }
 
-// ── Trigger manual dari Settings (tombol "Kirim Reminder Manual") ───────────
+// ── Dipanggil oleh trigger harian: menghormati selang hari reminder ulang ───
+function cekReminderPenawaranExpired() {
+  return _cekReminderPenawaranExpiredCore(false);
+}
+
+// ── Dipanggil tombol "Kirim Reminder Manual": tanpa batasan sudah/belum direminder ──
 function kirimReminderExpiredManual() {
-  return cekReminderPenawaranExpired();
+  return _cekReminderPenawaranExpiredCore(true);
 }
 
 function _waMsgReminderExpired(list) {
@@ -221,21 +242,53 @@ function _waMsgReminderExpired(list) {
   return lines.join('\n');
 }
 
+// ── Jadwal reminder (jam & selang hari) — dipanggil dari Settings ───────────
+function getWAReminderScheduleConfig() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    success:      true,
+    jam:          parseInt(props.getProperty('WA_REMINDER_HOUR')) || 8,
+    intervalHari: parseInt(props.getProperty('WA_REMINDER_INTERVAL_HARI')) || 3
+  };
+}
+
+function saveWAReminderScheduleConfig(payload) {
+  try {
+    var jam = parseInt(payload.jam);
+    if (isNaN(jam) || jam < 0 || jam > 23) jam = 8;
+    var intervalHari = parseInt(payload.intervalHari);
+    if (isNaN(intervalHari) || intervalHari < 1) intervalHari = 1;
+
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('WA_REMINDER_HOUR', jam.toString());
+    props.setProperty('WA_REMINDER_INTERVAL_HARI', intervalHari.toString());
+
+    _reinstallTriggerReminderExpired(jam);
+
+    return { success: true, message: 'Jadwal reminder disimpan: jam ' + jam + ':00, diulang tiap ' + intervalHari + ' hari.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+function _reinstallTriggerReminderExpired(jam) {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'cekReminderPenawaranExpired') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('cekReminderPenawaranExpired')
+    .timeBased().everyDays(1).atHour(jam).create();
+  PropertiesService.getScriptProperties().setProperty('TRIGGER_REMINDER_EXPIRED_INSTALLED', '1');
+}
+
 // ── Trigger harian (self-installing, dipanggil dari doGet) ──────────────────
 function _ensureTriggerReminderExpired() {
   try {
     var props = PropertiesService.getScriptProperties();
     if (props.getProperty('TRIGGER_REMINDER_EXPIRED_INSTALLED') === '1') return;
 
-    var triggers  = ScriptApp.getProjectTriggers();
-    var sudahAda = triggers.some(function(t) {
-      return t.getHandlerFunction() === 'cekReminderPenawaranExpired';
-    });
-    if (!sudahAda) {
-      ScriptApp.newTrigger('cekReminderPenawaranExpired')
-        .timeBased().everyDays(1).atHour(8).create();
-    }
-    props.setProperty('TRIGGER_REMINDER_EXPIRED_INSTALLED', '1');
+    var jam = parseInt(props.getProperty('WA_REMINDER_HOUR')) || 8;
+    _reinstallTriggerReminderExpired(jam);
   } catch (e) {
     Logger.log('_ensureTriggerReminderExpired error: ' + e);
   }
