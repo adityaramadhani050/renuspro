@@ -35,19 +35,7 @@
           </div>
         </div>
 
-        <!-- ── Tab: Profitabilitas / Rekap Akun ── -->
-        <div class="flex gap-2 mb-4">
-          <button id="lp-tab-profit-btn" onclick="switchLPTab('profit')"
-            class="px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-violet-700 shadow-sm">
-            Profit per WO
-          </button>
-          <button id="lp-tab-akun-btn" onclick="switchLPTab('akun')"
-            class="px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700">
-            Rekap per Akun
-          </button>
-        </div>
-
-        <!-- Tab Profitabilitas per WO -->
+        <!-- Tabel Profitabilitas per WO -->
         <div id="lp-tab-profit" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse" style="min-width:900px">
@@ -65,23 +53,6 @@
               </thead>
               <tbody id="lp-table-profit" class="text-sm divide-y divide-slate-100">
                 <tr><td colspan="8" class="p-8 text-center text-slate-400">Muat data untuk melihat laporan.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Tab Rekap per Akun -->
-        <div id="lp-tab-akun" class="hidden bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th class="p-4">Akun Pembayaran</th>
-                  <th class="p-4 text-right">Total Pengeluaran</th>
-                </tr>
-              </thead>
-              <tbody id="lp-table-akun" class="text-sm divide-y divide-slate-100">
-                <tr><td colspan="2" class="p-8 text-center text-slate-400">Muat data untuk melihat rekap.</td></tr>
               </tbody>
             </table>
           </div>

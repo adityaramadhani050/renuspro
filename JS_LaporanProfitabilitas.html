@@ -4,7 +4,6 @@
 // ================================================================
 
 var _lpData      = null;
-var _lpActiveTab = 'profit';
 
 function _fmtRpLP(n) {
   n = parseFloat(n) || 0;
@@ -42,8 +41,6 @@ window.loadLaporanProfitabilitas = function() {
 
   document.getElementById('lp-table-profit').innerHTML =
     '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  document.getElementById('lp-table-akun').innerHTML =
-    '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
   if (typeof google === 'undefined') return;
   google.script.run
@@ -109,37 +106,11 @@ function _renderLaporanProfit(res) {
     });
     document.getElementById('lp-table-profit').innerHTML = html;
   }
-
-  // Tabel rekap akun
-  var akunRows = res.rekapAkun || [];
-  if (akunRows.length === 0) {
-    document.getElementById('lp-table-akun').innerHTML =
-      '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>';
-  } else {
-    var htmlA = '';
-    akunRows.forEach(function(a) {
-      htmlA += '<tr class="hover:bg-slate-50">';
-      htmlA += '<td class="p-4 text-sm text-slate-700">' + _escLP(a.namaAkun) + '</td>';
-      htmlA += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpLP(a.total) + '</td>';
-      htmlA += '</tr>';
-    });
-    document.getElementById('lp-table-akun').innerHTML = htmlA;
-  }
 }
 
 function _escLP(s) {
   return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-window.switchLPTab = function(tab) {
-  _lpActiveTab = tab;
-  var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-violet-700 shadow-sm';
-  var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  document.getElementById('lp-tab-profit-btn').className = tab === 'profit' ? active : inactive;
-  document.getElementById('lp-tab-akun-btn').className   = tab === 'akun'   ? active : inactive;
-  document.getElementById('lp-tab-profit').classList.toggle('hidden', tab !== 'profit');
-  document.getElementById('lp-tab-akun').classList.toggle('hidden',   tab !== 'akun');
-};
 
 // ── Export PDF ─────────────────────────────────────────────────
 
@@ -156,7 +127,6 @@ window.exportLaporanProfitPDF = function() {
 
     var rows     = _lpData.rows      || [];
     var s        = _lpData.summary   || {};
-    var akunRows = _lpData.rekapAkun || [];
     var periodLabel = document.getElementById('lp-period-label');
     var periodText  = periodLabel ? periodLabel.textContent : '';
     var tglCetak    = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
@@ -245,27 +215,6 @@ window.exportLaporanProfitPDF = function() {
       }
     });
     y = doc.lastAutoTable.finalY + 8;
-
-    // ── Rekap Akun ────────────────────────────────────────────────
-    if (akunRows.length > 0) {
-      if (y > 160) { doc.addPage(); y = 14; }
-      doc.setFillColor(DARK[0],DARK[1],DARK[2]);
-      doc.roundedRect(ML, y, 120, 8, 1.5, 1.5, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
-      doc.text('REKAP PENGELUARAN PER AKUN', ML + 3, y + 5.5);
-      y += 10;
-      doc.autoTable({
-        startY: y, margin: { left: ML, right: MR },
-        head: [['Akun Pembayaran', 'Total Pengeluaran']],
-        body: akunRows.map(function(a) { return [a.namaAkun, rp(a.total)]; }),
-        theme: 'grid',
-        styles:     { fontSize: 8, cellPadding: 2.5, font:'helvetica', textColor: DARK },
-        headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 8 },
-        columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
-        alternateRowStyles: { fillColor: [248,250,252] },
-        tableWidth: 120
-      });
-    }
 
     // ── Page numbers ──────────────────────────────────────────────
     var totalPages = doc.internal.getNumberOfPages();
