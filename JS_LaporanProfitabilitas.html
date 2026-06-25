@@ -40,7 +40,7 @@ window.loadLaporanProfitabilitas = function() {
   var params = _lpBuildParams();
 
   document.getElementById('lp-table-profit').innerHTML =
-    '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+    '<tr><td colspan="9" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
   if (typeof google === 'undefined') return;
   google.script.run
@@ -70,7 +70,7 @@ function _renderLaporanProfit(res) {
   var rows = res.rows || [];
   if (rows.length === 0) {
     document.getElementById('lp-table-profit').innerHTML =
-      '<tr><td colspan="8" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
+      '<tr><td colspan="9" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
   } else {
     var html = '';
     rows.forEach(function(r) {
@@ -102,6 +102,14 @@ function _renderLaporanProfit(res) {
       html += '<td class="p-4 text-right text-xs font-semibold ' + selisihCls + '">' + (r.selisih >= 0 ? '+' : '') + _fmtRpLP(r.selisih) + '</td>';
       html += '<td class="p-4 text-right text-xs text-slate-500">' + _fmtPctLP(r.marginEstimasi) + '</td>';
       html += '<td class="p-4 text-right text-xs font-bold ' + (overBudget ? 'text-rose-600' : 'text-emerald-600') + '">' + _fmtPctLP(r.marginRealisasi) + '</td>';
+
+      // Kolom Aksi: export laporan pengeluaran WO ini
+      html += '<td class="p-4 text-center">';
+      html += '<button onclick="exportLaporanPengeluaranWO(\'' + _escLP(r.noWO).replace(/'/g, "\\'") + '\')" title="Lap. Pengeluaran" ';
+      html += 'class="inline-flex items-center gap-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">';
+      html += '<i class="fa-solid fa-file-lines text-[10px]"></i> Lap. Pengeluaran</button>';
+      html += '</td>';
+
       html += '</tr>';
     });
     document.getElementById('lp-table-profit').innerHTML = html;

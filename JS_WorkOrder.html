@@ -706,9 +706,9 @@
     }
 
     // ── Export Laporan Pengeluaran per WO (Fase 4) ─────────────────
-    window.exportLaporanPengeluaranWO = function() {
-      if (!_woDetailCurrent) return;
-      var noWO = _woDetailCurrent.noWO;
+    window.exportLaporanPengeluaranWO = function(noWO) {
+      noWO = noWO || (_woDetailCurrent && _woDetailCurrent.noWO);
+      if (!noWO) return;
       toggleLoader(true, 'Menyiapkan laporan pengeluaran...');
       google.script.run
         .withSuccessHandler(function(res) {
