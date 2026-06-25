@@ -115,8 +115,8 @@ function _renderLaporanKeuangan(res) {
     html += '<td colspan="7" class="px-4 pb-3 pt-0 bg-slate-50/70">';
     if (hasDetail) {
       html += '<div class="flex flex-wrap gap-3 mt-1">';
-      html += _lkKategoriMiniTable('Pengeluaran per Project (No WO - Nama Project)', r.kategoriProject);
-      html += _lkKategoriMiniTable('Pengeluaran Non-Project per Kategori', r.kategoriNonProject);
+      html += _lkKategoriMiniTable('Pengeluaran per Project', r.kategoriProject);
+      html += _lkKategoriMiniTable('Pengeluaran Non-Project', r.kategoriNonProject);
       html += '</div>';
     } else {
       html += '<p class="text-xs text-slate-400 italic text-center py-2">Tidak ada pengeluaran pada bulan ini.</p>';
@@ -192,7 +192,7 @@ window.exportLaporanKeuanganPDF = function() {
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(BLUE[0],BLUE[1],BLUE[2]);
     doc.text('RINGKASAN KEUANGAN', ML, y); y += 5;
     var kpiItems = [
-      { label:'Total Invoice (DPP)',       value: rp(s.totalInvoiceDPP),            color: DARK  },
+      { label:'Total Invoice',       value: rp(s.totalInvoiceDPP),            color: DARK  },
       { label:'Pengeluaran Project',       value: rp(s.totalPengeluaranProject),    color: RED   },
       { label:'Pengeluaran Non-Project',   value: rp(s.totalPengeluaranNonProject), color: RED   },
       { label:'Total Keuntungan',          value: rp(s.totalKeuntungan),            color: GREEN },
@@ -213,7 +213,7 @@ window.exportLaporanKeuanganPDF = function() {
     // ── Tabel bulanan ────────────────────────────────────────────
     doc.autoTable({
       startY: y, margin: { left: ML, right: MR },
-      head: [['Bulan', 'Invoice (DPP)', 'Peng. Project', 'Peng. Non-Project', 'Keuntungan', 'Margin']],
+      head: [['Bulan', 'Invoice', 'Peng. Project', 'Peng. Non-Project', 'Keuntungan', 'Margin']],
       body: rows.map(function(r) {
         return [r.bulan, rp(r.invoiceDPP), rp(r.pengeluaranProject), rp(r.pengeluaranNonProject), rp(r.keuntungan), pct(r.margin)];
       }),
@@ -242,7 +242,7 @@ window.exportLaporanKeuanganPDF = function() {
       doc.setFillColor(DARK[0],DARK[1],DARK[2]);
       doc.roundedRect(ML, y, CW, 7, 1.5, 1.5, 'F');
       doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
-      doc.text('RINCIAN PENGELUARAN KESELURUHAN (SETAHUN)', ML + 3, y + 5);
+      doc.text('RINCIAN PENGELUARAN', ML + 3, y + 5);
       y += 9;
 
       var halfWTahun = (CW - 4) / 2;
@@ -252,7 +252,7 @@ window.exportLaporanKeuanganPDF = function() {
       if (kProjTahun.length) {
         doc.autoTable({
           startY: startYTahun, margin: { left: ML, right: ML + halfWTahun + 4 },
-          head: [['Project (No WO - Nama Project)', 'Total']],
+          head: [['Project', 'Total']],
           body: kProjTahun.map(function(k) { return [k.kategori, rp(k.total)]; }),
           theme: 'grid', tableWidth: halfWTahun,
           styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
@@ -298,7 +298,7 @@ window.exportLaporanKeuanganPDF = function() {
       if (r.kategoriProject && r.kategoriProject.length) {
         doc.autoTable({
           startY: startYBoth, margin: { left: ML, right: ML + halfW + 4 },
-          head: [['Project (No WO - Nama Project)', 'Total']],
+          head: [['Project', 'Total']],
           body: r.kategoriProject.map(function(k) { return [k.kategori, rp(k.total)]; }),
           theme: 'grid', tableWidth: halfW,
           styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
