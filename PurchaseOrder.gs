@@ -9,7 +9,7 @@
  *  3  Nama Supplier
  *  4  Peruntukan
  *  5  No WO
- *  6  Status PO       Aktif | Diterima Sebagian | Diterima | Selesai | Batal
+ *  6  Status PO       Aktif | Menunggu Gudang | Diterima Sebagian | Diterima | Selesai | Batal
  *  7  Subtotal
  *  8  PPN Persen
  *  9  PPN Nominal
@@ -760,7 +760,7 @@ function submitPOKeGudang(noPO, namaUser) {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
     }
     var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
-    poSheet.getRange(poRowIdx, 7).setValue('Menunggu Penerimaan Gudang');
+    poSheet.getRange(poRowIdx, 7).setValue('Menunggu Gudang');
     poSheet.getRange(poRowIdx, 17).setValue(namaUser || '');
     poSheet.getRange(poRowIdx, 18).setValue(nowStr);
     invalidatePOCache();

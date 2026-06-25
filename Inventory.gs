@@ -711,7 +711,7 @@ function getPOItemsUntukPenerimaan(noPO) {
       }
     }
     if (!statusPO) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Gudang' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
@@ -807,7 +807,7 @@ function terimaPOItems(payload) {
       }
     }
     if (poRowIdx < 0) return { success: false, message: 'PO tidak ditemukan.' };
-    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
+    if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Gudang' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
     var noWOPO       = (poData[poRowIdx][5] || '').toString().trim();
@@ -1370,7 +1370,7 @@ function getPOMenungguPenerimaan() {
     var result = [];
     for (var i = 1; i < poData.length; i++) {
       var status = (poData[i][6] || '').toString();
-      if (status !== 'Menunggu Penerimaan Gudang') continue;
+      if (status !== 'Menunggu Gudang' && status !== 'Menunggu Penerimaan Gudang') continue;
       var noPO2 = (poData[i][0] || '').toString().trim();
       var noWO3 = (poData[i][5] || '').toString();
       var tgl   = poData[i][1]

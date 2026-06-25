@@ -15,6 +15,8 @@ function _pgRenderPurchaseOrder(data) {
   }
   var statusPOClass = {
     'Aktif': 'bg-blue-100 text-blue-700',
+    'Menunggu Gudang': 'bg-amber-100 text-amber-700',
+    'Menunggu Penerimaan Gudang': 'bg-amber-100 text-amber-700',
     'Diterima Sebagian': 'bg-amber-100 text-amber-700',
     'Diterima': 'bg-teal-100 text-teal-700',
     'Selesai': 'bg-emerald-100 text-emerald-700',
@@ -119,7 +121,7 @@ function _renderPOKPI(list) {
       outstanding += Math.max(0, grandTotal - totalDibayar);
     }
     if (statusPO !== 'Selesai' && statusPO !== 'Batal') jumlahAktif++;
-    if (statusPO === 'Menunggu Penerimaan Gudang' || statusPO === 'Diterima Sebagian') {
+    if (statusPO === 'Menunggu Gudang' || statusPO === 'Menunggu Penerimaan Gudang' || statusPO === 'Diterima Sebagian') {
       penerimaanCount++;
       penerimaanTotal += grandTotal;
     }
@@ -473,6 +475,8 @@ function tutupPanelPO() {
 function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
   var statusPOClass = {
     'Aktif': 'bg-blue-100 text-blue-700',
+    'Menunggu Gudang': 'bg-amber-100 text-amber-700',
+    'Menunggu Penerimaan Gudang': 'bg-amber-100 text-amber-700',
     'Diterima Sebagian': 'bg-amber-100 text-amber-700',
     'Diterima': 'bg-teal-100 text-teal-700',
     'Selesai': 'bg-emerald-100 text-emerald-700',
