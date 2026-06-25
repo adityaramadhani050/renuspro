@@ -88,7 +88,7 @@ function _renderLaporanKeuangan(res) {
     var kCls = r.keuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var mCls = r.margin === null || r.margin >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var hasDetail = (r.pengeluaranProject > 0) || (r.pengeluaranNonProject > 0);
-    html += '<tr class="hover:bg-slate-50 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
+    html += '<tr class="bg-blue-50/70 hover:bg-blue-100/70 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
     html += '<td class="p-4 text-sm font-semibold text-slate-700">';
     html += '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[10px] text-slate-300 mr-2 transition-transform"></i>';
     html += r.bulan + '</td>';
@@ -99,7 +99,7 @@ function _renderLaporanKeuangan(res) {
     html += '<td class="p-4 text-right text-xs font-bold ' + mCls + '">' + _fmtPctLK(r.margin) + '</td>';
     html += '</tr>';
 
-    html += '<tr id="lk-detail-' + idx + '" class="hidden bg-slate-50/60">';
+    html += '<tr id="lk-detail-' + idx + '" class="hidden bg-white">';
     html += '<td colspan="6" class="p-4">';
     if (hasDetail) {
       html += '<div class="flex flex-wrap gap-6">';
