@@ -27,7 +27,7 @@ window.loadLaporanKeuangan = function() {
   var tahun = parseInt(document.getElementById('lk-tahun').value, 10) || new Date().getFullYear();
 
   document.getElementById('lk-table-bulan').innerHTML =
-    '<tr><td colspan="6" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+    '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
   if (typeof google === 'undefined') return;
   google.script.run
@@ -47,20 +47,25 @@ window.loadLaporanKeuangan = function() {
 
 function _lkKategoriMiniTable(title, kategoriRows) {
   var html = '<div class="flex-1 min-w-[220px]">';
-  html += '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">' + title + '</p>';
+  html += '<p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">' + title + '</p>';
+  html += '<div class="rounded-xl border border-slate-200 overflow-hidden">';
   if (!kategoriRows || kategoriRows.length === 0) {
-    html += '<p class="text-xs text-slate-400 italic">Tidak ada pengeluaran.</p>';
+    html += '<p class="text-xs text-slate-400 italic p-3 text-center bg-white">Tidak ada pengeluaran.</p>';
   } else {
-    html += '<table class="w-full text-xs">';
+    html += '<table class="w-full text-left text-[11px]">';
+    html += '<thead class="bg-slate-100 border-b border-slate-200"><tr>';
+    html += '<th class="px-3 py-2 font-bold text-slate-500">Kategori</th>';
+    html += '<th class="px-3 py-2 font-bold text-slate-500 text-right">Total</th>';
+    html += '</tr></thead><tbody class="divide-y divide-slate-100">';
     kategoriRows.forEach(function(k) {
-      html += '<tr class="border-b border-slate-100 last:border-0">';
-      html += '<td class="py-1.5 pr-2 text-slate-600">' + _escLP(k.kategori) + '</td>';
-      html += '<td class="py-1.5 text-right font-semibold text-slate-700 whitespace-nowrap">' + _fmtRpLP(k.total) + '</td>';
+      html += '<tr class="hover:bg-white transition">';
+      html += '<td class="px-3 py-2 text-slate-600">' + _escLP(k.kategori) + '</td>';
+      html += '<td class="px-3 py-2 text-right font-bold text-slate-700 whitespace-nowrap">' + _fmtRpLP(k.total) + '</td>';
       html += '</tr>';
     });
-    html += '</table>';
+    html += '</tbody></table>';
   }
-  html += '</div>';
+  html += '</div></div>';
   return html;
 }
 
@@ -88,31 +93,38 @@ function _renderLaporanKeuangan(res) {
     var kCls = r.keuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var mCls = r.margin === null || r.margin >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var hasDetail = (r.pengeluaranProject > 0) || (r.pengeluaranNonProject > 0);
-    html += '<tr class="bg-blue-100 hover:bg-blue-200 border-l-4 border-blue-500 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
-    html += '<td class="p-4 text-sm font-bold text-slate-800">';
-    html += '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[10px] text-blue-500 mr-2 transition-transform"></i>';
-    html += r.bulan + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.invoiceDPP) + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranProject) + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranNonProject) + '</td>';
-    html += '<td class="p-4 text-right text-xs font-bold ' + kCls + '">' + _fmtRpLP(r.keuntungan) + '</td>';
-    html += '<td class="p-4 text-right text-xs font-bold ' + mCls + '">' + _fmtPctLK(r.margin) + '</td>';
-    html += '</tr>';
-
-    html += '<tr id="lk-detail-' + idx + '" class="hidden bg-white">';
-    html += '<td colspan="6" class="p-4">';
+    html += '<tr class="hover:bg-slate-50 transition">';
+    html += '<td class="px-4 py-3 text-xs font-bold text-slate-700 whitespace-nowrap">' + r.bulan + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-medium text-slate-600 whitespace-nowrap">' + _fmtRpLP(r.invoiceDPP) + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-medium text-slate-600 whitespace-nowrap">' + _fmtRpLP(r.pengeluaranProject) + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-medium text-slate-600 whitespace-nowrap">' + _fmtRpLP(r.pengeluaranNonProject) + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-bold whitespace-nowrap ' + kCls + '">' + _fmtRpLP(r.keuntungan) + '</td>';
+    html += '<td class="px-4 py-3 text-right text-xs font-bold whitespace-nowrap ' + mCls + '">' + _fmtPctLK(r.margin) + '</td>';
+    html += '<td class="px-4 py-3 text-center">';
     if (hasDetail) {
-      html += '<div class="flex flex-wrap gap-6">';
+      html += '<button onclick="_lkToggleDetail(' + idx + ')" id="lk-toggle-btn-' + idx + '"'
+            + ' class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 mx-auto">'
+            + '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[9px] transition-transform duration-200"></i>'
+            + ' Rincian</button>';
+    } else {
+      html += '<span class="text-[11px] text-slate-300">—</span>';
+    }
+    html += '</td></tr>';
+
+    html += '<tr id="lk-detail-' + idx + '" class="hidden">';
+    html += '<td colspan="7" class="px-4 pb-3 pt-0 bg-slate-50/70">';
+    if (hasDetail) {
+      html += '<div class="flex flex-wrap gap-3 mt-1">';
       html += _lkKategoriMiniTable('Pengeluaran per Project (No WO - Nama Project)', r.kategoriProject);
       html += _lkKategoriMiniTable('Pengeluaran Non-Project per Kategori', r.kategoriNonProject);
       html += '</div>';
     } else {
-      html += '<p class="text-xs text-slate-400 italic text-center">Tidak ada pengeluaran pada bulan ini.</p>';
+      html += '<p class="text-xs text-slate-400 italic text-center py-2">Tidak ada pengeluaran pada bulan ini.</p>';
     }
     html += '</td></tr>';
   });
   document.getElementById('lk-table-bulan').innerHTML = html ||
-    '<tr><td colspan="6" class="p-8 text-center text-slate-400">Tidak ada data untuk tahun ini.</td></tr>';
+    '<tr><td colspan="7" class="p-8 text-center text-slate-400">Tidak ada data untuk tahun ini.</td></tr>';
 
   _lkRenderRincianTahunan(res);
 }
@@ -123,21 +135,23 @@ function _lkRenderRincianTahunan(res) {
 
   var elProj = document.getElementById('lk-table-rincian-project');
   if (proj.length === 0) {
-    elProj.innerHTML = '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran project pada tahun ini.</td></tr>';
+    elProj.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-400">Tidak ada pengeluaran project pada tahun ini.</td></tr>';
   } else {
     elProj.innerHTML = proj.map(function(k) {
-      return '<tr><td class="p-4 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>' +
-        '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(k.total) + '</td></tr>';
+      return '<tr class="hover:bg-slate-50 transition">'
+        + '<td class="px-4 py-3 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>'
+        + '<td class="px-4 py-3 text-right text-xs font-bold text-slate-700 whitespace-nowrap">' + _fmtRpLP(k.total) + '</td></tr>';
     }).join('');
   }
 
   var elNonProj = document.getElementById('lk-table-rincian-nonproject');
   if (nonProj.length === 0) {
-    elNonProj.innerHTML = '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran non-project pada tahun ini.</td></tr>';
+    elNonProj.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-400">Tidak ada pengeluaran non-project pada tahun ini.</td></tr>';
   } else {
     elNonProj.innerHTML = nonProj.map(function(k) {
-      return '<tr><td class="p-4 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>' +
-        '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(k.total) + '</td></tr>';
+      return '<tr class="hover:bg-slate-50 transition">'
+        + '<td class="px-4 py-3 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>'
+        + '<td class="px-4 py-3 text-right text-xs font-bold text-slate-700 whitespace-nowrap">' + _fmtRpLP(k.total) + '</td></tr>';
     }).join('');
   }
 }
