@@ -48,7 +48,7 @@ function _pgRenderPurchaseOrder(data) {
       '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
       '<td class="p-4 text-right whitespace-nowrap">' +
         '<p class="font-bold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
-        ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Inkl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
+        ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
       '</td>' +
       '<td class="p-4 text-center">' +
         '<div class="flex items-center justify-center gap-1">' +
