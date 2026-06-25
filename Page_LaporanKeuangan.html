@@ -21,7 +21,7 @@
         </div>
 
         <!-- ── Summary Cards ── -->
-        <div id="lk-summary-cards" class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+        <div id="lk-summary-cards" class="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Invoice (DPP)</p>
             <p id="lk-card-invoice" class="text-2xl font-extrabold text-slate-800">—</p>
@@ -38,12 +38,17 @@
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Keuntungan</p>
             <p id="lk-card-keuntungan" class="text-2xl font-extrabold text-emerald-600">—</p>
           </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Margin Keuntungan</p>
+            <p id="lk-card-margin" class="text-2xl font-extrabold text-emerald-600">—</p>
+          </div>
         </div>
 
         <!-- ── Tabel Keuntungan Bulanan ── -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
-          <div class="px-4 py-3 border-b border-slate-100">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Keuntungan per Bulan</span>
+            <span class="text-[10px] text-slate-400 font-medium">Klik baris bulan untuk lihat rincian kategori pengeluaran</span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
@@ -54,30 +59,11 @@
                   <th class="p-4 text-right">Pengeluaran Project</th>
                   <th class="p-4 text-right">Pengeluaran Non-Project</th>
                   <th class="p-4 text-right">Keuntungan</th>
+                  <th class="p-4 text-right">Margin</th>
                 </tr>
               </thead>
               <tbody id="lk-table-bulan" class="text-sm divide-y divide-slate-100">
-                <tr><td colspan="5" class="p-8 text-center text-slate-400">Muat data untuk melihat laporan.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ── Rincian Kategori Pengeluaran Non-Project ── -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-100">
-            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rincian Kategori Pengeluaran Non-Project</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th class="p-4">Kategori</th>
-                  <th class="p-4 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody id="lk-table-kategori" class="text-sm divide-y divide-slate-100">
-                <tr><td colspan="2" class="p-8 text-center text-slate-400">Muat data untuk melihat rincian.</td></tr>
+                <tr><td colspan="6" class="p-8 text-center text-slate-400">Muat data untuk melihat laporan.</td></tr>
               </tbody>
             </table>
           </div>

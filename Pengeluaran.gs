@@ -693,7 +693,9 @@ function getLaporanKeuntunganBulanan(params) {
         bulanIdx:            b + 1,
         invoiceDPP:          0,
         pengeluaranProject:  0,
-        pengeluaranNonProject: 0
+        pengeluaranNonProject: 0,
+        kategoriProjectTotal:    {},
+        kategoriNonProjectTotal: {}
       });
     }
 
@@ -711,8 +713,9 @@ function getLaporanKeuntunganBulanan(params) {
       bulanData[m - 1].invoiceDPP += dpp;
     }
 
-    // Pengeluaran per bulan (project & non-project), + breakdown kategori non-project
-    var kategoriTotal = {};
+    // Pengeluaran per bulan (project & non-project), + breakdown kategori per bulan
+    // Project   → dikelompokkan per Nama Akun pembayaran
+    // Non-Project → dikelompokkan per Kategori
     var ss    = getSpreadsheet();
     var sheet = _ensurePengeluaranKategoriCol(ss);
     var expData = sheet.getDataRange().getValues();
@@ -726,18 +729,28 @@ function getLaporanKeuntunganBulanan(params) {
       if (ye !== tahun) continue;
       var totalExp = parseFloat(rowExp[12]) || 0;
       var noWOExp  = (rowExp[1] || '').toString().trim();
+      var dBulan   = bulanData[me - 1];
       if (noWOExp) {
-        bulanData[me - 1].pengeluaranProject += totalExp;
+        dBulan.pengeluaranProject += totalExp;
+        var namaAkun = (rowExp[7] || 'Lainnya').toString();
+        dBulan.kategoriProjectTotal[namaAkun] = (dBulan.kategoriProjectTotal[namaAkun] || 0) + totalExp;
       } else {
-        bulanData[me - 1].pengeluaranNonProject += totalExp;
+        dBulan.pengeluaranNonProject += totalExp;
         var kat = (rowExp[18] || 'Lainnya').toString();
-        kategoriTotal[kat] = (kategoriTotal[kat] || 0) + totalExp;
+        dBulan.kategoriNonProjectTotal[kat] = (dBulan.kategoriNonProjectTotal[kat] || 0) + totalExp;
       }
     }
+
+    var _sortKategori = function(totalMap) {
+      return Object.keys(totalMap).map(function(k) {
+        return { kategori: k, total: totalMap[k] };
+      }).sort(function(a, b) { return b.total - a.total; });
+    };
 
     var totalInvoiceDPP = 0, totalPengeluaranProject = 0, totalPengeluaranNonProject = 0;
     var rows = bulanData.map(function(d) {
       var keuntungan = d.invoiceDPP - d.pengeluaranProject - d.pengeluaranNonProject;
+      var margin     = d.invoiceDPP > 0 ? (keuntungan / d.invoiceDPP * 100) : null;
       totalInvoiceDPP            += d.invoiceDPP;
       totalPengeluaranProject    += d.pengeluaranProject;
       totalPengeluaranNonProject += d.pengeluaranNonProject;
@@ -747,13 +760,15 @@ function getLaporanKeuntunganBulanan(params) {
         invoiceDPP:             d.invoiceDPP,
         pengeluaranProject:     d.pengeluaranProject,
         pengeluaranNonProject:  d.pengeluaranNonProject,
-        keuntungan:             keuntungan
+        keuntungan:             keuntungan,
+        margin:                 margin,
+        kategoriProject:        _sortKategori(d.kategoriProjectTotal),
+        kategoriNonProject:     _sortKategori(d.kategoriNonProjectTotal)
       };
     });
 
-    var kategoriBreakdown = Object.keys(kategoriTotal).map(function(k) {
-      return { kategori: k, total: kategoriTotal[k] };
-    }).sort(function(a, b) { return b.total - a.total; });
+    var totalKeuntungan = totalInvoiceDPP - totalPengeluaranProject - totalPengeluaranNonProject;
+    var totalMargin     = totalInvoiceDPP > 0 ? (totalKeuntungan / totalInvoiceDPP * 100) : null;
 
     return {
       success: true,
@@ -764,9 +779,9 @@ function getLaporanKeuntunganBulanan(params) {
         totalPengeluaranProject:    totalPengeluaranProject,
         totalPengeluaranNonProject: totalPengeluaranNonProject,
         totalPengeluaran:           totalPengeluaranProject + totalPengeluaranNonProject,
-        totalKeuntungan:            totalInvoiceDPP - totalPengeluaranProject - totalPengeluaranNonProject
-      },
-      kategoriBreakdown: kategoriBreakdown
+        totalKeuntungan:            totalKeuntungan,
+        totalMargin:                totalMargin
+      }
     };
   } catch(e) {
     return { success: false, message: e.toString() };

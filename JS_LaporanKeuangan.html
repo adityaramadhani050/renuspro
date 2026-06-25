@@ -17,14 +17,17 @@ function _lkInitTahunSelect() {
   }
 }
 
+function _fmtPctLK(n) {
+  if (n === null || n === undefined) return '—';
+  return parseFloat(n).toFixed(1) + '%';
+}
+
 window.loadLaporanKeuangan = function() {
   if (!document.getElementById('lk-tahun').options.length) _lkInitTahunSelect();
   var tahun = parseInt(document.getElementById('lk-tahun').value, 10) || new Date().getFullYear();
 
   document.getElementById('lk-table-bulan').innerHTML =
-    '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  document.getElementById('lk-table-kategori').innerHTML =
-    '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+    '<tr><td colspan="6" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
 
   if (typeof google === 'undefined') return;
   google.script.run
@@ -42,6 +45,33 @@ window.loadLaporanKeuangan = function() {
     .getLaporanKeuntunganBulanan({ tahun: tahun });
 };
 
+function _lkKategoriMiniTable(title, kategoriRows) {
+  var html = '<div class="flex-1 min-w-[220px]">';
+  html += '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">' + title + '</p>';
+  if (!kategoriRows || kategoriRows.length === 0) {
+    html += '<p class="text-xs text-slate-400 italic">Tidak ada pengeluaran.</p>';
+  } else {
+    html += '<table class="w-full text-xs">';
+    kategoriRows.forEach(function(k) {
+      html += '<tr class="border-b border-slate-100 last:border-0">';
+      html += '<td class="py-1.5 pr-2 text-slate-600">' + _escLP(k.kategori) + '</td>';
+      html += '<td class="py-1.5 text-right font-semibold text-slate-700 whitespace-nowrap">' + _fmtRpLP(k.total) + '</td>';
+      html += '</tr>';
+    });
+    html += '</table>';
+  }
+  html += '</div>';
+  return html;
+}
+
+window._lkToggleDetail = function(idx) {
+  var row = document.getElementById('lk-detail-' + idx);
+  var icon = document.getElementById('lk-chevron-' + idx);
+  if (!row) return;
+  row.classList.toggle('hidden');
+  if (icon) icon.classList.toggle('fa-rotate-180');
+};
+
 function _renderLaporanKeuangan(res) {
   var s = res.summary || {};
   document.getElementById('lk-card-invoice').textContent        = _fmtRpLP(s.totalInvoiceDPP);
@@ -49,35 +79,40 @@ function _renderLaporanKeuangan(res) {
   document.getElementById('lk-card-exp-nonproject').textContent = _fmtRpLP(s.totalPengeluaranNonProject);
   document.getElementById('lk-card-keuntungan').textContent     = _fmtRpLP(s.totalKeuntungan);
   document.getElementById('lk-card-keuntungan').className = 'text-2xl font-extrabold ' + (s.totalKeuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600');
+  document.getElementById('lk-card-margin').textContent     = _fmtPctLK(s.totalMargin);
+  document.getElementById('lk-card-margin').className = 'text-2xl font-extrabold ' + (s.totalMargin === null || s.totalMargin >= 0 ? 'text-emerald-600' : 'text-rose-600');
 
   var rows = res.rows || [];
   var html = '';
-  rows.forEach(function(r) {
+  rows.forEach(function(r, idx) {
     var kCls = r.keuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600';
-    html += '<tr class="hover:bg-slate-50 transition-colors">';
-    html += '<td class="p-4 text-sm font-semibold text-slate-700">' + r.bulan + '</td>';
+    var mCls = r.margin === null || r.margin >= 0 ? 'text-emerald-600' : 'text-rose-600';
+    var hasDetail = (r.pengeluaranProject > 0) || (r.pengeluaranNonProject > 0);
+    html += '<tr class="hover:bg-slate-50 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
+    html += '<td class="p-4 text-sm font-semibold text-slate-700">';
+    html += '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[10px] text-slate-300 mr-2 transition-transform"></i>';
+    html += r.bulan + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.invoiceDPP) + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranProject) + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranNonProject) + '</td>';
     html += '<td class="p-4 text-right text-xs font-bold ' + kCls + '">' + _fmtRpLP(r.keuntungan) + '</td>';
+    html += '<td class="p-4 text-right text-xs font-bold ' + mCls + '">' + _fmtPctLK(r.margin) + '</td>';
     html += '</tr>';
-  });
-  document.getElementById('lk-table-bulan').innerHTML = html;
 
-  var kategoriRows = res.kategoriBreakdown || [];
-  if (kategoriRows.length === 0) {
-    document.getElementById('lk-table-kategori').innerHTML =
-      '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran non-project pada periode ini.</td></tr>';
-  } else {
-    var htmlK = '';
-    kategoriRows.forEach(function(k) {
-      htmlK += '<tr class="hover:bg-slate-50">';
-      htmlK += '<td class="p-4 text-sm text-slate-700">' + _escLP(k.kategori) + '</td>';
-      htmlK += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpLP(k.total) + '</td>';
-      htmlK += '</tr>';
-    });
-    document.getElementById('lk-table-kategori').innerHTML = htmlK;
-  }
+    html += '<tr id="lk-detail-' + idx + '" class="hidden bg-slate-50/60">';
+    html += '<td colspan="6" class="p-4">';
+    if (hasDetail) {
+      html += '<div class="flex flex-wrap gap-6">';
+      html += _lkKategoriMiniTable('Pengeluaran Project per Akun', r.kategoriProject);
+      html += _lkKategoriMiniTable('Pengeluaran Non-Project per Kategori', r.kategoriNonProject);
+      html += '</div>';
+    } else {
+      html += '<p class="text-xs text-slate-400 italic text-center">Tidak ada pengeluaran pada bulan ini.</p>';
+    }
+    html += '</td></tr>';
+  });
+  document.getElementById('lk-table-bulan').innerHTML = html ||
+    '<tr><td colspan="6" class="p-8 text-center text-slate-400">Tidak ada data untuk tahun ini.</td></tr>';
 }
 
 // ── Export PDF ─────────────────────────────────────────────────
@@ -89,11 +124,11 @@ window.exportLaporanKeuanganPDF = function() {
     var PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
     var DARK  = [30,41,59],  SLATE = [100,116,139], BLUE  = [30,64,175];
     var GREEN = [5,150,105], RED   = [190,30,45],   WHITE = [255,255,255];
-    var rp = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
+    var rp  = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
+    var pct = function(v) { return (v === null || v === undefined) ? '—' : parseFloat(v).toFixed(1) + '%'; };
 
-    var s        = _lkData.summary          || {};
-    var rows     = _lkData.rows             || [];
-    var kategori = _lkData.kategoriBreakdown || [];
+    var s        = _lkData.summary || {};
+    var rows     = _lkData.rows    || [];
     var tahun    = document.getElementById('lk-tahun').value;
     var tglCetak = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
 
@@ -119,36 +154,38 @@ window.exportLaporanKeuanganPDF = function() {
       { label:'Total Invoice (DPP)',       value: rp(s.totalInvoiceDPP),            color: DARK  },
       { label:'Pengeluaran Project',       value: rp(s.totalPengeluaranProject),    color: RED   },
       { label:'Pengeluaran Non-Project',   value: rp(s.totalPengeluaranNonProject), color: RED   },
-      { label:'Total Keuntungan',          value: rp(s.totalKeuntungan),            color: GREEN }
+      { label:'Total Keuntungan',          value: rp(s.totalKeuntungan),            color: GREEN },
+      { label:'Margin Keuntungan',         value: pct(s.totalMargin),               color: GREEN }
     ];
-    var boxW = (CW - 7.5) / 4, boxH = 14, gap = 2.5;
+    var boxW = (CW - 10) / 5, boxH = 14, gap = 2.5;
     kpiItems.forEach(function(k, i) {
       var bx = ML + i * (boxW + gap), by = y;
       doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
       doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'FD');
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
-      doc.text(k.label.toUpperCase(), bx + 3, by + 4.5);
-      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(k.color[0],k.color[1],k.color[2]);
-      doc.text(k.value, bx + 3, by + 10.5);
+      doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(SLATE[0],SLATE[1],SLATE[2]);
+      doc.text(k.label.toUpperCase(), bx + 2.5, by + 4.5);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(k.color[0],k.color[1],k.color[2]);
+      doc.text(k.value, bx + 2.5, by + 10.5);
     });
     y += boxH + 8;
 
     // ── Tabel bulanan ────────────────────────────────────────────
     doc.autoTable({
       startY: y, margin: { left: ML, right: MR },
-      head: [['Bulan', 'Invoice (DPP)', 'Peng. Project', 'Peng. Non-Project', 'Keuntungan']],
+      head: [['Bulan', 'Invoice (DPP)', 'Peng. Project', 'Peng. Non-Project', 'Keuntungan', 'Margin']],
       body: rows.map(function(r) {
-        return [r.bulan, rp(r.invoiceDPP), rp(r.pengeluaranProject), rp(r.pengeluaranNonProject), rp(r.keuntungan)];
+        return [r.bulan, rp(r.invoiceDPP), rp(r.pengeluaranProject), rp(r.pengeluaranNonProject), rp(r.keuntungan), pct(r.margin)];
       }),
       theme: 'grid',
       styles:     { fontSize: 8, cellPadding: 2.5, font:'helvetica', textColor: DARK },
       headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold' },
       columnStyles: {
-        1: { halign:'right' }, 2: { halign:'right' }, 3: { halign:'right' }, 4: { halign:'right', fontStyle:'bold' }
+        1: { halign:'right' }, 2: { halign:'right' }, 3: { halign:'right' },
+        4: { halign:'right', fontStyle:'bold' }, 5: { halign:'right', fontStyle:'bold' }
       },
       alternateRowStyles: { fillColor: [248,250,252] },
       didParseCell: function(d) {
-        if (d.section === 'body' && d.column.index === 4) {
+        if (d.section === 'body' && (d.column.index === 4 || d.column.index === 5)) {
           var r = rows[d.row.index];
           d.cell.styles.textColor = (r && r.keuntungan < 0) ? RED : GREEN;
         }
@@ -156,26 +193,51 @@ window.exportLaporanKeuanganPDF = function() {
     });
     y = doc.lastAutoTable.finalY + 8;
 
-    // ── Rincian kategori ─────────────────────────────────────────
-    if (kategori.length > 0) {
-      if (y > 250) { doc.addPage(); y = 14; }
+    // ── Rincian kategori per bulan ─────────────────────────────────
+    rows.forEach(function(r) {
+      var hasDetail = (r.kategoriProject && r.kategoriProject.length) || (r.kategoriNonProject && r.kategoriNonProject.length);
+      if (!hasDetail) return;
+      if (y > 255) { doc.addPage(); y = 14; }
       doc.setFillColor(DARK[0],DARK[1],DARK[2]);
-      doc.roundedRect(ML, y, 120, 8, 1.5, 1.5, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
-      doc.text('RINCIAN KATEGORI PENGELUARAN NON-PROJECT', ML + 3, y + 5.5);
-      y += 10;
-      doc.autoTable({
-        startY: y, margin: { left: ML, right: MR },
-        head: [['Kategori', 'Total']],
-        body: kategori.map(function(k) { return [k.kategori, rp(k.total)]; }),
-        theme: 'grid',
-        styles:     { fontSize: 8, cellPadding: 2.5, font:'helvetica', textColor: DARK },
-        headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 8 },
-        columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
-        alternateRowStyles: { fillColor: [248,250,252] },
-        tableWidth: 120
-      });
-    }
+      doc.roundedRect(ML, y, CW, 7, 1.5, 1.5, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+      doc.text('RINCIAN PENGELUARAN — ' + r.bulan.toUpperCase(), ML + 3, y + 5);
+      y += 9;
+
+      var halfW = (CW - 4) / 2;
+      var startYBoth = y;
+      var endYLeft = y, endYRight = y;
+
+      if (r.kategoriProject && r.kategoriProject.length) {
+        doc.autoTable({
+          startY: startYBoth, margin: { left: ML, right: ML + halfW + 4 },
+          head: [['Akun (Project)', 'Total']],
+          body: r.kategoriProject.map(function(k) { return [k.kategori, rp(k.total)]; }),
+          theme: 'grid', tableWidth: halfW,
+          styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
+          headStyles: { fillColor: [109,40,217], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
+          columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+          alternateRowStyles: { fillColor: [248,250,252] }
+        });
+        endYLeft = doc.lastAutoTable.finalY;
+      }
+
+      if (r.kategoriNonProject && r.kategoriNonProject.length) {
+        doc.autoTable({
+          startY: startYBoth, margin: { left: ML + halfW + 4, right: MR },
+          head: [['Kategori (Non-Project)', 'Total']],
+          body: r.kategoriNonProject.map(function(k) { return [k.kategori, rp(k.total)]; }),
+          theme: 'grid', tableWidth: halfW,
+          styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
+          headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
+          columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+          alternateRowStyles: { fillColor: [248,250,252] }
+        });
+        endYRight = doc.lastAutoTable.finalY;
+      }
+
+      y = Math.max(endYLeft, endYRight) + 7;
+    });
 
     // ── Page numbers ──────────────────────────────────────────────
     var totalPages = doc.internal.getNumberOfPages();
