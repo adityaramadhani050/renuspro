@@ -88,9 +88,9 @@ function _renderLaporanKeuangan(res) {
     var kCls = r.keuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var mCls = r.margin === null || r.margin >= 0 ? 'text-emerald-600' : 'text-rose-600';
     var hasDetail = (r.pengeluaranProject > 0) || (r.pengeluaranNonProject > 0);
-    html += '<tr class="bg-blue-50/70 hover:bg-blue-100/70 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
-    html += '<td class="p-4 text-sm font-semibold text-slate-700">';
-    html += '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[10px] text-slate-300 mr-2 transition-transform"></i>';
+    html += '<tr class="bg-blue-100 hover:bg-blue-200 border-l-4 border-blue-500 transition-colors cursor-pointer" onclick="_lkToggleDetail(' + idx + ')">';
+    html += '<td class="p-4 text-sm font-bold text-slate-800">';
+    html += '<i id="lk-chevron-' + idx + '" class="fa-solid fa-chevron-down text-[10px] text-blue-500 mr-2 transition-transform"></i>';
     html += r.bulan + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.invoiceDPP) + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranProject) + '</td>';
@@ -113,6 +113,33 @@ function _renderLaporanKeuangan(res) {
   });
   document.getElementById('lk-table-bulan').innerHTML = html ||
     '<tr><td colspan="6" class="p-8 text-center text-slate-400">Tidak ada data untuk tahun ini.</td></tr>';
+
+  _lkRenderRincianTahunan(res);
+}
+
+function _lkRenderRincianTahunan(res) {
+  var proj = res.kategoriProjectTahunan || [];
+  var nonProj = res.kategoriNonProjectTahunan || [];
+
+  var elProj = document.getElementById('lk-table-rincian-project');
+  if (proj.length === 0) {
+    elProj.innerHTML = '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran project pada tahun ini.</td></tr>';
+  } else {
+    elProj.innerHTML = proj.map(function(k) {
+      return '<tr><td class="p-4 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>' +
+        '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(k.total) + '</td></tr>';
+    }).join('');
+  }
+
+  var elNonProj = document.getElementById('lk-table-rincian-nonproject');
+  if (nonProj.length === 0) {
+    elNonProj.innerHTML = '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran non-project pada tahun ini.</td></tr>';
+  } else {
+    elNonProj.innerHTML = nonProj.map(function(k) {
+      return '<tr><td class="p-4 text-xs text-slate-600">' + _escLP(k.kategori) + '</td>' +
+        '<td class="p-4 text-right text-xs font-semibold text-slate-700">' + _fmtRpLP(k.total) + '</td></tr>';
+    }).join('');
+  }
 }
 
 // ── Export PDF ─────────────────────────────────────────────────
@@ -192,6 +219,52 @@ window.exportLaporanKeuanganPDF = function() {
       }
     });
     y = doc.lastAutoTable.finalY + 8;
+
+    // ── Rincian pengeluaran keseluruhan (setahun) ───────────────────
+    var kProjTahun = _lkData.kategoriProjectTahunan || [];
+    var kNonProjTahun = _lkData.kategoriNonProjectTahunan || [];
+    if (kProjTahun.length || kNonProjTahun.length) {
+      if (y > 255) { doc.addPage(); y = 14; }
+      doc.setFillColor(DARK[0],DARK[1],DARK[2]);
+      doc.roundedRect(ML, y, CW, 7, 1.5, 1.5, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
+      doc.text('RINCIAN PENGELUARAN KESELURUHAN (SETAHUN)', ML + 3, y + 5);
+      y += 9;
+
+      var halfWTahun = (CW - 4) / 2;
+      var startYTahun = y;
+      var endYLeftTahun = y, endYRightTahun = y;
+
+      if (kProjTahun.length) {
+        doc.autoTable({
+          startY: startYTahun, margin: { left: ML, right: ML + halfWTahun + 4 },
+          head: [['Project (No WO - Nama Project)', 'Total']],
+          body: kProjTahun.map(function(k) { return [k.kategori, rp(k.total)]; }),
+          theme: 'grid', tableWidth: halfWTahun,
+          styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
+          headStyles: { fillColor: [109,40,217], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
+          columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+          alternateRowStyles: { fillColor: [248,250,252] }
+        });
+        endYLeftTahun = doc.lastAutoTable.finalY;
+      }
+
+      if (kNonProjTahun.length) {
+        doc.autoTable({
+          startY: startYTahun, margin: { left: ML + halfWTahun + 4, right: MR },
+          head: [['Kategori (Non-Project)', 'Total']],
+          body: kNonProjTahun.map(function(k) { return [k.kategori, rp(k.total)]; }),
+          theme: 'grid', tableWidth: halfWTahun,
+          styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },
+          headStyles: { fillColor: [51,65,85], textColor: WHITE, fontStyle:'bold', fontSize: 7 },
+          columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+          alternateRowStyles: { fillColor: [248,250,252] }
+        });
+        endYRightTahun = doc.lastAutoTable.finalY;
+      }
+
+      y = Math.max(endYLeftTahun, endYRightTahun) + 8;
+    }
 
     // ── Rincian kategori per bulan ─────────────────────────────────
     rows.forEach(function(r) {

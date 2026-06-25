@@ -749,6 +749,17 @@ function getLaporanKeuntunganBulanan(params) {
       }).sort(function(a, b) { return b.total - a.total; });
     };
 
+    // Rincian keseluruhan setahun (akumulasi dari semua bulan)
+    var kategoriProjectTahunan = {}, kategoriNonProjectTahunan = {};
+    bulanData.forEach(function(d) {
+      Object.keys(d.kategoriProjectTotal).forEach(function(k) {
+        kategoriProjectTahunan[k] = (kategoriProjectTahunan[k] || 0) + d.kategoriProjectTotal[k];
+      });
+      Object.keys(d.kategoriNonProjectTotal).forEach(function(k) {
+        kategoriNonProjectTahunan[k] = (kategoriNonProjectTahunan[k] || 0) + d.kategoriNonProjectTotal[k];
+      });
+    });
+
     var totalInvoiceDPP = 0, totalPengeluaranProject = 0, totalPengeluaranNonProject = 0;
     var rows = bulanData.map(function(d) {
       var keuntungan = d.invoiceDPP - d.pengeluaranProject - d.pengeluaranNonProject;
@@ -783,7 +794,9 @@ function getLaporanKeuntunganBulanan(params) {
         totalPengeluaran:           totalPengeluaranProject + totalPengeluaranNonProject,
         totalKeuntungan:            totalKeuntungan,
         totalMargin:                totalMargin
-      }
+      },
+      kategoriProjectTahunan:    _sortKategori(kategoriProjectTahunan),
+      kategoriNonProjectTahunan: _sortKategori(kategoriNonProjectTahunan)
     };
   } catch(e) {
     return { success: false, message: e.toString() };
