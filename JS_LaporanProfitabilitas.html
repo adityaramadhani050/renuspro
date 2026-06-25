@@ -5,7 +5,6 @@
 
 var _lpData      = null;
 var _lpActiveTab = 'profit';
-var _lpFilter    = { mode: 'thisMonth', from: null, to: null };
 
 function _fmtRpLP(n) {
   n = parseFloat(n) || 0;
@@ -17,77 +16,22 @@ function _fmtPctLP(n) {
   return parseFloat(n).toFixed(1) + '%';
 }
 
-// ── Filter preset ────────────────────────────────────────────────
-
-window.setLPPreset = function(mode) {
-  _lpFilter.mode = mode;
-  document.querySelectorAll('.lp-preset-btn').forEach(function(b) {
-    b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
-    b.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
-  });
-  var active = document.getElementById('lp-preset-' + mode);
-  if (active) {
-    active.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
-    active.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
-  }
-  var customRange = document.getElementById('lp-custom-range');
-  if (mode === 'custom') {
-    customRange.classList.remove('hidden');
-    customRange.style.display = 'flex';
-    return;
-  }
-  customRange.classList.add('hidden');
-
-  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  if (mode === 'thisMonth') {
-    _lpFilter.from = new Date(y, m, 1);
-    _lpFilter.to   = new Date(y, m + 1, 0);
-  } else if (mode === 'lastMonth') {
-    var lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y;
-    _lpFilter.from = new Date(ly, lm, 1);
-    _lpFilter.to   = new Date(ly, lm + 1, 0);
-  } else if (mode === 'thisYear') {
-    _lpFilter.from = new Date(y, 0, 1);
-    _lpFilter.to   = new Date(y, 11, 31);
-  } else { // all
-    _lpFilter.from = null;
-    _lpFilter.to   = null;
-  }
-  _lpUpdatePeriodLabel();
-  loadLaporanProfitabilitas();
-};
-
-window.applyLPCustomFilter = function() {
-  var fromVal = document.getElementById('lp-date-from').value;
-  var toVal   = document.getElementById('lp-date-to').value;
-  if (!fromVal || !toVal) { showNotification('Pilih tanggal mulai dan akhir.', 'error'); return; }
-  _lpFilter.from = new Date(fromVal);
-  _lpFilter.to   = new Date(toVal);
-  _lpFilter.to.setHours(23, 59, 59);
-  _lpUpdatePeriodLabel();
-  loadLaporanProfitabilitas();
-};
-
 function _lpUpdatePeriodLabel() {
   var el = document.getElementById('lp-period-label');
   if (!el) return;
-  var f = _lpFilter;
-  if (!f.from && !f.to) { el.textContent = 'Semua Periode'; return; }
-  var opts = { day: '2-digit', month: 'short', year: 'numeric' };
-  var from = f.from ? f.from.toLocaleDateString('id-ID', opts) : '';
-  var to   = f.to   ? f.to.toLocaleDateString('id-ID', opts)   : '';
-  el.textContent = from + (to && to !== from ? ' – ' + to : '');
+  el.textContent = 'Tahun ' + new Date().getFullYear();
 }
 
 function _lpBuildParams() {
+  var y = new Date().getFullYear();
   var fmt = function(d) {
     return d.getFullYear() + '-'
       + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
       + ('0' + d.getDate()).slice(-2);
   };
   return {
-    tanggalDari:   _lpFilter.from ? fmt(_lpFilter.from) : '',
-    tanggalSampai: _lpFilter.to   ? fmt(_lpFilter.to)   : ''
+    tanggalDari:   fmt(new Date(y, 0, 1)),
+    tanggalSampai: fmt(new Date(y, 11, 31))
   };
 }
 
@@ -277,10 +221,6 @@ function _renderLaporanKeuntunganBulanan(res) {
     document.getElementById('lpb-table-kategori').innerHTML = htmlK;
   }
 }
-
-window.resetFilterLP = function() {
-  setLPPreset('thisMonth');
-};
 
 // ── Export PDF ─────────────────────────────────────────────────
 

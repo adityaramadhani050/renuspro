@@ -11,52 +11,12 @@
           </button>
         </div>
 
-        <!-- ── Filter Periode ── -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-            <i class="fa-solid fa-calendar-days mr-1 text-blue-500"></i> Periode
-          </span>
-          <div class="flex gap-1.5 flex-wrap">
-            <button id="lp-preset-thisMonth" onclick="setLPPreset('thisMonth')"
-              class="lp-preset-btn active px-3 py-1 rounded-lg text-[11px] font-bold border transition
-                     bg-blue-600 text-white border-blue-600">
-              Bulan Ini
-            </button>
-            <button id="lp-preset-lastMonth" onclick="setLPPreset('lastMonth')"
-              class="lp-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
-                     bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
-              Bulan Lalu
-            </button>
-            <button id="lp-preset-thisYear" onclick="setLPPreset('thisYear')"
-              class="lp-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
-                     bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
-              Tahun Ini
-            </button>
-            <button id="lp-preset-all" onclick="setLPPreset('all')"
-              class="lp-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
-                     bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
-              Semua
-            </button>
-            <button id="lp-preset-custom" onclick="setLPPreset('custom')"
-              class="lp-preset-btn px-3 py-1 rounded-lg text-[11px] font-bold border transition
-                     bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600">
-              Custom
-            </button>
-          </div>
-          <!-- Custom date range -->
-          <div id="lp-custom-range" class="hidden items-center gap-2 flex-wrap">
-            <input type="date" id="lp-date-from"
-              class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
-            <span class="text-xs text-slate-400">—</span>
-            <input type="date" id="lp-date-to"
-              class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300">
-            <button onclick="applyLPCustomFilter()"
-              class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition">
-              Terapkan
-            </button>
-          </div>
-          <!-- Period label -->
-          <span id="lp-period-label" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full ml-auto whitespace-nowrap"></span>
+        <!-- ── Periode ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 px-4 py-3 mb-5 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-days text-blue-500"></i>
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Periode</span>
+          <span id="lp-period-label" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full"></span>
+          <span class="text-xs text-slate-400">— menampilkan seluruh data tahun ini</span>
         </div>
 
         <!-- ── Summary Cards ── -->

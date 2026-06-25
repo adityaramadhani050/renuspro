@@ -80,10 +80,8 @@
       if(pageId === 'customer') loadCustomer();
       if(pageId === 'users') loadUsers();
       if(pageId === 'laporanfinance') {
-        // Inisialisasi filter ke "Bulan Ini" setiap kali halaman dibuka
-        var now = new Date(), y = now.getFullYear(), m = now.getMonth();
-        _frFilter = { mode: 'thisMonth', from: new Date(y, m, 1), to: new Date(y, m + 1, 0) };
-        setFRPreset('thisMonth');
+        _frUpdatePeriodLabel();
+        loadFinanceReport();
       }
       if(pageId === 'settings') loadSettings();
       if(pageId === 'supplier') loadSupplier();
@@ -103,7 +101,10 @@
         loadInventory();
       }
       if(pageId === 'pengeluaran') loadPengeluaran();
-      if(pageId === 'laporanprofitabilitas') setLPPreset('thisMonth');
+      if(pageId === 'laporanprofitabilitas') {
+        _lpUpdatePeriodLabel();
+        loadLaporanProfitabilitas();
+      }
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }
