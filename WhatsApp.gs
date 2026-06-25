@@ -101,45 +101,127 @@ function _waFmtRp(n) {
   return 'Rp ' + Math.round(n || 0).toLocaleString('id');
 }
 
-function notifInvoiceDibuat(inv) {
-  sendWANotif(
-    '📋 *Invoice Baru Diterbitkan*\n' +
-    inv.noInvoice + ' • ' + inv.jenis + (inv.persen > 0 ? ' ' + inv.persen + '%' : '') + '\n' +
-    'Klien  : ' + inv.namaKlien + '\n' +
-    'Project: ' + inv.namaProject + '\n' +
-    'Total  : ' + _waFmtRp(inv.total) + '\n' +
-    'Oleh   : ' + (inv.dibuatOleh || '-')
-  );
+// ── Reminder Penawaran Expired ───────────────────────────────────────────────
+// Kolom Penawaran_Main, 0-indexed: 3=Valid Hingga, 16=Status, 21=Reminder Expired Terkirim
+function cekReminderPenawaranExpired() {
+  try {
+    var ss    = getSpreadsheet();
+    var sheet = ss.getSheetByName('Penawaran_Main');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+
+    var tz    = Session.getScriptTimeZone();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function parseTgl(raw) {
+      if (raw instanceof Date) return isNaN(raw) ? null : raw;
+      if (!raw) return null;
+      var s = raw.toString();
+      if (s.indexOf('T') > 0) {
+        var d = new Date(s);
+        return isNaN(d) ? null : d;
+      }
+      var parts = s.split('/');
+      if (parts.length === 3) {
+        var d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+        return isNaN(d) ? null : d;
+      }
+      var d2 = new Date(s);
+      return isNaN(d2) ? null : d2;
+    }
+
+    // Dedupe: simpan baris dengan rev TERTINGGI per No Penawaran
+    var latestRowByNo = {};
+    for (var i = 1; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      var no  = data[i][0].toString();
+      var rev = parseInt(data[i][1]) || 0;
+      if (!(no in latestRowByNo) || rev > latestRowByNo[no].rev) {
+        latestRowByNo[no] = { rowIndex: i, rev: rev };
+      }
+    }
+
+    var klienMap = {};
+    var sheetKlien = ss.getSheetByName('Master_Klien');
+    if (sheetKlien) {
+      var kd = sheetKlien.getDataRange().getValues();
+      for (var k = 1; k < kd.length; k++) {
+        if (kd[k][0]) klienMap[kd[k][0].toString()] = kd[k][1].toString();
+      }
+    }
+
+    var expiredList = [];
+    for (var no2 in latestRowByNo) {
+      var rIdx   = latestRowByNo[no2].rowIndex;
+      var row    = data[rIdx];
+      var status = row[16] ? row[16].toString() : 'On-Progress';
+      if (status !== 'On-Progress') continue;
+
+      var sudahKirim = row[21] ? row[21].toString().trim().toUpperCase() : '';
+      if (sudahKirim === '1' || sudahKirim === 'TRUE') continue;
+
+      var validDate = parseTgl(row[3]);
+      if (!validDate || validDate >= today) continue;
+
+      var klienId = row[5] ? row[5].toString() : '';
+      expiredList.push({
+        rowIndex:    rIdx,
+        noPenawaran: no2,
+        namaProject: row[4] ? row[4].toString() : '',
+        namaKlien:   klienMap[klienId] || klienId,
+        dibuatOleh:  row[6] ? row[6].toString() : '',
+        validHingga: Utilities.formatDate(validDate, tz, 'dd/MM/yyyy')
+      });
+    }
+
+    if (!expiredList.length) return;
+
+    sendWANotif(_waMsgReminderExpired(expiredList));
+
+    expiredList.forEach(function(it) {
+      sheet.getRange(it.rowIndex + 1, 22).setValue('1');
+    });
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('cekReminderPenawaranExpired error: ' + e);
+  }
 }
 
-function notifInvoiceLunas(inv) {
-  sendWANotif(
-    '✅ *Invoice Lunas*\n' +
-    inv.noInvoice + '\n' +
-    'Klien  : ' + inv.namaKlien + '\n' +
-    'Project: ' + inv.namaProject + '\n' +
-    'Total  : ' + _waFmtRp(inv.total)
-  );
+function _waMsgReminderExpired(list) {
+  var lines = [
+    '⏰ *Reminder Follow-up Penawaran Expired*',
+    'Penawaran berikut sudah lewat tanggal berlaku, mohon follow-up kembali ke customer:',
+    ''
+  ];
+  list.forEach(function(it, idx) {
+    lines.push(
+      (idx + 1) + '. ' + it.noPenawaran + ' — ' + it.namaProject + '\n' +
+      '   Klien : ' + it.namaKlien + '\n' +
+      '   Sales : ' + it.dibuatOleh + '\n' +
+      '   Valid s.d. : ' + it.validHingga
+    );
+  });
+  return lines.join('\n');
 }
 
-function notifRequestInvoice(data) {
-  sendWANotif(
-    '🔔 *Request Buat Invoice*\n' +
-    'WO-' + data.noWO + '\n' +
-    'Klien  : ' + data.namaKlien + '\n' +
-    'Project: ' + data.namaProject + '\n' +
-    'Sales  : ' + data.sales + '\n' +
-    (data.pesan ? 'Pesan  : ' + data.pesan + '\n' : '') +
-    'Waktu  : ' + data.tanggal
-  );
-}
+// ── Trigger harian (self-installing, dipanggil dari doGet) ──────────────────
+function _ensureTriggerReminderExpired() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('TRIGGER_REMINDER_EXPIRED_INSTALLED') === '1') return;
 
-function notifWODibuat(wo) {
-  sendWANotif(
-    '🔨 *Work Order Dibuat*\n' +
-    'WO-' + wo.noWO + ' (dari ' + wo.noPenawaran + ')\n' +
-    'Klien  : ' + wo.namaKlien + '\n' +
-    'Project: ' + wo.namaProject + '\n' +
-    'Nilai  : ' + _waFmtRp(wo.nilaiKontrak)
-  );
+    var triggers  = ScriptApp.getProjectTriggers();
+    var sudahAda = triggers.some(function(t) {
+      return t.getHandlerFunction() === 'cekReminderPenawaranExpired';
+    });
+    if (!sudahAda) {
+      ScriptApp.newTrigger('cekReminderPenawaranExpired')
+        .timeBased().everyDays(1).atHour(8).create();
+    }
+    props.setProperty('TRIGGER_REMINDER_EXPIRED_INSTALLED', '1');
+  } catch (e) {
+    Logger.log('_ensureTriggerReminderExpired error: ' + e);
+  }
 }

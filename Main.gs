@@ -7,6 +7,7 @@
  */
 
 function doGet() {
+  try { _ensureTriggerReminderExpired(); } catch (e) {}
   return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('RenusPro - PT. Renus Global Indonesia')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)

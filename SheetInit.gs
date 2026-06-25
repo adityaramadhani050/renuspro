@@ -47,10 +47,11 @@ function buatSheetTemplatePaket(ss) {
 function buatSheetPenawaranDefault(ss) {
   const sheet = ss.insertSheet('Penawaran_Main');
   sheet.appendRow([
-    'No Penawaran', 'Rev', 'Tanggal', 'Valid Hingga', 'Nama Project',            
-    'Klien ID', 'Dibuat Oleh', 'Subtotal', 'Diskon', 'Pajak (PPN)', 'Grand Total',             
-    'Total HPP', 'Estimasi Keuntungan', 'Margin Profit (%)', 'Syarat Ketentuan (JSON)', 
-    'Rincian Item (JSON)', 'Status'                   
+    'No Penawaran', 'Rev', 'Tanggal', 'Valid Hingga', 'Nama Project',
+    'Klien ID', 'Dibuat Oleh', 'Subtotal', 'Diskon', 'Pajak (PPN)', 'Grand Total',
+    'Total HPP', 'Estimasi Keuntungan', 'Margin Profit (%)', 'Syarat Ketentuan (JSON)',
+    'Rincian Item (JSON)', 'Status', 'No WO', 'Tanggal Deal', 'Channel Marketing',
+    'Catatan Fail', 'Reminder Expired Terkirim'
   ]);
   return sheet;
 }

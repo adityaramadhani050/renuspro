@@ -372,13 +372,6 @@ function simpanInvoice(payload) {
     SpreadsheetApp.flush();
     invalidateInvoiceCache();
 
-    // Notifikasi WA
-    try {
-      notifInvoiceDibuat({ noInvoice: noInvoice, jenis: jenis, persen: persen,
-        namaKlien: wo.namaKlien, namaProject: wo.namaProject, total: total,
-        dibuatOleh: payload.dibuatOleh || 'Finance' });
-    } catch(e) {}
-
     return { success: true, message: 'Invoice ' + noInvoice + ' berhasil dibuat!', noInvoice: noInvoice };
   } catch (e) {
     return { success: false, message: 'Gagal menyimpan invoice: ' + e.toString() };
@@ -617,18 +610,6 @@ function updateStatusBayarInvoice(idInvoice, statusBaru, bukti) {
             ? 'Invoice dilunasi. Kwitansi ' + noKwitansi + ' otomatis dibuat.'
             : 'Status diperbarui: Lunas. Kwitansi ' + noKwitansi + ' sudah ada.')
         : 'Status bayar diperbarui: ' + statusBaru;
-
-      // Notifikasi WA
-      if (statusBaru === 'Lunas') {
-        try {
-          notifInvoiceLunas({
-            noInvoice:   idInvoice,
-            namaKlien:   data[i][9]  ? data[i][9].toString()  : '',
-            namaProject: data[i][10] ? data[i][10].toString() : '',
-            total:       parseFloat(data[i][14]) || 0
-          });
-        } catch(e) {}
-      }
 
       invalidateInvoiceCache();
       invalidateKwitansiCache();
