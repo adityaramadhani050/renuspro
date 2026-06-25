@@ -1050,7 +1050,7 @@ function simpanPenerimaanTanpaPO(payload) {
     var idMutasi = _generateIdMutasi(mSheet);
     mSheet.appendRow([
       idMutasi, tgl, idProduk, namaProduk,
-      'Penerimaan Tanpa PO', payload.referensi || '',
+      'Penerimaan Non-PO', payload.referensi || '',
       qty, 0, harga, saldoBaru,
       payload.keterangan || '',
       namaUser, nowStr
