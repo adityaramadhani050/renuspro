@@ -389,7 +389,8 @@ function _buatPengeluaranOtomatis(p) {
     parseFloat(p.total)       || 0,
     p.catatan     || '',
     p.dibuatOleh  || '',
-    nowStr, '', ''
+    nowStr, '', '',
+    p.kategori    || ''
   ]);
   invalidatePengeluaranCache();
   return id;

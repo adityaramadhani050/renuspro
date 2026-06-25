@@ -274,6 +274,8 @@ function getPOList() {
       var r = data[i];
       if (!r[0]) continue;
       var noWO2 = r[5] ? r[5].toString() : '';
+      var subtotal2     = parseFloat(r[7])  || 0;
+      var diskonNominal2 = parseFloat(r[19]) || 0;
       list.push({
         noPO:         r[0]  ? r[0].toString()  : '',
         tanggal:      _fmtTgl(r[1]),
@@ -283,7 +285,8 @@ function getPOList() {
         noWO:         noWO2,
         namaProject:  noWO2 ? (woNamaMap[noWO2] || '') : '',
         statusPO:     r[6]  ? r[6].toString()  : '',
-        subtotal:     parseFloat(r[7])  || 0,
+        subtotal:     subtotal2,
+        nilaiDPP:     Math.max(0, subtotal2 - diskonNominal2),
         ppnPersen:    parseFloat(r[8])  || 0,
         ppnNominal:   parseFloat(r[9])  || 0,
         grandTotal:   parseFloat(r[10]) || 0,
@@ -941,12 +944,14 @@ function simpanPembayaranPO(payload) {
     var poData = poSheet.getDataRange().getValues();
     var poRowIdx    = -1;
     var grandTotal  = 0;
+    var ppnNominalPO = 0;
     var noWOPO      = '';
     var namaSupplier = '';
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
         poRowIdx     = i + 1;
         grandTotal   = parseFloat(poData[i][10]) || 0;
+        ppnNominalPO = parseFloat(poData[i][9])  || 0;
         noWOPO       = (poData[i][5] || '').toString().trim();
         namaSupplier = (poData[i][3] || '').toString();
         break;
@@ -996,9 +1001,15 @@ function simpanPembayaranPO(payload) {
     poSheet.getRange(poRowIdx, 13).setValue(statusBayar);   // col 12 = col 13
     poSheet.getRange(poRowIdx, 14).setValue(totalDibayar);  // col 13 = col 14
 
-    // Hook Pengeluaran: jika PO terikat Work Order, buat entry pengeluaran otomatis
+    // Hook Pengeluaran: jika PO terikat Work Order, buat entry pengeluaran otomatis.
+    // Jumlah dipecah proporsional menjadi porsi DPP (pengeluaran project, masuk HPP)
+    // dan porsi PPN (pengeluaran non-project kategori "Pajak", tidak masuk HPP project).
     if (noWOPO) {
       try {
+        var ppnRatio   = grandTotal > 0 ? (ppnNominalPO / grandTotal) : 0;
+        var ppnPortion = Math.round(jumlah * ppnRatio);
+        var dppPortion = jumlah - ppnPortion;
+
         _buatPengeluaranOtomatis({
           noWO:        noWOPO,
           tanggal:     tanggalBayarStr,
@@ -1007,14 +1018,34 @@ function simpanPembayaranPO(payload) {
           idReferensi: idBayar,
           idAkun:      payload.idAkun   ? payload.idAkun.toString()   : '',
           namaAkun:    payload.namaAkun ? payload.namaAkun.toString() : '',
-          deskripsi:   'Pembayaran PO ' + noPO + ' — ' + namaSupplier,
+          deskripsi:   'Pembayaran PO ' + noPO + ' — ' + namaSupplier + ' (DPP)',
           qty:         1,
           satuan:      '',
-          hargaSatuan: jumlah,
-          total:       jumlah,
+          hargaSatuan: dppPortion,
+          total:       dppPortion,
           catatan:     payload.catatan  ? payload.catatan.toString()  : '',
           dibuatOleh:  payload.dibuatOleh ? payload.dibuatOleh.toString() : ''
         });
+
+        if (ppnPortion > 0) {
+          _buatPengeluaranOtomatis({
+            noWO:        '',
+            tanggal:     tanggalBayarStr,
+            sumber:      'Pembayaran PO',
+            noPO:        noPO,
+            idReferensi: idBayar,
+            idAkun:      payload.idAkun   ? payload.idAkun.toString()   : '',
+            namaAkun:    payload.namaAkun ? payload.namaAkun.toString() : '',
+            deskripsi:   'PPN Pembayaran PO ' + noPO + ' — ' + namaSupplier,
+            kategori:    'Pajak',
+            qty:         1,
+            satuan:      '',
+            hargaSatuan: ppnPortion,
+            total:       ppnPortion,
+            catatan:     payload.catatan  ? payload.catatan.toString()  : '',
+            dibuatOleh:  payload.dibuatOleh ? payload.dibuatOleh.toString() : ''
+          });
+        }
       } catch(eHook) {
         Logger.log('Hook pengeluaran PO gagal: ' + eHook.toString());
       }

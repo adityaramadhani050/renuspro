@@ -810,7 +810,6 @@ function terimaPOItems(payload) {
     if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian' && statusPO !== 'Menunggu Penerimaan Gudang') {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
-    var ppnPersenPO  = parseFloat(poData[poRowIdx][8]) || 0;
     var noWOPO       = (poData[poRowIdx][5] || '').toString().trim();
     var namaSupplier = (poData[poRowIdx][3] || '').toString();
 
@@ -873,7 +872,7 @@ function terimaPOItems(payload) {
       var qtyTerima2 = Number(it2.qty) || 0;
       if (qtyTerima2 <= 0) continue;
       var hargaAsli2 = Number(it2.hargaBeli) || 0;
-      var harga2   = Math.round(hargaAsli2 * (1 + ppnPersenPO / 100) + biayaPerUnit);
+      var harga2   = Math.round(hargaAsli2 + biayaPerUnit); // harga DPP (exclude PPN) + biaya tambahan per unit
 
       // Cari info produk untuk nama & satuan
       var namaProduk = it2.namaItem;
@@ -898,7 +897,7 @@ function terimaPOItems(payload) {
         var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2, qtyTerima2 * harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
         var keteranganMutasi = 'Penerimaan dari PO ' + noPO +
-          ' (harga incl. PPN' + (biayaPerUnit > 0 ? ' + biaya tambahan' : '') + ')';
+          ' (harga DPP excl. PPN' + (biayaPerUnit > 0 ? ' + biaya tambahan' : '') + ')';
         mSheet.appendRow([
           idMutasi, tglStr, idStokItem, namaProduk,
           'Penerimaan PO', noPO,
