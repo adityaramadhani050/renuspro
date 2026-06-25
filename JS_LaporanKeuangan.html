@@ -103,7 +103,7 @@ function _renderLaporanKeuangan(res) {
     html += '<td colspan="6" class="p-4">';
     if (hasDetail) {
       html += '<div class="flex flex-wrap gap-6">';
-      html += _lkKategoriMiniTable('Pengeluaran Project per Akun', r.kategoriProject);
+      html += _lkKategoriMiniTable('Pengeluaran per Project (No WO - Nama Project)', r.kategoriProject);
       html += _lkKategoriMiniTable('Pengeluaran Non-Project per Kategori', r.kategoriNonProject);
       html += '</div>';
     } else {
@@ -211,7 +211,7 @@ window.exportLaporanKeuanganPDF = function() {
       if (r.kategoriProject && r.kategoriProject.length) {
         doc.autoTable({
           startY: startYBoth, margin: { left: ML, right: ML + halfW + 4 },
-          head: [['Akun (Project)', 'Total']],
+          head: [['Project (No WO - Nama Project)', 'Total']],
           body: r.kategoriProject.map(function(k) { return [k.kategori, rp(k.total)]; }),
           theme: 'grid', tableWidth: halfW,
           styles:     { fontSize: 7, cellPadding: 1.8, font:'helvetica', textColor: DARK },

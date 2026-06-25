@@ -714,8 +714,9 @@ function getLaporanKeuntunganBulanan(params) {
     }
 
     // Pengeluaran per bulan (project & non-project), + breakdown kategori per bulan
-    // Project   → dikelompokkan per Nama Akun pembayaran
+    // Project     → dikelompokkan per Work Order (No WO - Nama Project)
     // Non-Project → dikelompokkan per Kategori
+    var woMap = _buildWOInfoMap();
     var ss    = getSpreadsheet();
     var sheet = _ensurePengeluaranKategoriCol(ss);
     var expData = sheet.getDataRange().getValues();
@@ -732,8 +733,9 @@ function getLaporanKeuntunganBulanan(params) {
       var dBulan   = bulanData[me - 1];
       if (noWOExp) {
         dBulan.pengeluaranProject += totalExp;
-        var namaAkun = (rowExp[7] || 'Lainnya').toString();
-        dBulan.kategoriProjectTotal[namaAkun] = (dBulan.kategoriProjectTotal[namaAkun] || 0) + totalExp;
+        var woInfo  = woMap[noWOExp] || { namaProject: '' };
+        var labelWO = noWOExp + (woInfo.namaProject ? ' - ' + woInfo.namaProject : '');
+        dBulan.kategoriProjectTotal[labelWO] = (dBulan.kategoriProjectTotal[labelWO] || 0) + totalExp;
       } else {
         dBulan.pengeluaranNonProject += totalExp;
         var kat = (rowExp[18] || 'Lainnya').toString();
