@@ -106,8 +106,7 @@ function _renderLaporanProfit(res) {
       // Kolom Aksi: export laporan pengeluaran WO ini
       html += '<td class="p-4 text-center">';
       html += '<button onclick="exportLaporanPengeluaranWO(\'' + _escLP(r.noWO).replace(/'/g, "\\'") + '\')" title="Lap. Pengeluaran" ';
-      html += 'class="inline-flex items-center gap-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">';
-      html += '<i class="fa-solid fa-file-lines text-[10px]"></i> Lap. Pengeluaran</button>';
+      html += 'class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"><i class="fa-solid fa-file-pdf"></i></button>';
       html += '</td>';
 
       html += '</tr>';
