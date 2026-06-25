@@ -253,6 +253,28 @@
       </div>
     </div>
 
+<!-- MODAL LIHAT CATATAN FAIL (read-only) -->
+    <div id="modal-lihat-catatan-fail" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">
+        <div class="px-6 pt-6 pb-2 text-center">
+          <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-circle-xmark text-rose-600 text-2xl"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800 mb-1">Catatan Penawaran Fail</h3>
+          <p id="lihat-catatan-fail-subtitle" class="text-sm text-slate-500">—</p>
+        </div>
+        <div class="px-6 pb-2">
+          <p id="lihat-catatan-fail-isi" class="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 whitespace-pre-wrap"></p>
+        </div>
+        <div class="flex gap-3 px-6 pt-3 pb-6">
+          <button onclick="tutupLihatCatatanFail()"
+            class="flex-1 px-4 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+
 <!-- MODAL BUKTI BAYAR INVOICE (LUNAS) -->
     <div id="modal-bukti-bayar-invoice" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">

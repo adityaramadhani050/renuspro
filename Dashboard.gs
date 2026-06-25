@@ -93,7 +93,8 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
           nilaiKontrak:     Math.max(0, (parseFloat(dataMain[i][7]) || 0) - (parseFloat(dataMain[i][8]) || 0)),
           grandTotal:       parseFloat(dataMain[i][10]) || 0,
           status:           status,
-          channelMarketing: dataMain[i][19] ? dataMain[i][19].toString() : ''
+          channelMarketing: dataMain[i][19] ? dataMain[i][19].toString() : '',
+          catatanFail:      dataMain[i][20] ? dataMain[i][20].toString() : ''
         };
       }
     }

@@ -639,7 +639,11 @@ function _dbRenderDetailAccordion(salesList) {
           + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
           + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
-          + '<td class="px-3 py-2">' + _statusBadge(p.status) + '</td>'
+          + '<td class="px-3 py-2"><div class="flex items-center gap-1.5">' + _statusBadge(p.status)
+          + (p.status === 'Fail' && p.catatanFail
+              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'' + _esc(p.catatanFail).replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Catatan Fail"><i class="fa-solid fa-circle-info text-xs"></i></button>'
+              : '')
+          + '</div></td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
           + '</tr>';
       }).join('');

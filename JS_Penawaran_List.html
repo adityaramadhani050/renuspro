@@ -105,6 +105,12 @@
               </td>
               <td class="p-4 text-center">
                 <div class="flex items-center justify-center gap-1">
+                ${i.status === 'Fail' && i.catatanFail
+                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','${i.catatanFail.replace(/'/g,"\\'").replace(/\n/g,' ')}')"
+                      class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Lihat Catatan Fail">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>`
+                  : ''}
                 <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'
                   class="text-teal-500 hover:bg-teal-50 p-1.5 rounded-lg transition" title="Salin sebagai Penawaran Baru">
                   <i class="fa-solid fa-copy"></i>
@@ -131,5 +137,14 @@
               </td>
             </tr>`;
       }).join('');
+    }
+
+    function lihatCatatanFail(id, namaProject, catatan) {
+      document.getElementById('lihat-catatan-fail-subtitle').innerText = id + (namaProject ? ' — ' + namaProject : '');
+      document.getElementById('lihat-catatan-fail-isi').innerText = catatan || '—';
+      document.getElementById('modal-lihat-catatan-fail').classList.remove('hidden');
+    }
+    function tutupLihatCatatanFail() {
+      document.getElementById('modal-lihat-catatan-fail').classList.add('hidden');
     }
 </script>
