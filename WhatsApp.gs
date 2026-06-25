@@ -107,9 +107,9 @@ function cekReminderPenawaranExpired() {
   try {
     var ss    = getSpreadsheet();
     var sheet = ss.getSheetByName('Penawaran_Main');
-    if (!sheet) return;
+    if (!sheet) return { success: false, message: 'Sheet Penawaran_Main tidak ditemukan.', count: 0 };
     var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return;
+    if (data.length < 2) return { success: true, message: 'Tidak ada penawaran expired yang perlu direminder.', count: 0 };
 
     var tz    = Session.getScriptTimeZone();
     var today = new Date();
@@ -176,7 +176,14 @@ function cekReminderPenawaranExpired() {
       });
     }
 
-    if (!expiredList.length) return;
+    if (!expiredList.length) {
+      return { success: true, message: 'Tidak ada penawaran expired yang perlu direminder.', count: 0 };
+    }
+
+    var config = _getWAConfig();
+    if (!config.enabled || !config.endpoint || !config.target) {
+      return { success: false, message: 'WA Bot belum aktif/dikonfigurasi. Aktifkan & simpan konfigurasi terlebih dahulu.', count: 0 };
+    }
 
     sendWANotif(_waMsgReminderExpired(expiredList));
 
@@ -184,9 +191,17 @@ function cekReminderPenawaranExpired() {
       sheet.getRange(it.rowIndex + 1, 22).setValue('1');
     });
     SpreadsheetApp.flush();
+
+    return { success: true, message: 'Reminder terkirim untuk ' + expiredList.length + ' penawaran expired.', count: expiredList.length };
   } catch (e) {
     Logger.log('cekReminderPenawaranExpired error: ' + e);
+    return { success: false, message: e.toString(), count: 0 };
   }
+}
+
+// ── Trigger manual dari Settings (tombol "Kirim Reminder Manual") ───────────
+function kirimReminderExpiredManual() {
+  return cekReminderPenawaranExpired();
 }
 
 function _waMsgReminderExpired(list) {

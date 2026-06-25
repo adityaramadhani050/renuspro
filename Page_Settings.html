@@ -43,19 +43,20 @@
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
           <p class="text-xs font-bold text-slate-600 mb-2">Event yang akan memicu notifikasi:</p>
-          <div class="flex items-center gap-2 text-xs text-slate-600"><i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i><span><b>Invoice Dibuat</b> — saat invoice baru diterbitkan</span></div>
-          <div class="flex items-center gap-2 text-xs text-slate-600"><i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i><span><b>Invoice Lunas</b> — saat status invoice diubah ke Lunas</span></div>
-          <div class="flex items-center gap-2 text-xs text-slate-600"><i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i><span><b>Work Order Dibuat</b> — saat penawaran ditandai Deal</span></div>
-          <div class="flex items-center gap-2 text-xs text-slate-600"><i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i><span><b>Request Invoice</b> — saat Sales mengajukan request buat invoice</span></div>
+          <div class="flex items-center gap-2 text-xs text-slate-600"><i class="fa-solid fa-circle-check text-emerald-500 text-[10px]"></i><span><b>Reminder Penawaran Expired</b> — otomatis setiap hari (08:00), mengingatkan Sales untuk follow-up penawaran On-Progress yang sudah lewat tanggal Valid Hingga. Setiap penawaran hanya diingatkan sekali.</span></div>
         </div>
-        <div class="flex items-center gap-3 pt-1">
+        <div class="flex items-center gap-3 pt-1 flex-wrap">
           <button onclick="simpanWAConfig()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2">
             <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan
           </button>
           <button onclick="testWAConfig()" id="wa-test-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2">
             <i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test
           </button>
+          <button onclick="kirimReminderManual()" id="wa-reminder-manual-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2">
+            <i class="fa-solid fa-bell text-sm"></i> Kirim Reminder Manual
+          </button>
         </div>
+        <p class="text-[11px] text-slate-400">Reminder otomatis berjalan tiap hari jam 08:00. Gunakan tombol "Kirim Reminder Manual" untuk memicu pengecekan &amp; pengiriman reminder sekarang juga, misalnya jika trigger otomatis gagal berjalan.</p>
       </div>
     </div>
 

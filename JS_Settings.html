@@ -87,6 +87,21 @@ function testWAConfig() {
     .testWANotif({ endpoint: endpoint, target: target });
 }
 
+function kirimReminderManual() {
+  var btn = document.getElementById('wa-reminder-manual-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> Mengirim...'; }
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell text-sm"></i> Kirim Reminder Manual'; }
+      showToast((r && r.message) || (r && r.success ? 'Selesai.' : 'Gagal.'), r && r.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell text-sm"></i> Kirim Reminder Manual'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .kirimReminderExpiredManual();
+}
+
 // ═══════════════════════════════════════════════════════
 // SYARAT & KETENTUAN
 // ═══════════════════════════════════════════════════════
