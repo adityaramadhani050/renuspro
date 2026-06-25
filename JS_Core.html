@@ -105,6 +105,9 @@
         _lpUpdatePeriodLabel();
         loadLaporanProfitabilitas();
       }
+      if(pageId === 'laporankeuangan') {
+        loadLaporanKeuangan();
+      }
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }

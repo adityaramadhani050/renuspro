@@ -1,0 +1,86 @@
+      <section id="page-laporankeuangan" class="page-section">
+
+        <!-- ── Header ── -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Keuangan</h2>
+          </div>
+          <button onclick="exportLaporanKeuanganPDF()" title="Export PDF"
+            class="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+            <i class="fa-solid fa-file-pdf text-xs"></i> Export PDF
+          </button>
+        </div>
+
+        <!-- ── Filter Tahun ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-150 px-4 py-3 mb-4 flex items-center gap-3">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+            <i class="fa-solid fa-calendar mr-1 text-blue-500"></i> Tahun
+          </span>
+          <select id="lk-tahun" onchange="loadLaporanKeuangan()"
+            class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"></select>
+        </div>
+
+        <!-- ── Summary Cards ── -->
+        <div id="lk-summary-cards" class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Invoice (DPP)</p>
+            <p id="lk-card-invoice" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Pengeluaran Project</p>
+            <p id="lk-card-exp-project" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Pengeluaran Non-Project</p>
+            <p id="lk-card-exp-nonproject" class="text-2xl font-extrabold text-slate-800">—</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Keuntungan</p>
+            <p id="lk-card-keuntungan" class="text-2xl font-extrabold text-emerald-600">—</p>
+          </div>
+        </div>
+
+        <!-- ── Tabel Keuntungan Bulanan ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+          <div class="px-4 py-3 border-b border-slate-100">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Keuntungan per Bulan</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">Bulan</th>
+                  <th class="p-4 text-right">Invoice Ditagihkan (DPP)</th>
+                  <th class="p-4 text-right">Pengeluaran Project</th>
+                  <th class="p-4 text-right">Pengeluaran Non-Project</th>
+                  <th class="p-4 text-right">Keuntungan</th>
+                </tr>
+              </thead>
+              <tbody id="lk-table-bulan" class="text-sm divide-y divide-slate-100">
+                <tr><td colspan="5" class="p-8 text-center text-slate-400">Muat data untuk melihat laporan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Rincian Kategori Pengeluaran Non-Project ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rincian Kategori Pengeluaran Non-Project</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="p-4">Kategori</th>
+                  <th class="p-4 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody id="lk-table-kategori" class="text-sm divide-y divide-slate-100">
+                <tr><td colspan="2" class="p-8 text-center text-slate-400">Muat data untuk melihat rincian.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>

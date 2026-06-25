@@ -135,92 +135,11 @@ window.switchLPTab = function(tab) {
   _lpActiveTab = tab;
   var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-violet-700 shadow-sm';
   var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  document.getElementById('lp-tab-profit-btn').className   = tab === 'profit'   ? active : inactive;
-  document.getElementById('lp-tab-akun-btn').className     = tab === 'akun'     ? active : inactive;
-  document.getElementById('lp-tab-bulanan-btn').className  = tab === 'bulanan'  ? active : inactive;
-  document.getElementById('lp-tab-profit').classList.toggle('hidden',  tab !== 'profit');
-  document.getElementById('lp-tab-akun').classList.toggle('hidden',    tab !== 'akun');
-  document.getElementById('lp-tab-bulanan').classList.toggle('hidden', tab !== 'bulanan');
-  if (tab === 'bulanan') {
-    if (!document.getElementById('lpb-tahun').options.length) _lpbInitTahunSelect();
-    loadLaporanKeuntunganBulanan();
-  }
+  document.getElementById('lp-tab-profit-btn').className = tab === 'profit' ? active : inactive;
+  document.getElementById('lp-tab-akun-btn').className   = tab === 'akun'   ? active : inactive;
+  document.getElementById('lp-tab-profit').classList.toggle('hidden', tab !== 'profit');
+  document.getElementById('lp-tab-akun').classList.toggle('hidden',   tab !== 'akun');
 };
-
-// ── Tab Keuntungan Bulanan ───────────────────────────────────────
-
-function _lpbInitTahunSelect() {
-  var sel = document.getElementById('lpb-tahun');
-  var thisYear = new Date().getFullYear();
-  sel.innerHTML = '';
-  for (var y = thisYear; y >= thisYear - 4; y--) {
-    var opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    sel.appendChild(opt);
-  }
-}
-
-window.loadLaporanKeuntunganBulanan = function() {
-  var tahun = parseInt(document.getElementById('lpb-tahun').value, 10) || new Date().getFullYear();
-
-  document.getElementById('lpb-table-bulan').innerHTML =
-    '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  document.getElementById('lpb-table-kategori').innerHTML =
-    '<tr><td colspan="2" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-
-  if (typeof google === 'undefined') return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) {
-        showNotification(res.message || 'Gagal memuat laporan.', 'error');
-        return;
-      }
-      _renderLaporanKeuntunganBulanan(res);
-    })
-    .withFailureHandler(function(err) {
-      showNotification('Error: ' + err.message, 'error');
-    })
-    .getLaporanKeuntunganBulanan({ tahun: tahun });
-};
-
-function _renderLaporanKeuntunganBulanan(res) {
-  var s = res.summary || {};
-  document.getElementById('lpb-card-invoice').textContent       = _fmtRpLP(s.totalInvoiceDPP);
-  document.getElementById('lpb-card-exp-project').textContent   = _fmtRpLP(s.totalPengeluaranProject);
-  document.getElementById('lpb-card-exp-nonproject').textContent = _fmtRpLP(s.totalPengeluaranNonProject);
-  document.getElementById('lpb-card-keuntungan').textContent    = _fmtRpLP(s.totalKeuntungan);
-  document.getElementById('lpb-card-keuntungan').className = 'text-2xl font-extrabold ' + (s.totalKeuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600');
-
-  var rows = res.rows || [];
-  var html = '';
-  rows.forEach(function(r) {
-    var kCls = r.keuntungan >= 0 ? 'text-emerald-600' : 'text-rose-600';
-    html += '<tr class="hover:bg-slate-50 transition-colors">';
-    html += '<td class="p-4 text-sm font-semibold text-slate-700">' + r.bulan + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.invoiceDPP) + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranProject) + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpLP(r.pengeluaranNonProject) + '</td>';
-    html += '<td class="p-4 text-right text-xs font-bold ' + kCls + '">' + _fmtRpLP(r.keuntungan) + '</td>';
-    html += '</tr>';
-  });
-  document.getElementById('lpb-table-bulan').innerHTML = html;
-
-  var kategoriRows = res.kategoriBreakdown || [];
-  if (kategoriRows.length === 0) {
-    document.getElementById('lpb-table-kategori').innerHTML =
-      '<tr><td colspan="2" class="p-8 text-center text-slate-400">Tidak ada pengeluaran non-project pada periode ini.</td></tr>';
-  } else {
-    var htmlK = '';
-    kategoriRows.forEach(function(k) {
-      htmlK += '<tr class="hover:bg-slate-50">';
-      htmlK += '<td class="p-4 text-sm text-slate-700">' + _escLP(k.kategori) + '</td>';
-      htmlK += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpLP(k.total) + '</td>';
-      htmlK += '</tr>';
-    });
-    document.getElementById('lpb-table-kategori').innerHTML = htmlK;
-  }
-}
 
 // ── Export PDF ─────────────────────────────────────────────────
 
@@ -246,7 +165,7 @@ window.exportLaporanProfitPDF = function() {
     doc.setFillColor(DARK[0], DARK[1], DARK[2]);
     doc.rect(0, 0, PW, 24, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(WHITE[0],WHITE[1],WHITE[2]);
-    doc.text('LAPORAN PROFIT', ML, 11);
+    doc.text('LAPORAN PROFIT PROJECT', ML, 11);
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(190,200,220);
     doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(170,195,255);
@@ -357,7 +276,7 @@ window.exportLaporanProfitPDF = function() {
       doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, PH - 5);
     }
 
-    var fname = 'LaporanProfit_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.pdf';
+    var fname = 'LaporanProfitProject_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.pdf';
     doc.save(fname);
     showNotification('PDF berhasil diunduh!');
   } catch(e) {
