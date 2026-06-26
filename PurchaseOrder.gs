@@ -254,27 +254,7 @@ function _hitungStatusBayarPO(grandTotal, totalDibayar) {
 
 // ── Read operations ───────────────────────────────────────────────────────────
 
-function _computePOKPI(list) {
-  var totalNilai = 0, outstanding = 0, jumlahAktif = 0, penerimaanCount = 0, penerimaanTotal = 0;
-  list.forEach(function(po) {
-    var statusPO     = po.statusPO     || '';
-    var statusBayar  = po.statusBayar  || '';
-    var grandTotal   = po.grandTotal   || 0;
-    var totalDibayar = po.totalDibayar || 0;
-    if (statusPO !== 'Batal') totalNilai += grandTotal;
-    if (statusBayar === 'Belum Dibayar' || statusBayar === 'Dibayar Sebagian') {
-      outstanding += Math.max(0, grandTotal - totalDibayar);
-    }
-    if (statusPO !== 'Selesai' && statusPO !== 'Batal') jumlahAktif++;
-    if (statusPO === 'Menunggu Gudang' || statusPO === 'Menunggu Penerimaan Gudang' || statusPO === 'Diterima Sebagian') {
-      penerimaanCount++;
-      penerimaanTotal += grandTotal;
-    }
-  });
-  return { totalNilai: totalNilai, outstanding: outstanding, jumlahAktif: jumlahAktif, penerimaanCount: penerimaanCount, penerimaanTotal: penerimaanTotal };
-}
-
-function getPOList(opts) {
+function getPOList() {
   try {
     var data = _cachedPO();
 
@@ -325,29 +305,9 @@ function getPOList(opts) {
         quotFileName:  r[25] ? r[25].toString() : ''
       });
     }
-
-    if (!opts) return list;
-
-    list.reverse(); // terbaru di atas, sesuai urutan tampilan client sebelumnya
-
-    const q      = (opts.search || '').toLowerCase().trim();
-    const status = (opts.status || '').trim();
-    const filtered = list.filter(function(po) {
-      if (q) {
-        var hay = ((po.noPO || '') + (po.namaSupplier || '') + (po.noWO || '') + (po.peruntukan || '')).toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (status && po.statusPO !== status) return false;
-      return true;
-    });
-
-    const kpi     = _computePOKPI(filtered);
-    const page    = parseInt(opts.page, 10)    || 1;
-    const perPage = parseInt(opts.perPage, 10) || 10;
-    const start   = (page - 1) * perPage;
-    return { rows: filtered.slice(start, start + perPage), total: filtered.length, kpi: kpi };
+    return list;
   } catch (e) {
-    return opts ? { rows: [], total: 0, kpi: _computePOKPI([]) } : [];
+    return [];
   }
 }
 

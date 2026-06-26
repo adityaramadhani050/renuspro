@@ -64,55 +64,74 @@ function _pgRenderPurchaseOrder(data) {
   }).join('');
 }
 
-// ── Fetch halaman PO dari server ────────────────────────────────────────────
-let _poFilters = {};
-
-function _pgFetchPurchaseOrder() {
+// ── Load daftar PO ──────────────────────────────────────────────────────────
+window.loadPurchaseOrder = function() {
   if (typeof google === 'undefined') return;
-  var state = _pgState.purchaseorder;
   google.script.run
-    .withSuccessHandler(function(res) {
-      var rows = (res && res.rows) || [];
-      state.total = (res && res.total) || 0;
-      _cachedPOData = rows;
-      _pgRenderPurchaseOrder(rows);
-      _renderPaginationBar('purchaseorder');
-      _renderPOKPI(res && res.kpi);
+    .withSuccessHandler(function(data) {
+      _cachedPOData = (data || []).slice().reverse();
+      _pgState.purchaseorder.data = _cachedPOData;
+      _pgState.purchaseorder.page = 1;
+      _injectPgBar('purchaseorder', '#table-purchaseorder');
+      _pgRender('purchaseorder');
+      _renderPOKPI(_cachedPOData);
     })
     .withFailureHandler(function() {
       document.getElementById('table-purchaseorder').innerHTML =
         '<tr><td colspan="7" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';
     })
-    .getPOList(Object.assign({ page: state.page, perPage: state.perPage }, _poFilters));
-}
-_pgFetchers.purchaseorder = _pgFetchPurchaseOrder;
-
-// ── Load daftar PO ──────────────────────────────────────────────────────────
-window.loadPurchaseOrder = function() {
-  _poFilters = {};
-  _pgState.purchaseorder.page = 1;
-  _injectPgBar('purchaseorder', '#table-purchaseorder');
-  _pgFetchPurchaseOrder();
+    .getPOList();
 };
 
 // ── Filter PO ───────────────────────────────────────────────────────────────
-window.filterPO = _debounce(function() {
-  _poFilters = {
-    search: (document.getElementById('search-po').value || '').trim(),
-    status: (document.getElementById('filter-po-status').value || '').trim()
-  };
+window.filterPO = function() {
+  var q      = (document.getElementById('search-po').value || '').toLowerCase().trim();
+  var status = (document.getElementById('filter-po-status').value || '').trim();
+  var filtered = _cachedPOData.filter(function(po) {
+    if (q) {
+      var hay = ((po.noPO || '') + (po.namaSupplier || '') + (po.noWO || '') + (po.peruntukan || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (status && po.statusPO !== status) return false;
+    return true;
+  });
+  _pgState.purchaseorder.data = filtered;
   _pgState.purchaseorder.page = 1;
-  _pgFetchPurchaseOrder();
-}, 350);
+  _pgRender('purchaseorder');
+  _renderPOKPI(filtered);
+};
 
-// ── KPI Cards (dihitung server-side atas seluruh data terfilter) ───────────
-function _renderPOKPI(kpi) {
-  kpi = kpi || { totalNilai: 0, outstanding: 0, jumlahAktif: 0, penerimaanCount: 0, penerimaanTotal: 0 };
-  document.getElementById('kpi-po-total').textContent             = 'Rp ' + (kpi.totalNilai || 0).toLocaleString('id-ID');
-  document.getElementById('kpi-po-outstanding').textContent       = 'Rp ' + (kpi.outstanding || 0).toLocaleString('id-ID');
-  document.getElementById('kpi-po-aktif').textContent              = kpi.jumlahAktif || 0;
-  document.getElementById('kpi-po-penerimaan-count').textContent  = kpi.penerimaanCount || 0;
-  document.getElementById('kpi-po-penerimaan-total').textContent  = 'Rp ' + (kpi.penerimaanTotal || 0).toLocaleString('id-ID');
+// ── KPI Cards ──────────────────────────────────────────────────────────────
+function _renderPOKPI(list) {
+  list = list || [];
+  var totalNilai    = 0;
+  var outstanding   = 0;
+  var jumlahAktif   = 0;
+  var penerimaanCount = 0;
+  var penerimaanTotal = 0;
+
+  list.forEach(function(po) {
+    var statusPO    = po.statusPO    || '';
+    var statusBayar = po.statusBayar || '';
+    var grandTotal  = po.grandTotal  || 0;
+    var totalDibayar = po.totalDibayar || 0;
+
+    if (statusPO !== 'Batal') totalNilai += grandTotal;
+    if (statusBayar === 'Belum Dibayar' || statusBayar === 'Dibayar Sebagian') {
+      outstanding += Math.max(0, grandTotal - totalDibayar);
+    }
+    if (statusPO !== 'Selesai' && statusPO !== 'Batal') jumlahAktif++;
+    if (statusPO === 'Menunggu Gudang' || statusPO === 'Menunggu Penerimaan Gudang' || statusPO === 'Diterima Sebagian') {
+      penerimaanCount++;
+      penerimaanTotal += grandTotal;
+    }
+  });
+
+  document.getElementById('kpi-po-total').textContent             = 'Rp ' + totalNilai.toLocaleString('id-ID');
+  document.getElementById('kpi-po-outstanding').textContent       = 'Rp ' + outstanding.toLocaleString('id-ID');
+  document.getElementById('kpi-po-aktif').textContent              = jumlahAktif;
+  document.getElementById('kpi-po-penerimaan-count').textContent  = penerimaanCount;
+  document.getElementById('kpi-po-penerimaan-total').textContent  = 'Rp ' + penerimaanTotal.toLocaleString('id-ID');
 }
 
 // ── Form Buat/Edit PO ────────────────────────────────────────────────────────

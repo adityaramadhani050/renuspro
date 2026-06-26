@@ -3,13 +3,13 @@
  * Modul Customer/Klien: list, simpan, edit, hapus.
  */
 
-function getCustomerList(opts) {
+function getCustomerList() {
   try {
     const ss = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Klien') || buatSheetKlienDefault(ss);
     const data = sheet.getDataRange().getValues();
     const list = [];
-
+    
     for (let i = 1; i < data.length; i++) {
       if (data[i][0]) {
         list.push({
@@ -21,19 +21,8 @@ function getCustomerList(opts) {
         });
       }
     }
-
-    if (!opts) return list;
-
-    const q = (opts.search || '').toLowerCase().trim();
-    const filtered = q
-      ? list.filter(i => (i.id + i.nama + i.perusahaan + i.alamat + i.kontak).toLowerCase().includes(q))
-      : list;
-
-    const page    = parseInt(opts.page, 10)    || 1;
-    const perPage = parseInt(opts.perPage, 10) || 10;
-    const start   = (page - 1) * perPage;
-    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
-  } catch(e) { return opts ? { rows: [], total: 0 } : []; }
+    return list;
+  } catch(e) { return []; }
 }
 function simpanCustomer(nama, perusahaan, telepon, alamat) {
   try {

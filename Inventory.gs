@@ -506,7 +506,7 @@ function _syncHPPProduk(ss, idProduk, hargaBeli) {
 
 // ── Read Functions ───────────────────────────────────────────────────────────
 
-function getStokList(opts) {
+function getStokList() {
   try {
     _ensureStokSheet();
     var data = _cachedStok();
@@ -526,20 +526,8 @@ function getStokList(opts) {
         terakhirDiubah:  data[i][6] ? data[i][6].toString() : ''
       });
     }
-
-    if (!opts) return list;
-
-    var q = (opts.search || '').toLowerCase().trim();
-    var filtered = q
-      ? list.filter(function(d) { return ((d.idStok || d.idProduk) + d.namaProduk).toLowerCase().includes(q); })
-      : list;
-
-    var totalNilaiStok = list.reduce(function(s, d) { return s + (d.nilaiStok || 0); }, 0);
-    var page    = parseInt(opts.page, 10)    || 1;
-    var perPage = parseInt(opts.perPage, 10) || 10;
-    var start   = (page - 1) * perPage;
-    return { rows: filtered.slice(start, start + perPage), total: filtered.length, totalNilaiStok: totalNilaiStok };
-  } catch(e) { return opts ? { rows: [], total: 0, totalNilaiStok: 0 } : []; }
+    return list;
+  } catch(e) { return []; }
 }
 
 function getMutasiStokList(params) {
@@ -572,14 +560,8 @@ function getMutasiStokList(params) {
     }
     // Sort terbaru dulu
     list.reverse();
-
-    if (!params.page) return list;
-
-    var page    = parseInt(params.page, 10)    || 1;
-    var perPage = parseInt(params.perPage, 10) || 20;
-    var start   = (page - 1) * perPage;
-    return { rows: list.slice(start, start + perPage), total: list.length };
-  } catch(e) { return (params && params.page) ? { rows: [], total: 0 } : []; }
+    return list;
+  } catch(e) { return []; }
 }
 
 /**

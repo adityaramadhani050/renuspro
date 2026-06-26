@@ -17,7 +17,7 @@ function _isSameMonthDate(dateVal) {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
 }
 
-function getPenawaranList(opts) {
+function getPenawaranList() {
   try {
     const ss = getSpreadsheet();
     const sheet = ss.getSheetByName('Penawaran_Main') || buatSheetPenawaranDefault(ss);
@@ -98,53 +98,8 @@ function getPenawaranList(opts) {
         return item;
       });
 
-    if (!opts) return list;
-
-    const q      = (opts.search || '').toLowerCase().trim();
-    const sales  = (opts.sales  || '').trim();
-    const status = (opts.status || '').trim();
-    const bulan  = (opts.bulan  || '').trim();
-    const tahun  = (opts.tahun  || '').trim();
-
-    const filtered = list.filter(d => {
-      if (q) {
-        const hay = (d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (sales  && d.dibuatOleh !== sales)  return false;
-      if (status && d.status !== status)     return false;
-      if (bulan || tahun) {
-        const parts = (d.tanggal || '').split('/');
-        if (parts.length !== 3) return false;
-        if (bulan && parts[1] !== bulan) return false;
-        if (tahun && parts[2] !== tahun) return false;
-      }
-      return true;
-    });
-
-    const page    = parseInt(opts.page, 10)    || 1;
-    const perPage = parseInt(opts.perPage, 10)  || 10;
-    const start   = (page - 1) * perPage;
-    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
-  } catch(e) { return opts ? { rows: [], total: 0 } : []; }
-}
-
-// ── Opsi dropdown filter (sales & tahun) — ringan, tanpa kirim seluruh dataset ──
-function getPenawaranFilterOptions() {
-  try {
-    const list = getPenawaranList();
-    const salesSet = new Set();
-    const tahunSet = new Set();
-    list.forEach(d => {
-      if (d.dibuatOleh) salesSet.add(d.dibuatOleh);
-      const parts = (d.tanggal || '').split('/');
-      if (parts.length === 3) tahunSet.add(parts[2]);
-    });
-    return {
-      salesList: [...salesSet].sort(),
-      tahunList: [...tahunSet].sort((a, b) => b - a)
-    };
-  } catch(e) { return { salesList: [], tahunList: [] }; }
+    return list;
+  } catch(e) { return []; }
 }
 function getRiwayatRevisi(noPenawaran) {
   try {

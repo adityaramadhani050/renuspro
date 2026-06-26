@@ -67,67 +67,45 @@ window.loadInventory = function() {
   loadPOMenungguPenerimaan();
 };
 
-let _stokFilters   = {};
-let _mutasiFilters = {};
-
-function _pgFetchStok() {
-  if (typeof google === 'undefined') return;
-  var state = _pgState.stok;
-  google.script.run.withSuccessHandler(function(res) {
-    var rows = (res && res.rows) || [];
-    state.total = (res && res.total) || 0;
-    _cachedStokData = rows;
-    _pgRenderStok(rows);
-    _renderPaginationBar('stok');
-    _updateTotalNilaiStok(res && res.totalNilaiStok);
-  }).getStokList(Object.assign({ page: state.page, perPage: state.perPage }, _stokFilters));
-}
-_pgFetchers.stok = _pgFetchStok;
-
 function _loadStok() {
+  if (typeof google === 'undefined') return;
   document.getElementById('table-stok').innerHTML =
     '<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  _stokFilters = {};
-  _pgState.stok.page = 1;
-  _injectPgBar('stok', '#table-stok');
-  _pgFetchStok();
+  google.script.run.withSuccessHandler(function(data) {
+    _cachedStokData = data || [];
+    _pgState.stok.data = data;
+    _pgState.stok.page = 1;
+    _injectPgBar('stok', '#table-stok');
+    _pgRender('stok');
+    _updateTotalNilaiStok();
+  }).getStokList();
 }
-
-function _pgFetchMutasi() {
-  if (typeof google === 'undefined') return;
-  var state = _pgState.mutasi;
-  google.script.run.withSuccessHandler(function(res) {
-    var rows = (res && res.rows) || [];
-    state.total = (res && res.total) || 0;
-    _cachedMutasiData = rows;
-    _pgRenderMutasi(rows);
-    _renderPaginationBar('mutasi');
-  }).getMutasiStokList(Object.assign({ page: state.page, perPage: state.perPage }, _mutasiFilters));
-}
-_pgFetchers.mutasi = _pgFetchMutasi;
 
 function _loadMutasi() {
+  if (typeof google === 'undefined') return;
   document.getElementById('table-mutasi').innerHTML =
     '<tr><td colspan="9" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  _populateMutasiProdukFilter();
-  _mutasiFilters = {};
-  _pgState.mutasi.page = 1;
-  _injectPgBar('mutasi', '#table-mutasi');
-  _pgFetchMutasi();
+  google.script.run.withSuccessHandler(function(data) {
+    _cachedMutasiData = data || [];
+    _populateMutasiProdukFilter(data);
+    _pgState.mutasi.data = data;
+    _pgState.mutasi.page = 1;
+    _injectPgBar('mutasi', '#table-mutasi');
+    _pgRender('mutasi');
+  }).getMutasiStokList({});
 }
 
-function _updateTotalNilaiStok(totalNilaiStok) {
+function _updateTotalNilaiStok() {
+  var total = (_cachedStokData || []).reduce(function(s, d) { return s + (d.nilaiStok || 0); }, 0);
   var el = document.getElementById('inv-total-nilai');
-  if (el) el.textContent = 'Rp ' + (totalNilaiStok || 0).toLocaleString('id-ID');
+  if (el) el.textContent = 'Rp ' + total.toLocaleString('id-ID');
 }
 
-// Dropdown filter produk Mutasi disumber dari Stok (selalu sudah dimuat lebih
-// dulu) — Mutasi sendiri tidak lagi membawa array lengkap di client.
-function _populateMutasiProdukFilter() {
+function _populateMutasiProdukFilter(data) {
   var sel = document.getElementById('filter-mutasi-produk');
   if (!sel) return;
   var produkSet = {};
-  (_cachedStokData || []).forEach(function(d) { produkSet[d.idProduk] = d.namaProduk; });
+  (data || []).forEach(function(d) { produkSet[d.idProduk] = d.namaProduk; });
   var opts = '<option value="">Semua Produk</option>';
   Object.keys(produkSet).sort().forEach(function(id) {
     opts += '<option value="' + _escHtml(id) + '">' + _escHtml(id + ' — ' + produkSet[id]) + '</option>';
@@ -365,19 +343,25 @@ function hapusMutasi(idMutasi) {
 
 // ── Filter ─────────────────────────────────────────────────────
 
-window.filterStok = _debounce(function() {
-  _stokFilters = { search: (document.getElementById('search-stok').value || '').trim() };
+window.filterStok = function() {
+  var q = (document.getElementById('search-stok').value || '').toLowerCase().trim();
+  _pgState.stok.data = q
+    ? _cachedStokData.filter(function(d) { return ((d.idStok || d.idProduk) + d.namaProduk).toLowerCase().includes(q); })
+    : _cachedStokData;
   _pgState.stok.page = 1;
-  _pgFetchStok();
-}, 350);
+  _pgRender('stok');
+};
 
 window.filterMutasi = function() {
-  _mutasiFilters = {
-    idProduk:    (document.getElementById('filter-mutasi-produk').value || '').trim(),
-    jenisMutasi: (document.getElementById('filter-mutasi-jenis').value || '').trim()
-  };
+  var idProduk   = (document.getElementById('filter-mutasi-produk').value || '').trim();
+  var jenisMutasi = (document.getElementById('filter-mutasi-jenis').value || '').trim();
+  _pgState.mutasi.data = _cachedMutasiData.filter(function(d) {
+    if (idProduk && d.idProduk !== idProduk) return false;
+    if (jenisMutasi && d.jenisMutasi !== jenisMutasi) return false;
+    return true;
+  });
   _pgState.mutasi.page = 1;
-  _pgFetchMutasi();
+  _pgRender('mutasi');
 };
 
 // Tab mutasi lazy-load

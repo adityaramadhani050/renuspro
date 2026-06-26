@@ -4,7 +4,6 @@
 // ================================================================
 
 let _cachedSupplierData = [];
-let _supplierFilters = {};
 
 // ── Render tabel supplier ─────────────────────────────────────────
 function _pgRenderSupplier(data) {
@@ -39,31 +38,22 @@ function _pgRenderSupplier(data) {
   }).join('');
 }
 
-// ── Fetch halaman supplier dari server ────────────────────────────
-function _pgFetchSupplier() {
-  if (typeof google === 'undefined') return;
-  const state = _pgState.supplier;
-  google.script.run.withSuccessHandler(function(res) {
-    const rows = (res && res.rows) || [];
-    state.total = (res && res.total) || 0;
-    _cachedSupplierData = rows;
-    _pgRenderSupplier(rows);
-    _renderPaginationBar('supplier');
-  }).withFailureHandler(function(err) {
-    const tbody = document.getElementById('table-supplier');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-rose-400">
-      <i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat data supplier.</td></tr>`;
-  }).getSupplierList(Object.assign({ page: state.page, perPage: state.perPage }, _supplierFilters));
-}
-_pgFetchers.supplier = _pgFetchSupplier;
-
 // ── Load data supplier ────────────────────────────────────────────
 window.loadSupplier = function() {
-  if (typeof resetSearch === 'function') resetSearch('supplier');
-  _supplierFilters = {};
-  _pgState.supplier.page = 1;
-  _injectPgBar('supplier', '#table-supplier');
-  _pgFetchSupplier();
+  if (typeof google !== 'undefined') {
+    google.script.run.withSuccessHandler(function(data) {
+      _cachedSupplierData = data || [];
+      if (typeof resetSearch === 'function') resetSearch('supplier');
+      _pgState.supplier.data = _cachedSupplierData;
+      _pgState.supplier.page = 1;
+      _injectPgBar('supplier', '#table-supplier');
+      _pgRender('supplier');
+    }).withFailureHandler(function(err) {
+      const tbody = document.getElementById('table-supplier');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-rose-400">
+        <i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat data supplier.</td></tr>`;
+    }).getSupplierList();
+  }
 };
 
 // ── Submit tambah supplier ────────────────────────────────────────

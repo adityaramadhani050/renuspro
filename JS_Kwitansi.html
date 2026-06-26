@@ -46,38 +46,32 @@
       }).join('');
     }
 
-    let _kwitansiFilters = {};
-
-    function _pgFetchKwitansi() {
-      if (typeof google === 'undefined') return;
-      const state = _pgState.kwitansi;
-      google.script.run.withSuccessHandler(function(res) {
-        const rows = (res && res.rows) || [];
-        state.total = (res && res.total) || 0;
-        _cachedKwitansiData = rows;
-        _pgRenderKwitansi(rows);
-        _renderPaginationBar('kwitansi');
-      }).getKwitansiList(Object.assign({ page: state.page, perPage: state.perPage }, _kwitansiFilters));
-    }
-    _pgFetchers.kwitansi = _pgFetchKwitansi;
-
     window.loadKwitansi = function() {
       const btnBuat = document.querySelector('[onclick="bukaModalBuatKwitansi()"]');
       if (btnBuat) btnBuat.classList.toggle('hidden', !(typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()));
       const tbody = document.getElementById('table-kwitansi');
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data kwitansi...</td></tr>`;
-      const s = document.getElementById('search-kwitansi'); if (s) s.value = '';
-      _kwitansiFilters = {};
-      _pgState.kwitansi.page = 1;
-      _injectPgBar('kwitansi', '#table-kwitansi');
-      _pgFetchKwitansi();
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+          _cachedKwitansiData = data || [];
+          const s = document.getElementById('search-kwitansi'); if (s) s.value = '';
+          _pgState.kwitansi.data = _cachedKwitansiData;
+          _pgState.kwitansi.page = 1;
+          _injectPgBar('kwitansi', '#table-kwitansi');
+          _pgRender('kwitansi');
+        }).getKwitansiList();
+      }
     };
 
-    window.filterKwitansi = _debounce(function() {
-      _kwitansiFilters = { search: (document.getElementById('search-kwitansi').value || '').trim() };
+    window.filterKwitansi = function() {
+      const q = (document.getElementById('search-kwitansi').value || '').toLowerCase().trim();
+      _pgState.kwitansi.data = _cachedKwitansiData.filter(d => {
+        if (!q) return true;
+        return (d.id + d.noInvoice + d.noWO + d.terimaDari + d.untuk).toLowerCase().includes(q);
+      });
       _pgState.kwitansi.page = 1;
-      _pgFetchKwitansi();
-    }, 350);
+      _pgRender('kwitansi');
+    };
 
     // ── Isi dropdown invoice (shared buat & edit) ──
     function _isiDropdownKwitansi(list, selectedId, disabled) {

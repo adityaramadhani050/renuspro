@@ -164,38 +164,32 @@
       }).join('');
     }
 
-    let _invoiceFilters = {};
-
-    function _pgFetchInvoice() {
-      if (typeof google === 'undefined') return;
-      const state = _pgState.invoice;
-      google.script.run.withSuccessHandler(function(res) {
-        const rows = (res && res.rows) || [];
-        state.total = (res && res.total) || 0;
-        _cachedInvoiceData = rows;
-        _pgRenderInvoice(rows);
-        _renderPaginationBar('invoice');
-      }).getInvoiceList(Object.assign({ page: state.page, perPage: state.perPage }, _invoiceFilters));
-    }
-    _pgFetchers.invoice = _pgFetchInvoice;
-
     window.loadInvoice = function() {
       const btnBuat = document.querySelector('[onclick="bukaModalBuatInvoice()"]');
       if (btnBuat) btnBuat.classList.toggle('hidden', !_isFinanceOrAdmin());
       const tbody = document.getElementById('table-invoice');
       if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data invoice...</td></tr>`;
-      const s = document.getElementById('search-invoice'); if (s) s.value = '';
-      _invoiceFilters = {};
-      _pgState.invoice.page = 1;
-      _injectPgBar('invoice', '#table-invoice');
-      _pgFetchInvoice();
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(data) {
+          _cachedInvoiceData = data || [];
+          const s = document.getElementById('search-invoice'); if (s) s.value = '';
+          _pgState.invoice.data = _cachedInvoiceData;
+          _pgState.invoice.page = 1;
+          _injectPgBar('invoice', '#table-invoice');
+          _pgRender('invoice');
+        }).getInvoiceList();
+      }
     };
 
-    window.filterInvoice = _debounce(function() {
-      _invoiceFilters = { search: (document.getElementById('search-invoice').value || '').trim() };
+    window.filterInvoice = function() {
+      const q = (document.getElementById('search-invoice').value || '').toLowerCase().trim();
+      _pgState.invoice.data = _cachedInvoiceData.filter(d => {
+        if (!q) return true;
+        return (d.id + d.noWO + d.noPenawaran + d.namaKlien + d.namaProject + d.jenis).toLowerCase().includes(q);
+      });
       _pgState.invoice.page = 1;
-      _pgFetchInvoice();
-    }, 350);
+      _pgRender('invoice');
+    };
 
     // ── Form Buat Invoice ──
     function bukaModalBuatInvoice(preSelectNoWO) {

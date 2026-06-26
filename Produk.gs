@@ -30,7 +30,7 @@ function _ensureStokLinkKolom(ss) {
   if (lastCol < 8) sheet.getRange(1, 8).setValue('Qty Tersedia');
 }
 
-function getProdukList(opts) {
+function getProdukList() {
   try {
     const data = _cachedProduk();
     const list = [];
@@ -48,19 +48,8 @@ function getProdukList(opts) {
         });
       }
     }
-
-    if (!opts) return list;
-
-    const q = (opts.search || '').toLowerCase().trim();
-    const filtered = q
-      ? list.filter(i => (i.sku + i.nama + i.unit).toLowerCase().includes(q))
-      : list;
-
-    const page    = parseInt(opts.page, 10)    || 1;
-    const perPage = parseInt(opts.perPage, 10) || 10;
-    const start   = (page - 1) * perPage;
-    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
-  } catch(e) { return opts ? { rows: [], total: 0 } : []; }
+    return list;
+  } catch(e) { return []; }
 }
 
 function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
