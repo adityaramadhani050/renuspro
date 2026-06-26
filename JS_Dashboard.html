@@ -606,15 +606,15 @@ function _dbRenderLeaderboard(salesList) {
   }
   tbody.innerHTML = salesList.map(function(s, idx) {
     return '<tr class="hover:bg-slate-50 transition">'
-      + '<td class="px-4 py-3 text-center" data-label="Rank">' + _rankBadge(idx + 1) + '</td>'
-      + '<td class="px-4 py-3" data-label="Nama Sales"><span class="text-sm font-bold text-slate-800">' + _esc(s.nama) + '</span></td>'
-      + '<td class="px-4 py-3 text-xs text-slate-600" data-label="Penawaran">' + s.totalPenawaran + '</td>'
-      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap" data-label="Nilai Total">' + _rp(s.totalNilaiPenawaran) + '</td>'
-      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600" data-label="Deal">' + s.dealCount + '</td>'
-      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap" data-label="Revenue Deal">' + _rp(s.dealRevenue) + '</td>'
-      + '<td class="px-4 py-3 text-xs text-slate-600" data-label="Win Rate">' + _pct(s.winRate) + '</td>'
-      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap" data-label="Target">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
-      + '<td class="px-4 py-3" data-label="Capaian">' + _achieveBadge(s.achievement) + '</td>'
+      + '<td class="px-4 py-3 text-center">' + _rankBadge(idx + 1) + '</td>'
+      + '<td class="px-4 py-3"><span class="text-sm font-bold text-slate-800">' + _esc(s.nama) + '</span></td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600">' + s.totalPenawaran + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + _rp(s.totalNilaiPenawaran) + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
+      + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
       + '</tr>';
   }).join('');
 }
