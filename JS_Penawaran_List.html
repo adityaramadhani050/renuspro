@@ -85,7 +85,8 @@
               </td>
               <td class="p-4 text-center">
                 <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)" data-prev-status="${i.status}"
-                  ${i.status==='Fail' && i.catatanFail ? `title="Catatan Fail: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
+                  ${i.status==='Fail' && i.catatanFail ? `title="Kode Lost: ${(i.kodeLost||'-').replace(/"/g,'&quot;')} — Catatan: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
+                  ${i.status==='Deal' && i.kodeWin ? `title="Kode Win: ${i.kodeWin.replace(/"/g,'&quot;')}"` : ''}
                   class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusClass}">
                   <option value="On-Progress" ${i.status==='On-Progress'?'selected':''}>On-Progress</option>
                   <option value="Deal"        ${i.status==='Deal'?'selected':''}>Deal</option>
@@ -106,9 +107,15 @@
               <td class="p-4 text-center">
                 <div class="flex items-center justify-center gap-1">
                 ${i.status === 'Fail' && i.catatanFail
-                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','${i.catatanFail.replace(/'/g,"\\'").replace(/\n/g,' ')}')"
+                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Lost: ${(i.kodeLost||'-')}\\n\\n${i.catatanFail.replace(/'/g,"\\'").replace(/\n/g,' ')}')"
                       class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Lihat Catatan Fail">
                       <i class="fa-solid fa-circle-info"></i>
+                    </button>`
+                  : ''}
+                ${i.status === 'Deal' && i.kodeWin
+                  ? `<button onclick="lihatKodeWin('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Win: ${i.kodeWin}\\n\\n${(i.catatanWin||'').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
+                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Lihat Kode Win">
+                      <i class="fa-solid fa-trophy"></i>
                     </button>`
                   : ''}
                 <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'
@@ -140,6 +147,17 @@
     }
 
     function lihatCatatanFail(id, namaProject, catatan) {
+      document.getElementById('lihat-catatan-fail-title').innerText    = 'Catatan Penawaran Fail';
+      document.getElementById('lihat-catatan-fail-icon-wrap').className = 'w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4';
+      document.getElementById('lihat-catatan-fail-icon').className     = 'fa-solid fa-circle-xmark text-rose-600 text-2xl';
+      document.getElementById('lihat-catatan-fail-subtitle').innerText = id + (namaProject ? ' — ' + namaProject : '');
+      document.getElementById('lihat-catatan-fail-isi').innerText = catatan || '—';
+      document.getElementById('modal-lihat-catatan-fail').classList.remove('hidden');
+    }
+    function lihatKodeWin(id, namaProject, catatan) {
+      document.getElementById('lihat-catatan-fail-title').innerText    = 'Faktor Kemenangan Penawaran';
+      document.getElementById('lihat-catatan-fail-icon-wrap').className = 'w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4';
+      document.getElementById('lihat-catatan-fail-icon').className     = 'fa-solid fa-trophy text-emerald-600 text-2xl';
       document.getElementById('lihat-catatan-fail-subtitle').innerText = id + (namaProject ? ' — ' + namaProject : '');
       document.getElementById('lihat-catatan-fail-isi').innerText = catatan || '—';
       document.getElementById('modal-lihat-catatan-fail').classList.remove('hidden');

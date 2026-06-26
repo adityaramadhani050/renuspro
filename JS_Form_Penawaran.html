@@ -817,6 +817,51 @@
 
         // --- UPDATE STATUS PENAWARAN ---
     let _catatanFailCtx = null;
+    let _kodeWinCtx     = null;
+
+    const KODE_WIN_LIST = [
+      { kode: 'W01', label: 'Harga Kompetitif' },
+      { kode: 'W02', label: 'Solusi Teknis Unggul' },
+      { kode: 'W03', label: 'Respon Cepat' },
+      { kode: 'W04', label: 'Kepercayaan / Reputasi' },
+      { kode: 'W05', label: 'Repeat Customer' },
+      { kode: 'W06', label: 'Referral' },
+      { kode: 'W07', label: 'Relationship' },
+      { kode: 'W08', label: 'After Sales & Garansi' },
+      { kode: 'W09', label: 'Lead Time Lebih Baik' },
+      { kode: 'W10', label: 'Skema Pembayaran' },
+      { kode: 'W11', label: 'Dukungan Manajemen' },
+      { kode: 'W12', label: 'Faktor Lain' }
+    ];
+    const KODE_LOST_LIST = [
+      { kode: 'L01', label: 'Harga Tidak Kompetitif' },
+      { kode: 'L02', label: 'Kompetitor Lebih Unggul' },
+      { kode: 'L03', label: 'Budget Ditunda' },
+      { kode: 'L04', label: 'Proyek Dibatalkan' },
+      { kode: 'L05', label: 'Follow-up Kurang Intensif' },
+      { kode: 'L06', label: 'Respon Terlambat' },
+      { kode: 'L07', label: 'Solusi Teknis Tidak Sesuai' },
+      { kode: 'L08', label: 'Lead Time Terlalu Lama' },
+      { kode: 'L09', label: 'Administrasi / Legal' },
+      { kode: 'L10', label: 'Decision Maker Sulit Dijangkau' },
+      { kode: 'L11', label: 'Customer Memilih Vendor Lama' },
+      { kode: 'L12', label: 'Faktor Eksternal' }
+    ];
+
+    function _populateKodeWinLostSelects() {
+      const selWin  = document.getElementById('select-kode-win');
+      const selLost = document.getElementById('select-kode-lost');
+      if (selWin && !selWin.dataset.populated) {
+        selWin.innerHTML = '<option value="">-- Pilih Kode Win --</option>' +
+          KODE_WIN_LIST.map(k => `<option value="${k.kode}">${k.kode} — ${k.label}</option>`).join('');
+        selWin.dataset.populated = '1';
+      }
+      if (selLost && !selLost.dataset.populated) {
+        selLost.innerHTML = '<option value="">-- Pilih Kode Lost --</option>' +
+          KODE_LOST_LIST.map(k => `<option value="${k.kode}">${k.kode} — ${k.label}</option>`).join('');
+        selLost.dataset.populated = '1';
+      }
+    }
 
     function ubahStatusPenawaran(noPenawaran, rev, selectEl) {
       const statusBaru = selectEl.value;
@@ -824,11 +869,28 @@
 
       if (statusBaru === 'Fail') {
         _catatanFailCtx = { noPenawaran, rev, selectEl, prevStatus };
+        _populateKodeWinLostSelects();
         const sub = document.getElementById('catatan-fail-subtitle');
         if (sub) sub.textContent = `Masukkan catatan alasan penawaran ${noPenawaran} ini fail.`;
         const ta = document.getElementById('input-catatan-fail');
         if (ta) ta.value = '';
+        const selLost = document.getElementById('select-kode-lost');
+        if (selLost) selLost.value = '';
         const modal = document.getElementById('modal-catatan-fail');
+        if (modal) modal.classList.remove('hidden');
+        return;
+      }
+
+      if (statusBaru === 'Deal') {
+        _kodeWinCtx = { noPenawaran, rev, selectEl, prevStatus };
+        _populateKodeWinLostSelects();
+        const sub = document.getElementById('kode-win-subtitle');
+        if (sub) sub.textContent = `Pilih faktor kemenangan penawaran ${noPenawaran}.`;
+        const selWin = document.getElementById('select-kode-win');
+        if (selWin) selWin.value = '';
+        const ta = document.getElementById('input-catatan-win');
+        if (ta) ta.value = '';
+        const modal = document.getElementById('modal-kode-win');
         if (modal) modal.classList.remove('hidden');
         return;
       }
@@ -836,7 +898,7 @@
       _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru);
     }
 
-    function _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru, catatanFail) {
+    function _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru, catatanFail, extra) {
       const statusConfig = {
         'On-Progress': 'bg-blue-100 text-blue-700',
         'Deal':        'bg-emerald-100 text-emerald-800',
@@ -857,7 +919,7 @@
             }
           })
           .withFailureHandler(err => { showNotification(err.message, "error"); loadPenawaran(); })
-          .updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail || '');
+          .updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail || '', extra || {});
       }
     }
 
@@ -872,13 +934,49 @@
 
     function simpanCatatanFail() {
       if (!_catatanFailCtx) return;
+      const selLost = document.getElementById('select-kode-lost');
+      const kodeLost = selLost ? selLost.value : '';
+      if (!kodeLost) {
+        showNotification('Pilih kode lost terlebih dahulu.', 'error');
+        return;
+      }
       const ta = document.getElementById('input-catatan-fail');
       const catatanFail = ta ? ta.value.trim() : '';
       const { noPenawaran, rev, selectEl } = _catatanFailCtx;
       const modal = document.getElementById('modal-catatan-fail');
       if (modal) modal.classList.add('hidden');
-      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Fail', catatanFail);
+      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Fail', catatanFail, { kodeLost });
       _catatanFailCtx = null;
+    }
+
+    function batalKodeWin() {
+      if (_kodeWinCtx && _kodeWinCtx.selectEl) {
+        _kodeWinCtx.selectEl.value = _kodeWinCtx.prevStatus;
+      }
+      _kodeWinCtx = null;
+      const modal = document.getElementById('modal-kode-win');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function simpanKodeWin() {
+      if (!_kodeWinCtx) return;
+      const selWin = document.getElementById('select-kode-win');
+      const kodeWin = selWin ? selWin.value : '';
+      if (!kodeWin) {
+        showNotification('Pilih kode win terlebih dahulu.', 'error');
+        return;
+      }
+      const ta = document.getElementById('input-catatan-win');
+      const catatanWin = ta ? ta.value.trim() : '';
+      if (kodeWin === 'W12' && !catatanWin) {
+        showNotification('Kode "Faktor Lain" wajib dijelaskan di catatan.', 'error');
+        return;
+      }
+      const { noPenawaran, rev, selectEl } = _kodeWinCtx;
+      const modal = document.getElementById('modal-kode-win');
+      if (modal) modal.classList.add('hidden');
+      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Deal', '', { kodeWin, catatanWin });
+      _kodeWinCtx = null;
     }
 
       // --- MUAT DATA PENAWARAN KE FORM UNTUK DIEDIT ---

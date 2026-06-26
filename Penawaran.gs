@@ -80,7 +80,10 @@ function getPenawaranList() {
           noWO:              data[i][17] ? data[i][17].toString() : '',
           tanggalDeal:       data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : ''),
           channelMarketing:  data[i][19] ? data[i][19].toString() : '',
-          catatanFail:       data[i][20] ? data[i][20].toString() : ''
+          catatanFail:       data[i][20] ? data[i][20].toString() : '',
+          kodeWin:           data[i][22] ? data[i][22].toString() : '',
+          catatanWin:        data[i][23] ? data[i][23].toString() : '',
+          kodeLost:          data[i][24] ? data[i][24].toString() : ''
         };
       }
     }
@@ -331,7 +334,8 @@ function simpanPenawaranKeSheet(payload) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
-function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail) {
+function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra) {
+  extra = extra || {};
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
@@ -342,8 +346,13 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
 
-        // Kolom 21 = Catatan Fail (hanya diisi saat status Fail, dikosongkan untuk status lain)
+        // Kolom 21 = Catatan Fail, Kolom 25 = Kode Lost (hanya diisi saat status Fail)
         sheet.getRange(i + 1, 21).setValue(statusBaru === 'Fail' ? (catatanFail || '') : '');
+        sheet.getRange(i + 1, 25).setValue(statusBaru === 'Fail' ? (extra.kodeLost || '') : '');
+
+        // Kolom 23 = Kode Win, Kolom 24 = Catatan Win (hanya diisi saat status Deal)
+        sheet.getRange(i + 1, 23).setValue(statusBaru === 'Deal' ? (extra.kodeWin || '') : '');
+        sheet.getRange(i + 1, 24).setValue(statusBaru === 'Deal' ? (extra.catatanWin || '') : '');
 
         // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
