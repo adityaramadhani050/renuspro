@@ -231,14 +231,28 @@ function _waMsgReminderExpired(list) {
     'Penawaran berikut sudah lewat tanggal berlaku, mohon follow-up kembali ke customer:',
     ''
   ];
-  list.forEach(function(it, idx) {
-    lines.push(
-      (idx + 1) + '. ' + it.noPenawaran + ' — ' + it.namaProject + '\n' +
-      '   Klien : ' + it.namaKlien + '\n' +
-      '   Sales : ' + it.dibuatOleh + '\n' +
-      '   Valid s.d. : ' + it.validHingga + '\n'
-    );
+
+  // Kelompokkan per sales (dibuatOleh)
+  var groups    = {};
+  var salesUrut = [];
+  list.forEach(function(it) {
+    var sales = it.dibuatOleh || 'Tanpa Sales';
+    if (!groups[sales]) { groups[sales] = []; salesUrut.push(sales); }
+    groups[sales].push(it);
   });
+
+  salesUrut.forEach(function(sales, gIdx) {
+    lines.push('👤 *' + sales + '*');
+    groups[sales].forEach(function(it, idx) {
+      lines.push(
+        (idx + 1) + '. ' + it.noPenawaran + ' — ' + it.namaProject + '\n' +
+        '   Klien : ' + it.namaKlien + '\n' +
+        '   Valid s.d. : ' + it.validHingga
+      );
+    });
+    if (gIdx < salesUrut.length - 1) lines.push('');
+  });
+
   return lines.join('\n');
 }
 
