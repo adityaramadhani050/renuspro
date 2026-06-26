@@ -39,21 +39,21 @@
 
         return `<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-sm cursor-pointer"
                     onclick='bukaDetailWO(${itemJson})'>
-          <td class="p-4 whitespace-nowrap">
+          <td class="p-4 whitespace-nowrap" data-label="No WO / Penawaran">
             <span class="inline-flex items-center bg-emerald-50 text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-100 text-sm"><i class="fa-solid fa-clipboard-check mr-1.5 text-xs"></i>${i.noWO}</span>
             <p class="text-[11px] text-blue-600 font-semibold mt-1">${i.id} <span class="text-slate-400 font-normal">Rev${i.rev}</span></p>
             <p class="text-[10px] text-slate-400">${i.tanggal || ''}</p>
           </td>
-          <td class="p-4 max-w-[200px]">
+          <td class="p-4 max-w-[200px]" data-label="Klien / Project">
             <p class="text-[11px] text-slate-400 truncate">${i.namaKlien}</p>
             <p class="font-semibold text-slate-700 truncate">${i.namaProject}</p>
             <p class="text-[10px] text-slate-400 mt-0.5">${i.dibuatOleh || ''}</p>
           </td>
-          <td class="p-4 text-right whitespace-nowrap">
+          <td class="p-4 text-right whitespace-nowrap" data-label="Nilai Kontrak">
             <p class="font-bold text-slate-800">Rp ${rp(i.nilaiKontrak)}</p>
             ${i.ppnRate > 0 ? `<p class="text-[10px] text-slate-400">Incl. PPN Rp ${rp(i.grandTotal)}</p>` : ''}
           </td>
-          <td class="p-4">
+          <td class="p-4" data-label="Progress Pembayaran">
             <div class="flex justify-between text-[10px] text-slate-400 mb-1">
               <span>${i.invoices.length} invoice</span>
               <span>${i.pctLunas}% lunas</span>
@@ -64,11 +64,11 @@
             </div>
             <p class="text-[10px] text-slate-400 mt-1">${ditagihFmt} ditagih</p>
           </td>
-          <td class="p-4 text-center">
+          <td class="p-4 text-center" data-label="Status">
             <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${_woBadge(i.paymentStatus)}">${i.paymentStatus}</span>
             ${agingBadgeWO ? `<div class="mt-1">${agingBadgeWO}</div>` : ''}
           </td>
-          <td class="p-4 text-center" onclick="event.stopPropagation()">
+          <td class="p-4 text-center rp-actions" onclick="event.stopPropagation()">
             <div class="flex items-center justify-center gap-1">
               <button onclick='bukaDetailWO(${itemJson})'
                 class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail & Invoice">

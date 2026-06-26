@@ -153,20 +153,20 @@ function _renderPengeluaran(list) {
     var sumberBadge = _sumberBadge(r.sumber);
     var isOtomatis  = (r.sumber === 'Pembayaran PO' || r.sumber === 'Penggunaan Stok');
     html += '<tr class="hover:bg-slate-50 transition-colors">';
-    html += '<td class="p-4"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
+    html += '<td class="p-4" data-label="ID / Tanggal"><div class="font-mono text-xs text-slate-500">' + r.id + '</div><div class="text-xs text-slate-400 mt-0.5">' + (r.tanggal || '—') + '</div></td>';
     if (r.noWO) {
-      html += '<td class="p-4"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
+      html += '<td class="p-4" data-label="No WO / Project"><div class="font-bold text-slate-800 text-xs">' + r.noWO + '</div><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.namaProject || r.namaKlien || '—') + '</div></td>';
     } else {
-      html += '<td class="p-4"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700"><i class="fas fa-building text-[10px]"></i>Non-Project</span><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.kategori || '—') + '</div></td>';
+      html += '<td class="p-4" data-label="No WO / Project"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700"><i class="fas fa-building text-[10px]"></i>Non-Project</span><div class="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">' + (r.kategori || '—') + '</div></td>';
     }
-    html += '<td class="p-4 text-center">' + sumberBadge + '</td>';
-    html += '<td class="p-4 text-xs text-slate-600">' + (r.noPO || '—') + '</td>';
-    html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';
-    html += '<td class="p-4 text-sm text-slate-700 max-w-[180px]"><div class="truncate" title="' + _esc(r.deskripsi) + '">' + _esc(r.deskripsi) + '</div></td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + (r.qty || 0) + ' ' + (r.satuan || '') + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600">' + _fmtRpExp(r.hargaSatuan) + '</td>';
-    html += '<td class="p-4 text-right font-bold text-slate-800">' + _fmtRpExp(r.total) + '</td>';
-    html += '<td class="p-4 text-center">';
+    html += '<td class="p-4 text-center" data-label="Sumber">' + sumberBadge + '</td>';
+    html += '<td class="p-4 text-xs text-slate-600" data-label="No PO">' + (r.noPO || '—') + '</td>';
+    html += '<td class="p-4 text-xs text-slate-600 max-w-[120px] truncate" data-label="Akun" title="' + r.namaAkun + '">' + r.namaAkun + '</td>';
+    html += '<td class="p-4 text-sm text-slate-700 max-w-[180px]" data-label="Deskripsi"><div class="truncate" title="' + _esc(r.deskripsi) + '">' + _esc(r.deskripsi) + '</div></td>';
+    html += '<td class="p-4 text-right text-xs text-slate-600" data-label="Qty">' + (r.qty || 0) + ' ' + (r.satuan || '') + '</td>';
+    html += '<td class="p-4 text-right text-xs text-slate-600" data-label="Harga">' + _fmtRpExp(r.hargaSatuan) + '</td>';
+    html += '<td class="p-4 text-right font-bold text-slate-800" data-label="Total">' + _fmtRpExp(r.total) + '</td>';
+    html += '<td class="p-4 text-center rp-actions">';
     if (isOtomatis) {
       html += '<span class="text-slate-400 text-xs" title="Kelola dari sumbernya"><i class="fas fa-lock text-xs"></i></span>';
     } else {

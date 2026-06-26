@@ -32,27 +32,27 @@ function _pgRenderPurchaseOrder(data) {
     var bc = statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-500';
     var isAktif = po.statusPO === 'Aktif';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">' +
-      '<td class="p-4">' +
+      '<td class="p-4" data-label="No PO / Tanggal">' +
         '<div class="font-mono font-bold text-slate-700">' + (po.noPO || '') + '</div>' +
         '<div class="text-xs text-slate-400 mt-0.5">' + (po.tanggal || '') + '</div>' +
       '</td>' +
-      '<td class="p-4">' +
+      '<td class="p-4" data-label="Nama Order / Supplier">' +
         '<div class="font-medium text-slate-800">' + (_escHtml(po.peruntukan) || (po.namaSupplier || po.idSupplier || '—')) + '</div>' +
         '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaSupplier || po.idSupplier || '') + '</div>' +
       '</td>' +
-      '<td class="p-4">' +
+      '<td class="p-4" data-label="No WO / Proyek">' +
         (po.noWO
           ? '<div class="font-mono text-sm text-teal-700">' + _escHtml(po.noWO) + '</div>' +
             (po.namaProject ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaProject) + '</div>' : '')
           : '<span class="text-slate-400">—</span>') +
       '</td>' +
-      '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
-      '<td class="p-4 text-center"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
-      '<td class="p-4 text-right whitespace-nowrap">' +
+      '<td class="p-4 text-center" data-label="Status PO"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
+      '<td class="p-4 text-center" data-label="Status Bayar"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
+      '<td class="p-4 text-right whitespace-nowrap" data-label="Nilai PO (DPP)">' +
         '<p class="font-bold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
         ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
       '</td>' +
-      '<td class="p-4 text-center">' +
+      '<td class="p-4 text-center rp-actions">' +
         '<div class="flex items-center justify-center gap-1">' +
           '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
           (isAktif ? '<button onclick="bukaEditPO(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' : '') +

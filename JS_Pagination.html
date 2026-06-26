@@ -323,15 +323,15 @@ function _pgRenderProduk(data) {
       ? `<div class="font-mono text-[10px] text-indigo-600 font-bold">${i.stokId}</div><div class="text-[10px] text-slate-400">${(i.qtyTersedia||0).toLocaleString('id-ID')} ${i.unit}</div>`
       : `<span class="text-[10px] text-slate-300">—</span>`;
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-      <td class="p-4 font-bold text-slate-600">${i.sku}</td>
-      <td class="p-4 font-semibold">${i.nama}</td>
-      <td class="p-4 text-slate-500 text-center">${i.unit}</td>
-      <td class="p-4 text-center">${tipeHtml}</td>
-      <td class="p-4 text-center">${stokHtml}</td>
-      <td class="p-4 text-right font-bold text-slate-800">Rp ${i.harga.toLocaleString('id-ID')}</td>
-      <td class="p-4 text-right font-medium text-rose-600">Rp ${i.hpp.toLocaleString('id-ID')}</td>
-      <td class="p-4 text-right"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
-      <td class="p-4 text-center">
+      <td class="p-4 font-bold text-slate-600" data-label="ID">${i.sku}</td>
+      <td class="p-4 font-semibold" data-label="Nama Item">${i.nama}</td>
+      <td class="p-4 text-slate-500 text-center" data-label="Unit">${i.unit}</td>
+      <td class="p-4 text-center" data-label="Tipe">${tipeHtml}</td>
+      <td class="p-4 text-center" data-label="Stok Terkait">${stokHtml}</td>
+      <td class="p-4 text-right font-bold text-slate-800" data-label="Harga Jual">Rp ${i.harga.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right font-medium text-rose-600" data-label="HPP">Rp ${i.hpp.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right" data-label="Margin"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
+      <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           <button onclick='bukaModalEditProduk(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
           <button onclick="konfirmasiHapus('produk','${i.sku}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
@@ -373,11 +373,11 @@ function _pgRenderTemplate(keys) {
       return s + (item.qty || 0) * h;
     }, 0);
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
-      <td class="p-4 font-bold text-teal-700">${id}</td>
-      <td class="p-4 font-semibold text-slate-800">${t.nama}</td>
-      <td class="p-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-lg">${items.length} item</span></td>
-      <td class="p-4 text-right font-bold text-slate-700">Rp ${estimasi.toLocaleString('id-ID')}</td>
-      <td class="p-4 text-center">
+      <td class="p-4 font-bold text-teal-700" data-label="ID">${id}</td>
+      <td class="p-4 font-semibold text-slate-800" data-label="Nama Paket">${t.nama}</td>
+      <td class="p-4 text-center" data-label="Jumlah Item"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-lg">${items.length} item</span></td>
+      <td class="p-4 text-right font-bold text-slate-700" data-label="Nilai Paket">Rp ${estimasi.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-1">
           <button onclick="lihatDetailTemplate('${id}')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Lihat Detail"><i class="fa-solid fa-eye text-sm"></i></button>
           <button onclick="bukaModalEditTemplate('${id}')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
@@ -413,12 +413,12 @@ function _pgRenderCustomer(data) {
   }
   tbody.innerHTML = data.map(i => `
     <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-      <td class="p-4 font-bold text-slate-600">${i.id}</td>
-      <td class="p-4 font-bold text-slate-800">${i.nama}</td>
-      <td class="p-4 text-slate-600">${i.perusahaan}</td>
-      <td class="p-4 text-slate-500">${i.alamat}</td>
-      <td class="p-4 text-slate-600 font-medium">${i.kontak}</td>
-      <td class="p-4 text-center">
+      <td class="p-4 font-bold text-slate-600" data-label="ID">${i.id}</td>
+      <td class="p-4 font-bold text-slate-800" data-label="Nama Klien">${i.nama}</td>
+      <td class="p-4 text-slate-600" data-label="Kategori Industri">${i.perusahaan}</td>
+      <td class="p-4 text-slate-500" data-label="Lokasi">${i.alamat}</td>
+      <td class="p-4 text-slate-600 font-medium" data-label="Kontak">${i.kontak}</td>
+      <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           <button onclick='bukaModalEditCustomer(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
           <button onclick="konfirmasiHapus('customer','${i.id}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>

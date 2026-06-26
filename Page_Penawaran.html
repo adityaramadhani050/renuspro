@@ -78,7 +78,7 @@
             </div>
           </div>
           <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-x-auto">
-            <table class="w-full min-w-[1000px] text-left border-collapse">
+            <table class="w-full min-w-[1000px] text-left border-collapse rp-table">
               <thead><tr id="thead-penawaran" class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider font-bold">
                 <th class="p-3 whitespace-nowrap">No Quot & Tanggal</th>
                 <th class="p-3">Klien & Nama Project</th>
@@ -125,7 +125,7 @@
                       <i class="fa-solid fa-user-plus text-xs"></i> Tambah Klien
                     </button>
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Klien / Perusahaan</label>
                       <div>
@@ -166,7 +166,7 @@
                     </select>
                   </div>
                   <input type="hidden" id="noPenawaran">
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tgl Penawaran</label>
                       <input type="date" id="tglPenawaran" class="input-field text-sm" required>
                     </div>
@@ -244,7 +244,7 @@
               </div>
               <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
                 <h2 class="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2"><i class="fa-solid fa-handshake mr-2 text-blue-600"></i>Syarat & Ketentuan Komerisal</h2>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status Material</label><select id="tc_material" class="input-field py-1.5 text-sm"></select></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Down Payment</label><select id="tc_dp" class="input-field py-1.5 text-sm"></select></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Term 2 Payment</label><select id="tc_term" class="input-field py-1.5 text-sm"></select></div>
@@ -258,9 +258,9 @@
             </div>
 
             <!-- TOMBOL SUBMIT -->
-            <div class="flex justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
-              <button type="button" onclick="resetFormQuotation(true)" class="px-6 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 text-sm font-bold text-slate-600 transition">Reset Form</button>
-              <button type="submit" id="btnSubmitForm" class="px-8 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran</button>
+            <div class="flex flex-col sm:flex-row sm:justify-end gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-150">
+              <button type="button" onclick="resetFormQuotation(true)" class="px-6 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 text-sm font-bold text-slate-600 transition w-full sm:w-auto">Reset Form</button>
+              <button type="submit" id="btnSubmitForm" class="px-8 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2 w-full sm:w-auto justify-center"><i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran</button>
             </div>
           </form>
         </div>

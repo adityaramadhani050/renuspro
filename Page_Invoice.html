@@ -22,7 +22,7 @@
         <!-- Tabel Invoice -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+            <table class="w-full text-left border-collapse rp-table">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                   <th class="p-4">No Invoice</th>
@@ -80,7 +80,7 @@
               </div>
 
               <!-- Info WO (otomatis dari penawaran) -->
-              <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs grid grid-cols-2 gap-2">
+              <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><span class="text-slate-400">Klien:</span> <span id="inv-info-klien" class="font-bold text-slate-700"></span></div>
                 <div><span class="text-slate-400">Project:</span> <span id="inv-info-project" class="font-bold text-slate-700"></span></div>
                 <div><span class="text-slate-400">Nilai Kontrak (DPP):</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
@@ -89,7 +89,7 @@
                 <div><span class="text-slate-400">Sisa Bisa Ditagih:</span> <span id="inv-info-sisa" class="font-extrabold text-emerald-600"></span></div>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan Pembayaran</label>
                   <select id="inv-jenis" onchange="onInvoiceJenisChange()" class="input-field text-sm">
@@ -130,7 +130,7 @@
                   <input type="checkbox" id="inv-ada-po" onchange="onInvoicePOToggle()" class="w-4 h-4">
                   <span class="font-bold text-slate-600">Ada PO dari customer?</span>
                 </label>
-                <div id="inv-po-fields" class="grid grid-cols-2 gap-4" style="display:none">
+                <div id="inv-po-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-4" style="display:none">
                   <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">No. PO Pelanggan</label>
                     <input type="text" id="inv-nopo" placeholder="PO/2026/.." class="input-field text-sm">
@@ -154,7 +154,7 @@
               </div>
 
               <!-- Note & Bank Account -->
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Note (opsional)</label>
                   <textarea id="inv-catatan" rows="3" placeholder="Catatan pada invoice..." class="input-field text-sm"></textarea>
@@ -173,11 +173,11 @@
               </div>
             </div>
 
-            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+            <div class="flex flex-col sm:flex-row sm:justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
               <button type="button" onclick="document.getElementById('modal-invoice').classList.add('hidden')"
-                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+                class="w-full sm:w-auto px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
               <button type="button" id="inv-submit-btn" onclick="submitInvoice()"
-                class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                class="w-full sm:w-auto px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Invoice
               </button>
             </div>

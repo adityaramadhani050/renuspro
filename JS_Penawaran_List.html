@@ -65,25 +65,25 @@
         const statusClass = statusConfig[i.status] || 'bg-slate-100 text-slate-600';
         const isAdmin = _currentUser && _currentUser.role === 'admin';
         return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
-              <td class="p-4 max-w-[220px]">
+              <td class="p-4 max-w-[220px]" data-label="No Quot & Tanggal">
                 <p class="font-bold text-blue-700 whitespace-nowrap">${i.id}<span class="text-slate-400 font-normal text-[10px] ml-1">Rev${i.rev}</span></p>
                 <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.tanggal}</p>
                 ${i.noWO ? `<span class="inline-flex items-center mt-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-emerald-100">WO ${i.noWO}</span>` : ''}
               </td>
-              <td class="p-4 max-w-[220px]">
+              <td class="p-4 max-w-[220px]" data-label="Klien & Nama Project">
                 <p class="text-[11px] text-slate-400 font-medium truncate leading-tight mb-0.5">${i.namaKlien}</p>
                 <p class="font-semibold text-slate-700 truncate leading-snug">${i.namaProject}</p>
                 ${i.channelMarketing ? `<span class="inline-flex items-center mt-1 bg-indigo-50 text-indigo-700 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-indigo-100"><i class="fa-solid fa-bullhorn mr-1 text-[9px]"></i>${i.channelMarketing}</span>` : ''}
               </td>
-              <td class="p-4 text-slate-600 whitespace-nowrap">${i.dibuatOleh || '-'}</td>
-              <td class="p-4 text-right whitespace-nowrap">
+              <td class="p-4 text-slate-600 whitespace-nowrap" data-label="Sales">${i.dibuatOleh || '-'}</td>
+              <td class="p-4 text-right whitespace-nowrap" data-label="Nilai Penawaran">
                 <p class="font-bold text-slate-800">Rp ${Math.max(0, (i.subtotal||0)-(i.diskon||0)).toLocaleString('id-ID')}</p>
                 ${i.pajak > 0 ? `<p class="text-[10px] text-slate-400">Incl. PPN Rp ${i.grandTotal.toLocaleString('id-ID')}</p>` : ''}
               </td>
-              <td class="p-4 text-right">
+              <td class="p-4 text-right" data-label="Margin">
                 <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${marginClass}">${parseFloat(i.marginPersen).toFixed(1)}%</span>
               </td>
-              <td class="p-4 text-center">
+              <td class="p-4 text-center" data-label="Status">
                 <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)" data-prev-status="${i.status}"
                   ${i.status==='Fail' && i.catatanFail ? `title="Kode Lost: ${(i.kodeLost||'-').replace(/"/g,'&quot;')} — Catatan: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
                   ${i.status==='Deal' && i.kodeWin ? `title="Kode Win: ${i.kodeWin.replace(/"/g,'&quot;')}"` : ''}
@@ -93,7 +93,7 @@
                   <option value="Fail"        ${i.status==='Fail'?'selected':''}>Fail</option>
                 </select>
               </td>
-              <td class="p-4 text-center">
+              <td class="p-4 text-center" data-label="Revisi">
                 <button onclick="bukaRiwayatRevisi('${i.id}', '${i.namaProject}')"
                   class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg
                         ${parseInt(i.rev) > 0
@@ -104,7 +104,7 @@
                   Rev${i.rev}
                 </button>
               </td>
-              <td class="p-4 text-center">
+              <td class="p-4 text-center rp-actions">
                 <div class="flex items-center justify-center gap-1">
                 ${i.status === 'Fail' && i.catatanFail
                   ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Lost: ${(i.kodeLost||'-')}\\n\\n${i.catatanFail.replace(/'/g,"\\'").replace(/\n/g,' ')}')"

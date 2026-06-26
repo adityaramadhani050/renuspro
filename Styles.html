@@ -138,6 +138,59 @@
         }
       }
 
+      /* ── Tabel daftar → tampilan kartu di mobile ──────────────────────
+         Tambahkan class "rp-table" pada <table> dan data-label="..." pada
+         setiap <td> agar baris tabel otomatis berubah jadi kartu di layar
+         sempit. Tampilan desktop (>=768px) tidak berubah sama sekali. */
+      @media (max-width: 767px) {
+        table.rp-table thead { display: none; }
+        table.rp-table, table.rp-table tbody, table.rp-table tr, table.rp-table td {
+          display: block; width: 100%;
+        }
+        table.rp-table { border-collapse: separate; }
+        table.rp-table tbody {
+          display: flex; flex-direction: column; gap: 10px;
+        }
+        table.rp-table tr {
+          background: #fff;
+          border: 1px solid #f1f5f9;
+          border-radius: 14px;
+          box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+          overflow: hidden;
+        }
+        table.rp-table tr:hover { background: #fff; }
+        table.rp-table td {
+          display: flex;
+          align-items: flex-start;
+          justify-content: flex-end;
+          gap: 12px;
+          padding: 9px 14px !important;
+          border-bottom: 1px solid #f8fafc;
+          text-align: right;
+          white-space: normal !important;
+          max-width: none !important;
+        }
+        table.rp-table td:last-child { border-bottom: none; }
+        table.rp-table td[data-label] { justify-content: space-between; }
+        table.rp-table td[data-label]::before {
+          content: attr(data-label);
+          flex-shrink: 0;
+          text-align: left;
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #94a3b8;
+          padding-top: 2px;
+        }
+        table.rp-table td.rp-actions {
+          justify-content: center;
+          background: #f8fafc;
+          gap: 4px;
+        }
+        table.rp-table td.rp-actions::before { content: none; }
+      }
+
     .sd-wrap { position: relative; }
     .sd-display {
       width: 100%; padding: 0.5rem 2rem 0.5rem 1rem;

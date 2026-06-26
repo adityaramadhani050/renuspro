@@ -311,22 +311,22 @@ function _renderTabelUsers(data) {
   tbody.innerHTML = data.map(function(u) {
     const isMe = _currentUser && u.id === _currentUser.id;
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition ${isMe ? 'bg-blue-50/50' : ''}">
-      <td class="p-4 font-bold text-slate-600">${u.id} ${isMe ? '<span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md ml-1">Anda</span>' : ''}</td>
-      <td class="p-4 font-semibold text-slate-800">${u.nama}</td>
-      <td class="p-4 font-mono text-slate-600 text-sm">${u.username}</td>
-      <td class="p-4 text-center">
+      <td class="p-4 font-bold text-slate-600" data-label="ID">${u.id} ${isMe ? '<span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md ml-1">Anda</span>' : ''}</td>
+      <td class="p-4 font-semibold text-slate-800" data-label="Nama Lengkap">${u.nama}</td>
+      <td class="p-4 font-mono text-slate-600 text-sm" data-label="Username">${u.username}</td>
+      <td class="p-4 text-center" data-label="Role">
         <span class="text-xs font-extrabold px-2 py-1 rounded-lg
           ${(_ROLE_BADGE[u.role] || _ROLE_BADGE.sales)}">
           ${(_ROLE_LABEL[u.role] || u.role.toUpperCase())}
         </span>
       </td>
-      <td class="p-4 text-center">
+      <td class="p-4 text-center" data-label="Status">
         <span class="text-xs font-extrabold px-2 py-1 rounded-lg
           ${u.aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}">
           ${u.aktif ? 'Aktif' : 'Non-aktif'}
         </span>
       </td>
-      <td class="p-4 text-center">
+      <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-1">
           <button onclick='_bukaEditUser(${JSON.stringify(u)})'
             class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Edit">

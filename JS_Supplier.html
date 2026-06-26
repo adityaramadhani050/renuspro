@@ -18,17 +18,17 @@ function _pgRenderSupplier(data) {
       ? 'bg-emerald-100 text-emerald-700'
       : 'bg-rose-100 text-rose-600';
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-      <td class="p-4 font-bold text-slate-600">${i.id}</td>
-      <td class="p-4 font-bold text-slate-800">${i.nama}</td>
-      <td class="p-4 text-slate-600">${i.pic || '-'}</td>
-      <td class="p-4 text-slate-600">${i.telepon || '-'}</td>
-      <td class="p-4 text-slate-600">${i.email || '-'}</td>
-      <td class="p-4 text-center">
+      <td class="p-4 font-bold text-slate-600" data-label="ID">${i.id}</td>
+      <td class="p-4 font-bold text-slate-800" data-label="Nama Supplier">${i.nama}</td>
+      <td class="p-4 text-slate-600" data-label="PIC">${i.pic || '-'}</td>
+      <td class="p-4 text-slate-600" data-label="Telepon">${i.telepon || '-'}</td>
+      <td class="p-4 text-slate-600" data-label="Email">${i.email || '-'}</td>
+      <td class="p-4 text-center" data-label="Status">
         <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${statusBadge}">
           ${i.status || 'Aktif'}
         </span>
       </td>
-      <td class="p-4 text-center">
+      <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           <button onclick='bukaModalEditSupplier(JSON.stringify(${JSON.stringify(i).replace(/'/g, "&#39;")}))' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
           <button onclick="konfirmasiHapus('supplier','${i.id}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>

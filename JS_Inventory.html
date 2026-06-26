@@ -130,15 +130,15 @@ function _pgRenderStok(data) {
       '<button onclick=\'bukaRincianLot(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
       'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
-      '<td class="p-4 font-mono text-xs font-bold text-slate-500">' + _escHtml(idStok) + '</td>' +
-      '<td class="p-4 font-semibold text-slate-800">' + _escHtml(d.namaProduk) + '</td>' +
-      '<td class="p-4 text-right ' + qtyClass + '">' + d.qtyTersedia.toLocaleString('id-ID') +
+      '<td class="p-4 font-mono text-xs font-bold text-slate-500" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
+      '<td class="p-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
+      '<td class="p-4 text-right ' + qtyClass + '" data-label="Stok Tersedia">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
-      '<td class="p-4 text-center text-slate-500">' + _escHtml(d.satuan) + '</td>' +
-      '<td class="p-4 text-right text-slate-700">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-4 text-right font-bold text-teal-700">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-4 text-center text-xs text-slate-400">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
-      '<td class="p-4 text-center">' + aksiBtn + '</td>' +
+      '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _escHtml(d.satuan) + '</td>' +
+      '<td class="p-4 text-right text-slate-700" data-label="Harga Beli Terakhir">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="p-4 text-right font-bold text-teal-700" data-label="Total Nilai Stok">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="p-4 text-center text-xs text-slate-400" data-label="Terakhir Diubah">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
+      '<td class="p-4 text-center rp-actions">' + aksiBtn + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -258,21 +258,21 @@ function _pgRenderMutasi(data) {
       '<button onclick=\'hapusMutasi(' + JSON.stringify(d.idMutasi).replace(/'/g, "&#39;") + ')\' ' +
         'class="text-red-500 hover:text-red-700 transition" title="Hapus"><i class="fa-solid fa-trash"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">' +
-      '<td class="p-3">' +
+      '<td class="p-3" data-label="ID Mutasi / Tanggal">' +
         '<div class="font-mono font-bold text-slate-700">' + _escHtml(d.idMutasi) + '</div>' +
         '<div class="text-slate-400 mt-0.5">' + _escHtml(d.tanggal) + '</div>' +
       '</td>' +
-      '<td class="p-3 font-semibold text-slate-700">' + _escHtml(d.namaProduk) + '</td>' +
-      '<td class="p-3">' +
+      '<td class="p-3 font-semibold text-slate-700" data-label="Produk">' + _escHtml(d.namaProduk) + '</td>' +
+      '<td class="p-3" data-label="Jenis / Referensi">' +
         '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ' + badge + '">' + _escHtml(d.jenisMutasi) + '</span>' +
         '<div class="text-slate-400 mt-1">' + _escHtml(d.referensi || '—') + '</div>' +
       '</td>' +
-      '<td class="p-3 text-right font-bold text-teal-700">' + (d.qtyMasuk ? '+' + d.qtyMasuk.toLocaleString('id-ID') : '—') + '</td>' +
-      '<td class="p-3 text-right font-bold text-red-600">' + (d.qtyKeluar ? '-' + d.qtyKeluar.toLocaleString('id-ID') : '—') + '</td>' +
-      '<td class="p-3 text-right text-slate-600">Rp ' + (d.hargaSatuan || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-3 text-right font-bold text-slate-800">' + (d.saldoSetelah || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-3 text-slate-500 max-w-xs truncate">' + _escHtml(d.keterangan || '—') + '</td>' +
-      '<td class="p-3 text-center whitespace-nowrap">' + aksiBtn + '</td>' +
+      '<td class="p-3 text-right font-bold text-teal-700" data-label="Stok Masuk">' + (d.qtyMasuk ? '+' + d.qtyMasuk.toLocaleString('id-ID') : '—') + '</td>' +
+      '<td class="p-3 text-right font-bold text-red-600" data-label="Stok Keluar">' + (d.qtyKeluar ? '-' + d.qtyKeluar.toLocaleString('id-ID') : '—') + '</td>' +
+      '<td class="p-3 text-right text-slate-600" data-label="Harga Satuan">Rp ' + (d.hargaSatuan || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="p-3 text-right font-bold text-slate-800" data-label="Stok Akhir">' + (d.saldoSetelah || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="p-3 text-slate-500 max-w-xs truncate" data-label="Keterangan">' + _escHtml(d.keterangan || '—') + '</td>' +
+      '<td class="p-3 text-center whitespace-nowrap rp-actions">' + aksiBtn + '</td>' +
       '</tr>';
   }).join('');
 }
