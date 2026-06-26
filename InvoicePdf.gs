@@ -422,11 +422,11 @@ function _sisipkanFooterInvoice(sheet, startRow, inv, col) {
   sheet.getRange(row, 1, 1, leftW).merge()
     .setValue(noteVal)
     .setBackground('#f2f2f2').setFontColor('#000000')
-    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
+    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left').setFontWeight('normal');
   sheet.getRange(row, mid + 1, 1, rightW).merge()
     .setValue(bankVal)
     .setBackground('#f2f2f2').setFontColor('#000000')
-    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left');
+    .setWrap(true).setVerticalAlignment('top').setHorizontalAlignment('left').setFontWeight('normal');
   const noteLines = Math.max((noteVal.match(/\n/g) || []).length + 1, Math.ceil(noteVal.length / 45));
   const bankLines = (bankVal.match(/\n/g) || []).length + 1;
   sheet.setRowHeight(row, Math.max(44, Math.max(noteLines, bankLines, 2) * 16 + 10));
