@@ -236,7 +236,7 @@ function _waMsgReminderExpired(list) {
       (idx + 1) + '. ' + it.noPenawaran + ' — ' + it.namaProject + '\n' +
       '   Klien : ' + it.namaKlien + '\n' +
       '   Sales : ' + it.dibuatOleh + '\n' +
-      '   Valid s.d. : ' + it.validHingga
+      '   Valid s.d. : ' + it.validHingga + '\n'
     );
   });
   return lines.join('\n');
