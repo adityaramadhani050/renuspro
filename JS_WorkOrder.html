@@ -102,37 +102,44 @@
       if (outstandingEl) outstandingEl.innerText = rp((summary.totalKontrak || 0) - (summary.totalLunas || 0));
     }
 
+    // ── Fetch halaman WO dari server ──
+    let _workOrderFilters = {};
+
+    function _pgFetchWorkOrder() {
+      if (typeof google === 'undefined') return;
+      const state = _pgState.workorder;
+      google.script.run.withSuccessHandler(function(res) {
+        const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
+        _cachedWorkOrderData = data;
+        state.total = (res && res.total) || data.length;
+        if (res && res.summary) _updateWOSummary(res.summary);
+        _pgRenderWorkOrder(data);
+        _renderPaginationBar('workorder');
+      }).getWorkOrderDashboard(Object.assign({ page: state.page, perPage: state.perPage }, _workOrderFilters));
+    }
+    _pgFetchers.workorder = _pgFetchWorkOrder;
+
     // ── Load ──
     window.loadWorkOrder = function() {
       const tbody = document.getElementById('table-workorder');
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...</td></tr>`;
-      if (typeof google !== 'undefined') {
-        google.script.run.withSuccessHandler(function(res) {
-          const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
-          _cachedWorkOrderData = data;
-          if (res && res.summary) _updateWOSummary(res.summary);
-          const search = document.getElementById('search-workorder');
-          if (search) search.value = '';
-          const filterEl = document.getElementById('filter-wo-status');
-          if (filterEl) filterEl.value = '';
-          _pgState.workorder.data = _cachedWorkOrderData;
-          _pgState.workorder.page = 1;
-          _injectPgBar('workorder', '#table-workorder');
-          _pgRender('workorder');
-        }).getWorkOrderDashboard();
-      }
+      const search = document.getElementById('search-workorder');
+      if (search) search.value = '';
+      const filterEl = document.getElementById('filter-wo-status');
+      if (filterEl) filterEl.value = '';
+      _workOrderFilters = {};
+      _pgState.workorder.page = 1;
+      _injectPgBar('workorder', '#table-workorder');
+      _pgFetchWorkOrder();
     };
 
     window.filterWorkOrder = function() {
-      const q       = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
-      const status  = (document.getElementById('filter-wo-status') || {}).value || '';
-      _pgState.workorder.data = _cachedWorkOrderData.filter(d => {
-        const matchQ = !q || (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase().includes(q);
-        const matchS = !status || d.paymentStatus === status;
-        return matchQ && matchS;
-      });
+      _workOrderFilters = {
+        search: (document.getElementById('search-workorder').value || '').trim(),
+        status: (document.getElementById('filter-wo-status') || {}).value || ''
+      };
       _pgState.workorder.page = 1;
-      _pgRender('workorder');
+      _pgFetchWorkOrder();
     };
 
     // ── Modal Detail WO ──
@@ -344,7 +351,7 @@
           if (_woDetailCurrent && String(_woDetailCurrent.noWO) === String(noWO)) {
             _woDetailCurrent.catatanCustomer = catatan;
           }
-          _pgRender('workorder');
+          _pgRenderWorkOrder(_cachedWorkOrderData);
         } else {
           showNotification((res && res.message) || 'Gagal menyimpan catatan.', 'error');
         }

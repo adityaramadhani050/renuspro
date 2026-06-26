@@ -487,10 +487,10 @@ function editInvoice(payload) {
 }
 
 // ── Daftar semua invoice ────────────────────────────────────────────────────
-function getInvoiceList() {
+function getInvoiceList(opts) {
   try {
     const data = _cachedInvoice();
-    if (!data || data.length === 0) return [];
+    if (!data || data.length === 0) return opts ? { rows: [], total: 0 } : [];
     const kwMap = _getKwitansiInvoiceMap(null);
     const list = [];
 
@@ -528,10 +528,23 @@ function getInvoiceList() {
     }
 
     list.sort(function(a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
-    return list;
+
+    if (!opts) return list;
+
+    const q = (opts.search || '').toLowerCase().trim();
+    const filtered = q
+      ? list.filter(function(d) {
+          return (d.id + d.noWO + d.noPenawaran + d.namaKlien + d.namaProject + d.jenis).toLowerCase().includes(q);
+        })
+      : list;
+
+    const page    = parseInt(opts.page, 10)    || 1;
+    const perPage = parseInt(opts.perPage, 10) || 10;
+    const start   = (page - 1) * perPage;
+    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
   } catch (e) {
     Logger.log('getInvoiceList error: ' + e);
-    return [];
+    return opts ? { rows: [], total: 0 } : [];
   }
 }
 

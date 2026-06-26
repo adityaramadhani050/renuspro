@@ -105,10 +105,10 @@ function simpanKwitansi(payload) {
   }
 }
 
-function getKwitansiList() {
+function getKwitansiList(opts) {
   try {
     const data = _cachedKwitansi();
-    if (!data || data.length === 0) return [];
+    if (!data || data.length === 0) return opts ? { rows: [], total: 0 } : [];
     const list = [];
 
     for (let i = 1; i < data.length; i++) {
@@ -129,10 +129,23 @@ function getKwitansiList() {
     }
 
     list.sort(function(a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
-    return list;
+
+    if (!opts) return list;
+
+    const q = (opts.search || '').toLowerCase().trim();
+    const filtered = q
+      ? list.filter(function(d) {
+          return (d.id + d.noInvoice + d.noWO + d.terimaDari + d.untuk).toLowerCase().includes(q);
+        })
+      : list;
+
+    const page    = parseInt(opts.page, 10)    || 1;
+    const perPage = parseInt(opts.perPage, 10) || 10;
+    const start   = (page - 1) * perPage;
+    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
   } catch (e) {
     Logger.log('getKwitansiList error: ' + e);
-    return [];
+    return opts ? { rows: [], total: 0 } : [];
   }
 }
 

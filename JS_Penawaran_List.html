@@ -13,33 +13,25 @@
       const now = new Date();
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }
-    function _isiDropdownFilterPenawaran(data) {
-      const isAdmin = _currentUser && _currentUser.role === 'admin';      
-      const salesSet = new Set();
-      data.forEach(d => { if (d.dibuatOleh) salesSet.add(d.dibuatOleh); });
+    function _isiDropdownFilterPenawaran(opts) {
+      opts = opts || {};
+      const salesList = opts.salesList || [];
+      const tahunList = opts.tahunList || [];
+
       const selSales = document.getElementById('filter-sales');
       const current = selSales.value;
       selSales.innerHTML = '<option value="">Semua Sales</option>';
-      [...salesSet].sort().forEach(s => {
+      salesList.forEach(s => {
         const o = document.createElement('option');
         o.value = s; o.text = s;
         if (s === current) o.selected = true;
         selSales.add(o);
-      });    
-    
-
-      // Dropdown Tahun — ambil dari data
-      const tahunSet = new Set();
-      data.forEach(d => {
-        if (d.tanggal) {
-          const parts = d.tanggal.split('/');
-          if (parts.length === 3) tahunSet.add(parts[2]);
-        }
       });
+
       const selTahun = document.getElementById('filter-tahun');
       const currentTahun = selTahun.value;
       selTahun.innerHTML = '<option value="">Tahun</option>';
-      [...tahunSet].sort((a,b) => b - a).forEach(y => {
+      tahunList.forEach(y => {
         const o = document.createElement('option');
         o.value = y; o.text = y;
         if (y === currentTahun) o.selected = true;

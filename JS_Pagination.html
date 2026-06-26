@@ -1,18 +1,25 @@
 <script>
 // ── State Pagination ──────────────────────────────────────────────
+// `total` = jumlah baris hasil filter di server (semua tipe kecuali 'template').
+// `template` tetap memakai array `data` di memori karena sumbernya sudah
+// dimuat penuh saat bootstrap (erpState.templatePaket), bukan per-load.
 const _pgState = {
-  penawaran:     { page: 1, perPage: 10, data: [] },
-  workorder:     { page: 1, perPage: 10, data: [] },
-  invoice:       { page: 1, perPage: 10, data: [] },
-  kwitansi:      { page: 1, perPage: 10, data: [] },
-  produk:        { page: 1, perPage: 10, data: [] },
+  penawaran:     { page: 1, perPage: 10, total: 0 },
+  workorder:     { page: 1, perPage: 10, total: 0 },
+  invoice:       { page: 1, perPage: 10, total: 0 },
+  kwitansi:      { page: 1, perPage: 10, total: 0 },
+  produk:        { page: 1, perPage: 10, total: 0 },
   template:      { page: 1, perPage: 10, data: [] },
-  customer:      { page: 1, perPage: 10, data: [] },
-  supplier:      { page: 1, perPage: 10, data: [] },
-  purchaseorder: { page: 1, perPage: 10, data: [] },
-  stok:          { page: 1, perPage: 20, data: [] },
-  mutasi:        { page: 1, perPage: 20, data: [] },
+  customer:      { page: 1, perPage: 10, total: 0 },
+  supplier:      { page: 1, perPage: 10, total: 0 },
+  purchaseorder: { page: 1, perPage: 10, total: 0 },
+  stok:          { page: 1, perPage: 20, total: 0 },
+  mutasi:        { page: 1, perPage: 20, total: 0 },
 };
+
+// Diisi oleh masing-masing modul: tipe → fungsi yang mengambil ulang
+// halaman saat ini dari server (dipanggil oleh _pgGo / _pgSetPerPage).
+const _pgFetchers = {};
 
 // ── Style injeksi sekali ──────────────────────────────────────────
 (function() {
@@ -117,9 +124,14 @@ const _pgState = {
 })();
 
 // ── Render pagination bar ─────────────────────────────────────────
+function _pgTotalData(tipe) {
+  const state = _pgState[tipe];
+  return tipe === 'template' ? state.data.length : (state.total || 0);
+}
+
 function _renderPaginationBar(tipe) {
   const state     = _pgState[tipe];
-  const totalData = state.data.length;
+  const totalData = _pgTotalData(tipe);
   const totalPage = Math.max(1, Math.ceil(totalData / state.perPage));
   const curPage   = Math.min(state.page, totalPage);
   state.page      = curPage;
@@ -181,10 +193,14 @@ function _buildPageNumbers(cur, total) {
 }
 
 function _pgGo(tipe, page) {
-  const total = Math.ceil(_pgState[tipe].data.length / _pgState[tipe].perPage);
-  if (page < 1 || page > total) return;
+  const totalPage = Math.max(1, Math.ceil(_pgTotalData(tipe) / _pgState[tipe].perPage));
+  if (page < 1 || page > totalPage) return;
   _pgState[tipe].page = page;
-  _pgRender(tipe);
+  if (tipe === 'template') {
+    _pgRender(tipe);
+  } else if (_pgFetchers[tipe]) {
+    _pgFetchers[tipe]();
+  }
   // Scroll ke atas tabel
   const tbl = document.getElementById('table-' + tipe);
   if (tbl) tbl.closest('.overflow-x-auto, .bg-white')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -193,27 +209,20 @@ function _pgGo(tipe, page) {
 function _pgSetPerPage(tipe, val) {
   _pgState[tipe].perPage = parseInt(val);
   _pgState[tipe].page    = 1;
-  _pgRender(tipe);
+  if (tipe === 'template') {
+    _pgRender(tipe);
+  } else if (_pgFetchers[tipe]) {
+    _pgFetchers[tipe]();
+  }
 }
 
-// ── Render halaman saat ini ───────────────────────────────────────
+// ── Render halaman saat ini (khusus Template Paket — sumber data in-memory) ──
 function _pgRender(tipe) {
+  if (tipe !== 'template') return;
   const state  = _pgState[tipe];
   const start  = (state.page - 1) * state.perPage;
   const sliced = state.data.slice(start, start + state.perPage);
-
-  if (tipe === 'penawaran')     _renderTabelPenawaran(sliced);
-  if (tipe === 'workorder')     _pgRenderWorkOrder(sliced);
-  if (tipe === 'invoice')       _pgRenderInvoice(sliced);
-  if (tipe === 'kwitansi')      _pgRenderKwitansi(sliced);
-  if (tipe === 'produk')        _pgRenderProduk(sliced);
-  if (tipe === 'template')      _pgRenderTemplate(sliced);
-  if (tipe === 'customer')      _pgRenderCustomer(sliced);
-  if (tipe === 'supplier')      _pgRenderSupplier(sliced);
-  if (tipe === 'purchaseorder') _pgRenderPurchaseOrder(sliced);
-  if (tipe === 'stok')          _pgRenderStok(sliced);
-  if (tipe === 'mutasi')        _pgRenderMutasi(sliced);
-
+  _pgRenderTemplate(sliced);
   _renderPaginationBar(tipe);
 }
 
@@ -235,44 +244,39 @@ function _injectPgBar(tipe, tbodySelector) {
 }
 
 // ================================================================
-// FUNGSI LOADER + RENDER (sadar-pagination)
+// FUNGSI LOADER + RENDER (server-side pagination & filter)
 // ================================================================
 
 // ── PENAWARAN ─────────────────────────────────────────────────────
+let _penawaranFilters = {};
+
+function _pgFetchPenawaran() {
+  if (typeof google === 'undefined') return;
+  const state = _pgState.penawaran;
+  google.script.run.withSuccessHandler(function(res) {
+    const rows = (res && res.rows) || [];
+    state.total = (res && res.total) || 0;
+    _renderTabelPenawaran(rows);
+    _renderPaginationBar('penawaran');
+
+    const infoEl = document.getElementById('filter-result-info');
+    const f = _penawaranFilters;
+    const adaFilter = f.search || f.sales || f.status || f.bulan || f.tahun;
+    if (infoEl) infoEl.innerText = adaFilter ? `Menampilkan ${state.total} penawaran sesuai filter` : '';
+  }).getPenawaranList(Object.assign({ page: state.page, perPage: state.perPage }, _penawaranFilters));
+}
+_pgFetchers.penawaran = _pgFetchPenawaran;
+
 window.filterPenawaran = function() {
-  const q      = (document.getElementById('search-penawaran').value || '').toLowerCase().trim();
-  const sales  = (document.getElementById('filter-sales').value  || '').trim();
-  const status = (document.getElementById('filter-status').value || '').trim();
-  const bulan  = (document.getElementById('filter-bulan').value  || '').trim();
-  const tahun  = (document.getElementById('filter-tahun').value  || '').trim();
-
-  const filtered = _cachedPenawaranData.filter(d => {
-    if (q) {
-      const hay = (d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    if (sales  && d.dibuatOleh !== sales)  return false;
-    if (status && d.status !== status)     return false;
-    if (bulan || tahun) {
-      const parts = (d.tanggal || '').split('/');
-      if (parts.length !== 3) return false;
-      if (bulan && parts[1] !== bulan) return false;
-      if (tahun && parts[2] !== tahun) return false;
-    }
-    return true;
-  });
-
-  _pgState.penawaran.data = filtered;
+  _penawaranFilters = {
+    search: (document.getElementById('search-penawaran').value || '').trim(),
+    sales:  (document.getElementById('filter-sales').value  || '').trim(),
+    status: (document.getElementById('filter-status').value || '').trim(),
+    bulan:  (document.getElementById('filter-bulan').value  || '').trim(),
+    tahun:  (document.getElementById('filter-tahun').value  || '').trim()
+  };
   _pgState.penawaran.page = 1;
-  _pgRender('penawaran');
-
-  const infoEl = document.getElementById('filter-result-info');
-  const adaFilter = q || sales || status || bulan || tahun;
-  if (infoEl) {
-    infoEl.innerText = adaFilter
-      ? `Menampilkan ${filtered.length} dari ${_cachedPenawaranData.length} penawaran`
-      : '';
-  }
+  _pgFetchPenawaran();
 };
 
 window.resetFilterPenawaran = function() {
@@ -281,28 +285,27 @@ window.resetFilterPenawaran = function() {
   document.getElementById('filter-status').value = '';
   document.getElementById('filter-bulan').value  = '';
   document.getElementById('filter-tahun').value  = '';
-  _pgState.penawaran.data = _cachedPenawaranData;
+  _penawaranFilters = {};
   _pgState.penawaran.page = 1;
-  _pgRender('penawaran');
+  _pgFetchPenawaran();
   const infoEl = document.getElementById('filter-result-info');
   if (infoEl) infoEl.innerText = '';
 };
 
 window.loadPenawaran = function() {
-  if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedPenawaranData = data || [];
-      _isiDropdownFilterPenawaran(data);
-      _pgState.penawaran.data = data;
-      _pgState.penawaran.page = 1;
-      _injectPgBar('penawaran', '#table-penawaran');
-      _pgRender('penawaran');
-    }).getPenawaranList();
-  }
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(opts) {
+    _isiDropdownFilterPenawaran(opts);
+  }).getPenawaranFilterOptions();
+
+  _penawaranFilters = {};
+  _pgState.penawaran.page = 1;
+  _injectPgBar('penawaran', '#table-penawaran');
+  _pgFetchPenawaran();
 };
 
 // ── PRODUK ────────────────────────────────────────────────────────
-let _cachedProdukData = [];
+let _produkFilters = {};
 
 function _pgRenderProduk(data) {
   const tbody = document.getElementById('table-produk');
@@ -341,20 +344,30 @@ function _pgRenderProduk(data) {
   }).join('');
 }
 
+function _pgFetchProduk() {
+  if (typeof google === 'undefined') return;
+  const state = _pgState.produk;
+  google.script.run.withSuccessHandler(function(res) {
+    const rows = (res && res.rows) || [];
+    state.total = (res && res.total) || 0;
+    _pgRenderProduk(rows);
+    _renderPaginationBar('produk');
+  }).getProdukList(Object.assign({ page: state.page, perPage: state.perPage }, _produkFilters));
+}
+_pgFetchers.produk = _pgFetchProduk;
+
 window.loadProduk = function() {
-  if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedProdukData = data || [];
-      resetSearch('produk');
-      _pgState.produk.data = data;
-      _pgState.produk.page = 1;
-      _injectPgBar('produk', '#table-produk');
-      _pgRender('produk');
-    }).getProdukList();
-  }
+  resetSearch('produk');
+  _produkFilters = {};
+  _pgState.produk.page = 1;
+  _injectPgBar('produk', '#table-produk');
+  _pgFetchProduk();
 };
 
 // ── TEMPLATE ──────────────────────────────────────────────────────
+// Template Paket sudah dimuat penuh ke memori (erpState.templatePaket) saat
+// bootstrap aplikasi — jumlah templatenya kecil, jadi tetap dipaginasi lokal
+// tanpa perlu round-trip server tambahan per halaman.
 let _cachedTemplateKeys = [];
 
 function _pgRenderTemplate(keys) {
@@ -402,7 +415,7 @@ window.loadTemplate = function() {
 };
 
 // ── CUSTOMER ──────────────────────────────────────────────────────
-let _cachedCustomerData = [];
+let _customerFilters = {};
 
 function _pgRenderCustomer(data) {
   const tbody = document.getElementById('table-customer');
@@ -427,27 +440,32 @@ function _pgRenderCustomer(data) {
     </tr>`).join('');
 }
 
+function _pgFetchCustomer() {
+  if (typeof google === 'undefined') return;
+  const state = _pgState.customer;
+  google.script.run.withSuccessHandler(function(res) {
+    const rows = (res && res.rows) || [];
+    state.total = (res && res.total) || 0;
+    _pgRenderCustomer(rows);
+    _renderPaginationBar('customer');
+  }).getCustomerList(Object.assign({ page: state.page, perPage: state.perPage }, _customerFilters));
+}
+_pgFetchers.customer = _pgFetchCustomer;
+
 window.loadCustomer = function() {
-  if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedCustomerData = data || [];
-      resetSearch('customer');
-      _pgState.customer.data = data;
-      _pgState.customer.page = 1;
-      _injectPgBar('customer', '#table-customer');
-      _pgRender('customer');
-    }).getCustomerList();
-  }
+  resetSearch('customer');
+  _customerFilters = {};
+  _pgState.customer.page = 1;
+  _injectPgBar('customer', '#table-customer');
+  _pgFetchCustomer();
 };
 
-// ── filterTabel (produk/template/customer) ────────────────────────
+// ── filterTabel (produk/template/customer/supplier) ───────────────
 window.filterTabel = function(tipe) {
   if (tipe === 'produk') {
-    const q = document.getElementById('search-produk').value.toLowerCase().trim();
-    _pgState.produk.data = _cachedProdukData.filter(i =>
-      (i.sku + i.nama + i.unit).toLowerCase().includes(q));
+    _produkFilters = { search: document.getElementById('search-produk').value.trim() };
     _pgState.produk.page = 1;
-    _pgRender('produk');
+    _pgFetchProduk();
     return;
   }
   if (tipe === 'template') {
@@ -461,19 +479,15 @@ window.filterTabel = function(tipe) {
     return;
   }
   if (tipe === 'customer') {
-    const q = document.getElementById('search-customer').value.toLowerCase().trim();
-    _pgState.customer.data = _cachedCustomerData.filter(i =>
-      (i.id + i.nama + i.perusahaan + i.alamat + i.kontak).toLowerCase().includes(q));
+    _customerFilters = { search: document.getElementById('search-customer').value.trim() };
     _pgState.customer.page = 1;
-    _pgRender('customer');
+    _pgFetchCustomer();
     return;
   }
   if (tipe === 'supplier') {
-    const q = document.getElementById('search-supplier').value.toLowerCase().trim();
-    _pgState.supplier.data = _cachedSupplierData.filter(i =>
-      (i.id + i.nama + i.pic + i.telepon + i.email).toLowerCase().includes(q));
+    _supplierFilters = { search: document.getElementById('search-supplier').value.trim() };
     _pgState.supplier.page = 1;
-    _pgRender('supplier');
+    if (_pgFetchers.supplier) _pgFetchers.supplier();
     return;
   }
 };

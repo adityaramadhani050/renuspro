@@ -16,7 +16,7 @@ function _ensureSupplierSheet(ss) {
   return sheet;
 }
 
-function getSupplierList() {
+function getSupplierList(opts) {
   try {
     const ss = getSpreadsheet();
     const sheet = _ensureSupplierSheet(ss);
@@ -39,8 +39,19 @@ function getSupplierList() {
         });
       }
     }
-    return list;
-  } catch (e) { return []; }
+
+    if (!opts) return list;
+
+    const q = (opts.search || '').toLowerCase().trim();
+    const filtered = q
+      ? list.filter(i => (i.id + i.nama + i.pic + i.telepon + i.email).toLowerCase().includes(q))
+      : list;
+
+    const page    = parseInt(opts.page, 10)    || 1;
+    const perPage = parseInt(opts.perPage, 10) || 10;
+    const start   = (page - 1) * perPage;
+    return { rows: filtered.slice(start, start + perPage), total: filtered.length };
+  } catch (e) { return opts ? { rows: [], total: 0 } : []; }
 }
 
 function simpanSupplier(payload) {

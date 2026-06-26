@@ -118,7 +118,7 @@ function buatSheetWorkOrderCatatan(ss) {
   return sheet;
 }
 
-function getWorkOrderDashboard() {
+function getWorkOrderDashboard(opts) {
   try {
     const ss = getSpreadsheet();
     const woList = getWorkOrderList();
@@ -204,9 +204,28 @@ function getWorkOrderDashboard() {
       };
     });
 
+    let resultList = woDashboard;
+    let total       = woDashboard.length;
+
+    if (opts) {
+      const q      = (opts.search || '').toLowerCase().trim();
+      const status = (opts.status || '').trim();
+      const filtered = woDashboard.filter(function(d) {
+        const matchQ = !q || (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase().includes(q);
+        const matchS = !status || d.paymentStatus === status;
+        return matchQ && matchS;
+      });
+      total = filtered.length;
+      const page    = parseInt(opts.page, 10)   || 1;
+      const perPage = parseInt(opts.perPage, 10) || 10;
+      const start   = (page - 1) * perPage;
+      resultList = filtered.slice(start, start + perPage);
+    }
+
     return {
       success: true,
-      woList: woDashboard,
+      woList: resultList,
+      total:   total,
       summary: {
         totalWO:      woDashboard.length,
         totalKontrak: sumKontrak,
