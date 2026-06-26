@@ -286,6 +286,8 @@ function saveWAReminderScheduleConfig(payload) {
 }
 
 function _reinstallTriggerReminderExpired(jam) {
+  jam = parseInt(jam, 10);
+  if (isNaN(jam) || jam < 0 || jam > 23) jam = 8;
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function(t) {
     if (t.getHandlerFunction() === 'cekReminderPenawaranExpired') ScriptApp.deleteTrigger(t);
