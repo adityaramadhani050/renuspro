@@ -387,17 +387,17 @@ function _srRenderLeaderboard(salesList) {
     const achBadge = _achieveBadge(s.achievement);
     html += `
       <tr class="hover:bg-slate-50 transition">
-        <td class="px-4 py-3 text-center">${_rankBadge(rank)}</td>
-        <td class="px-4 py-3">
+        <td class="px-4 py-3 text-center" data-label="Rank">${_rankBadge(rank)}</td>
+        <td class="px-4 py-3" data-label="Nama Sales">
           <span class="text-sm font-bold text-slate-800">${_esc(s.nama)}</span>
         </td>
-        <td class="px-4 py-3 text-xs text-slate-600">${s.totalPenawaran}</td>
-        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">${_rp(s.totalNilaiPenawaran)}</td>
-        <td class="px-4 py-3 text-xs font-bold text-emerald-600">${s.dealCount}</td>
-        <td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">${_rp(s.dealRevenue)}</td>
-        <td class="px-4 py-3 text-xs text-slate-600">${_pct(s.winRate)}</td>
-        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">${s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>'}</td>
-        <td class="px-4 py-3">${achBadge}</td>
+        <td class="px-4 py-3 text-xs text-slate-600" data-label="Penawaran">${s.totalPenawaran}</td>
+        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap" data-label="Nilai Total">${_rp(s.totalNilaiPenawaran)}</td>
+        <td class="px-4 py-3 text-xs font-bold text-emerald-600" data-label="Deal">${s.dealCount}</td>
+        <td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap" data-label="Revenue Deal">${_rp(s.dealRevenue)}</td>
+        <td class="px-4 py-3 text-xs text-slate-600" data-label="Win Rate">${_pct(s.winRate)}</td>
+        <td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap" data-label="Target">${s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>'}</td>
+        <td class="px-4 py-3" data-label="Capaian">${achBadge}</td>
       </tr>`;
   });
   tbody.innerHTML = html;
