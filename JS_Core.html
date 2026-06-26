@@ -1,4 +1,14 @@
 <script>
+    // --- DEBOUNCE (untuk input pencarian yang memicu server-side fetch) ---
+    function _debounce(fn, delay) {
+      let timer;
+      return function() {
+        const args = arguments, ctx = this;
+        clearTimeout(timer);
+        timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+      };
+    }
+
     // --- STATE MANAGEMENT ---
     let erpState = { klien: [], produk: [], templatePaket: {}, nextNo: "" };
     let kalkulasiGlobalState = { subtotalSemua: 0, diskonNominal: 0, pajakNominal: 0, grandTotal: 0, totalHpp: 0, profitInternal: 0, marginPersen: 0 };

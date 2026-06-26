@@ -133,14 +133,14 @@
       _pgFetchWorkOrder();
     };
 
-    window.filterWorkOrder = function() {
+    window.filterWorkOrder = _debounce(function() {
       _workOrderFilters = {
         search: (document.getElementById('search-workorder').value || '').trim(),
         status: (document.getElementById('filter-wo-status') || {}).value || ''
       };
       _pgState.workorder.page = 1;
       _pgFetchWorkOrder();
-    };
+    }, 350);
 
     // ── Modal Detail WO ──
     window.bukaDetailWO = function(item) {

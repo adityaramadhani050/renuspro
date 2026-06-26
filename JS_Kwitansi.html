@@ -73,11 +73,11 @@
       _pgFetchKwitansi();
     };
 
-    window.filterKwitansi = function() {
+    window.filterKwitansi = _debounce(function() {
       _kwitansiFilters = { search: (document.getElementById('search-kwitansi').value || '').trim() };
       _pgState.kwitansi.page = 1;
       _pgFetchKwitansi();
-    };
+    }, 350);
 
     // ── Isi dropdown invoice (shared buat & edit) ──
     function _isiDropdownKwitansi(list, selectedId, disabled) {

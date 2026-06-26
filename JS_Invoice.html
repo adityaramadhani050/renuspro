@@ -191,11 +191,11 @@
       _pgFetchInvoice();
     };
 
-    window.filterInvoice = function() {
+    window.filterInvoice = _debounce(function() {
       _invoiceFilters = { search: (document.getElementById('search-invoice').value || '').trim() };
       _pgState.invoice.page = 1;
       _pgFetchInvoice();
-    };
+    }, 350);
 
     // ── Form Buat Invoice ──
     function bukaModalBuatInvoice(preSelectNoWO) {

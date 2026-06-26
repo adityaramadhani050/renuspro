@@ -365,11 +365,11 @@ function hapusMutasi(idMutasi) {
 
 // ── Filter ─────────────────────────────────────────────────────
 
-window.filterStok = function() {
+window.filterStok = _debounce(function() {
   _stokFilters = { search: (document.getElementById('search-stok').value || '').trim() };
   _pgState.stok.page = 1;
   _pgFetchStok();
-};
+}, 350);
 
 window.filterMutasi = function() {
   _mutasiFilters = {

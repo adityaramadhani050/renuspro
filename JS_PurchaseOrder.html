@@ -96,14 +96,14 @@ window.loadPurchaseOrder = function() {
 };
 
 // ── Filter PO ───────────────────────────────────────────────────────────────
-window.filterPO = function() {
+window.filterPO = _debounce(function() {
   _poFilters = {
     search: (document.getElementById('search-po').value || '').trim(),
     status: (document.getElementById('filter-po-status').value || '').trim()
   };
   _pgState.purchaseorder.page = 1;
   _pgFetchPurchaseOrder();
-};
+}, 350);
 
 // ── KPI Cards (dihitung server-side atas seluruh data terfilter) ───────────
 function _renderPOKPI(kpi) {

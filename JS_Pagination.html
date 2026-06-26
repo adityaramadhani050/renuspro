@@ -267,7 +267,7 @@ function _pgFetchPenawaran() {
 }
 _pgFetchers.penawaran = _pgFetchPenawaran;
 
-window.filterPenawaran = function() {
+window.filterPenawaran = _debounce(function() {
   _penawaranFilters = {
     search: (document.getElementById('search-penawaran').value || '').trim(),
     sales:  (document.getElementById('filter-sales').value  || '').trim(),
@@ -277,7 +277,7 @@ window.filterPenawaran = function() {
   };
   _pgState.penawaran.page = 1;
   _pgFetchPenawaran();
-};
+}, 350);
 
 window.resetFilterPenawaran = function() {
   document.getElementById('search-penawaran').value = '';
@@ -461,11 +461,18 @@ window.loadCustomer = function() {
 };
 
 // ── filterTabel (produk/template/customer/supplier) ───────────────
+// Template difilter lokal (instan, tanpa server) — produk/customer/supplier
+// memicu fetch ke server sehingga di-debounce agar tidak membanjiri request
+// pada setiap ketikan.
+const _debouncedFetchProduk    = _debounce(function() { _pgFetchProduk(); }, 350);
+const _debouncedFetchCustomer  = _debounce(function() { _pgFetchCustomer(); }, 350);
+const _debouncedFetchSupplier  = _debounce(function() { if (_pgFetchers.supplier) _pgFetchers.supplier(); }, 350);
+
 window.filterTabel = function(tipe) {
   if (tipe === 'produk') {
     _produkFilters = { search: document.getElementById('search-produk').value.trim() };
     _pgState.produk.page = 1;
-    _pgFetchProduk();
+    _debouncedFetchProduk();
     return;
   }
   if (tipe === 'template') {
@@ -481,13 +488,13 @@ window.filterTabel = function(tipe) {
   if (tipe === 'customer') {
     _customerFilters = { search: document.getElementById('search-customer').value.trim() };
     _pgState.customer.page = 1;
-    _pgFetchCustomer();
+    _debouncedFetchCustomer();
     return;
   }
   if (tipe === 'supplier') {
     _supplierFilters = { search: document.getElementById('search-supplier').value.trim() };
     _pgState.supplier.page = 1;
-    if (_pgFetchers.supplier) _pgFetchers.supplier();
+    _debouncedFetchSupplier();
     return;
   }
 };
