@@ -84,6 +84,21 @@ function _renderUserSidebar(user) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
     });
+
+  // Sembunyikan title grup menu yang seluruh itemnya tidak relevan dengan role user
+  const navGroups = {
+    'nav-group-penjualan':  ['penawaran','workorder','invoice','kwitansi','customer'],
+    'nav-group-masterdata': ['produk','template','supplier'],
+    'nav-group-pembelian':  ['purchaseorder','inventory'],
+    'nav-group-keuangan':   ['pengeluaran','laporanfinance','laporanprofitabilitas','laporankeuangan'],
+    'nav-group-administrasi': ['users','settings']
+  };
+  Object.keys(navGroups).forEach(function(groupId) {
+    const groupEl = document.getElementById(groupId);
+    if (!groupEl) return;
+    const hasVisible = navGroups[groupId].some(function(page) { return allowed.includes(page); });
+    groupEl.classList.toggle('hidden', !hasVisible);
+  });
 }
 
 // ── doLogin ───────────────────────────────────────────────────────────────
