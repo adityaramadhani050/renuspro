@@ -260,7 +260,7 @@ function _waMsgReminderExpired(list) {
     groups[sales].forEach(function(it, idx) {
       lines.push(
         (idx + 1) + '. ' + it.noPenawaran + ' - ' + it.namaProject +
-        ' (' + it.namaKlien + ') #Valid s.d ' + it.validHingga
+        ' (' + it.namaKlien + ') #Exp. ' + it.validHingga
       );
     });
     if (gIdx < salesUrut.length - 1) lines.push('');
