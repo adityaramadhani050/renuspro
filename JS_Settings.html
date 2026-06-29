@@ -26,6 +26,7 @@ function _loadWAConfig() {
       document.getElementById('wa-enabled').checked  = !!r.enabled;
       document.getElementById('wa-endpoint').value   = r.endpoint || '';
       document.getElementById('wa-target').value     = r.target   || '';
+      document.getElementById('wa-token').value      = r.token    || '';
       _updateWAEnabledLabel(!!r.enabled);
     })
     .withFailureHandler(function() {})
@@ -55,6 +56,7 @@ function simpanWAConfig() {
   var enabled  = document.getElementById('wa-enabled').checked;
   var endpoint = (document.getElementById('wa-endpoint').value || '').trim();
   var target   = (document.getElementById('wa-target').value   || '').trim();
+  var token    = (document.getElementById('wa-token').value    || '').trim();
   if (!endpoint || !target) { showToast('Server URL dan Group JID wajib diisi.', 'error'); return; }
   var btn = document.querySelector('[onclick="simpanWAConfig()"]');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
@@ -67,12 +69,13 @@ function simpanWAConfig() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target });
+    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token });
 }
 
 function testWAConfig() {
   var endpoint = (document.getElementById('wa-endpoint').value || '').trim();
   var target   = (document.getElementById('wa-target').value   || '').trim();
+  var token    = (document.getElementById('wa-token').value    || '').trim();
   if (!endpoint || !target) { showToast('Isi Server URL dan Group JID terlebih dahulu.', 'error'); return; }
   var btn = document.getElementById('wa-test-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> Mengirim...'; }
@@ -85,7 +88,7 @@ function testWAConfig() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp text-sm"></i> Kirim Test'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .testWANotif({ endpoint: endpoint, target: target });
+    .testWANotif({ endpoint: endpoint, target: target, token: token });
 }
 
 function _populateReminderHourOptions() {
