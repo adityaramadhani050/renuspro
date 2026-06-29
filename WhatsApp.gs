@@ -241,6 +241,8 @@ function _waMsgReminderExpired(list) {
   var lines = [
     '⏰ *Reminder Follow-up Penawaran Expired*',
     'Penawaran berikut sudah lewat tanggal berlaku, mohon follow-up kembali ke customer:',
+    '',
+    '📊 Total: *' + list.length + '* penawaran perlu di-follow-up',
     ''
   ];
 
@@ -254,12 +256,11 @@ function _waMsgReminderExpired(list) {
   });
 
   salesUrut.forEach(function(sales, gIdx) {
-    lines.push('👤 *' + sales + '*');
+    lines.push('👤 *' + sales + '* (' + groups[sales].length + ' penawaran)');
     groups[sales].forEach(function(it, idx) {
       lines.push(
-        (idx + 1) + '. ' + it.noPenawaran + ' — ' + it.namaProject + '\n' +
-        '   Klien : ' + it.namaKlien + '\n' +
-        '   Valid s.d. : ' + it.validHingga
+        (idx + 1) + '. ' + it.noPenawaran + ' - ' + it.namaProject +
+        ' (' + it.namaKlien + ') #Valid s.d ' + it.validHingga
       );
     });
     if (gIdx < salesUrut.length - 1) lines.push('');
