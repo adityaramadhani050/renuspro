@@ -148,10 +148,19 @@ function _cekReminderPenawaranExpiredCore(forceAll) {
     }
 
     function parseLastSent(raw) {
-      if (raw instanceof Date) return isNaN(raw) ? null : raw;
-      if (!raw) return null;
-      var d = new Date(raw.toString().trim());
-      return isNaN(d) ? null : d;
+      var d;
+      if (raw instanceof Date) {
+        d = isNaN(raw) ? null : new Date(raw.getTime());
+      } else if (!raw) {
+        d = null;
+      } else {
+        d = new Date(raw.toString().trim());
+        if (isNaN(d)) d = null;
+      }
+      // Normalisasi ke tengah malam agar selisih hari dihitung per kalender,
+      // bukan terpengaruh jam saat reminder dikirim (mis. 08:12).
+      if (d) d.setHours(0, 0, 0, 0);
+      return d;
     }
 
     // Dedupe: simpan baris dengan rev TERTINGGI per No Penawaran
