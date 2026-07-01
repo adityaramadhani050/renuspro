@@ -60,6 +60,7 @@ window.loadPengeluaran = function() {
   _loadPendingApprovalKPI();
   _loadWOOptionsExp('exp-wo', '');       // dropdown WO di form pengeluaran
   _loadAkunOptionsExp('exp-akun', '');   // dropdown akun di form pengeluaran
+  _loadKategoriPengeluaranOptions('');   // kategori pengeluaran (dinamis)
   // Cash Manager: saldo + mutasi (tab default)
   if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
   if (typeof loadMutasi === 'function') loadMutasi();
@@ -270,10 +271,10 @@ window.bukaFormPengeluaranLangsung = function(preNoWO) {
   document.getElementById('exp-harga').value       = '';
   document.getElementById('exp-catatan').value     = '';
   document.getElementById('exp-total-display').textContent = 'Rp 0';
-  document.getElementById('exp-kategori').value    = '';
 
   _loadWOOptionsExp('exp-wo', preNoWO || '');
   _loadAkunOptionsExp('exp-akun', '');
+  _loadKategoriPengeluaranOptions('');
   _onExpWOChange();
   document.getElementById('modal-exp-langsung').classList.remove('hidden');
 };
@@ -281,6 +282,34 @@ window.bukaFormPengeluaranLangsung = function(preNoWO) {
 function _onExpWOChange() {
   var noWO = document.getElementById('exp-wo').value;
   document.getElementById('exp-kategori-wrap').classList.toggle('hidden', !!noWO);
+}
+
+// ── Kategori pengeluaran (dinamis dari Settings) ───────────────
+var _expKategoriList = [];
+function _loadKategoriPengeluaranOptions(selectedVal) {
+  if (typeof google === 'undefined') { _fillKategoriSelect(selectedVal); return; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _expKategoriList = (res && res.list) ? res.list : [];
+      _fillKategoriSelect(selectedVal);
+    })
+    .withFailureHandler(function() { _fillKategoriSelect(selectedVal); })
+    .getKategoriPengeluaran();
+}
+function _fillKategoriSelect(selectedVal) {
+  var sel = document.getElementById('exp-kategori');
+  if (!sel) return;
+  var val = (selectedVal != null && selectedVal !== '') ? selectedVal : (sel.value || '');
+  var opts = '<option value="">-- Pilih Kategori --</option>';
+  var found = false;
+  _expKategoriList.forEach(function(k) {
+    if (k === val) found = true;
+    opts += '<option value="' + _esc(k) + '">' + _esc(k) + '</option>';
+  });
+  // Kategori lama pada record yang sudah dihapus dari master → tetap tampilkan
+  if (val && !found) opts += '<option value="' + _esc(val) + '">' + _esc(val) + ' (lama)</option>';
+  sel.innerHTML = opts;
+  sel.value = val;
 }
 
 window.tutupFormPengeluaranLangsung = function() {
@@ -396,7 +425,7 @@ window.editPengeluaran = function(id) {
   document.getElementById('exp-harga').value       = r.hargaSatuan ? r.hargaSatuan.toLocaleString('id-ID') : '';
   document.getElementById('exp-catatan').value     = r.catatan || '';
   document.getElementById('exp-total-display').textContent = _fmtRpExp(r.total);
-  document.getElementById('exp-kategori').value    = r.kategori || '';
+  _loadKategoriPengeluaranOptions(r.kategori || '');
 
   _loadWOOptionsExp('exp-wo', r.noWO);
   _loadAkunOptionsExp('exp-akun', r.idAkun);

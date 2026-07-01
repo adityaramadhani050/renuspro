@@ -53,6 +53,48 @@ function saveTCOptions(payload) {
   }
 }
 
+// ── Kategori Pengeluaran (non-project) ───────────────────────────────────────
+var _KATEGORI_PENGELUARAN_DEFAULT = [
+  'Operasional Kantor',
+  'Gaji & Tunjangan',
+  'Sewa',
+  'Utilitas (listrik/internet/air)',
+  'Marketing & Promosi',
+  'Lainnya'
+];
+
+function getKategoriPengeluaran() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('KATEGORI_PENGELUARAN');
+    var list = raw ? JSON.parse(raw) : _KATEGORI_PENGELUARAN_DEFAULT.slice();
+    if (!Array.isArray(list)) list = _KATEGORI_PENGELUARAN_DEFAULT.slice();
+    return { success: true, list: list };
+  } catch(e) {
+    return { success: false, message: e.toString(), list: _KATEGORI_PENGELUARAN_DEFAULT.slice() };
+  }
+}
+
+function saveKategoriPengeluaran(list) {
+  try {
+    if (!Array.isArray(list)) return { success: false, message: 'Format kategori tidak valid.' };
+    // Bersihkan: trim, buang kosong, buang duplikat (case-insensitive)
+    var seen = {}, clean = [];
+    list.forEach(function(k) {
+      var v = (k || '').toString().trim();
+      if (!v) return;
+      var low = v.toLowerCase();
+      if (seen[low]) return;
+      seen[low] = true;
+      clean.push(v);
+    });
+    if (!clean.length) return { success: false, message: 'Minimal satu kategori harus diisi.' };
+    PropertiesService.getScriptProperties().setProperty('KATEGORI_PENGELUARAN', JSON.stringify(clean));
+    return { success: true, message: 'Kategori pengeluaran berhasil disimpan.', list: clean };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
 // ── Bank Accounts ─────────────────────────────────────────────────────────────
 
 function getBankAccounts() {

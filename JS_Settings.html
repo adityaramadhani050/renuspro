@@ -12,6 +12,88 @@ function loadSettings() {
   _loadTCOptions();
   _loadBankAccounts();
   _loadDocSign();
+  _loadKategoriPengeluaran();
+}
+
+// ═══════════════════════════════════════════════════════
+// KATEGORI PENGELUARAN (non-project)
+// ═══════════════════════════════════════════════════════
+var _kategoriPengData = [];
+
+function _loadKategoriPengeluaran() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _kategoriPengData = (res && res.list) ? res.list : [];
+      _renderKategoriPengList();
+    })
+    .withFailureHandler(function() {})
+    .getKategoriPengeluaran();
+}
+
+function _renderKategoriPengList() {
+  var container = document.getElementById('kategori-peng-list');
+  if (!container) return;
+  if (!_kategoriPengData.length) {
+    container.innerHTML = '<div class="text-xs text-slate-400 italic">Belum ada kategori. Klik "Tambah Kategori".</div>';
+    return;
+  }
+  container.innerHTML = '';
+  _kategoriPengData.forEach(function(k, idx) {
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML =
+      '<input type="text" value="' + _escHtml(k) + '" oninput="_onKategoriPengInput(' + idx + ', this.value)" ' +
+        'class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100">' +
+      '<button onclick="deleteKategoriPengeluaran(' + idx + ')" class="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition shrink-0" title="Hapus">' +
+        '<i class="fa-solid fa-trash-can text-xs"></i></button>';
+    container.appendChild(row);
+  });
+}
+
+function _onKategoriPengInput(idx, val) {
+  if (idx >= 0 && idx < _kategoriPengData.length) _kategoriPengData[idx] = val;
+}
+
+function addKategoriPengeluaran() {
+  _kategoriPengData.push('');
+  _renderKategoriPengList();
+  var container = document.getElementById('kategori-peng-list');
+  if (container) {
+    var inputs = container.querySelectorAll('input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }
+}
+
+function deleteKategoriPengeluaran(idx) {
+  if (idx < 0 || idx >= _kategoriPengData.length) return;
+  _kategoriPengData.splice(idx, 1);
+  _renderKategoriPengList();
+}
+
+function simpanKategoriPengeluaran() {
+  // Ambil nilai terkini dari input (jaga-jaga)
+  var container = document.getElementById('kategori-peng-list');
+  if (container) {
+    var inputs = container.querySelectorAll('input');
+    _kategoriPengData = Array.prototype.map.call(inputs, function(i) { return i.value; });
+  }
+  var btn = document.getElementById('kategori-peng-save-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...'; }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kategori'; }
+      if (res && res.success) {
+        _kategoriPengData = res.list || _kategoriPengData;
+        _renderKategoriPengList();
+      }
+      showToast((res && res.message) || (res && res.success ? 'Tersimpan.' : 'Gagal.'), res && res.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kategori'; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .saveKategoriPengeluaran(_kategoriPengData);
 }
 
 // ═══════════════════════════════════════════════════════
