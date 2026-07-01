@@ -7,7 +7,7 @@ var _expData       = [];
 var _expWOList     = [];
 var _expAkunList   = [];
 var _expEditMode   = false;
-var _expActiveTab  = 'pengeluaran';
+var _expActiveTab  = 'pemasukan';
 
 // ── Tab Switching ──────────────────────────────────────────────
 
@@ -15,10 +15,15 @@ window.switchExpTab = function(tab) {
   _expActiveTab = tab;
   var active   = 'px-5 py-2 rounded-xl text-sm font-bold transition bg-emerald-600 text-white shadow-sm';
   var inactive = 'px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700';
+  var pemBtn = document.getElementById('exp-tab-pemasukan-btn');
+  if (pemBtn) pemBtn.className = tab === 'pemasukan' ? active : inactive;
   document.getElementById('exp-tab-pengeluaran-btn').className = tab === 'pengeluaran' ? active : inactive;
   document.getElementById('exp-tab-payreq-btn').className      = tab === 'payreq'      ? active : inactive;
+  var pemTab = document.getElementById('exp-tab-pemasukan');
+  if (pemTab) pemTab.classList.toggle('hidden', tab !== 'pemasukan');
   document.getElementById('exp-tab-pengeluaran').classList.toggle('hidden', tab !== 'pengeluaran');
   document.getElementById('exp-tab-payreq').classList.toggle('hidden',      tab !== 'payreq');
+  if (tab === 'pemasukan' && typeof loadPemasukan === 'function') loadPemasukan();
   if (tab === 'payreq') loadPaymentRequestList();
 };
 
@@ -58,6 +63,9 @@ window.loadPengeluaran = function() {
   _loadWOOptionsExp('exp-wo', '');
   _loadAkunOptionsExp('filter-exp-akun', '');
   _loadAkunOptionsExp('exp-akun', '');
+  // Cash Manager: saldo + pemasukan (default tab)
+  if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
+  if (typeof loadPemasukan === 'function') loadPemasukan();
 };
 
 function _loadPendingApprovalKPI() {

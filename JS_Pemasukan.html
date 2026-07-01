@@ -1,0 +1,304 @@
+<script>
+// ================================================================
+//  CASH MANAGER — Pemasukan & Saldo (JavaScript)
+// ================================================================
+
+var _inData     = [];
+var _inAkunList = [];
+
+// ── Helpers ────────────────────────────────────────────────────
+function _escIn(s) {
+  return (s == null ? '' : s.toString())
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function _inTglToMs(ddmmyyyy) {
+  if (!ddmmyyyy) return null;
+  var p = ddmmyyyy.split('/');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0])).getTime();
+}
+function _inCurrentUserName() {
+  return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : '';
+}
+
+// ── Load utama ─────────────────────────────────────────────────
+window.loadPemasukan = function() {
+  _loadInAkunOptions();
+  _loadInData();
+};
+
+function _loadInData() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _inData = (res && res.success) ? (res.list || []) : [];
+      _renderPemasukan(_applyInFilter(_inData));
+    })
+    .withFailureHandler(function() {
+      _inData = [];
+      _renderPemasukan([]);
+    })
+    .getPemasukanList({});
+}
+
+// ── Saldo panel ────────────────────────────────────────────────
+window.loadSaldoPanel = function() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(_renderSaldoPanel)
+    .withFailureHandler(function() {})
+    .getSaldoAkun();
+};
+
+function _renderSaldoPanel(res) {
+  var container = document.getElementById('cm-saldo-panel');
+  if (!container) return;
+  if (!res || !res.success) {
+    container.innerHTML = '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 text-xs text-rose-500">Gagal memuat saldo.</div>';
+    return;
+  }
+  var html = '';
+  // Kartu total
+  html += '<div class="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-sm p-4 text-white">'
+    + '<p class="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1"><i class="fa-solid fa-sack-dollar mr-1"></i>Total Uang Saat Ini</p>'
+    + '<p class="text-2xl font-extrabold">' + _fmtRpExp(res.totalSaldo) + '</p>'
+    + '<p class="text-[11px] opacity-80 mt-1">Masuk ' + _fmtRpExp(res.totalMasuk) + ' &middot; Keluar ' + _fmtRpExp(res.totalKeluar) + '</p>'
+    + '</div>';
+  // Kartu per akun
+  (res.akun || []).forEach(function(a) {
+    var neg = a.saldo < 0;
+    html += '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
+      + '<div class="flex items-center gap-2 mb-1">'
+      + '<span class="bg-slate-100 text-slate-500 h-6 w-6 rounded-lg flex items-center justify-center text-[11px]"><i class="fa-solid fa-' + (a.tipe === 'Kas' ? 'wallet' : 'building-columns') + '"></i></span>'
+      + '<p class="text-xs font-bold text-slate-600 truncate">' + _escIn(a.nama) + '</p>'
+      + (a.status && a.status !== 'Aktif' ? '<span class="text-[9px] bg-slate-100 text-slate-400 px-1 py-0.5 rounded font-bold">' + _escIn(a.status) + '</span>' : '')
+      + '</div>'
+      + '<p class="text-xl font-extrabold ' + (neg ? 'text-rose-600' : 'text-slate-800') + '">' + _fmtRpExp(a.saldo) + '</p>'
+      + '<p class="text-[11px] text-slate-400 mt-1"><span class="text-emerald-600 font-semibold">+' + _fmtRpExp(a.masuk) + '</span> &middot; <span class="text-rose-500 font-semibold">-' + _fmtRpExp(a.keluar) + '</span></p>'
+      + '</div>';
+  });
+  if (!(res.akun || []).length) {
+    html += '<div class="bg-white rounded-2xl shadow-sm border border-dashed border-slate-200 p-4 text-xs text-slate-400 flex items-center">Belum ada akun kas. Tambah di Pengaturan → Akun Pembayaran.</div>';
+  }
+  container.innerHTML = html;
+}
+
+// ── Akun options (filter + form) ───────────────────────────────
+function _loadInAkunOptions() {
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      var list = (res && res.success) ? (res.list || []) : [];
+      _inAkunList = list.filter(function(a) { return a.id !== 'AP001' && (a.status || 'Aktif') === 'Aktif'; });
+      _fillInAkunSelect('filter-in-akun', '', true);
+      _fillInAkunSelect('in-akun', '', false);
+    })
+    .withFailureHandler(function() {})
+    .getAkunPembayaranList();
+}
+
+function _fillInAkunSelect(selId, selectedVal, withAll) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var opts = withAll ? '<option value="">Semua Akun</option>' : '<option value="">— Pilih Akun —</option>';
+  _inAkunList.forEach(function(a) {
+    var s = (a.id === selectedVal) ? ' selected' : '';
+    opts += '<option value="' + a.id + '" data-nama="' + _escIn(a.namaAkun) + '"' + s + '>' + _escIn(a.namaAkun) + ' (' + _escIn(a.tipe) + ')</option>';
+  });
+  sel.innerHTML = opts;
+  if (selectedVal) sel.value = selectedVal;
+}
+
+// ── Render tabel + KPI ─────────────────────────────────────────
+function _sumberBadgeIn(sumber) {
+  if (sumber === 'Invoice') return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700"><i class="fas fa-file-invoice-dollar text-[10px]"></i> Invoice</span>';
+  return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700"><i class="fas fa-hand-holding-dollar text-[10px]"></i> Langsung</span>';
+}
+
+function _renderPemasukan(list) {
+  _renderInKPI(list);
+  var tbody = document.getElementById('table-pemasukan');
+  if (!tbody) return;
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-sm text-slate-400 py-10">Belum ada pemasukan pada filter ini.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(function(it) {
+    var isInvoice = it.sumber === 'Invoice';
+    var aksi = isInvoice
+      ? '<span class="text-slate-300 p-1.5 inline-flex" title="Otomatis dari invoice — kelola dari status invoice"><i class="fas fa-lock text-xs"></i></span>'
+      : '<button onclick="editPemasukan(\'' + _escIn(it.id) + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fas fa-pen-to-square"></i></button>'
+        + '<button onclick="hapusPemasukanUI(\'' + _escIn(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fas fa-trash-can"></i></button>';
+    var akunTxt = it.namaAkun || (it.idAkun ? it.idAkun : '<span class="text-amber-500 text-[11px]">— belum terpetakan —</span>');
+    return '<tr class="hover:bg-slate-50 transition border-b border-slate-50">'
+      + '<td class="p-4" data-label="ID / Tanggal"><div class="font-mono text-xs text-slate-600">' + _escIn(it.id) + '</div><div class="text-[11px] text-slate-400 mt-0.5">' + _fmtTglExp(it.tanggal) + '</div></td>'
+      + '<td class="p-4" data-label="Sumber">' + _sumberBadgeIn(it.sumber) + '</td>'
+      + '<td class="p-4 text-xs text-slate-600" data-label="Kategori">' + _escIn(it.kategori || '—') + '</td>'
+      + '<td class="p-4 text-xs text-slate-600" data-label="Akun">' + akunTxt + '</td>'
+      + '<td class="p-4 text-xs text-slate-600" data-label="Deskripsi">' + _escIn(it.deskripsi || '—') + (it.noRef ? '<div class="text-[10px] text-slate-400 mt-0.5">Ref: ' + _escIn(it.noRef) + '</div>' : '') + '</td>'
+      + '<td class="p-4 text-right font-bold text-emerald-600 whitespace-nowrap" data-label="Jumlah">' + _fmtRpExp(it.jumlah) + '</td>'
+      + '<td class="p-4 text-center rp-actions"><div class="flex items-center justify-center gap-1">' + aksi + '</div></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function _renderInKPI(list) {
+  var total = 0, inv = 0;
+  list.forEach(function(it) {
+    total += it.jumlah || 0;
+    if (it.sumber === 'Invoice') inv += it.jumlah || 0;
+  });
+  var elT = document.getElementById('kpi-in-total');   if (elT) elT.innerText = _fmtRpExp(total);
+  var elI = document.getElementById('kpi-in-invoice'); if (elI) elI.innerText = _fmtRpExp(inv);
+  var elC = document.getElementById('kpi-in-count');   if (elC) elC.innerText = list.length;
+}
+
+// ── Filter (client-side) ───────────────────────────────────────
+function _applyInFilter(data) {
+  var akun     = (document.getElementById('filter-in-akun')    || {}).value || '';
+  var sumber   = (document.getElementById('filter-in-sumber')  || {}).value || '';
+  var kategori = (document.getElementById('filter-in-kategori')|| {}).value || '';
+  var dari     = (document.getElementById('filter-in-dari')    || {}).value || '';
+  var sampai   = (document.getElementById('filter-in-sampai')  || {}).value || '';
+  var dariMs   = dari   ? new Date(dari + 'T00:00:00').getTime()   : null;
+  var sampaiMs = sampai ? new Date(sampai + 'T23:59:59').getTime() : null;
+  return data.filter(function(it) {
+    if (akun     && it.idAkun   !== akun)     return false;
+    if (sumber   && it.sumber   !== sumber)   return false;
+    if (kategori && it.kategori !== kategori) return false;
+    if (dariMs || sampaiMs) {
+      var ms = _inTglToMs(it.tanggal);
+      if (ms == null) return false;
+      if (dariMs   && ms < dariMs)   return false;
+      if (sampaiMs && ms > sampaiMs) return false;
+    }
+    return true;
+  });
+}
+
+window.filterPemasukan = function() { _renderPemasukan(_applyInFilter(_inData)); };
+window.resetFilterPemasukan = function() {
+  ['filter-in-akun','filter-in-sumber','filter-in-kategori','filter-in-dari','filter-in-sampai'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  _renderPemasukan(_inData);
+};
+
+// ── Form ───────────────────────────────────────────────────────
+window.bukaFormPemasukan = function() {
+  document.getElementById('in-modal-title').innerText = 'Tambah Pemasukan';
+  document.getElementById('in-id-field').value  = '';
+  document.getElementById('in-tanggal').value   = _todayInput();
+  document.getElementById('in-kategori').value  = 'Pendapatan Lain';
+  document.getElementById('in-deskripsi').value = '';
+  document.getElementById('in-noref').value     = '';
+  document.getElementById('in-jumlah').value    = '';
+  document.getElementById('in-catatan').value   = '';
+  _fillInAkunSelect('in-akun', '', false);
+  document.getElementById('modal-in-langsung').classList.remove('hidden');
+};
+
+window.tutupFormPemasukan = function() {
+  document.getElementById('modal-in-langsung').classList.add('hidden');
+};
+
+function _todayInput() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function _inputToTgl(v) {
+  if (!v) return '';
+  var p = v.split('-');
+  return (p.length === 3) ? (p[2] + '/' + p[1] + '/' + p[0]) : v;
+}
+
+window.editPemasukan = function(id) {
+  var it = _inData.filter(function(x) { return x.id === id; })[0];
+  if (!it) return;
+  if (it.sumber !== 'Langsung') { showNotification('Pemasukan otomatis dari invoice tidak bisa diedit.', 'error'); return; }
+  document.getElementById('in-modal-title').innerText = 'Edit Pemasukan';
+  document.getElementById('in-id-field').value  = it.id;
+  document.getElementById('in-tanggal').value   = _tglToInputIn(it.tanggal);
+  _fillInAkunSelect('in-akun', it.idAkun, false);
+  document.getElementById('in-kategori').value  = it.kategori || 'Pendapatan Lain';
+  document.getElementById('in-deskripsi').value = it.deskripsi || '';
+  document.getElementById('in-noref').value     = it.noRef || '';
+  document.getElementById('in-jumlah').value    = it.jumlah ? Math.round(it.jumlah).toLocaleString('id-ID') : '';
+  document.getElementById('in-catatan').value   = it.catatan || '';
+  document.getElementById('modal-in-langsung').classList.remove('hidden');
+};
+
+function _tglToInputIn(tgl) {
+  if (!tgl) return _todayInput();
+  var p = tgl.split('/');
+  return (p.length === 3) ? (p[2] + '-' + p[1] + '-' + p[0]) : _todayInput();
+}
+
+window.submitPemasukan = function() {
+  var id       = document.getElementById('in-id-field').value.trim();
+  var akunSel  = document.getElementById('in-akun');
+  var idAkun   = akunSel.value;
+  var namaAkun = idAkun ? (akunSel.options[akunSel.selectedIndex].getAttribute('data-nama') || '') : '';
+  var payload = {
+    id:         id,
+    tanggal:    _inputToTgl(document.getElementById('in-tanggal').value),
+    kategori:   document.getElementById('in-kategori').value,
+    idAkun:     idAkun,
+    namaAkun:   namaAkun,
+    noRef:      document.getElementById('in-noref').value.trim(),
+    deskripsi:  document.getElementById('in-deskripsi').value.trim(),
+    jumlah:     _parseCurrencyExp(document.getElementById('in-jumlah').value),
+    catatan:    document.getElementById('in-catatan').value.trim()
+  };
+  if (!payload.idAkun)   { showNotification('Akun penerima wajib dipilih.', 'error'); return; }
+  if (!payload.deskripsi){ showNotification('Deskripsi wajib diisi.', 'error'); return; }
+  if (payload.jumlah <= 0){ showNotification('Jumlah harus lebih dari 0.', 'error'); return; }
+
+  var btn = document.getElementById('in-submit-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+
+  var done = function(res) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk text-xs"></i> Simpan'; }
+    if (res && res.success) {
+      showNotification(res.message || 'Tersimpan.');
+      tutupFormPemasukan();
+      loadPemasukan();
+      loadSaldoPanel();
+    } else {
+      showNotification((res && res.message) || 'Gagal menyimpan.', 'error');
+    }
+  };
+  var fail = function(e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk text-xs"></i> Simpan'; }
+    showNotification('Error: ' + (e && e.message ? e.message : e), 'error');
+  };
+
+  if (id) {
+    payload.diubahOleh = _inCurrentUserName();
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail).editPemasukanLangsung(payload);
+  } else {
+    payload.dibuatOleh = _inCurrentUserName();
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail).simpanPemasukanLangsung(payload);
+  }
+};
+
+window.hapusPemasukanUI = function(id) {
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Pemasukan?',
+    message: 'Yakin menghapus pemasukan ' + id + '? Saldo akun akan menyesuaikan.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showNotification((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
+          loadPemasukan();
+          loadSaldoPanel();
+        })
+        .withFailureHandler(function(e) { showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+        .hapusPemasukan(id);
+    }
+  });
+};
+</script>

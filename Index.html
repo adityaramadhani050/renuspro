@@ -73,7 +73,7 @@
         <p id="nav-group-keuangan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Keuangan & Laporan</p>
         <button onclick="navigate('pengeluaran')" id="nav-pengeluaran"
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
-          <i class="fas fa-money-bill-transfer w-6"></i> Pengeluaran
+          <i class="fas fa-wallet w-6"></i> Cash Manager
         </button>
         <button onclick="navigate('laporanfinance')" id="nav-laporanfinance"
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
@@ -206,6 +206,7 @@
   <?!= include('JS_PurchaseOrder'); ?>
   <?!= include('JS_Inventory'); ?>
   <?!= include('JS_Pengeluaran'); ?>
+  <?!= include('JS_Pemasukan'); ?>
   <?!= include('JS_LaporanProfitabilitas'); ?>
   <?!= include('JS_LaporanKeuangan'); ?>
 </body>
