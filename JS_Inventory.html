@@ -44,8 +44,7 @@ function switchInvTab(tab) {
   document.getElementById('tab-btn-mutasi').className      = tab === 'mutasi'      ? active : inactive;
 
   if (tab === 'penerimaan') {
-    loadPOMenungguPenerimaan();
-    loadRiwayatPenerimaanInv();
+    loadPenerimaanBarang();
   }
 }
 
@@ -64,7 +63,7 @@ window.loadInventory = function() {
   _showInvSection('inv-list-section');
   switchInvTab('stok');
   _loadStok();
-  loadPOMenungguPenerimaan();
+  loadPenerimaanBarang();
 };
 
 function _loadStok() {
@@ -539,99 +538,150 @@ function submitPenyesuaianStok() {
 
 var _currentPOGudang = null; // { noPO, namaSupplier, items }
 
-function loadPOMenungguPenerimaan() {
-  var tbody = document.getElementById('table-po-gudang');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  google.script.run
-    .withSuccessHandler(function(data) {
-      var list = data || [];
-      document.getElementById('po-gudang-count').innerText = list.length ? list.length + ' PO' : '';
-      var badge = document.getElementById('inv-penerimaan-badge');
-      if (badge) {
-        badge.textContent = list.length;
-        badge.classList.toggle('hidden', list.length === 0);
-      }
-      if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Tidak ada PO yang menunggu penerimaan gudang.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = list.map(function(po) {
-        var noWO   = po.noWO || '';
-        var proyek = po.namaProject || '';
-        return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
-          '<td class="p-4">' +
-            '<div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(po.noPO) + '</div>' +
-            '<div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(po.tanggal) + '</div>' +
-          '</td>' +
-          '<td class="p-4">' +
-            '<div class="text-sm font-medium text-slate-800">' + _escHtmlInv(po.peruntukan || po.namaSupplier || '—') + '</div>' +
-            '<div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(po.namaSupplier) + '</div>' +
-          '</td>' +
-          '<td class="p-4">' +
-            (noWO
-              ? '<div class="font-mono text-sm text-teal-700">' + _escHtmlInv(noWO) + '</div>' +
-                (proyek ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(proyek) + '</div>' : '')
-              : '<span class="text-slate-400 text-sm">—</span>') +
-          '</td>' +
-          '<td class="p-4 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg text-xs font-bold">' + po.jumlahItemPending + ' item</span></td>' +
-          '<td class="p-4 text-center"><button onclick="bukaProsesTerimaPOGudang(' + JSON.stringify(po).replace(/"/g,'&quot;') + ')" class="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition">Proses</button></td>' +
-        '</tr>';
-      }).join('');
-    })
-    .withFailureHandler(function() {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-red-500">Gagal memuat data.</td></tr>';
-    })
-    .getPOMenungguPenerimaan();
-}
-
 function _escHtmlInv(s) {
   return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function loadRiwayatPenerimaanInv() {
-  var tbody = document.getElementById('table-riwayat-penerimaan');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  var modeClass = {
-    'Langsung': 'bg-blue-100 text-blue-700',
-    'Gudang':   'bg-amber-100 text-amber-700'
-  };
+// ── Penerimaan Barang: satu sistem (status PO + riwayat digabung) ──
+var _penerimaanData = [];
+var _penPending = null, _penRiwayat = null;
+
+function loadPenerimaanBarang() {
+  var tbody = document.getElementById('table-penerimaan');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  if (typeof google === 'undefined') return;
+  _penPending = null; _penRiwayat = null;
   google.script.run
-    .withSuccessHandler(function(res) {
-      var list = (res && res.list) || [];
-      if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Belum ada riwayat penerimaan barang.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = list.map(function(r) {
-        var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
-        var itemList = (r.items || []).map(function(it) {
-          return _escHtmlInv(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtmlInv(it.satuan) : '') + ')';
-        }).join('<br>');
-        var catatanList = (r.items || []).map(function(it) {
-          return (it.catatan || '').toString().trim();
-        }).filter(function(c) { return c; }).join('<br>');
-        var buktiHtml = r.buktiFileUrl
-          ? '<a href="' + _escHtmlInv(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold" title="Lihat bukti barang diterima"><i class="fa-solid fa-image"></i> Lihat</a>'
-          : '<span class="text-slate-300">—</span>';
-        return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
-          '<td class="p-4"><div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(r.noPO) + '</div><div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(r.tanggal) + '</div></td>' +
-          '<td class="p-4"><div class="text-sm font-medium text-slate-800">' + _escHtmlInv(r.peruntukan || r.namaSupplier || '—') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(r.namaSupplier) + '</div></td>' +
-          '<td class="p-4 text-xs font-mono text-teal-700">' + (r.noWO ? _escHtmlInv(r.noWO) : '<span class="text-slate-400">—</span>') + '</td>' +
-          '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + mc + '">' + _escHtmlInv(r.mode || '') + '</span></td>' +
-          '<td class="p-4 text-xs text-slate-600">' + (itemList || '—') + '</td>' +
-          '<td class="p-4 text-xs text-rose-600">' + (catatanList || '<span class="text-slate-400">—</span>') + '</td>' +
-          '<td class="p-4 text-xs text-slate-500">' + _escHtmlInv(r.dibuatOleh) + '</td>' +
-          '<td class="p-4 text-center">' + buktiHtml + '</td>' +
-        '</tr>';
-      }).join('');
+    .withSuccessHandler(function(data) {
+      _penPending = data || [];
+      var badge = document.getElementById('inv-penerimaan-badge');
+      if (badge) { badge.textContent = _penPending.length; badge.classList.toggle('hidden', _penPending.length === 0); }
+      _penFetchRiwayat();
     })
-    .withFailureHandler(function(err) {
-      tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-rose-400">Gagal memuat: ' + (err.message || '') + '</td></tr>';
-    })
+    .withFailureHandler(function() { _penPending = []; _penFetchRiwayat(); })
+    .getPOMenungguPenerimaan();
+}
+
+function _penFetchRiwayat() {
+  google.script.run
+    .withSuccessHandler(function(res) { _penRiwayat = (res && res.list) || []; _penBuildAndRender(); })
+    .withFailureHandler(function() { _penRiwayat = []; _penBuildAndRender(); })
     .getRiwayatPenerimaanList({});
 }
+
+function _penBuildAndRender() {
+  if (_penPending === null || _penRiwayat === null) return;
+  var map = {}, order = [];
+  function ensure(noPO, meta) {
+    if (!map[noPO]) {
+      map[noPO] = { noPO: noPO, riwayat: [], po: null, status: '', jumlahItemPending: 0, terakhirTgl: '',
+        tanggal: meta.tanggal || '', namaSupplier: meta.namaSupplier || '', peruntukan: meta.peruntukan || '',
+        noWO: meta.noWO || '', namaProject: meta.namaProject || '' };
+      order.push(noPO);
+    }
+    return map[noPO];
+  }
+  (_penPending || []).forEach(function(po) {
+    var e = ensure(po.noPO, { tanggal: po.tanggal, namaSupplier: po.namaSupplier, peruntukan: po.peruntukan, noWO: po.noWO, namaProject: po.namaProject });
+    e.po = po;
+    e.jumlahItemPending = po.jumlahItemPending || 0;
+    var anyReceived = (po.items || []).some(function(it) { return (it.qtyDiterima || 0) > 0; });
+    e.status = anyReceived ? 'sebagian' : 'menunggu';
+  });
+  (_penRiwayat || []).forEach(function(r) {
+    var e = ensure(r.noPO, { tanggal: r.tanggal, namaSupplier: r.namaSupplier, peruntukan: r.peruntukan, noWO: r.noWO });
+    e.riwayat.push(r);
+  });
+  order.forEach(function(noPO) {
+    var e = map[noPO];
+    if (!e.status) e.status = 'selesai';
+    if (e.riwayat.length) e.terakhirTgl = e.riwayat[0].tanggal;   // riwayat sudah urut terbaru dulu
+  });
+  var prio = { menunggu: 0, sebagian: 1, selesai: 2 };
+  var pr = function(st) { return prio.hasOwnProperty(st) ? prio[st] : 9; };
+  _penerimaanData = order.map(function(n) { return map[n]; });
+  _penerimaanData.sort(function(a, b) { return pr(a.status) - pr(b.status); });
+  _renderPenerimaan();
+}
+
+function _penStatusBadge(st) {
+  if (st === 'menunggu') return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><i class="fas fa-hourglass-half text-[9px]"></i> Menunggu</span>';
+  if (st === 'sebagian') return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700"><i class="fas fa-truck-ramp-box text-[9px]"></i> Sebagian</span>';
+  return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"><i class="fas fa-circle-check text-[9px]"></i> Selesai</span>';
+}
+
+window._renderPenerimaan = function() {
+  var tbody = document.getElementById('table-penerimaan');
+  if (!tbody) return;
+  var f = (document.getElementById('filter-penerimaan-status') || {}).value || '';
+  var data = _penerimaanData.filter(function(e) {
+    if (f === 'pending') return e.status !== 'selesai';
+    if (f === 'selesai') return e.status === 'selesai';
+    return true;
+  });
+  var actionable = _penerimaanData.filter(function(e) { return e.status !== 'selesai'; }).length;
+  var cnt = document.getElementById('po-gudang-count');
+  if (cnt) cnt.innerText = actionable ? (actionable + ' PO menunggu') : '';
+
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic">Tidak ada data penerimaan.</td></tr>';
+    return;
+  }
+  var modeClass = { 'Langsung': 'bg-blue-100 text-blue-700', 'Gudang': 'bg-amber-100 text-amber-700' };
+  var html = '';
+  data.forEach(function(e, idx) {
+    var noWO = e.noWO || '';
+    var penCell;
+    if (e.status === 'selesai') {
+      penCell = '<span class="text-slate-600">' + e.riwayat.length + ' penerimaan</span>'
+        + (e.terakhirTgl ? '<div class="text-[10px] text-slate-400 mt-0.5">Terakhir: ' + _fmtTglInv(e.terakhirTgl) + '</div>' : '');
+    } else {
+      penCell = '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg text-xs font-bold">' + e.jumlahItemPending + ' item menunggu</span>'
+        + (e.riwayat.length ? '<div class="text-[10px] text-slate-400 mt-0.5">' + e.riwayat.length + ' penerimaan sebelumnya</div>' : '');
+    }
+    var aksi = '';
+    if (e.po) aksi += '<button onclick="bukaProsesTerimaPOGudang(' + JSON.stringify(e.po).replace(/"/g,'&quot;') + ')" class="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition">Proses</button>';
+    if (e.riwayat.length) aksi += ' <button id="pen-toggle-' + idx + '" onclick="_togglePenerimaanRiwayat(' + idx + ')" class="px-2.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-bold transition"><i class="fas fa-clock-rotate-left text-[10px]"></i> Riwayat</button>';
+    if (!aksi) aksi = '<span class="text-slate-300 text-xs">—</span>';
+
+    html += '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">'
+      + '<td class="p-4"><div class="font-mono font-bold text-teal-700 text-sm">' + _escHtmlInv(e.noPO) + '</div><div class="text-xs text-slate-400 mt-0.5">' + _fmtTglInv(e.tanggal) + '</div></td>'
+      + '<td class="p-4"><div class="text-sm font-medium text-slate-800">' + _escHtmlInv(e.peruntukan || e.namaSupplier || '—') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(e.namaSupplier) + '</div></td>'
+      + '<td class="p-4">' + (noWO ? '<div class="font-mono text-sm text-teal-700">' + _escHtmlInv(noWO) + '</div>' + (e.namaProject ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtmlInv(e.namaProject) + '</div>' : '') : '<span class="text-slate-400 text-sm">—</span>') + '</td>'
+      + '<td class="p-4 text-center">' + _penStatusBadge(e.status) + '</td>'
+      + '<td class="p-4">' + penCell + '</td>'
+      + '<td class="p-4 text-center whitespace-nowrap">' + aksi + '</td>'
+      + '</tr>';
+
+    if (e.riwayat.length) {
+      html += '<tr id="pen-detail-' + idx + '" class="hidden bg-slate-50/60"><td colspan="6" class="px-4 pb-4 pt-1">'
+        + '<div class="space-y-2">'
+        + e.riwayat.map(function(r) {
+            var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
+            var itemList = (r.items || []).map(function(it) { return _escHtmlInv(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtmlInv(it.satuan) : '') + ')'; }).join(', ');
+            var catatanList = (r.items || []).map(function(it) { return (it.catatan || '').toString().trim(); }).filter(function(c) { return c; }).join(' · ');
+            var buktiHtml = r.buktiFileUrl ? '<a href="' + _escHtmlInv(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold"><i class="fa-solid fa-image"></i> Bukti</a>' : '';
+            return '<div class="bg-white border border-slate-100 rounded-xl p-3 text-xs">'
+              + '<div class="flex items-center justify-between gap-2 flex-wrap mb-1">'
+              + '<span class="font-semibold text-slate-600"><i class="fas fa-box-open text-teal-500 mr-1"></i>' + _fmtTglInv(r.tanggal) + ' <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ' + mc + '">' + _escHtmlInv(r.mode || '') + '</span></span>'
+              + '<span class="text-slate-400">' + _escHtmlInv(r.dibuatOleh) + (buktiHtml ? ' · ' + buktiHtml : '') + '</span>'
+              + '</div>'
+              + '<div class="text-slate-700">' + (itemList || '—') + '</div>'
+              + (catatanList ? '<div class="text-rose-600 mt-1"><i class="fas fa-triangle-exclamation text-[10px] mr-1"></i>' + _escHtmlInv(catatanList) + '</div>' : '')
+              + '</div>';
+          }).join('')
+        + '</div></td></tr>';
+    }
+  });
+  tbody.innerHTML = html;
+};
+
+window._togglePenerimaanRiwayat = function(idx) {
+  var row = document.getElementById('pen-detail-' + idx);
+  if (row) row.classList.toggle('hidden');
+  var btn = document.getElementById('pen-toggle-' + idx);
+  if (btn) { btn.classList.toggle('bg-slate-200'); btn.classList.toggle('bg-slate-100'); }
+};
 
 function _resetTerimaGudangBuktiFileField() { _removeFileField('terima-gudang-bukti-file'); }
 function handleTerimaGudangBuktiFileChange(input) { _uploadSupplierFile('terima-gudang-bukti-file', input, 'uploadFileBuktiPenerimaanPO', 'teal'); }
@@ -725,7 +775,7 @@ function submitProsesTerimaPOGudang() {
       if (res.success) {
         showNotification(res.message, 'success');
         tutupModalTerimaPOGudang();
-        loadPOMenungguPenerimaan();
+        loadPenerimaanBarang();
         loadInventory();
       } else {
         showNotification(res.message, 'error');

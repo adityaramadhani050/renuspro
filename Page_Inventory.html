@@ -82,58 +82,38 @@
             </div>
           </div>
 
-          <!-- ── Tab Penerimaan Barang ── -->
+          <!-- ── Tab Penerimaan Barang (gabungan: status PO + riwayat) ── -->
           <div id="tab-penerimaan" class="hidden">
-            <!-- List PO Menunggu Gudang -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden mb-4">
-              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                <i class="fas fa-hourglass-half text-amber-500"></i>
-                <span class="text-sm font-bold text-slate-700">PO Menunggu Gudang</span>
-                <span id="po-gudang-count" class="ml-auto text-xs text-slate-400"></span>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                  <thead>
-                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th class="p-4">No PO / Tanggal</th>
-                      <th class="p-4">Nama Order / Supplier</th>
-                      <th class="p-4">No WO / Proyek</th>
-                      <th class="p-4 text-center">Item Pending</th>
-                      <th class="p-4 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="table-po-gudang" class="text-sm">
-                    <tr><td colspan="5" class="p-8 text-center text-slate-400 italic">
-                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
-                    </td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Riwayat Penerimaan PO -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
-              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2 flex-wrap">
                 <i class="fas fa-box-open text-teal-500"></i>
-                <span class="text-sm font-bold text-slate-700">Riwayat Penerimaan Barang</span>
+                <span class="text-sm font-bold text-slate-700">Penerimaan Barang</span>
+                <span id="po-gudang-count" class="text-xs text-slate-400"></span>
+                <select id="filter-penerimaan-status" onchange="_renderPenerimaan()"
+                  class="ml-auto text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 font-medium focus:outline-none focus:border-teal-400">
+                  <option value="">Semua</option>
+                  <option value="pending">Perlu Diproses</option>
+                  <option value="selesai">Selesai</option>
+                </select>
+                <button onclick="loadPenerimaanBarang()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition" title="Refresh">
+                  <i class="fas fa-rotate-right text-xs"></i>
+                </button>
               </div>
               <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full text-left border-collapse" style="min-width:820px">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                       <th class="p-4">No PO / Tanggal</th>
                       <th class="p-4">Supplier / Peruntukan</th>
-                      <th class="p-4">No WO</th>
-                      <th class="p-4 text-center">Mode</th>
-                      <th class="p-4">Item Diterima</th>
-                      <th class="p-4">Catatan Kendala</th>
-                      <th class="p-4">Dibuat Oleh</th>
-                      <th class="p-4 text-center">Bukti</th>
+                      <th class="p-4">No WO / Proyek</th>
+                      <th class="p-4 text-center">Status</th>
+                      <th class="p-4">Penerimaan</th>
+                      <th class="p-4 text-center" style="width:160px">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody id="table-riwayat-penerimaan" class="text-sm">
-                    <tr><td colspan="8" class="p-8 text-center text-slate-500">
-                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat riwayat penerimaan...
+                  <tbody id="table-penerimaan" class="text-sm">
+                    <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">
+                      <i class="fas fa-spinner fa-spin mr-2"></i> Memuat...
                     </td></tr>
                   </tbody>
                 </table>
