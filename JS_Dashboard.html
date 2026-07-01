@@ -9,6 +9,8 @@ var _dbPeriodMode = 'mtd';
 var _dbTrendChart   = null;
 var _dbDonutChart   = null;
 var _dbChannelChart = null;
+var _dbWinChart     = null;
+var _dbLostChart    = null;
 
 // ── Formatting helpers ─────────────────────────────────────────
 function _rp(n) {
@@ -251,6 +253,8 @@ function _dbRenderAll(rawData, salesData) {
   // Admin/leadsales sections
   document.getElementById('db-leaderboard-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
   document.getElementById('db-detail-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
+  var winlossSection = document.getElementById('db-winloss-section');
+  if (winlossSection) winlossSection.classList.toggle('hidden', !(isAdmin || isLeadSales));
 
   var items   = (rawData && rawData.items) ? rawData.items : [];
   var summary = (salesData && salesData.summary) ? salesData.summary : {};
@@ -271,6 +275,7 @@ function _dbRenderAll(rawData, salesData) {
   if (isAdmin || isLeadSales) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
+    _dbRenderWinLossFactors(salesList);
   }
 
   document.getElementById('db-loading').classList.add('hidden');
@@ -594,6 +599,84 @@ function _dbRenderChannel(items, fromMs, toMs) {
       }).join('');
     }
   }
+}
+
+// ── Faktor Win / Lost (kode + keterangan) ─────────────────────
+function _dbAggWinLoss(salesList) {
+  var win = {}, lost = {};
+  (salesList || []).forEach(function(s) {
+    (s.penawaran || []).forEach(function(p) {
+      if (p.status === 'Deal' && p.kodeWin)  win[p.kodeWin]   = (win[p.kodeWin]   || 0) + 1;
+      if (p.status === 'Fail' && p.kodeLost) lost[p.kodeLost] = (lost[p.kodeLost] || 0) + 1;
+    });
+  });
+  return { win: win, lost: lost };
+}
+
+function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, color, setChart) {
+  var rows = (kodeList || [])
+    .filter(function(k) { return counts[k.kode] > 0; })
+    .map(function(k) { return { kode: k.kode, label: k.label, count: counts[k.kode] }; })
+    .sort(function(a, b) { return b.count - a.count; });
+  var total = rows.reduce(function(s, r) { return s + r.count; }, 0);
+
+  var canvas = document.getElementById(canvasId);
+  if (canvas) {
+    setChart(null, canvas);  // destroy previous instance
+    if (rows.length) {
+      var chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: rows.map(function(r) { return r.kode; }),
+          datasets: [{ data: rows.map(function(r) { return r.count; }),
+            backgroundColor: color, borderRadius: 6, borderSkipped: false, barThickness: 18 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function(ctx) {
+              var r = rows[ctx.dataIndex];
+              var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
+              return ' ' + r.label + ': ' + r.count + ' (' + pct + '%)';
+            }}}
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, stepSize: 1, precision: 0 }, border: { display: false } },
+            y: { grid: { display: false }, ticks: { font: { size: 10 } }, border: { display: false } }
+          }
+        }
+      });
+      setChart(chart, canvas);
+    }
+  }
+
+  var legendEl = document.getElementById(legendId);
+  if (legendEl) {
+    if (!rows.length) {
+      legendEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Belum ada data pada periode ini.</p>';
+    } else {
+      legendEl.innerHTML = rows.map(function(r) {
+        var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
+        return '<div class="flex items-center justify-between text-xs gap-2">'
+          + '<div class="flex items-center gap-1.5 min-w-0">'
+          + '<span class="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style="background:' + color + '22;color:' + color + '">' + r.kode + '</span>'
+          + '<span class="text-slate-600 truncate">' + _esc(r.label) + '</span></div>'
+          + '<span class="font-bold text-slate-700 flex-shrink-0">' + r.count + ' <span class="text-slate-400 font-normal">(' + pct + '%)</span></span>'
+          + '</div>';
+      }).join('');
+    }
+  }
+}
+
+function _dbRenderWinLossFactors(salesList) {
+  var agg = _dbAggWinLoss(salesList);
+  _dbRenderFactorChart('db-winfactor-chart', 'db-winfactor-legend', agg.win,
+    (typeof KODE_WIN_LIST !== 'undefined' ? KODE_WIN_LIST : []), '#10B981',
+    function(c) { if (_dbWinChart) { _dbWinChart.destroy(); _dbWinChart = null; } if (c) _dbWinChart = c; });
+  _dbRenderFactorChart('db-lostfactor-chart', 'db-lostfactor-legend', agg.lost,
+    (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []), '#EF4444',
+    function(c) { if (_dbLostChart) { _dbLostChart.destroy(); _dbLostChart = null; } if (c) _dbLostChart = c; });
 }
 
 // ── Leaderboard table ──────────────────────────────────────────
