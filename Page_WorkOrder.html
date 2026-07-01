@@ -292,28 +292,26 @@
             </div>
 
             <!-- Footer modal -->
-            <div class="flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
               <div class="flex gap-2 flex-wrap">
                 <button id="wo-btn-catatan" onclick="_catatanDariDetailWO()"
-                  class="px-4 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-comment-dots"></i> Catatan
+                  class="px-3.5 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-comment-dots text-amber-500"></i> Catatan
                 </button>
                 <button id="wo-btn-pdf" onclick="_pdfDariDetailWO()"
-                  class="px-4 py-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-file-arrow-down"></i> WO PDF
+                  class="px-3.5 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-file-arrow-down text-indigo-500"></i> WO PDF
                 </button>
                 <button id="wo-btn-export-lap" onclick="exportLaporanPengeluaranWO()"
-                  class="hidden px-4 py-2 text-sm bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl font-bold transition flex items-center gap-2">
-                  <i class="fa-solid fa-file-lines"></i> Lap. Pengeluaran
+                  class="hidden px-3.5 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center gap-2">
+                  <i class="fa-solid fa-file-lines text-violet-500"></i> Lap. Pengeluaran
                 </button>
               </div>
-              <div class="flex gap-2">
-                <!-- Finance/Admin only: buat invoice -->
-                <button id="wo-btn-invoice" onclick="_buatInvoiceDariWO()"
-                  class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
-                  <i class="fa-solid fa-plus"></i> Buat Invoice
-                </button>
-              </div>
+              <!-- Finance/Admin only: buat invoice -->
+              <button id="wo-btn-invoice" onclick="_buatInvoiceDariWO()"
+                class="w-full sm:w-auto px-5 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-plus"></i> Buat Invoice
+              </button>
             </div>
           </div>
         </div>

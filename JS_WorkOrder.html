@@ -567,31 +567,46 @@
       el('wo-hpp-marg-real').className = 'text-base font-extrabold ' + (isLower ? 'text-rose-600' : 'text-emerald-700');
       el('wo-hpp-marg-real').innerText = (margReal !== null && margReal !== undefined) ? margReal.toFixed(1) + '%' : '—';
 
-      // Breakdown per akun
+      // Breakdown per akun (zebra + baris total)
       var akunTbody = el('wo-hpp-akun-tbody');
       if (!res.breakdownAkun || res.breakdownAkun.length === 0) {
         akunTbody.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-300">Belum ada pengeluaran</td></tr>';
       } else {
-        akunTbody.innerHTML = res.breakdownAkun.map(function(a) {
-          return '<tr class="border-b border-slate-50">'
+        var totAkun = res.breakdownAkun.reduce(function(s, a) { return s + (a.total || 0); }, 0);
+        akunTbody.innerHTML = res.breakdownAkun.map(function(a, i) {
+          return '<tr class="' + (i % 2 ? 'bg-slate-50/50 ' : '') + 'border-b border-slate-50">'
             + '<td class="p-2 text-slate-700 font-medium">' + _escWO(a.namaAkun) + '</td>'
             + '<td class="p-2 text-right text-slate-800 font-bold whitespace-nowrap">' + rp(a.total) + '</td>'
             + '<td class="p-2 text-right text-slate-400 whitespace-nowrap">' + a.persen + '%</td>'
             + '</tr>';
-        }).join('');
+        }).join('')
+          + '<tr class="border-t-2 border-slate-200 bg-slate-50">'
+          + '<td class="p-2 font-bold text-slate-600">Total</td>'
+          + '<td class="p-2 text-right font-extrabold text-slate-800 whitespace-nowrap">' + rp(totAkun) + '</td>'
+          + '<td class="p-2 text-right text-slate-400">100%</td>'
+          + '</tr>';
       }
 
-      // Breakdown per sumber
+      // Breakdown per sumber (zebra + baris total)
       var sumberTbody = el('wo-hpp-sumber-tbody');
       var sClr = { 'Pembayaran PO': 'text-blue-700', 'Penggunaan Stok': 'text-amber-700', 'Langsung': 'text-emerald-700' };
-      var sumerHtml = (res.breakdownSumber || []).map(function(s) {
-        return '<tr class="border-b border-slate-50">'
-          + '<td class="p-2 font-medium ' + (sClr[s.sumber] || 'text-slate-600') + '">' + _escWO(s.sumber) + '</td>'
-          + '<td class="p-2 text-right text-slate-800 font-bold whitespace-nowrap">' + rp(s.total) + '</td>'
-          + '<td class="p-2 text-right text-slate-400 whitespace-nowrap">' + s.persen + '%</td>'
+      if (!res.breakdownSumber || res.breakdownSumber.length === 0) {
+        sumberTbody.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>';
+      } else {
+        var totSumber = res.breakdownSumber.reduce(function(s, x) { return s + (x.total || 0); }, 0);
+        sumberTbody.innerHTML = res.breakdownSumber.map(function(s, i) {
+          return '<tr class="' + (i % 2 ? 'bg-slate-50/50 ' : '') + 'border-b border-slate-50">'
+            + '<td class="p-2 font-medium ' + (sClr[s.sumber] || 'text-slate-600') + '">' + _escWO(s.sumber) + '</td>'
+            + '<td class="p-2 text-right text-slate-800 font-bold whitespace-nowrap">' + rp(s.total) + '</td>'
+            + '<td class="p-2 text-right text-slate-400 whitespace-nowrap">' + s.persen + '%</td>'
+            + '</tr>';
+        }).join('')
+          + '<tr class="border-t-2 border-slate-200 bg-slate-50">'
+          + '<td class="p-2 font-bold text-slate-600">Total</td>'
+          + '<td class="p-2 text-right font-extrabold text-slate-800 whitespace-nowrap">' + rp(totSumber) + '</td>'
+          + '<td class="p-2 text-right text-slate-400">100%</td>'
           + '</tr>';
-      }).join('');
-      sumberTbody.innerHTML = sumerHtml || '<tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>';
+      }
 
       // Daftar pengeluaran
       var expTbody = el('wo-hpp-exp-tbody');
