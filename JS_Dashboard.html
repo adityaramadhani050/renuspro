@@ -643,7 +643,7 @@ function _dbRenderDetailAccordion(salesList) {
           + (p.status === 'Fail' && (p.catatanFail || p.kodeLost)
               ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Lost: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanFail || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Catatan Fail"><i class="fa-solid fa-circle-info text-xs"></i></button>'
               : '')
-          + (p.status === 'Deal' && p.kodeWin
+          + (p.status === 'Deal'
               ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Win: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanWin || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Kode Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
               : '')
           + '</div></td>'
