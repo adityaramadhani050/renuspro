@@ -19,13 +19,9 @@
 
         <!-- ── Tab Bar ── -->
         <div class="flex gap-1.5 mb-5 bg-white rounded-2xl shadow-sm border border-slate-100 p-1.5 w-fit flex-wrap">
-          <button id="exp-tab-pemasukan-btn" onclick="switchExpTab('pemasukan')"
+          <button id="exp-tab-mutasi-btn" onclick="switchExpTab('mutasi')"
             class="px-5 py-2 rounded-xl text-sm font-bold transition bg-emerald-600 text-white shadow-sm">
-            <i class="fas fa-arrow-down-long mr-1.5"></i> Pemasukan
-          </button>
-          <button id="exp-tab-pengeluaran-btn" onclick="switchExpTab('pengeluaran')"
-            class="px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700">
-            <i class="fas fa-arrow-up-long mr-1.5"></i> Pengeluaran
+            <i class="fas fa-right-left mr-1.5"></i> Mutasi Kas
           </button>
           <button id="exp-tab-payreq-btn" onclick="switchExpTab('payreq')"
             class="px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700">
@@ -34,36 +30,43 @@
           </button>
         </div>
 
-        <!-- ══════════ TAB: PEMASUKAN ══════════ -->
-        <div id="exp-tab-pemasukan">
+        <!-- ══════════ TAB: MUTASI KAS ══════════ -->
+        <div id="exp-tab-mutasi">
 
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
             <div>
-              <h3 class="text-lg font-extrabold text-slate-900 tracking-tight">Daftar Pemasukan</h3>
-              <p class="text-xs text-slate-400">Uang masuk dari pembayaran invoice &amp; pemasukan langsung</p>
+              <h3 class="text-lg font-extrabold text-slate-900 tracking-tight">Mutasi Kas</h3>
+              <p class="text-xs text-slate-400">Riwayat uang masuk &amp; keluar tiap akun — seperti rekening koran</p>
             </div>
-            <button onclick="bukaFormPemasukan()"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
-              <i class="fas fa-plus text-xs"></i> Tambah Pemasukan
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="bukaFormPemasukan()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-arrow-down-long text-xs"></i> Pemasukan
+              </button>
+              <button onclick="bukaFormPengeluaranLangsung()"
+                class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-arrow-up-long text-xs"></i> Pengeluaran
+              </button>
+            </div>
           </div>
 
           <!-- KPI -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Pemasukan</p>
-              <p id="kpi-in-total" class="text-2xl font-extrabold text-emerald-600">Rp 0</p>
-              <p class="text-xs text-slate-400 mt-1">Sesuai filter aktif</p>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Masuk</p>
+              <p id="kpi-mut-masuk" class="text-xl font-extrabold text-emerald-600">Rp 0</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Dari Invoice</p>
-              <p id="kpi-in-invoice" class="text-2xl font-extrabold text-slate-800">Rp 0</p>
-              <p class="text-xs text-slate-400 mt-1">Pembayaran invoice lunas</p>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Keluar</p>
+              <p id="kpi-mut-keluar" class="text-xl font-extrabold text-rose-600">Rp 0</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Selisih (Net)</p>
+              <p id="kpi-mut-net" class="text-xl font-extrabold text-slate-800">Rp 0</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jumlah Transaksi</p>
-              <p id="kpi-in-count" class="text-2xl font-extrabold text-slate-800">0</p>
-              <p class="text-xs text-slate-400 mt-1">Sesuai filter aktif</p>
+              <p id="kpi-mut-count" class="text-xl font-extrabold text-slate-800">0</p>
             </div>
           </div>
 
@@ -72,214 +75,56 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
                 <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Akun</label>
-                <select id="filter-in-akun" onchange="filterPemasukan()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white"></select>
+                <select id="filter-mut-akun" onchange="filterMutasi()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white"></select>
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sumber</label>
-                <select id="filter-in-sumber" onchange="filterPemasukan()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipe</label>
+                <select id="filter-mut-tipe" onchange="filterMutasi()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
                   <option value="">Semua</option>
-                  <option value="Invoice">Invoice</option>
-                  <option value="Langsung">Langsung</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kategori</label>
-                <select id="filter-in-kategori" onchange="filterPemasukan()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
-                  <option value="">Semua</option>
-                  <option value="Saldo Awal">Saldo Awal</option>
-                  <option value="Pembayaran Invoice">Pembayaran Invoice</option>
-                  <option value="Pendapatan Lain">Pendapatan Lain</option>
-                  <option value="Modal">Modal</option>
-                  <option value="Pinjaman">Pinjaman</option>
-                  <option value="Lainnya">Lainnya</option>
+                  <option value="masuk">Masuk</option>
+                  <option value="keluar">Keluar</option>
                 </select>
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dari Tanggal</label>
-                <input type="date" id="filter-in-dari" onchange="filterPemasukan()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                <input type="date" id="filter-mut-dari" onchange="filterMutasi()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sampai Tanggal</label>
-                <input type="date" id="filter-in-sampai" onchange="filterPemasukan()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+                <input type="date" id="filter-mut-sampai" onchange="filterMutasi()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cari</label>
+                <input type="text" id="filter-mut-cari" oninput="filterMutasi()" placeholder="deskripsi / ref / id..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400">
               </div>
             </div>
-            <div class="flex justify-end mt-3">
-              <button onclick="resetFilterPemasukan()" class="text-xs text-slate-400 hover:text-slate-600 font-semibold"><i class="fas fa-rotate-left mr-1"></i>Reset Filter</button>
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 gap-3 flex-wrap">
+              <p class="text-[11px] text-slate-400"><i class="fas fa-circle-info mr-1"></i>Kolom <b>Saldo</b> berjalan muncul saat memilih 1 akun.</p>
+              <button onclick="resetFilterMutasi()" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition"><i class="fas fa-rotate-left text-[10px]"></i> Reset Filter</button>
             </div>
           </div>
 
           <!-- Table -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse rp-table">
+              <table class="w-full text-left border-collapse rp-table" style="min-width:820px">
                 <thead class="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID / Tanggal</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sumber</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Akun</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Deskripsi</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Jumlah</th>
-                    <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
+                  <tr class="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th class="p-4">Tanggal</th>
+                    <th class="p-4">Keterangan</th>
+                    <th class="p-4">Akun</th>
+                    <th class="p-4 text-right">Masuk</th>
+                    <th class="p-4 text-right">Keluar</th>
+                    <th class="p-4 text-right">Saldo</th>
+                    <th class="p-4 text-center" style="width:80px">Aksi</th>
                   </tr>
                 </thead>
-                <tbody id="table-pemasukan"></tbody>
+                <tbody id="table-mutasi"></tbody>
               </table>
             </div>
           </div>
 
         </div>
-
-        <!-- ══════════ TAB: PENGELUARAN ══════════ -->
-        <div id="exp-tab-pengeluaran" class="hidden">
-
-          <!-- ── Header + Actions ── -->
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-            <div>
-              <h3 class="text-lg font-extrabold text-slate-900 tracking-tight">Daftar Pengeluaran</h3>
-              <p class="text-xs text-slate-400">Uang keluar: pembayaran PO, penggunaan stok &amp; pengeluaran langsung</p>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <button onclick="bukaFormPengeluaranLangsung()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
-                <i class="fas fa-plus text-xs"></i> Pengeluaran Langsung
-              </button>
-            </div>
-          </div>
-
-          <!-- ── KPI Cards ── -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Pengeluaran</p>
-              <p id="kpi-exp-total" class="text-2xl font-extrabold text-slate-800">Rp 0</p>
-              <p class="text-xs text-slate-400 mt-1">Sesuai filter aktif</p>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pengeluaran per Sumber</p>
-              <div class="space-y-1 mt-1.5">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-blue-600 font-semibold"><i class="fas fa-file-invoice-dollar text-[10px] mr-1"></i>Pembayaran PO</span>
-                  <span id="kpi-exp-sumber-po" class="font-bold text-slate-700">Rp 0</span>
-                </div>
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-amber-600 font-semibold"><i class="fas fa-boxes-stacked text-[10px] mr-1"></i>Penggunaan Stok</span>
-                  <span id="kpi-exp-sumber-stok" class="font-bold text-slate-700">Rp 0</span>
-                </div>
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-emerald-600 font-semibold"><i class="fas fa-money-bill-wave text-[10px] mr-1"></i>Langsung</span>
-                  <span id="kpi-exp-sumber-langsung" class="font-bold text-slate-700">Rp 0</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jumlah Transaksi</p>
-              <p id="kpi-exp-count" class="text-2xl font-extrabold text-slate-800">0</p>
-              <p class="text-xs text-slate-400 mt-1">Sesuai filter aktif</p>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 cursor-pointer hover:border-amber-200 transition"
-              onclick="switchExpTab('payreq')">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pending Approval PO</p>
-              <p id="kpi-exp-pending-count" class="text-2xl font-extrabold text-amber-600">0</p>
-              <p id="kpi-exp-pending-total" class="text-xs text-slate-500 mt-1 font-semibold">Rp 0 menunggu disetujui</p>
-            </div>
-
-          </div>
-
-          <!-- ── Filter Bar ── -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-
-              <div class="lg:col-span-1">
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Work Order</label>
-                <select id="filter-exp-wo" onchange="filterPengeluaran()"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                  <option value="">Semua WO</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Sumber</label>
-                <select id="filter-exp-sumber" onchange="filterPengeluaran()"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                  <option value="">Semua Sumber</option>
-                  <option value="Pembayaran PO">Pembayaran PO</option>
-                  <option value="Penggunaan Stok">Penggunaan Stok</option>
-                  <option value="Langsung">Langsung</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Akun Pembayaran</label>
-                <select id="filter-exp-akun" onchange="filterPengeluaran()"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400 bg-white text-slate-700">
-                  <option value="">Semua Akun</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Dari Tanggal</label>
-                <input type="date" id="filter-exp-dari" onchange="filterPengeluaran()"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
-              </div>
-
-              <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Sampai Tanggal</label>
-                <input type="date" id="filter-exp-sampai" onchange="filterPengeluaran()"
-                  class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-400">
-              </div>
-
-              <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Cari No PO / Ref</label>
-                <div class="relative">
-                  <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                  <input type="text" id="filter-exp-nopo" oninput="filterPengeluaran()"
-                    placeholder="No PO..."
-                    class="w-full pl-8 pr-3 text-sm border border-slate-200 rounded-xl py-2 focus:outline-none focus:border-emerald-400">
-                </div>
-              </div>
-
-            </div>
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-              <p id="exp-total-badge" class="text-xs text-slate-400 font-medium"></p>
-              <button onclick="resetFilterPengeluaran()"
-                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition">
-                <i class="fas fa-rotate-left text-[10px]"></i> Reset Filter
-              </button>
-            </div>
-          </div>
-
-          <!-- ── Tabel Pengeluaran ── -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="rp-table w-full text-left border-collapse" style="min-width:900px">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <th class="p-4">ID / Tanggal</th>
-                    <th class="p-4">No WO / Project</th>
-                    <th class="p-4 text-center">Sumber</th>
-                    <th class="p-4">No PO</th>
-                    <th class="p-4">Akun</th>
-                    <th class="p-4">Deskripsi</th>
-                    <th class="p-4 text-right">Qty</th>
-                    <th class="p-4 text-right">Harga</th>
-                    <th class="p-4 text-right">Total</th>
-                    <th class="p-4 text-center" style="width:90px">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="table-pengeluaran" class="text-sm divide-y divide-slate-100">
-                  <tr><td colspan="10" class="p-8 text-center text-slate-400">
-                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data...
-                  </td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div><!-- end exp-tab-pengeluaran -->
 
         <!-- ══════════ TAB: PERMINTAAN PEMBAYARAN PO ══════════ -->
         <div id="exp-tab-payreq" class="hidden">

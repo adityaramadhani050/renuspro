@@ -22,24 +22,43 @@ function _inCurrentUserName() {
   return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : '';
 }
 
-// ── Load utama ─────────────────────────────────────────────────
-window.loadPemasukan = function() {
-  _loadInAkunOptions();
-  _loadInData();
-};
+// ── Load utama (Mutasi Kas gabungan pemasukan + pengeluaran) ───
+var _mutData = [];
+var _mutPem  = null, _mutEng = null;
 
-function _loadInData() {
+window.loadPemasukan = function() { loadMutasi(); };   // alias utk pemanggil lama
+
+window.loadMutasi = function() {
+  _loadInAkunOptions();
+  _mutPem = null; _mutEng = null;
+  var tb = document.getElementById('table-mutasi');
+  if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   if (typeof google === 'undefined') return;
   google.script.run
-    .withSuccessHandler(function(res) {
-      _inData = (res && res.success) ? (res.list || []) : [];
-      _renderPemasukan(_applyInFilter(_inData));
-    })
-    .withFailureHandler(function() {
-      _inData = [];
-      _renderPemasukan([]);
-    })
+    .withSuccessHandler(function(r) { _mutPem = (r && r.success) ? (r.list || []) : []; _inData = _mutPem; _tryRenderMutasi(); })
+    .withFailureHandler(function() { _mutPem = []; _inData = []; _tryRenderMutasi(); })
     .getPemasukanList({});
+  google.script.run
+    .withSuccessHandler(function(r) { _mutEng = (r && r.success) ? (r.list || []) : []; _expData = _mutEng; _tryRenderMutasi(); })
+    .withFailureHandler(function() { _mutEng = []; _expData = []; _tryRenderMutasi(); })
+    .getPengeluaranList({});
+};
+
+function _tryRenderMutasi() {
+  if (_mutPem === null || _mutEng === null) return;   // tunggu keduanya
+  _mutData = [];
+  _mutPem.forEach(function(p) {
+    _mutData.push({ tipe:'masuk', id:p.id, tanggal:p.tanggal, jumlah:p.jumlah || 0,
+      deskripsi:p.deskripsi, sumber:p.sumber, kategori:p.kategori, idAkun:p.idAkun,
+      namaAkun:p.namaAkun, ref:(p.noRef || ''), editable:(p.sumber === 'Langsung') });
+  });
+  _mutEng.forEach(function(e) {
+    _mutData.push({ tipe:'keluar', id:e.id, tanggal:e.tanggal, jumlah:e.total || 0,
+      deskripsi:e.deskripsi, sumber:e.sumber,
+      kategori:(e.noWO ? (e.namaProject || e.noWO) : (e.kategori || '')),
+      idAkun:e.idAkun, namaAkun:e.namaAkun, ref:(e.noPO || ''), editable:(e.sumber === 'Langsung') });
+  });
+  filterMutasi();
 }
 
 // ── Saldo panel ────────────────────────────────────────────────
@@ -92,7 +111,7 @@ function _loadInAkunOptions() {
       // Akun = Bank Account (data yang sama dengan invoice)
       var list = (res && res.accounts) ? res.accounts : [];
       _inAkunList = list.map(function(b) { return { id: b.id, namaAkun: b.label }; });
-      _fillInAkunSelect('filter-in-akun', '', true);
+      _fillInAkunSelect('filter-mut-akun', '', true);
       _fillInAkunSelect('in-akun', '', false);
     })
     .withFailureHandler(function() {})
@@ -111,79 +130,111 @@ function _fillInAkunSelect(selId, selectedVal, withAll) {
   if (selectedVal) sel.value = selectedVal;
 }
 
-// ── Render tabel + KPI ─────────────────────────────────────────
-function _sumberBadgeIn(sumber) {
-  if (sumber === 'Invoice') return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700"><i class="fas fa-file-invoice-dollar text-[10px]"></i> Invoice</span>';
-  return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700"><i class="fas fa-hand-holding-dollar text-[10px]"></i> Langsung</span>';
+// ── Render mutasi + KPI + saldo berjalan ───────────────────────
+function _tipeBadgeMut(m) {
+  if (m.tipe === 'masuk') {
+    var lblIn = (m.sumber === 'Invoice') ? 'Invoice' : (m.kategori || 'Pemasukan');
+    return '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fas fa-arrow-down text-[9px]"></i> ' + _escIn(lblIn) + '</span>';
+  }
+  var cfg = { 'Pembayaran PO':'bg-blue-100 text-blue-700', 'Penggunaan Stok':'bg-amber-100 text-amber-700', 'Langsung':'bg-rose-100 text-rose-700' };
+  var cls = cfg[m.sumber] || 'bg-rose-100 text-rose-700';
+  var lbl = (m.sumber === 'Langsung') ? (m.kategori || 'Pengeluaran') : m.sumber;
+  return '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ' + cls + '"><i class="fas fa-arrow-up text-[9px]"></i> ' + _escIn(lbl) + '</span>';
 }
 
-function _renderPemasukan(list) {
-  _renderInKPI(list);
-  var tbody = document.getElementById('table-pemasukan');
+function _renderMutasi(list) {
+  _renderMutKPI(list);
+  var tbody = document.getElementById('table-mutasi');
   if (!tbody) return;
+
+  // Saldo berjalan hanya bila tepat 1 akun dipilih (dihitung atas seluruh riwayat akun tsb)
+  var akunFilter = (document.getElementById('filter-mut-akun') || {}).value || '';
+  var showSaldo = !!akunFilter;
+  var saldoMap = {};
+  if (showSaldo) {
+    var acctAll = _mutData.filter(function(m){ return m.idAkun === akunFilter; }).slice()
+      .sort(function(a, b){ return (_inTglToMs(a.tanggal) || 0) - (_inTglToMs(b.tanggal) || 0); });
+    var run = 0;
+    acctAll.forEach(function(m){ run += (m.tipe === 'masuk' ? m.jumlah : -m.jumlah); saldoMap[m.id] = run; });
+  }
+
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-sm text-slate-400 py-10">Belum ada pemasukan pada filter ini.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-sm text-slate-400 py-10">Belum ada mutasi pada filter ini.</td></tr>';
     return;
   }
-  tbody.innerHTML = list.map(function(it) {
-    var isInvoice = it.sumber === 'Invoice';
-    var aksi = isInvoice
-      ? '<span class="text-slate-300 p-1.5 inline-flex" title="Otomatis dari invoice — kelola dari status invoice"><i class="fas fa-lock text-xs"></i></span>'
-      : '<button onclick="editPemasukan(\'' + _escIn(it.id) + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fas fa-pen-to-square"></i></button>'
-        + '<button onclick="hapusPemasukanUI(\'' + _escIn(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fas fa-trash-can"></i></button>';
-    var akunTxt = it.namaAkun || (it.idAkun ? it.idAkun : '<span class="text-amber-500 text-[11px]">— belum terpetakan —</span>');
+
+  tbody.innerHTML = list.map(function(m) {
+    var isMasuk = m.tipe === 'masuk';
+    var aksi;
+    if (!m.editable) {
+      aksi = '<span class="text-slate-300 p-1.5 inline-flex" title="Otomatis — kelola dari sumbernya"><i class="fas fa-lock text-xs"></i></span>';
+    } else if (isMasuk) {
+      aksi = '<button onclick="editPemasukan(\'' + _escIn(m.id) + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fas fa-pen-to-square"></i></button>'
+           + '<button onclick="hapusPemasukanUI(\'' + _escIn(m.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fas fa-trash-can"></i></button>';
+    } else {
+      aksi = '<button onclick="editPengeluaran(\'' + _escIn(m.id) + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fas fa-pen-to-square"></i></button>'
+           + '<button onclick="bukaModalHapusExp(\'' + _escIn(m.id) + '\',\'' + _escIn(m.sumber) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fas fa-trash-can"></i></button>';
+    }
+    var akunTxt = m.namaAkun || (m.idAkun ? _escIn(m.idAkun) : '<span class="text-amber-500 text-[11px]">— belum terpetakan —</span>');
+    var masukCol  = isMasuk  ? '<span class="font-bold text-emerald-600">' + _fmtRpExp(m.jumlah) + '</span>' : '<span class="text-slate-300">—</span>';
+    var keluarCol = !isMasuk ? '<span class="font-bold text-rose-600">'    + _fmtRpExp(m.jumlah) + '</span>' : '<span class="text-slate-300">—</span>';
+    var saldoCol  = showSaldo ? '<span class="font-semibold text-slate-700">' + _fmtRpExp(saldoMap[m.id]) + '</span>' : '<span class="text-slate-300">—</span>';
     return '<tr class="hover:bg-slate-50 transition border-b border-slate-50">'
-      + '<td class="p-4" data-label="ID / Tanggal"><div class="font-mono text-xs text-slate-600">' + _escIn(it.id) + '</div><div class="text-[11px] text-slate-400 mt-0.5">' + _fmtTglExp(it.tanggal) + '</div></td>'
-      + '<td class="p-4" data-label="Sumber">' + _sumberBadgeIn(it.sumber) + '</td>'
-      + '<td class="p-4 text-xs text-slate-600" data-label="Kategori">' + _escIn(it.kategori || '—') + '</td>'
+      + '<td class="p-4 whitespace-nowrap" data-label="Tanggal"><div class="text-xs font-semibold text-slate-700">' + _fmtTglExp(m.tanggal) + '</div><div class="text-[10px] text-slate-400 font-mono mt-0.5">' + _escIn(m.id) + '</div></td>'
+      + '<td class="p-4" data-label="Keterangan"><div class="text-xs text-slate-700">' + _escIn(m.deskripsi || '—') + '</div><div class="mt-1 flex items-center gap-1 flex-wrap">' + _tipeBadgeMut(m) + (m.ref ? '<span class="text-[10px] text-slate-400">Ref: ' + _escIn(m.ref) + '</span>' : '') + '</div></td>'
       + '<td class="p-4 text-xs text-slate-600" data-label="Akun">' + akunTxt + '</td>'
-      + '<td class="p-4 text-xs text-slate-600" data-label="Deskripsi">' + _escIn(it.deskripsi || '—') + (it.noRef ? '<div class="text-[10px] text-slate-400 mt-0.5">Ref: ' + _escIn(it.noRef) + '</div>' : '') + '</td>'
-      + '<td class="p-4 text-right font-bold text-emerald-600 whitespace-nowrap" data-label="Jumlah">' + _fmtRpExp(it.jumlah) + '</td>'
+      + '<td class="p-4 text-right whitespace-nowrap" data-label="Masuk">' + masukCol + '</td>'
+      + '<td class="p-4 text-right whitespace-nowrap" data-label="Keluar">' + keluarCol + '</td>'
+      + '<td class="p-4 text-right whitespace-nowrap" data-label="Saldo">' + saldoCol + '</td>'
       + '<td class="p-4 text-center rp-actions"><div class="flex items-center justify-center gap-1">' + aksi + '</div></td>'
       + '</tr>';
   }).join('');
 }
 
-function _renderInKPI(list) {
-  var total = 0, inv = 0;
-  list.forEach(function(it) {
-    total += it.jumlah || 0;
-    if (it.sumber === 'Invoice') inv += it.jumlah || 0;
-  });
-  var elT = document.getElementById('kpi-in-total');   if (elT) elT.innerText = _fmtRpExp(total);
-  var elI = document.getElementById('kpi-in-invoice'); if (elI) elI.innerText = _fmtRpExp(inv);
-  var elC = document.getElementById('kpi-in-count');   if (elC) elC.innerText = list.length;
+function _renderMutKPI(list) {
+  var masuk = 0, keluar = 0;
+  list.forEach(function(m){ if (m.tipe === 'masuk') masuk += m.jumlah || 0; else keluar += m.jumlah || 0; });
+  var net = masuk - keluar, e;
+  e = document.getElementById('kpi-mut-masuk');  if (e) e.innerText = _fmtRpExp(masuk);
+  e = document.getElementById('kpi-mut-keluar'); if (e) e.innerText = _fmtRpExp(keluar);
+  e = document.getElementById('kpi-mut-net');    if (e) { e.innerText = _fmtRpExp(net); e.className = 'text-xl font-extrabold ' + (net < 0 ? 'text-rose-600' : 'text-slate-800'); }
+  e = document.getElementById('kpi-mut-count');  if (e) e.innerText = list.length;
 }
 
-// ── Filter (client-side) ───────────────────────────────────────
-function _applyInFilter(data) {
-  var akun     = (document.getElementById('filter-in-akun')    || {}).value || '';
-  var sumber   = (document.getElementById('filter-in-sumber')  || {}).value || '';
-  var kategori = (document.getElementById('filter-in-kategori')|| {}).value || '';
-  var dari     = (document.getElementById('filter-in-dari')    || {}).value || '';
-  var sampai   = (document.getElementById('filter-in-sampai')  || {}).value || '';
+// ── Filter mutasi (client-side) ────────────────────────────────
+function _applyMutFilter(data) {
+  var akun   = (document.getElementById('filter-mut-akun')   || {}).value || '';
+  var tipe   = (document.getElementById('filter-mut-tipe')   || {}).value || '';
+  var dari   = (document.getElementById('filter-mut-dari')   || {}).value || '';
+  var sampai = (document.getElementById('filter-mut-sampai') || {}).value || '';
+  var cari   = ((document.getElementById('filter-mut-cari')  || {}).value || '').toLowerCase();
   var dariMs   = dari   ? new Date(dari + 'T00:00:00').getTime()   : null;
   var sampaiMs = sampai ? new Date(sampai + 'T23:59:59').getTime() : null;
-  return data.filter(function(it) {
-    if (akun     && it.idAkun   !== akun)     return false;
-    if (sumber   && it.sumber   !== sumber)   return false;
-    if (kategori && it.kategori !== kategori) return false;
+  var out = data.filter(function(m) {
+    if (akun && m.idAkun !== akun) return false;
+    if (tipe && m.tipe !== tipe) return false;
+    if (cari) {
+      var hay = ((m.deskripsi || '') + ' ' + (m.ref || '') + ' ' + (m.id || '') + ' ' + (m.kategori || '')).toLowerCase();
+      if (hay.indexOf(cari) === -1) return false;
+    }
     if (dariMs || sampaiMs) {
-      var ms = _inTglToMs(it.tanggal);
+      var ms = _inTglToMs(m.tanggal);
       if (ms == null) return false;
-      if (dariMs   && ms < dariMs)   return false;
+      if (dariMs && ms < dariMs) return false;
       if (sampaiMs && ms > sampaiMs) return false;
     }
     return true;
   });
+  out.sort(function(a, b){ return (_inTglToMs(b.tanggal) || 0) - (_inTglToMs(a.tanggal) || 0); });  // terbaru dulu
+  return out;
 }
 
-window.filterPemasukan = function() { _renderPemasukan(_applyInFilter(_inData)); };
-window.resetFilterPemasukan = function() {
-  ['filter-in-akun','filter-in-sumber','filter-in-kategori','filter-in-dari','filter-in-sampai'].forEach(function(id) {
+window.filterMutasi = function() { _renderMutasi(_applyMutFilter(_mutData)); };
+window.resetFilterMutasi = function() {
+  ['filter-mut-akun','filter-mut-tipe','filter-mut-dari','filter-mut-sampai','filter-mut-cari'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  _renderPemasukan(_inData);
+  _renderMutasi(_applyMutFilter(_mutData));
 };
 
 // ── Form ───────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ var _expData       = [];
 var _expWOList     = [];
 var _expAkunList   = [];
 var _expEditMode   = false;
-var _expActiveTab  = 'pemasukan';
+var _expActiveTab  = 'mutasi';
 
 // ── Tab Switching ──────────────────────────────────────────────
 
@@ -15,15 +15,15 @@ window.switchExpTab = function(tab) {
   _expActiveTab = tab;
   var active   = 'px-5 py-2 rounded-xl text-sm font-bold transition bg-emerald-600 text-white shadow-sm';
   var inactive = 'px-5 py-2 rounded-xl text-sm font-bold transition text-slate-500 hover:text-slate-700';
-  var pemBtn = document.getElementById('exp-tab-pemasukan-btn');
-  if (pemBtn) pemBtn.className = tab === 'pemasukan' ? active : inactive;
-  document.getElementById('exp-tab-pengeluaran-btn').className = tab === 'pengeluaran' ? active : inactive;
-  document.getElementById('exp-tab-payreq-btn').className      = tab === 'payreq'      ? active : inactive;
-  var pemTab = document.getElementById('exp-tab-pemasukan');
-  if (pemTab) pemTab.classList.toggle('hidden', tab !== 'pemasukan');
-  document.getElementById('exp-tab-pengeluaran').classList.toggle('hidden', tab !== 'pengeluaran');
-  document.getElementById('exp-tab-payreq').classList.toggle('hidden',      tab !== 'payreq');
-  if (tab === 'pemasukan' && typeof loadPemasukan === 'function') loadPemasukan();
+  var mBtn = document.getElementById('exp-tab-mutasi-btn');
+  var pBtn = document.getElementById('exp-tab-payreq-btn');
+  if (mBtn) mBtn.className = tab === 'mutasi' ? active : inactive;
+  if (pBtn) pBtn.className = tab === 'payreq' ? active : inactive;
+  var mTab = document.getElementById('exp-tab-mutasi');
+  var pTab = document.getElementById('exp-tab-payreq');
+  if (mTab) mTab.classList.toggle('hidden', tab !== 'mutasi');
+  if (pTab) pTab.classList.toggle('hidden', tab !== 'payreq');
+  if (tab === 'mutasi' && typeof loadMutasi === 'function') loadMutasi();
   if (tab === 'payreq') loadPaymentRequestList();
 };
 
@@ -56,16 +56,13 @@ function _fmtTglExp(s) {
 // ── Load utama ─────────────────────────────────────────────────
 
 window.loadPengeluaran = function() {
-  _loadExpData();
   loadPaymentRequestList();
   _loadPendingApprovalKPI();
-  _loadWOOptionsExp('filter-exp-wo', '');
-  _loadWOOptionsExp('exp-wo', '');
-  _loadAkunOptionsExp('filter-exp-akun', '');
-  _loadAkunOptionsExp('exp-akun', '');
-  // Cash Manager: saldo + pemasukan (default tab)
+  _loadWOOptionsExp('exp-wo', '');       // dropdown WO di form pengeluaran
+  _loadAkunOptionsExp('exp-akun', '');   // dropdown akun di form pengeluaran
+  // Cash Manager: saldo + mutasi (tab default)
   if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
-  if (typeof loadPemasukan === 'function') loadPemasukan();
+  if (typeof loadMutasi === 'function') loadMutasi();
 };
 
 function _loadPendingApprovalKPI() {
@@ -73,28 +70,20 @@ function _loadPendingApprovalKPI() {
   google.script.run
     .withSuccessHandler(function(res) {
       var list  = (res && res.list) ? res.list : [];
-      var total = list.reduce(function(sum, r) { return sum + (r.jumlah || 0); }, 0);
-      document.getElementById('kpi-exp-pending-count').textContent = list.length;
-      document.getElementById('kpi-exp-pending-total').textContent = _fmtRpExp(total) + ' menunggu disetujui';
+      var badge = document.getElementById('exp-payreq-badge');
+      if (badge) {
+        if (list.length) { badge.textContent = list.length; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+      }
     })
     .withFailureHandler(function() {})
     .getPaymentRequestList({ status: 'Menunggu' });
 }
 
+// Dipakai oleh handler simpan/hapus pengeluaran → segarkan mutasi + saldo
 function _loadExpData() {
-  if (typeof google === 'undefined') return;
-  document.getElementById('table-pengeluaran').innerHTML =
-    '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
-  google.script.run
-    .withSuccessHandler(function(res) {
-      _expData = (res && res.list) ? res.list : [];
-      _renderPengeluaran(_expData);
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('table-pengeluaran').innerHTML =
-        '<tr><td colspan="10" class="p-8 text-center text-rose-500">Gagal memuat data: ' + err.message + '</td></tr>';
-    })
-    .getPengeluaranList({});
+  if (typeof loadMutasi === 'function') loadMutasi();
+  if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
 }
 
 function _loadWOOptionsExp(selId, selectedVal) {
