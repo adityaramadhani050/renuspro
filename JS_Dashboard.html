@@ -392,7 +392,7 @@ function _dbRenderKonversi(summary) {
   if (bar) bar.style.width = Math.min(winRate, 100) + '%';
 }
 
-// ── Trend Chart (line, 12 bulan dari raw cache) ────────────────
+// ── Trend Chart (line, Jan–Des tahun berjalan) ─────────────────
 function _dbRenderTrend(items) {
   var canvas = document.getElementById('db-trend-chart');
   if (!canvas) return;
@@ -400,11 +400,10 @@ function _dbRenderTrend(items) {
 
   var isAdmin = _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'owner');
   var now = new Date();
+  var yr  = now.getFullYear();
   var mon = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   var buckets = [];
-  for (var m = 11; m >= 0; m--) {
-    var mo = now.getMonth() - m, yr = now.getFullYear();
-    if (mo < 0) { mo += 12; yr--; }
+  for (var mo = 0; mo < 12; mo++) {
     buckets.push({
       label: mon[mo],
       fromMs: new Date(yr, mo, 1).getTime(),
