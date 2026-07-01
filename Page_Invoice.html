@@ -172,16 +172,14 @@
                 </div>
               </div>
 
-              <!-- Note & Bank Account -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Note (opsional)</label>
-                  <textarea id="inv-catatan" rows="3" placeholder="Catatan pada invoice..." class="input-field text-sm"></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bank Account</label>
-                  <select id="inv-bank" class="input-field text-sm"></select>
-                </div>
+              <!-- Bank Account & Note (ditumpuk agar tinggi rapi, tanpa area kosong) -->
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bank Account</label>
+                <select id="inv-bank" class="input-field text-sm"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Note (opsional)</label>
+                <textarea id="inv-catatan" rows="2" placeholder="Catatan pada invoice..." class="input-field text-sm"></textarea>
               </div>
 
             </div>
