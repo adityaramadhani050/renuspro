@@ -528,7 +528,6 @@
           if (loading) loading.classList.add('hidden');
           if (content) content.classList.remove('hidden');
           _renderRealisasiHPP(res);
-          switchWOHPPTab('akun');
         })
         .withFailureHandler(function(err) {
           if (loading) {
@@ -653,20 +652,6 @@
     function _escWO(s) {
       return (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-
-    window.switchWOHPPTab = function(tab) {
-      ['akun', 'exp', 'po'].forEach(function(t) {
-        var btn  = document.getElementById('wo-hpp-tab-' + t);
-        var cont = document.getElementById('wo-hpp-content-' + t);
-        if (t === tab) {
-          if (btn)  btn.className  = 'flex-1 py-1.5 text-xs font-bold rounded-lg transition bg-white text-slate-700 shadow-sm';
-          if (cont) cont.classList.remove('hidden');
-        } else {
-          if (btn)  btn.className  = 'flex-1 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-slate-600';
-          if (cont) cont.classList.add('hidden');
-        }
-      });
-    };
 
     function _tambahPengeluaranDariWO() {
       if (!_woDetailCurrent) return;

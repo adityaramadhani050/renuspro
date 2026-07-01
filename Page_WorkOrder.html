@@ -202,50 +202,66 @@
                     </div>
                   </div>
 
-                  <!-- Mini tab bar -->
-                  <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
-                    <button id="wo-hpp-tab-akun" onclick="switchWOHPPTab('akun')"
-                      class="flex-1 py-1.5 text-xs font-bold rounded-lg transition">Breakdown Akun</button>
-                    <button id="wo-hpp-tab-exp" onclick="switchWOHPPTab('exp')"
-                      class="flex-1 py-1.5 text-xs font-bold rounded-lg transition">Pengeluaran</button>
-                    <button id="wo-hpp-tab-po" onclick="switchWOHPPTab('po')"
-                      class="flex-1 py-1.5 text-xs font-bold rounded-lg transition">PO Terkait</button>
+                  <!-- ══ Semua rincian dalam satu tampilan (tanpa tab) ══ -->
+
+                  <!-- Breakdown per Akun -->
+                  <div class="rounded-xl border border-slate-100 overflow-hidden">
+                    <p class="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <i class="fa-solid fa-building-columns text-slate-400 mr-1"></i> Breakdown per Akun
+                    </p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-xs">
+                        <thead>
+                          <tr class="text-slate-400 border-b border-slate-100 text-left">
+                            <th class="p-2 font-semibold">Akun Pembayaran</th>
+                            <th class="p-2 text-right font-semibold">Total</th>
+                            <th class="p-2 text-right font-semibold">%</th>
+                          </tr>
+                        </thead>
+                        <tbody id="wo-hpp-akun-tbody">
+                          <tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  <!-- Tab: Breakdown per Akun & Sumber -->
-                  <div id="wo-hpp-content-akun">
-                    <table class="w-full text-xs">
-                      <thead>
-                        <tr class="text-slate-400 border-b border-slate-100 text-left">
-                          <th class="p-2 font-semibold">Akun Pembayaran</th>
-                          <th class="p-2 text-right font-semibold">Total</th>
-                          <th class="p-2 text-right font-semibold">%</th>
-                        </tr>
-                      </thead>
-                      <tbody id="wo-hpp-akun-tbody">
-                        <tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>
-                      </tbody>
-                    </table>
-                    <p class="text-[10px] text-slate-400 mt-3 mb-1 font-bold uppercase tracking-wider">Per Sumber</p>
-                    <table class="w-full text-xs">
-                      <thead>
-                        <tr class="text-slate-400 border-b border-slate-100 text-left">
-                          <th class="p-2 font-semibold">Sumber</th>
-                          <th class="p-2 text-right font-semibold">Total</th>
-                          <th class="p-2 text-right font-semibold">%</th>
-                        </tr>
-                      </thead>
-                      <tbody id="wo-hpp-sumber-tbody">
-                        <tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>
-                      </tbody>
-                    </table>
+                  <!-- Breakdown per Sumber -->
+                  <div class="rounded-xl border border-slate-100 overflow-hidden">
+                    <p class="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <i class="fa-solid fa-layer-group text-slate-400 mr-1"></i> Per Sumber
+                    </p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-xs">
+                        <thead>
+                          <tr class="text-slate-400 border-b border-slate-100 text-left">
+                            <th class="p-2 font-semibold">Sumber</th>
+                            <th class="p-2 text-right font-semibold">Total</th>
+                            <th class="p-2 text-right font-semibold">%</th>
+                          </tr>
+                        </thead>
+                        <tbody id="wo-hpp-sumber-tbody">
+                          <tr><td colspan="3" class="p-3 text-center text-slate-300">—</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  <!-- Tab: Daftar Pengeluaran -->
-                  <div id="wo-hpp-content-exp" class="hidden">
-                    <div class="overflow-x-auto rounded-xl border border-slate-100" style="max-height:220px;overflow-y:auto">
+                  <!-- Rincian Pengeluaran -->
+                  <div class="rounded-xl border border-slate-100 overflow-hidden">
+                    <div class="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+                      <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <i class="fa-solid fa-receipt text-slate-400 mr-1"></i> Rincian Pengeluaran
+                      </p>
+                      <div id="wo-hpp-add-btns" class="hidden">
+                        <button onclick="_tambahPengeluaranDariWO()"
+                          class="px-2.5 py-1 text-[11px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold transition flex items-center gap-1.5">
+                          <i class="fa-solid fa-plus text-[10px]"></i> Tambah
+                        </button>
+                      </div>
+                    </div>
+                    <div class="overflow-x-auto">
                       <table class="w-full text-xs" style="min-width:520px">
-                        <thead class="sticky top-0 bg-slate-50">
+                        <thead class="bg-slate-50/60">
                           <tr class="text-slate-400 border-b border-slate-100 text-left">
                             <th class="p-2 font-semibold">Tanggal</th>
                             <th class="p-2 font-semibold">Sumber</th>
@@ -259,18 +275,15 @@
                         </tbody>
                       </table>
                     </div>
-                    <div id="wo-hpp-add-btns" class="hidden mt-2">
-                      <button onclick="_tambahPengeluaranDariWO()"
-                        class="px-3 py-1.5 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-plus text-[10px]"></i> Tambah Pengeluaran
-                      </button>
-                    </div>
                   </div>
 
-                  <!-- Tab: PO Terkait -->
-                  <div id="wo-hpp-content-po" class="hidden">
-                    <div id="wo-hpp-po-content">
-                      <p class="text-xs text-slate-300 text-center py-3">—</p>
+                  <!-- PO Terkait -->
+                  <div class="rounded-xl border border-slate-100 overflow-hidden">
+                    <p class="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <i class="fa-solid fa-file-invoice-dollar text-slate-400 mr-1"></i> PO Terkait
+                    </p>
+                    <div id="wo-hpp-po-content" class="p-3">
+                      <p class="text-xs text-slate-300 text-center py-2">—</p>
                     </div>
                   </div>
                 </div>
