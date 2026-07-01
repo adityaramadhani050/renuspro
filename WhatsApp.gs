@@ -191,7 +191,12 @@ function _cekReminderPenawaranExpiredCore(forceAll) {
       if (status !== 'On-Progress') continue;
 
       var validDate = parseTgl(row[3]);
-      if (!validDate || validDate >= today) continue;
+      if (!validDate) continue;
+      validDate.setHours(0, 0, 0, 0);
+      // Reminder mulai H-1 (satu hari sebelum tanggal berlaku habis) dan seterusnya.
+      var reminderMulai = new Date(validDate.getTime());
+      reminderMulai.setDate(reminderMulai.getDate() - 1);
+      if (reminderMulai > today) continue;
 
       if (!forceAll) {
         var lastSent = parseLastSent(row[21]);
@@ -248,8 +253,8 @@ function kirimReminderExpiredManual() {
 
 function _waMsgReminderExpired(list) {
   var lines = [
-    '⏰ *Reminder Follow-up Penawaran Expired*',
-    'Penawaran berikut sudah lewat tanggal berlaku, mohon follow-up kembali ke customer:',
+    '⏰ *Reminder Follow-up Penawaran*',
+    'Penawaran berikut akan/sudah lewat tanggal berlaku, mohon segera follow-up ke customer:',
     '',
     '📊 Total: *' + list.length + '* penawaran perlu di-follow-up',
     ''
