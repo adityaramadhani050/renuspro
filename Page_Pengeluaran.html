@@ -148,6 +148,22 @@
             </div>
           </div>
 
+          <!-- KPI ringkas (dihitung dari data yang tampil) -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Jumlah Request</p>
+              <p id="kpi-payreq-count" class="text-xl font-extrabold text-slate-800">0</p>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Total Diminta</p>
+              <p id="kpi-payreq-total" class="text-xl font-extrabold text-slate-800 leading-tight">Rp 0</p>
+            </div>
+            <div class="bg-amber-50/40 rounded-2xl border border-amber-100 shadow-sm p-4">
+              <p class="text-xs text-amber-600 font-semibold uppercase tracking-wider mb-1">Menunggu Approval</p>
+              <p id="kpi-payreq-pending" class="text-xl font-extrabold text-amber-700">0</p>
+            </div>
+          </div>
+
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse" style="min-width:860px">

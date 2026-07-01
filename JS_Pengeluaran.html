@@ -510,9 +510,19 @@ window.loadPaymentRequestList = function() {
 };
 
 function _renderPaymentRequestList(list) {
+  list = list || [];
+
+  // KPI ringkas (dari data yang tampil)
+  var _tot = 0, _pending = 0;
+  list.forEach(function(r) { _tot += (r.jumlah || 0); if (r.status === 'Menunggu') _pending++; });
+  var _k;
+  _k = document.getElementById('kpi-payreq-count');   if (_k) _k.textContent = list.length;
+  _k = document.getElementById('kpi-payreq-total');   if (_k) _k.textContent = _fmtRpExp(_tot);
+  _k = document.getElementById('kpi-payreq-pending'); if (_k) _k.textContent = _pending;
+
   var tbody = document.getElementById('table-payreq');
   if (!tbody) return;
-  if (!list || !list.length) {
+  if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>';
     return;
   }
