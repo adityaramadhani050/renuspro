@@ -24,35 +24,52 @@ function _inCurrentUserName() {
 
 // ── Load utama (Mutasi Kas gabungan pemasukan + pengeluaran) ───
 var _mutData = [];
-var _mutPem  = null, _mutEng = null;
 
 window.loadPemasukan = function() { loadMutasi(); };   // alias utk pemanggil lama
 
 window.loadMutasi = function() {
-  _loadInAkunOptions();
-  _mutPem = null; _mutEng = null;
   var tb = document.getElementById('table-mutasi');
   if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  _loadInAkunOptions();
   if (typeof google === 'undefined') return;
+  // Ambil pemasukan → lalu pengeluaran (berurutan, deterministik)
   google.script.run
-    .withSuccessHandler(function(r) { _mutPem = (r && r.success) ? (r.list || []) : []; _inData = _mutPem; _tryRenderMutasi(); })
-    .withFailureHandler(function() { _mutPem = []; _inData = []; _tryRenderMutasi(); })
+    .withSuccessHandler(function(rp) {
+      var pem = (rp && rp.success) ? (rp.list || []) : [];
+      _inData = pem;
+      _fetchPengeluaranThenBuild(pem);
+    })
+    .withFailureHandler(function() { _inData = []; _fetchPengeluaranThenBuild([]); })
     .getPemasukanList({});
-  google.script.run
-    .withSuccessHandler(function(r) { _mutEng = (r && r.success) ? (r.list || []) : []; _expData = _mutEng; _tryRenderMutasi(); })
-    .withFailureHandler(function() { _mutEng = []; _expData = []; _tryRenderMutasi(); })
-    .getPengeluaranList({});
 };
 
-function _tryRenderMutasi() {
-  if (_mutPem === null || _mutEng === null) return;   // tunggu keduanya
+function _fetchPengeluaranThenBuild(pem) {
+  if (typeof google === 'undefined') { _buildMutasi(pem, []); return; }
+  google.script.run
+    .withSuccessHandler(function(re) {
+      var eng = (re && re.success) ? (re.list || []) : [];
+      _expData = eng;
+      _buildMutasi(pem, eng);
+    })
+    .withFailureHandler(function(err) {
+      _expData = [];
+      _buildMutasi(pem, []);
+      if (!pem.length) {
+        var tb = document.getElementById('table-mutasi');
+        if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat data: ' + (err && err.message ? err.message : '') + '</td></tr>';
+      }
+    })
+    .getPengeluaranList({});
+}
+
+function _buildMutasi(pem, eng) {
   _mutData = [];
-  _mutPem.forEach(function(p) {
+  (pem || []).forEach(function(p) {
     _mutData.push({ tipe:'masuk', id:p.id, tanggal:p.tanggal, jumlah:p.jumlah || 0,
       deskripsi:p.deskripsi, sumber:p.sumber, kategori:p.kategori, idAkun:p.idAkun,
       namaAkun:p.namaAkun, ref:(p.noRef || ''), editable:(p.sumber === 'Langsung') });
   });
-  _mutEng.forEach(function(e) {
+  (eng || []).forEach(function(e) {
     _mutData.push({ tipe:'keluar', id:e.id, tanggal:e.tanggal, jumlah:e.total || 0,
       deskripsi:e.deskripsi, sumber:e.sumber,
       kategori:(e.noWO ? (e.namaProject || e.noWO) : (e.kategori || '')),
