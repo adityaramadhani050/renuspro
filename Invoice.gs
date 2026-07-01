@@ -605,6 +605,33 @@ function updateStatusBayarInvoice(idInvoice, statusBaru, bukti) {
         }
       }
 
+      // ── Cash Manager: catat/hapus pemasukan otomatis (nilai = DPP) ──
+      try {
+        if (statusBaru === 'Lunas') {
+          const dppInv        = parseFloat(data[i][11]) || 0;   // kol 12 DPP (exclude PPN)
+          const jenisInv      = data[i][4]  ? data[i][4].toString()  : 'Penuh';
+          const persenInv     = parseFloat(data[i][5]) || 0;
+          const namaKlienInv  = data[i][9]  ? data[i][9].toString()  : '';
+          const namaProjInv   = data[i][10] ? data[i][10].toString() : '';
+          const bankTextInv   = data[i][19] ? data[i][19].toString() : '';   // kol 20 Bank Account
+          const akunKas       = _resolveAkunKasFromBankText(bankTextInv);
+          _buatPemasukanOtomatis({
+            sumber:      'Invoice',
+            kategori:    'Pembayaran Invoice',
+            idReferensi: idInvoice,
+            noRef:       idInvoice,
+            idAkun:      akunKas.idAkun,
+            namaAkun:    akunKas.namaAkun,
+            jumlah:      dppInv,
+            deskripsi:   'Pembayaran ' + jenisInv + (persenInv > 0 ? ' ' + persenInv + '%' : '') +
+                         ' - ' + namaKlienInv + (namaProjInv ? ' (' + namaProjInv + ')' : ''),
+            dibuatOleh:  'Sistem'
+          });
+        } else if (statusBaru === 'Belum Lunas') {
+          _hapusPemasukanByReferensi(idInvoice);
+        }
+      } catch (ePem) { Logger.log('Pemasukan hook error: ' + ePem); }
+
       const msg = statusBaru === 'Lunas'
         ? (kwitansiBaru
             ? 'Invoice dilunasi. Kwitansi ' + noKwitansi + ' otomatis dibuat.'

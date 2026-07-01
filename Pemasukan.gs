@@ -317,6 +317,34 @@ function _hapusPemasukanByReferensi(idReferensi) {
   invalidatePemasukanCache();
 }
 
+// ── Resolusi akun kas dari teks Bank Account invoice ─────────────────────────
+// Invoice menyimpan teks detail rekening (kolom 20). Tiap entri BANK_ACCOUNTS
+// dipetakan ke Akun Pembayaran via field `akunId` (diatur di Settings).
+function _resolveAkunKasFromBankText(bankText) {
+  var res = { idAkun: '', namaAkun: '' };
+  if (!bankText) return res;
+  try {
+    var raw   = PropertiesService.getScriptProperties().getProperty('BANK_ACCOUNTS');
+    var banks = raw ? JSON.parse(raw) : [];
+    var target = bankText.toString().trim();
+    var akunId = '';
+    for (var i = 0; i < banks.length; i++) {
+      if ((banks[i].detail || '').toString().trim() === target) {
+        akunId = (banks[i].akunId || '').toString();
+        break;
+      }
+    }
+    if (!akunId) return res;
+    res.idAkun = akunId;
+    var sheet = _ensureAkunPembayaranSheet();
+    var data  = sheet.getDataRange().getValues();
+    for (var j = 1; j < data.length; j++) {
+      if ((data[j][0] || '').toString() === akunId) { res.namaAkun = (data[j][1] || '').toString(); break; }
+    }
+  } catch(e) {}
+  return res;
+}
+
 // ── Saldo per akun (inti Cash Manager) ───────────────────────────────────────
 // Saldo tiap akun kas = Σ Pemasukan − Σ Pengeluaran (akun AP001/Stok dikecualikan
 // karena bukan kas riil, hanya realisasi HPP).
