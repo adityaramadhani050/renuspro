@@ -309,8 +309,11 @@ function getSalesReportData(params) {
         if (status === 'Fail') sd.failCount++;
       }
 
-      // Masuk daftar penawaran jika dibuat dalam periode ATAU deal dalam periode
-      if (creationInRange || dealInRange) {
+      // Masuk daftar penawaran:
+      // - Deal    → berdasarkan tanggal deal (meski penawaran dibuat di periode lain)
+      // - Non-Deal → berdasarkan tanggal pembuatan
+      var masukList = (status === 'Deal') ? dealInRange : creationInRange;
+      if (masukList) {
         if (!sd._penawaranInRange[noPenawaran]) {
           sd._penawaranInRange[noPenawaran] = pObj;
         }
@@ -341,7 +344,7 @@ function getSalesReportData(params) {
       // achievement
       sd.achievement = sd.targetBulanan > 0 ? (sd.dealRevenue / sd.targetBulanan) * 100 : null;
 
-      // Penawaran: hanya yang tanggal pembuatan dalam periode
+      // Penawaran: Deal berdasarkan tanggal deal, non-Deal berdasarkan tanggal pembuatan
       var penawaranArr = [];
       for (var pid in sd._penawaranInRange) penawaranArr.push(sd._penawaranInRange[pid]);
 
