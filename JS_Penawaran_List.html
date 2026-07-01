@@ -106,14 +106,14 @@
               </td>
               <td class="p-4 text-center rp-actions">
                 <div class="flex items-center justify-center gap-1">
-                ${i.status === 'Fail' && i.catatanFail
-                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Lost: ${(i.kodeLost||'-')}\\n\\n${i.catatanFail.replace(/'/g,"\\'").replace(/\n/g,' ')}')"
+                ${i.status === 'Fail' && (i.catatanFail || i.kodeLost)
+                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Lost: ${(_ketKodeLost(i.kodeLost)||'-').replace(/'/g,"\\'")}\\n\\n${(i.catatanFail||'Tidak ada catatan.').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
                       class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Lihat Catatan Fail">
                       <i class="fa-solid fa-circle-info"></i>
                     </button>`
                   : ''}
                 ${i.status === 'Deal' && i.kodeWin
-                  ? `<button onclick="lihatKodeWin('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Win: ${i.kodeWin}\\n\\n${(i.catatanWin||'').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
+                  ? `<button onclick="lihatKodeWin('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Win: ${(_ketKodeWin(i.kodeWin)||'-').replace(/'/g,"\\'")}\\n\\n${(i.catatanWin||'Tidak ada catatan.').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
                       class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Lihat Kode Win">
                       <i class="fa-solid fa-trophy"></i>
                     </button>`

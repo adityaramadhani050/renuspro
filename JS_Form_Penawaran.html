@@ -848,6 +848,18 @@
       { kode: 'L12', label: 'Faktor Eksternal' }
     ];
 
+    // Cari keterangan (label) dari kode Win/Lost, dipakai lintas modul (list & dashboard).
+    function _ketKodeWin(kode) {
+      if (!kode) return '';
+      var f = KODE_WIN_LIST.filter(function(k){ return k.kode === kode; })[0];
+      return f ? (f.kode + ' — ' + f.label) : kode;
+    }
+    function _ketKodeLost(kode) {
+      if (!kode) return '';
+      var f = KODE_LOST_LIST.filter(function(k){ return k.kode === kode; })[0];
+      return f ? (f.kode + ' — ' + f.label) : kode;
+    }
+
     function _populateKodeWinLostSelects() {
       const selWin  = document.getElementById('select-kode-win');
       const selLost = document.getElementById('select-kode-lost');

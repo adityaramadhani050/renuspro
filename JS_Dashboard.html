@@ -640,8 +640,11 @@ function _dbRenderDetailAccordion(salesList) {
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
           + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
           + '<td class="px-3 py-2"><div class="flex items-center gap-1.5">' + _statusBadge(p.status)
-          + (p.status === 'Fail' && p.catatanFail
-              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'' + _esc(p.catatanFail).replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Catatan Fail"><i class="fa-solid fa-circle-info text-xs"></i></button>'
+          + (p.status === 'Fail' && (p.catatanFail || p.kodeLost)
+              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Lost: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanFail || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Catatan Fail"><i class="fa-solid fa-circle-info text-xs"></i></button>'
+              : '')
+          + (p.status === 'Deal' && p.kodeWin
+              ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Win: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanWin || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Kode Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
               : '')
           + '</div></td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'

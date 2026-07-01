@@ -94,7 +94,10 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
           grandTotal:       parseFloat(dataMain[i][10]) || 0,
           status:           status,
           channelMarketing: dataMain[i][19] ? dataMain[i][19].toString() : '',
-          catatanFail:      dataMain[i][20] ? dataMain[i][20].toString() : ''
+          catatanFail:      dataMain[i][20] ? dataMain[i][20].toString() : '',
+          kodeWin:          dataMain[i][22] ? dataMain[i][22].toString() : '',
+          catatanWin:       dataMain[i][23] ? dataMain[i][23].toString() : '',
+          kodeLost:         dataMain[i][24] ? dataMain[i][24].toString() : ''
         };
       }
     }
