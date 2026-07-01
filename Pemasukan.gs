@@ -318,8 +318,8 @@ function _hapusPemasukanByReferensi(idReferensi) {
 }
 
 // ── Resolusi akun kas dari teks Bank Account invoice ─────────────────────────
-// Invoice menyimpan teks detail rekening (kolom 20). Tiap entri BANK_ACCOUNTS
-// dipetakan ke Akun Pembayaran via field `akunId` (diatur di Settings).
+// Invoice menyimpan teks detail rekening (kolom 20). Akun kas Cash Manager =
+// Bank Account itu sendiri, jadi cukup cocokkan teks → id/label bank account.
 function _resolveAkunKasFromBankText(bankText) {
   var res = { idAkun: '', namaAkun: '' };
   if (!bankText) return res;
@@ -327,45 +327,39 @@ function _resolveAkunKasFromBankText(bankText) {
     var raw   = PropertiesService.getScriptProperties().getProperty('BANK_ACCOUNTS');
     var banks = raw ? JSON.parse(raw) : [];
     var target = bankText.toString().trim();
-    var akunId = '';
     for (var i = 0; i < banks.length; i++) {
       if ((banks[i].detail || '').toString().trim() === target) {
-        akunId = (banks[i].akunId || '').toString();
-        break;
+        res.idAkun   = (banks[i].id    || '').toString();
+        res.namaAkun = (banks[i].label || '').toString();
+        return res;
       }
-    }
-    if (!akunId) return res;
-    res.idAkun = akunId;
-    var sheet = _ensureAkunPembayaranSheet();
-    var data  = sheet.getDataRange().getValues();
-    for (var j = 1; j < data.length; j++) {
-      if ((data[j][0] || '').toString() === akunId) { res.namaAkun = (data[j][1] || '').toString(); break; }
     }
   } catch(e) {}
   return res;
 }
 
 // ── Saldo per akun (inti Cash Manager) ───────────────────────────────────────
-// Saldo tiap akun kas = Σ Pemasukan − Σ Pengeluaran (akun AP001/Stok dikecualikan
-// karena bukan kas riil, hanya realisasi HPP).
+// Akun kas = Bank Account (yang sama dengan yang dipakai di invoice).
+// Saldo tiap akun = Σ Pemasukan − Σ Pengeluaran. Akun Stok (AP001) untuk
+// penggunaan stok bukan kas riil, jadi otomatis tidak ikut (bukan bank account).
 
 function getSaldoAkun() {
   try {
     var ss = getSpreadsheet();
 
-    // Daftar akun (kecuali AP001/Stok)
-    var akunSheet = _ensureAkunPembayaranSheet(ss);
-    var akunData  = akunSheet.getDataRange().getValues();
+    // Daftar akun = Bank Accounts (data yang sama dengan invoice)
+    var raw   = PropertiesService.getScriptProperties().getProperty('BANK_ACCOUNTS');
+    var banks = raw ? JSON.parse(raw) : [];
     var akunOrder = [];
     var akunMap   = {};
-    for (var a = 1; a < akunData.length; a++) {
-      var aid = (akunData[a][0] || '').toString();
-      if (!aid || aid === 'AP001') continue;
+    for (var a = 0; a < banks.length; a++) {
+      var aid = (banks[a].id || '').toString();
+      if (!aid || akunMap[aid]) continue;
       akunMap[aid] = {
         id:     aid,
-        nama:   (akunData[a][1] || '').toString(),
-        tipe:   (akunData[a][2] || '').toString(),
-        status: (akunData[a][4] || '').toString(),
+        nama:   (banks[a].label || '').toString(),
+        tipe:   'Bank',
+        status: 'Aktif',
         masuk:  0,
         keluar: 0,
         saldo:  0
@@ -379,7 +373,7 @@ function getSaldoAkun() {
     for (var i = 1; i < pemData.length; i++) {
       if (!pemData[i][0]) continue;
       var pAkun = (pemData[i][4] || '').toString();
-      if (pAkun === 'AP001' || !akunMap[pAkun]) continue;
+      if (!akunMap[pAkun]) continue;
       akunMap[pAkun].masuk += parseFloat(pemData[i][9]) || 0;
     }
 
@@ -389,7 +383,7 @@ function getSaldoAkun() {
     for (var j = 1; j < engData.length; j++) {
       if (!engData[j][0]) continue;
       var eAkun = (engData[j][6] || '').toString();
-      if (eAkun === 'AP001' || !akunMap[eAkun]) continue;
+      if (!akunMap[eAkun]) continue;
       akunMap[eAkun].keluar += parseFloat(engData[j][12]) || 0;
     }
 

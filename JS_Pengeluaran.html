@@ -128,20 +128,19 @@ function _loadAkunOptionsExp(selId, selectedVal) {
       var isFilter = selId.startsWith('filter-');
       var placeholder = isFilter ? '<option value="">Semua Akun</option>' : '<option value="">-- Pilih Akun --</option>';
       sel.innerHTML = placeholder;
-      _expAkunList = (res && res.list ? res.list : []).filter(function(a) {
-        return a.status === 'Aktif' && a.id !== 'AP001';
-      });
+      // Akun = Bank Account (data yang sama dengan invoice)
+      _expAkunList = (res && res.accounts ? res.accounts : []);
       _expAkunList.forEach(function(a) {
         var opt = document.createElement('option');
         opt.value = a.id;
-        opt.dataset.nama = a.namaAkun;
-        opt.textContent = a.namaAkun + (a.tipe !== 'Bank' ? ' (' + a.tipe + ')' : '');
+        opt.dataset.nama = a.label;
+        opt.textContent = a.label;
         if (a.id === selectedVal) opt.selected = true;
         sel.appendChild(opt);
       });
     })
     .withFailureHandler(function() {})
-    .getAkunPembayaranList();
+    .getBankAccounts();
 }
 
 // ── Render table ───────────────────────────────────────────────

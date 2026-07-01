@@ -89,13 +89,14 @@ function _loadInAkunOptions() {
   if (typeof google === 'undefined') return;
   google.script.run
     .withSuccessHandler(function(res) {
-      var list = (res && res.success) ? (res.list || []) : [];
-      _inAkunList = list.filter(function(a) { return a.id !== 'AP001' && (a.status || 'Aktif') === 'Aktif'; });
+      // Akun = Bank Account (data yang sama dengan invoice)
+      var list = (res && res.accounts) ? res.accounts : [];
+      _inAkunList = list.map(function(b) { return { id: b.id, namaAkun: b.label }; });
       _fillInAkunSelect('filter-in-akun', '', true);
       _fillInAkunSelect('in-akun', '', false);
     })
     .withFailureHandler(function() {})
-    .getAkunPembayaranList();
+    .getBankAccounts();
 }
 
 function _fillInAkunSelect(selId, selectedVal, withAll) {
@@ -104,7 +105,7 @@ function _fillInAkunSelect(selId, selectedVal, withAll) {
   var opts = withAll ? '<option value="">Semua Akun</option>' : '<option value="">— Pilih Akun —</option>';
   _inAkunList.forEach(function(a) {
     var s = (a.id === selectedVal) ? ' selected' : '';
-    opts += '<option value="' + a.id + '" data-nama="' + _escIn(a.namaAkun) + '"' + s + '>' + _escIn(a.namaAkun) + ' (' + _escIn(a.tipe) + ')</option>';
+    opts += '<option value="' + a.id + '" data-nama="' + _escIn(a.namaAkun) + '"' + s + '>' + _escIn(a.namaAkun) + '</option>';
   });
   sel.innerHTML = opts;
   if (selectedVal) sel.value = selectedVal;
