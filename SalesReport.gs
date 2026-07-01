@@ -257,6 +257,9 @@ function getSalesReportData(params) {
       var noWO          = row[17] || '';
       var tanggalDeal   = parseTgl(row[18]);
       var catatanFail   = String(row[20] || '').trim();
+      var kodeWin       = String(row[22] || '').trim();
+      var catatanWin    = String(row[23] || '').trim();
+      var kodeLost      = String(row[24] || '').trim();
       // Fallback: data lama (sebelum fitur tanggalDeal) → gunakan tanggal penawaran
       var effectiveDealDate = tanggalDeal || tanggal;
 
@@ -293,6 +296,9 @@ function getSalesReportData(params) {
         status:       status,
         noWO:         noWO,
         catatanFail:  catatanFail,
+        kodeWin:      kodeWin,
+        catatanWin:   catatanWin,
+        kodeLost:     kodeLost,
         dealInPeriod: dealInRange && !creationInRange  // penawaran dibuat di luar periode tapi deal dalam periode
       };
 
