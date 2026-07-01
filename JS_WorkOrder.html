@@ -551,7 +551,7 @@
       el('wo-hpp-selisih-card').className = 'rounded-xl p-3 text-center border ' + (isOver ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100');
       el('wo-hpp-selisih-label').className = 'text-[10px] uppercase font-semibold mb-1 ' + (isOver ? 'text-rose-500' : 'text-emerald-600');
       el('wo-hpp-selisih-label').innerText = isOver ? 'Over Budget' : 'Hemat';
-      el('wo-hpp-selisih').className = 'text-sm font-extrabold ' + (isOver ? 'text-rose-600' : 'text-emerald-700');
+      el('wo-hpp-selisih').className = 'text-base font-extrabold ' + (isOver ? 'text-rose-600' : 'text-emerald-700');
       el('wo-hpp-selisih').innerText = (isOver ? '- ' : '') + rp(Math.abs(res.selisih || 0));
       el('wo-hpp-selisih-pct').className = 'text-[10px] mt-0.5 ' + (isOver ? 'text-rose-400' : 'text-emerald-500');
       el('wo-hpp-selisih-pct').innerText = (res.selisihPersen !== null && res.selisihPersen !== undefined)
@@ -564,7 +564,7 @@
       var isLower = (margReal !== null && margReal !== undefined && margEst !== null && margEst !== undefined && margReal < margEst);
       el('wo-hpp-marg-real-card').className = 'rounded-xl p-3 text-center border ' + (isLower ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100');
       el('wo-hpp-marg-real-label').className = 'text-[10px] uppercase font-semibold mb-1 ' + (isLower ? 'text-rose-500' : 'text-emerald-600');
-      el('wo-hpp-marg-real').className = 'text-sm font-extrabold ' + (isLower ? 'text-rose-600' : 'text-emerald-700');
+      el('wo-hpp-marg-real').className = 'text-base font-extrabold ' + (isLower ? 'text-rose-600' : 'text-emerald-700');
       el('wo-hpp-marg-real').innerText = (margReal !== null && margReal !== undefined) ? margReal.toFixed(1) + '%' : '—';
 
       // Breakdown per akun
