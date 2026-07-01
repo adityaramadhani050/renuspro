@@ -80,14 +80,23 @@
               </div>
 
               <!-- Info WO (otomatis dari penawaran) -->
-              <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div><span class="text-slate-400">Klien:</span> <span id="inv-info-klien" class="font-bold text-slate-700"></span></div>
-                <div><span class="text-slate-400">Project:</span> <span id="inv-info-project" class="font-bold text-slate-700"></span></div>
-                <div><span class="text-slate-400">Nilai Kontrak (DPP):</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
-                <div><span class="text-slate-400">PPN Penawaran:</span> <span id="inv-info-ppn" class="font-bold text-slate-700"></span></div>
-                <div><span class="text-slate-400">Sudah Ditagih:</span> <span id="inv-info-ditagih" class="font-bold text-amber-600"></span></div>
-                <div><span class="text-slate-400">Sisa Bisa Ditagih:</span> <span id="inv-info-sisa" class="font-extrabold text-emerald-600"></span></div>
+              <div id="inv-wo-info" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div><span class="text-slate-400">Klien:</span> <span id="inv-info-klien" class="font-bold text-slate-700"></span></div>
+                  <div><span class="text-slate-400">Project:</span> <span id="inv-info-project" class="font-bold text-slate-700"></span></div>
+                  <div><span class="text-slate-400">Nilai Kontrak (DPP):</span> <span id="inv-info-grand" class="font-bold text-slate-700"></span></div>
+                  <div><span class="text-slate-400">PPN Penawaran:</span> <span id="inv-info-ppn" class="font-bold text-slate-700"></span></div>
+                  <div><span class="text-slate-400">Sudah Ditagih:</span> <span id="inv-info-ditagih" class="font-bold text-amber-600"></span></div>
+                </div>
+                <div class="flex items-center justify-between bg-white border border-emerald-100 rounded-lg px-3 py-2">
+                  <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sisa Bisa Ditagih</span>
+                  <span id="inv-info-sisa" class="text-base font-extrabold text-emerald-600">—</span>
+                </div>
               </div>
+
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-4 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-invoice-dollar text-slate-300"></i> Detail Tagihan
+              </p>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -108,21 +117,31 @@
               <!-- Pengaturan nominal (DP/Termin): persentase & nominal linked -->
               <div id="inv-nominal-wrap" class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Atur Nominal Tagihan</label>
-                <div class="flex items-center gap-2">
-                  <div class="relative w-28">
-                    <input type="number" id="inv-persen" value="30" step="any" oninput="onInvoicePersenInput()"
-                      class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none">
-                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                <div class="flex items-end gap-2">
+                  <div class="w-28">
+                    <span class="block text-[10px] font-semibold text-slate-400 mb-1">Persen</span>
+                    <div class="relative">
+                      <input type="number" id="inv-persen" value="30" step="any" oninput="onInvoicePersenInput()"
+                        class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none">
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                    </div>
                   </div>
-                  <span class="text-xs text-slate-400 font-bold">/</span>
-                  <div class="relative flex-1">
-                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
-                    <input type="text" id="inv-nominal" oninput="onInvoiceNominalInput()"
-                      class="w-full pl-8 pr-2 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none" placeholder="0">
+                  <span class="text-xs text-slate-400 font-bold pb-2">/</span>
+                  <div class="flex-1">
+                    <span class="block text-[10px] font-semibold text-slate-400 mb-1">Nominal</span>
+                    <div class="relative">
+                      <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                      <input type="text" id="inv-nominal" oninput="onInvoiceNominalInput()"
+                        class="w-full pl-8 pr-2 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none" placeholder="0">
+                    </div>
                   </div>
                 </div>
                 <p class="text-[11px] text-slate-400 mt-1.5">Persentase dari nilai kontrak (DPP). Ubah salah satu, yang lain menyesuaikan.</p>
               </div>
+
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-4 flex items-center gap-1.5">
+                <i class="fa-solid fa-paperclip text-slate-300"></i> Referensi &amp; Catatan
+              </p>
 
               <!-- PO Pelanggan: toggle ada / tidak ada -->
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
@@ -165,21 +184,28 @@
                 </div>
               </div>
 
-              <!-- Ringkasan -->
-              <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm space-y-1">
-                <div class="flex justify-between"><span class="text-slate-500">DPP (Nilai Tagih)</span><span class="font-bold text-slate-700">Rp <span id="inv-dpp">0</span></span></div>
-                <div class="flex justify-between"><span class="text-slate-500">PPN <span id="inv-ppn-label"></span></span><span class="font-bold text-slate-700">Rp <span id="inv-ppn-nominal">0</span></span></div>
-                <div class="flex justify-between text-base border-t border-blue-200 pt-1 mt-1"><span class="font-extrabold text-slate-800">GRAND TOTAL</span><span class="font-extrabold text-blue-700">Rp <span id="inv-total">0</span></span></div>
-              </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row sm:justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
-              <button type="button" onclick="document.getElementById('modal-invoice').classList.add('hidden')"
-                class="w-full sm:w-auto px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
-              <button type="button" id="inv-submit-btn" onclick="submitInvoice()"
-                class="w-full sm:w-auto px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-floppy-disk"></i> Simpan Invoice
-              </button>
+            <!-- Footer: ringkasan selalu terlihat + aksi -->
+            <div class="sticky bottom-0 bg-white rounded-b-2xl border-t border-slate-100">
+              <div class="px-6 pt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <div class="flex items-center gap-4 text-xs text-slate-500">
+                  <span>DPP <b class="text-slate-700">Rp <span id="inv-dpp">0</span></b></span>
+                  <span>PPN <span id="inv-ppn-label"></span> <b class="text-slate-700">Rp <span id="inv-ppn-nominal">0</span></b></span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grand Total</span>
+                  <span class="text-lg font-extrabold text-blue-700">Rp <span id="inv-total">0</span></span>
+                </div>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:justify-end gap-3 px-6 pb-5 pt-3">
+                <button type="button" onclick="document.getElementById('modal-invoice').classList.add('hidden')"
+                  class="w-full sm:w-auto px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+                <button type="button" id="inv-submit-btn" onclick="submitInvoice()"
+                  class="w-full sm:w-auto px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Invoice
+                </button>
+              </div>
             </div>
 
           </div>
