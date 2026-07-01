@@ -279,12 +279,21 @@ function _renderBankList() {
   }
   container.innerHTML = '';
   _bankData.forEach(function(acc, idx) {
+    var akunNama = '';
+    if (acc.akunId) {
+      var found = (_akunPembayaranData || []).filter(function(a) { return a.id === acc.akunId; })[0];
+      akunNama = found ? found.namaAkun : '';
+    }
+    var akunTag = akunNama
+      ? '<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mt-1"><i class="fa-solid fa-link"></i> Kas: ' + _escHtml(akunNama) + '</span>'
+      : '<span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1"><i class="fa-solid fa-triangle-exclamation"></i> Belum dikaitkan ke akun kas</span>';
     var html = '<div class="flex items-start gap-3 p-3 border border-slate-200 rounded-xl">' +
       '<div class="bg-violet-50 text-violet-600 h-8 w-8 rounded-lg flex items-center justify-center shrink-0">' +
         '<i class="fa-solid fa-building-columns text-sm"></i></div>' +
       '<div class="flex-1 min-w-0">' +
         '<p class="text-sm font-bold text-slate-700">' + _escHtml(acc.label) + '</p>' +
         '<p class="text-xs text-slate-400 whitespace-pre-line mt-0.5">' + _escHtml(acc.detail) + '</p>' +
+        akunTag +
       '</div>' +
       '<div class="flex gap-1 shrink-0">' +
         '<button onclick="showEditBankModal(' + idx + ')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition">' +
@@ -297,11 +306,26 @@ function _renderBankList() {
   });
 }
 
+function _populateBankAkunDropdown(selectedVal) {
+  var sel = document.getElementById('bank-akun');
+  if (!sel) return;
+  var opts = '<option value="">— Tidak dikaitkan —</option>';
+  (_akunPembayaranData || []).forEach(function(akun) {
+    if (akun.id === 'AP001') return;                 // Stok bukan akun kas
+    if ((akun.status || 'Aktif') !== 'Aktif') return;
+    var selAttr = (akun.id === selectedVal) ? ' selected' : '';
+    opts += '<option value="' + akun.id + '"' + selAttr + '>' + _escHtml(akun.namaAkun) + ' (' + _escHtml(akun.tipe) + ')</option>';
+  });
+  sel.innerHTML = opts;
+  sel.value = selectedVal || '';
+}
+
 function showAddBankModal() {
   document.getElementById('bank-modal-title').textContent = 'Tambah Bank Account';
   document.getElementById('bank-edit-id').value = '';
   document.getElementById('bank-label').value  = '';
   document.getElementById('bank-detail').value = '';
+  _populateBankAkunDropdown('');
   document.getElementById('modal-bank').classList.remove('hidden');
   document.getElementById('bank-label').focus();
 }
@@ -313,6 +337,7 @@ function showEditBankModal(idx) {
   document.getElementById('bank-edit-id').value  = String(idx);
   document.getElementById('bank-label').value    = acc.label  || '';
   document.getElementById('bank-detail').value   = acc.detail || '';
+  _populateBankAkunDropdown(acc.akunId || '');
   document.getElementById('modal-bank').classList.remove('hidden');
   document.getElementById('bank-label').focus();
 }
@@ -325,11 +350,12 @@ function saveBankAccount() {
   var label  = (document.getElementById('bank-label').value  || '').trim();
   var detail = (document.getElementById('bank-detail').value || '').trim();
   if (!label || !detail) { showToast('Nama bank dan detail rekening wajib diisi.', 'error'); return; }
+  var akunId = (document.getElementById('bank-akun').value || '').trim();
   var editId = document.getElementById('bank-edit-id').value;
   if (editId !== '') {
-    _bankData[parseInt(editId)] = { id: _bankData[parseInt(editId)].id, label: label, detail: detail };
+    _bankData[parseInt(editId)] = { id: _bankData[parseInt(editId)].id, label: label, detail: detail, akunId: akunId };
   } else {
-    _bankData.push({ id: Date.now().toString(), label: label, detail: detail });
+    _bankData.push({ id: Date.now().toString(), label: label, detail: detail, akunId: akunId });
   }
   _persistBankAccounts();
 }
@@ -431,6 +457,7 @@ function _loadAkunPembayaranList() {
       if (!res || !res.success) return;
       _akunPembayaranData = res.list || [];
       _renderAkunPembayaranList();
+      if (_bankData && _bankData.length) _renderBankList();  // refresh tag "Kas terkait"
     })
     .withFailureHandler(function() {})
     .getAkunPembayaranList();
