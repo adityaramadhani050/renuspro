@@ -85,6 +85,9 @@ function _renderLaporanProfit(res) {
       html += '<i class="fa-solid fa-clipboard-check mr-1 text-[10px]"></i>' + _escLP(r.noWO);
       html += '</span>';
       html += '<div class="text-[10px] text-slate-400 mt-1">' + _escLP(r.tanggal) + '</div>';
+      if (overBudget) {
+        html += '<div class="mt-1"><span class="inline-flex items-center gap-1 text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded"><i class="fa-solid fa-triangle-exclamation"></i> Over Budget</span></div>';
+      }
       html += '</td>';
 
       // Kolom 2: Customer + Project + Sales
