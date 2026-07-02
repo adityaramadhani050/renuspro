@@ -722,11 +722,11 @@ function _dbRenderDetailAccordion(salesList) {
           + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
           + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
           + '<td class="px-3 py-2"><div class="flex items-center gap-1.5">' + _statusBadge(p.status)
-          + (p.status === 'Fail' && (p.catatanFail || p.kodeLost)
-              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Lost: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanFail || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Catatan Fail"><i class="fa-solid fa-circle-info text-xs"></i></button>'
+          + (p.status === 'Fail' && p.kodeLost
+              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Analisa Lost"><i class="fa-solid fa-circle-info text-xs"></i></button>'
               : '')
-          + (p.status === 'Deal' && (p.kodeWin || p.catatanWin)
-              ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Kode Win: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\n' + _esc(p.catatanWin || 'Tidak ada catatan.').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Kode Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
+          + (p.status === 'Deal' && p.kodeWin
+              ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Analisa Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
               : '')
           + '</div></td>'
           + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
@@ -817,9 +817,9 @@ window.exportDashboardPDF = function() {
     var _winLbl = {}, _lostLbl = {};
     (typeof KODE_WIN_LIST  !== 'undefined' ? KODE_WIN_LIST  : []).forEach(function(k){ _winLbl[k.kode]  = k.label; });
     (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []).forEach(function(k){ _lostLbl[k.kode] = k.label; });
-    var _cycleDays = function(p) {
+    var _cycleDays = function(p, isWin) {
       var parse = function(d){ if(!d) return null; var x=d.toString().split('/'); if(x.length!==3) return null; var dt=new Date(+x[2],+x[1]-1,+x[0]); return isNaN(dt)?null:dt; };
-      var a = parse(p.tanggal), b = parse(p.tanggalDeal);
+      var a = parse(p.tanggal), b = parse(isWin ? p.tanggalDeal : p.tanggalFail);
       if (!a || !b) return '-';
       var days = Math.round((b - a) / 86400000);
       return (days >= 0 ? days : 0) + ' hari';
@@ -830,16 +830,15 @@ window.exportDashboardPDF = function() {
       doc.text(title, ML+3, y); y += 2.5;
       doc.autoTable({
         startY: y, margin: { left:ML, right:MR },
-        head: [['No','Project','Nilai','Sales Cycle', isWin?'Root Cause Win':'Root Cause Lost','Catatan']],
+        head: [['No','Project','Nilai','Sales Cycle', isWin?'Root Cause Win':'Root Cause Lost','Lesson Learned','Action']],
         body: rows.map(function(p, i) {
-          var rc  = isWin ? (_winLbl[p.kodeWin]||p.kodeWin||'-') : (_lostLbl[p.kodeLost]||p.kodeLost||'-');
-          var cat = isWin ? (p.catatanWin||'-') : (p.catatanFail||'-');
-          return [i+1, p.namaProject||'-', rp(p.nilaiKontrak!==undefined?p.nilaiKontrak:p.grandTotal), _cycleDays(p), rc, cat];
+          var rc = isWin ? (_winLbl[p.kodeWin]||p.kodeWin||'-') : (_lostLbl[p.kodeLost]||p.kodeLost||'-');
+          return [i+1, p.namaProject||'-', rp(p.nilaiKontrak!==undefined?p.nilaiKontrak:p.grandTotal), _cycleDays(p, isWin), rc, p.lessonLearned||'-', p.action||'-'];
         }),
         theme:'grid',
         headStyles: { fillColor: isWin?GREEN:RED, textColor:WHITE, fontStyle:'bold', fontSize:6.5, halign:'center' },
         bodyStyles: { fontSize:6.5, textColor:DARK, valign:'top' },
-        columnStyles: { 0:{halign:'center',cellWidth:8}, 1:{cellWidth:34,fontStyle:'bold'}, 2:{halign:'right',cellWidth:24}, 3:{halign:'center',cellWidth:18}, 4:{cellWidth:30}, 5:{cellWidth:'auto'} },
+        columnStyles: { 0:{halign:'center',cellWidth:7}, 1:{cellWidth:24,fontStyle:'bold'}, 2:{halign:'right',cellWidth:22}, 3:{halign:'center',cellWidth:14}, 4:{cellWidth:24}, 5:{cellWidth:'auto'}, 6:{cellWidth:'auto'} },
         alternateRowStyles: { fillColor:[248,250,252] }
       });
       y = doc.lastAutoTable.finalY + 5;
@@ -957,7 +956,7 @@ window.exportDashboardPDF = function() {
 
       // Analisa Win & Lost per sales
       var winRows  = sales.penawaran.filter(function(p){ return p.status==='Deal' && p.kodeWin; });
-      var lostRows = sales.penawaran.filter(function(p){ return p.status==='Fail' && (p.kodeLost || p.catatanFail); });
+      var lostRows = sales.penawaran.filter(function(p){ return p.status==='Fail' && p.kodeLost; });
       if (winRows.length)  _analisaTable('ANALISA WIN — ' + sales.nama,  winRows,  true);
       if (lostRows.length) _analisaTable('ANALISA LOST — ' + sales.nama, lostRows, false);
     });

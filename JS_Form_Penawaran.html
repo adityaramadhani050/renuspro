@@ -883,9 +883,9 @@
         _catatanFailCtx = { noPenawaran, rev, selectEl, prevStatus };
         _populateKodeWinLostSelects();
         const sub = document.getElementById('catatan-fail-subtitle');
-        if (sub) sub.textContent = `Masukkan catatan alasan penawaran ${noPenawaran} ini fail.`;
-        const ta = document.getElementById('input-catatan-fail');
-        if (ta) ta.value = '';
+        if (sub) sub.textContent = `Masukkan analisa penawaran ${noPenawaran} ini gagal.`;
+        var lf = document.getElementById('input-lesson-fail'); if (lf) lf.value = '';
+        var af = document.getElementById('input-action-fail'); if (af) af.value = '';
         const selLost = document.getElementById('select-kode-lost');
         if (selLost) selLost.value = '';
         const modal = document.getElementById('modal-catatan-fail');
@@ -900,8 +900,8 @@
         if (sub) sub.textContent = `Pilih faktor kemenangan penawaran ${noPenawaran}.`;
         const selWin = document.getElementById('select-kode-win');
         if (selWin) selWin.value = '';
-        const ta = document.getElementById('input-catatan-win');
-        if (ta) ta.value = '';
+        var lw = document.getElementById('input-lesson-win'); if (lw) lw.value = '';
+        var aw = document.getElementById('input-action-win'); if (aw) aw.value = '';
         const modal = document.getElementById('modal-kode-win');
         if (modal) modal.classList.remove('hidden');
         return;
@@ -919,8 +919,8 @@
       if (sub) sub.textContent = (item.kodeWin ? 'Ubah' : 'Pilih') + ' faktor kemenangan penawaran ' + item.id + '.';
       var selWin = document.getElementById('select-kode-win');
       if (selWin) selWin.value = item.kodeWin || '';
-      var ta = document.getElementById('input-catatan-win');
-      if (ta) ta.value = item.catatanWin || '';
+      var law = document.getElementById('input-lesson-win'); if (law) law.value = item.lessonLearned || '';
+      var aaw = document.getElementById('input-action-win'); if (aaw) aaw.value = item.action || '';
       var modal = document.getElementById('modal-kode-win');
       if (modal) modal.classList.remove('hidden');
     };
@@ -929,11 +929,11 @@
       _catatanFailCtx = { noPenawaran: item.id, rev: String(item.rev), selectEl: null, prevStatus: 'Fail' };
       _populateKodeWinLostSelects();
       var sub = document.getElementById('catatan-fail-subtitle');
-      if (sub) sub.textContent = (item.kodeLost ? 'Ubah' : 'Masukkan') + ' catatan alasan penawaran ' + item.id + ' ini fail.';
+      if (sub) sub.textContent = (item.kodeLost ? 'Ubah' : 'Masukkan') + ' analisa penawaran ' + item.id + ' ini gagal.';
       var selLost = document.getElementById('select-kode-lost');
       if (selLost) selLost.value = item.kodeLost || '';
-      var ta = document.getElementById('input-catatan-fail');
-      if (ta) ta.value = item.catatanFail || '';
+      var laf = document.getElementById('input-lesson-fail'); if (laf) laf.value = item.lessonLearned || '';
+      var aaf = document.getElementById('input-action-fail'); if (aaf) aaf.value = item.action || '';
       var modal = document.getElementById('modal-catatan-fail');
       if (modal) modal.classList.remove('hidden');
     };
@@ -982,16 +982,16 @@
         showNotification('Pilih kode lost terlebih dahulu.', 'error');
         return;
       }
-      const ta = document.getElementById('input-catatan-fail');
-      const catatanFail = ta ? ta.value.trim() : '';
-      if (!catatanFail) {
-        showNotification('Catatan wajib diisi.', 'error');
-        return;
-      }
+      var lf = document.getElementById('input-lesson-fail');
+      var af = document.getElementById('input-action-fail');
+      const lessonLearned = lf ? lf.value.trim() : '';
+      const action        = af ? af.value.trim() : '';
+      if (!lessonLearned) { showNotification('Lesson Learned wajib diisi.', 'error'); return; }
+      if (!action)        { showNotification('Action wajib diisi.', 'error'); return; }
       const { noPenawaran, rev, selectEl } = _catatanFailCtx;
       const modal = document.getElementById('modal-catatan-fail');
       if (modal) modal.classList.add('hidden');
-      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Fail', catatanFail, { kodeLost });
+      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Fail', '', { kodeLost: kodeLost, lessonLearned: lessonLearned, action: action });
       _catatanFailCtx = null;
     }
 
@@ -1012,16 +1012,16 @@
         showNotification('Pilih kode win terlebih dahulu.', 'error');
         return;
       }
-      const ta = document.getElementById('input-catatan-win');
-      const catatanWin = ta ? ta.value.trim() : '';
-      if (!catatanWin) {
-        showNotification('Catatan wajib diisi.', 'error');
-        return;
-      }
+      var lw = document.getElementById('input-lesson-win');
+      var aw = document.getElementById('input-action-win');
+      const lessonLearned = lw ? lw.value.trim() : '';
+      const action        = aw ? aw.value.trim() : '';
+      if (!lessonLearned) { showNotification('Lesson Learned wajib diisi.', 'error'); return; }
+      if (!action)        { showNotification('Action wajib diisi.', 'error'); return; }
       const { noPenawaran, rev, selectEl } = _kodeWinCtx;
       const modal = document.getElementById('modal-kode-win');
       if (modal) modal.classList.add('hidden');
-      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Deal', '', { kodeWin, catatanWin });
+      _terapkanStatusPenawaran(noPenawaran, rev, selectEl, 'Deal', '', { kodeWin: kodeWin, lessonLearned: lessonLearned, action: action });
       _kodeWinCtx = null;
     }
 

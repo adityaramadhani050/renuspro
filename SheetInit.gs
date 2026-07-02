@@ -51,7 +51,8 @@ function buatSheetPenawaranDefault(ss) {
     'Klien ID', 'Dibuat Oleh', 'Subtotal', 'Diskon', 'Pajak (PPN)', 'Grand Total',
     'Total HPP', 'Estimasi Keuntungan', 'Margin Profit (%)', 'Syarat Ketentuan (JSON)',
     'Rincian Item (JSON)', 'Status', 'No WO', 'Tanggal Deal', 'Channel Marketing',
-    'Catatan Fail', 'Reminder Expired Terkirim', 'Kode Win', 'Catatan Win', 'Kode Lost'
+    'Catatan Fail', 'Reminder Expired Terkirim', 'Kode Win', 'Catatan Win', 'Kode Lost',
+    'Tanggal Fail', 'Lesson Learned', 'Action'
   ]);
   return sheet;
 }

@@ -83,7 +83,10 @@ function getPenawaranList() {
           catatanFail:       data[i][20] ? data[i][20].toString() : '',
           kodeWin:           data[i][22] ? data[i][22].toString() : '',
           catatanWin:        data[i][23] ? data[i][23].toString() : '',
-          kodeLost:          data[i][24] ? data[i][24].toString() : ''
+          kodeLost:          data[i][24] ? data[i][24].toString() : '',
+          tanggalFail:       data[i][25] instanceof Date ? Utilities.formatDate(data[i][25], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][25] ? data[i][25].toString() : ''),
+          lessonLearned:     data[i][26] ? data[i][26].toString() : '',
+          action:            data[i][27] ? data[i][27].toString() : ''
         };
       }
     }
@@ -334,6 +337,15 @@ function simpanPenawaranKeSheet(payload) {
     try { lock.releaseLock(); } catch(e) {}
   }
 }
+// Kolom tambahan (0-idx): 25 Tanggal Fail, 26 Lesson Learned, 27 Action
+function _ensurePenawaranExtraCols(sheet) {
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols < 28) sheet.insertColumnsAfter(maxCols, 28 - maxCols);
+  if (!sheet.getRange(1, 26).getValue()) sheet.getRange(1, 26).setValue('Tanggal Fail');
+  if (!sheet.getRange(1, 27).getValue()) sheet.getRange(1, 27).setValue('Lesson Learned');
+  if (!sheet.getRange(1, 28).getValue()) sheet.getRange(1, 28).setValue('Action');
+}
+
 function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra) {
   extra = extra || {};
   const lock = LockService.getScriptLock();
@@ -344,15 +356,22 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra)
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() === noPenawaran && data[i][1].toString() === rev) {
+        _ensurePenawaranExtraCols(sheet);
+        const isWinLoss = (statusBaru === 'Deal' || statusBaru === 'Fail');
+
         sheet.getRange(i + 1, 17).setValue(statusBaru); // Kolom 17 = Status
 
-        // Kolom 21 = Catatan Fail, Kolom 25 = Kode Lost (hanya diisi saat status Fail)
-        sheet.getRange(i + 1, 21).setValue(statusBaru === 'Fail' ? (catatanFail || '') : '');
+        // Kode Lost (kol 25) hanya saat Fail; Kode Win (kol 23) hanya saat Deal
         sheet.getRange(i + 1, 25).setValue(statusBaru === 'Fail' ? (extra.kodeLost || '') : '');
-
-        // Kolom 23 = Kode Win, Kolom 24 = Catatan Win (hanya diisi saat status Deal)
         sheet.getRange(i + 1, 23).setValue(statusBaru === 'Deal' ? (extra.kodeWin || '') : '');
-        sheet.getRange(i + 1, 24).setValue(statusBaru === 'Deal' ? (extra.catatanWin || '') : '');
+
+        // Lesson Learned (kol 27) & Action (kol 28) untuk Deal/Fail
+        sheet.getRange(i + 1, 27).setValue(isWinLoss ? (extra.lessonLearned || '') : '');
+        sheet.getRange(i + 1, 28).setValue(isWinLoss ? (extra.action || '') : '');
+
+        // Catatan lama (kol 21 Catatan Fail / kol 24 Catatan Win) tidak dipakai lagi
+        sheet.getRange(i + 1, 21).setValue('');
+        sheet.getRange(i + 1, 24).setValue('');
 
         // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
@@ -376,6 +395,13 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra)
             noWO = '';
           }
           sheet.getRange(i + 1, 19).setValue('');
+        }
+
+        // ── Tanggal Fail (Kolom 26) — mirror Tanggal Deal ──
+        if (statusBaru === 'Fail') {
+          if (!data[i][25]) sheet.getRange(i + 1, 26).setValue(new Date());
+        } else {
+          sheet.getRange(i + 1, 26).setValue('');
         }
 
         SpreadsheetApp.flush();
