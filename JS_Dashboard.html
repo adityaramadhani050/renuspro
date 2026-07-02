@@ -770,12 +770,14 @@ function _dbDetailTableRows(s) {
 
 // Konten detail (KPI grid + tabel) — dipakai oleh accordion & tampilan flat.
 function _dbDetailInner(s) {
-  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 p-4 bg-slate-50">'
+  var avgNilaiDeal = (s.dealCount > 0) ? (s.dealRevenue / s.dealCount) : 0;
+  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50">'
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
     + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Nilai Penawaran', _rpShort(s.avgNilaiPenawaran || 0), 'text-blue-600 text-sm leading-tight')
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
     + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
+    + _dbMiniKPI('Avg Nilai Deal', _rpShort(avgNilaiDeal), 'text-emerald-600 text-sm leading-tight')
     + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
     + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
