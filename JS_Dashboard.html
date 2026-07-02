@@ -279,8 +279,14 @@ function _dbRenderAll(rawData, salesData) {
   var ms = params ? _dbPeriodToMs(params) : { fromMs: null, toMs: null };
   var prev = (ms.fromMs && ms.toMs) ? _dbPrevKPI(items, ms.fromMs, ms.toMs) : { prevRevenue: 0, prevDeals: 0 };
 
+  // Target tahunan: admin/leadsales pakai target perusahaan; sales pakai
+  // target bulanannya sendiri × 12 (disesuaikan dgn target sales tsb).
+  var annualTarget = (isAdmin || isLeadSales)
+    ? DB_TARGET_TAHUNAN
+    : ((summary.teamTarget || 0) * 12);
+
   _dbRenderKPIs(summary, prev, salesList);
-  _dbRenderTargetBar(summary, items);
+  _dbRenderTargetBar(summary, items, annualTarget);
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
   _dbRenderDonut(items, ms.fromMs, ms.toMs);
@@ -290,7 +296,7 @@ function _dbRenderAll(rawData, salesData) {
     _dbRenderDetailAccordion(salesList);
     _dbRenderWinLossFactors(salesList);
   }
-  _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null, DB_TARGET_TAHUNAN, _dbYtdRevenue(items));
+  _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null, annualTarget, _dbYtdRevenue(items));
 
   document.getElementById('db-loading').classList.add('hidden');
   document.getElementById('db-main-content').classList.remove('hidden');
@@ -364,7 +370,7 @@ function _dbYtdRevenue(items) {
   return rev;
 }
 
-function _dbRenderTargetBar(summary, items) {
+function _dbRenderTargetBar(summary, items, annualTarget) {
   var rev    = summary.teamRevenue || 0;
   var target = summary.teamTarget  || 0;
   var pct    = target > 0 ? Math.min((rev / target) * 100, 100) : 0;
@@ -377,9 +383,9 @@ function _dbRenderTargetBar(summary, items) {
   var txt = document.getElementById('db-target-text');
   if (txt) txt.textContent = _rp(rev) + ' / ' + _rp(target);
 
-  // YTD revenue vs target tahunan
+  // YTD revenue vs target tahunan (default target perusahaan jika tak diberi)
   var ytdRev = _dbYtdRevenue(items);
-  var targetTahunan = DB_TARGET_TAHUNAN;
+  var targetTahunan = (annualTarget != null && annualTarget > 0) ? annualTarget : DB_TARGET_TAHUNAN;
   var ytdPct    = targetTahunan > 0 ? (ytdRev / targetTahunan * 100) : 0;
   var ytdBarPct = Math.min(ytdPct, 100);
 
