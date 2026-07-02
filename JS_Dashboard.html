@@ -384,6 +384,8 @@ function _dbRenderKonversi(summary) {
   if (avgEl) avgEl.textContent = avgDeal > 0 ? _rp(avgDeal) : '—';
   var avgMarginEl = document.getElementById('db-stat-avgmargin');
   if (avgMarginEl) avgMarginEl.textContent = dealCount > 0 ? _pct(summary.teamAvgMarginDeal) : '—';
+  var avgCycleEl = document.getElementById('db-stat-avgcycle');
+  if (avgCycleEl) avgCycleEl.textContent = (summary.teamAvgSalesCycle != null) ? (Math.round(summary.teamAvgSalesCycle) + ' hari') : '—';
   var pipEl = document.getElementById('db-stat-pipeline-count');
   if (pipEl) pipEl.textContent = pipeline;
   var pctEl = document.getElementById('db-stat-winrate-pct');
@@ -730,11 +732,12 @@ function _dbRenderDetailAccordion(salesList) {
               ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Analisa Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
               : '')
           + '</div></td>'
-          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.tanggalDeal || '—') + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.status === 'Deal' ? (p.tanggalDeal || '—') : (p.status === 'Fail' ? (p.tanggalFail || '—') : '—')) + '</td>'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap text-center">' + (p.salesCycleDays != null ? (p.salesCycleDays + ' hari') : '—') + '</td>'
           + '</tr>';
       }).join('');
     } else {
-      tableRows = '<tr><td colspan="7" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
+      tableRows = '<tr><td colspan="8" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
     }
 
     return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
@@ -752,7 +755,7 @@ function _dbRenderDetailAccordion(salesList) {
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
       + '</div></button>'
       + '<div id="' + detailId + '" class="hidden border-t border-slate-100">'
-      + '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 p-4 bg-slate-50">'
+      + '<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 p-4 bg-slate-50">'
       + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
       + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
       + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
@@ -760,6 +763,7 @@ function _dbRenderDetailAccordion(salesList) {
       + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
       + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
       + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
+      + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
       + '</div>'
       + '<div class="overflow-x-auto">'
       + '<table class="w-full text-left border-collapse">'
@@ -770,7 +774,8 @@ function _dbRenderDetailAccordion(salesList) {
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>'
       + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal/Fail</th>'
+      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Sales Cycle</th>'
       + '</tr></thead>'
       + '<tbody class="divide-y divide-slate-50">' + tableRows + '</tbody>'
       + '</table></div></div></div>';

@@ -62,6 +62,22 @@ function inRange(dt, from, to) {
   return d >= from && d <= to;
 }
 
+/**
+ * Sales cycle (hari) untuk 1 penawaran: dari tanggal penawaran awal dibuat
+ * sampai tanggal deal (jika Deal) atau tanggal fail (jika Fail).
+ * pObj punya field string dd/MM/yyyy: tanggal, tanggalDeal, tanggalFail.
+ * @returns {number|null} jumlah hari (>=0) atau null jika tidak dapat dihitung.
+ */
+function hitungSalesCycle(pObj) {
+  var start = parseTgl(pObj.tanggal);
+  var end = null;
+  if (pObj.status === 'Deal')      end = parseTgl(pObj.tanggalDeal);
+  else if (pObj.status === 'Fail') end = parseTgl(pObj.tanggalFail);
+  if (!start || !end) return null;
+  var days = Math.round((dateOnly(end).getTime() - dateOnly(start).getTime()) / 86400000);
+  return days >= 0 ? days : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Trend helper — last N months labels in Bahasa Indonesia
 // ---------------------------------------------------------------------------
@@ -343,6 +359,7 @@ function getSalesReportData(params) {
 
     // --- Step 3: Finalize each sales entry ---
     var salesList = [];
+    var teamCycleSum = 0, teamCycleCount = 0; // untuk avg sales cycle seluruh sales
     for (var sName in salesData) {
       var sd = salesData[sName];
 
@@ -370,6 +387,17 @@ function getSalesReportData(params) {
         return b.grandTotal - a.grandTotal;
       });
 
+      // Sales cycle per penawaran (Deal/Fail) + rata-rata per sales
+      var cycleSum = 0, cycleCount = 0;
+      for (var pci = 0; pci < penawaranArr.length; pci++) {
+        var cyc = hitungSalesCycle(penawaranArr[pci]);
+        penawaranArr[pci].salesCycleDays = cyc;
+        if (cyc !== null) { cycleSum += cyc; cycleCount++; }
+      }
+      sd.avgSalesCycle = cycleCount > 0 ? (cycleSum / cycleCount) : null;
+      teamCycleSum += cycleSum;
+      teamCycleCount += cycleCount;
+
       salesList.push({
         nama:                sd.nama,
         targetBulanan:       sd.targetBulanan,
@@ -384,6 +412,7 @@ function getSalesReportData(params) {
         dealCohort:          sd.dealCohort,
         winRate:             sd.winRate,
         avgMarginDeal:       sd.avgMarginDeal,
+        avgSalesCycle:       sd.avgSalesCycle,
         achievement:         sd.achievement,
         penawaran:           penawaranArr
       });
@@ -422,6 +451,10 @@ function getSalesReportData(params) {
     var teamAvgMarginDeal = teamRevenue > 0
       ? ((teamRevenue - teamHppDeal) / teamRevenue) * 100
       : 0;
+
+    var teamAvgSalesCycle = teamCycleCount > 0
+      ? (teamCycleSum / teamCycleCount)
+      : null;
 
     // teamTarget = sum of targets sesuai scope
     if (isAdmin) {
@@ -517,7 +550,8 @@ function getSalesReportData(params) {
         teamWinRate:       teamWinRate,
         teamPipelineValue: teamPipelineValue,
         teamPipelineCount: teamPipelineCount,
-        teamAvgMarginDeal: teamAvgMarginDeal
+        teamAvgMarginDeal: teamAvgMarginDeal,
+        teamAvgSalesCycle: teamAvgSalesCycle
       },
       trend:        trend,
       salesList:    salesList,
