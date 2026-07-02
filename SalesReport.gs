@@ -230,6 +230,7 @@ function getSalesReportData(params) {
           pipelineCount: 0,
           pipelineValue: 0,
           failCount: 0,
+          dealCohort: 0,   // penawaran DIBUAT periode ini yang berstatus Deal (untuk win rate)
           // penawaran IDs to collect (deduplication via set)
           _penawaranInRange: {}    // key: noPenawaran, val: penawaran object (filtered by creation date)
         };
@@ -313,6 +314,7 @@ function getSalesReportData(params) {
         sd.totalPenawaran++;
         sd.totalNilaiPenawaran += nilaiKontrak;
         if (status === 'Fail') sd.failCount++;
+        if (status === 'Deal') sd.dealCohort++;   // deal dari kohort periode ini
       }
 
       // Masuk daftar penawaran:
@@ -344,8 +346,13 @@ function getSalesReportData(params) {
     for (var sName in salesData) {
       var sd = salesData[sName];
 
-      // winRate = Deal / Total Penawaran (konsisten dengan dashboard)
-      sd.winRate = sd.totalPenawaran > 0 ? (sd.dealCount / sd.totalPenawaran) * 100 : 0;
+      // winRate = deal DARI KOHORT periode ini / total penawaran dibuat periode ini.
+      // Hindari inflasi: penawaran bulan lalu yang deal bulan ini TIDAK dihitung
+      // (bukan bagian kohort periode ini), sehingga WR tidak bisa >100%.
+      sd.winRate = sd.totalPenawaran > 0 ? (sd.dealCohort / sd.totalPenawaran) * 100 : 0;
+
+      // Rata-rata margin deal (value-weighted, konsisten dgn tim)
+      sd.avgMarginDeal = sd.dealRevenue > 0 ? ((sd.dealRevenue - sd.dealHpp) / sd.dealRevenue) * 100 : null;
 
       // achievement
       sd.achievement = sd.targetBulanan > 0 ? (sd.dealRevenue / sd.targetBulanan) * 100 : null;
@@ -374,7 +381,9 @@ function getSalesReportData(params) {
         pipelineCount:       sd.pipelineCount,
         pipelineValue:       sd.pipelineValue,
         failCount:           sd.failCount,
+        dealCohort:          sd.dealCohort,
         winRate:             sd.winRate,
+        avgMarginDeal:       sd.avgMarginDeal,
         achievement:         sd.achievement,
         penawaran:           penawaranArr
       });
@@ -393,6 +402,7 @@ function getSalesReportData(params) {
     var teamTarget       = 0;
     var teamPenawaran    = 0;
     var teamDealCount    = 0;
+    var teamDealCohort   = 0;
     var teamFailCount    = 0;
     var teamPipelineValue = 0;
     var teamPipelineCount = 0;
@@ -403,6 +413,7 @@ function getSalesReportData(params) {
       teamHppDeal         += s.dealHpp;
       teamPenawaran      += s.totalPenawaran;
       teamDealCount      += s.dealCount;
+      teamDealCohort     += (s.dealCohort || 0);
       teamFailCount      += s.failCount;
       teamPipelineValue  += s.pipelineValue;
       teamPipelineCount  += s.pipelineCount;
@@ -429,7 +440,7 @@ function getSalesReportData(params) {
     }
 
     var teamWinRate = teamPenawaran > 0
-      ? (teamDealCount / teamPenawaran) * 100
+      ? (teamDealCohort / teamPenawaran) * 100
       : 0;
 
     // --- Step 5: 3-month trend (team, by tanggalDeal) ---
