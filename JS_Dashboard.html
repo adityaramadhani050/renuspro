@@ -321,17 +321,29 @@ function _dbRenderAll(rawData, salesData) {
 }
 
 // ── KPI Cards ──────────────────────────────────────────────────
-// Hitung jumlah deal (by tanggalDeal) pada bulan kalender tertentu.
-function _dbDealCountInMonth(items, year, month) {
-  var fromMs = new Date(year, month, 1).getTime();
-  var toMs   = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
-  var n = 0;
-  (items || []).forEach(function(item) {
-    if (item.status !== 'Deal') return;
-    var ts = item.tanggalDeal || item.tanggal;
-    if (ts && ts >= fromMs && ts <= toMs) n++;
+// Deal BULAN INI dipecah berdasarkan bulan pembuatan penawarannya:
+// - fromThis: penawaran dibuat bulan ini yang deal bulan ini (kohort)
+// - fromLast: penawaran dibuat bulan lalu yang deal bulan ini
+function _dbDealCohortSplit(items) {
+  var now = new Date();
+  var curFrom  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  var curTo    = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+  var pm = now.getMonth() - 1, py = now.getFullYear();
+  if (pm < 0) { pm = 11; py--; }
+  var lastFrom = new Date(py, pm, 1).getTime();
+  var lastTo   = new Date(py, pm + 1, 0, 23, 59, 59, 999).getTime();
+
+  var fromThis = 0, fromLast = 0;
+  (items || []).forEach(function(it) {
+    if (it.status !== 'Deal') return;
+    var d = it.tanggalDeal || it.tanggal;          // tanggal deal
+    if (!d || d < curFrom || d > curTo) return;    // harus deal bulan ini
+    var c = it.tanggal;                             // tanggal penawaran dibuat
+    if (c == null) return;
+    if (c >= curFrom && c <= curTo) fromThis++;
+    else if (c >= lastFrom && c <= lastTo) fromLast++;
   });
-  return n;
+  return { fromThis: fromThis, fromLast: fromLast };
 }
 
 function _dbRenderKPIs(summary, prev, salesList, items) {
@@ -367,19 +379,14 @@ function _dbRenderKPIs(summary, prev, salesList, items) {
     dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
       (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
   }
-  // Win rate berbasis kohort (dari backend) — hindari inflasi deal bulan lalu
+  // Win rate berbasis kohort (dari backend) — hindari inflasi deal bulan lalu.
+  // Satu baris: win rate + rincian deal bulan ini menurut bulan pembuatan
+  // penawarannya (dari penawaran bulan ini vs bulan lalu).
   var winRateCalc = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
+  var split = _dbDealCohortSplit(items);
   var dealSub = document.getElementById('db-kpi-deal-sub');
-  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc);
-
-  // Jumlah deal bulan ini vs bulan lalu (by tanggal deal, per bulan kalender)
-  var _now = new Date();
-  var dealThisMonth = _dbDealCountInMonth(items, _now.getFullYear(), _now.getMonth());
-  var _prevM = _now.getMonth() - 1, _prevY = _now.getFullYear();
-  if (_prevM < 0) { _prevM = 11; _prevY--; }
-  var dealLastMonth = _dbDealCountInMonth(items, _prevY, _prevM);
-  var dealSub2 = document.getElementById('db-kpi-deal-sub2');
-  if (dealSub2) dealSub2.textContent = 'Bulan ini: ' + dealThisMonth + ' · Bulan lalu: ' + dealLastMonth;
+  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc)
+    + ' · Deal dari penawaran bln ini: ' + split.fromThis + ', bln lalu: ' + split.fromLast;
 
   // Pipeline
   var pipEl = document.getElementById('db-kpi-pipeline');
