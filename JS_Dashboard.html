@@ -279,11 +279,19 @@ function _dbRenderAll(rawData, salesData) {
   var ms = params ? _dbPeriodToMs(params) : { fromMs: null, toMs: null };
   var prev = (ms.fromMs && ms.toMs) ? _dbPrevKPI(items, ms.fromMs, ms.toMs) : { prevRevenue: 0, prevDeals: 0 };
 
-  // Target tahunan: admin/leadsales pakai target perusahaan; sales pakai
-  // target bulanannya sendiri × 12 (disesuaikan dgn target sales tsb).
-  var annualTarget = (isAdmin || isLeadSales)
-    ? DB_TARGET_TAHUNAN
-    : ((summary.teamTarget || 0) * 12);
+  // Target tahunan:
+  // - admin      → target perusahaan penuh (Rp 25 M)
+  // - lead sales → target perusahaan ÷ jumlah lead sales aktif
+  // - sales      → target bulanannya sendiri × 12
+  var annualTarget;
+  if (isAdmin) {
+    annualTarget = DB_TARGET_TAHUNAN;
+  } else if (isLeadSales) {
+    var _lsCount = (summary.leadSalesCount && summary.leadSalesCount > 0) ? summary.leadSalesCount : 1;
+    annualTarget = DB_TARGET_TAHUNAN / _lsCount;
+  } else {
+    annualTarget = (summary.teamTarget || 0) * 12;
+  }
 
   _dbRenderKPIs(summary, prev, salesList);
   _dbRenderTargetBar(summary, items, annualTarget);

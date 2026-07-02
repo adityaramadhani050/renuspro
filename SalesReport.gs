@@ -169,20 +169,24 @@ function getSalesReportData(params) {
     var userMap = {}; // key: nama (col 1)
     var allSalesNames = []; // all active sales user names
     var teamNames = null; // null = semua, array = filter ke anggota tim (leadsales)
+    var leadSalesCount = 0; // jumlah lead sales aktif (untuk bagi target tahunan)
     try {
       var userData = _cachedUser();
       if (userData && userData.length > 0) {
         for (var ui = 1; ui < userData.length; ui++) {
           var urow = userData[ui];
           var uNama = urow[1] || '';
+          var uRole = String(urow[4] || '').trim().toLowerCase();
           var uAktif = urow[5];
           var uTarget = parseFloat(urow[6]) || 0;
+          var uIsAktif = (uAktif === true || uAktif === 'TRUE' || uAktif === 'Ya' || uAktif === 1);
           if (uNama) {
             userMap[uNama] = { targetBulanan: uTarget };
-            if (uAktif === true || uAktif === 'TRUE' || uAktif === 'Ya' || uAktif === 1) {
+            if (uIsAktif) {
               allSalesNames.push(uNama);
             }
           }
+          if (uRole === 'leadsales' && uIsAktif) leadSalesCount++;
           // Kumpulkan anggota tim untuk leadsales
           if (params.role === 'leadsales' && params.userId) {
             var uLeadId = urow[7] ? urow[7].toString().trim() : '';
@@ -636,7 +640,8 @@ function getSalesReportData(params) {
         teamPipelineValue: teamPipelineValue,
         teamPipelineCount: teamPipelineCount,
         teamAvgMarginDeal: teamAvgMarginDeal,
-        teamAvgSalesCycle: teamAvgSalesCycle
+        teamAvgSalesCycle: teamAvgSalesCycle,
+        leadSalesCount:    leadSalesCount
       },
       trend:        trend,
       salesList:    salesList,
