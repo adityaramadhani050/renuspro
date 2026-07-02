@@ -375,7 +375,6 @@ function _dbRenderKonversi(summary) {
     ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
   var dealCount = summary.teamDealCount || 0;
   var revenue   = summary.teamRevenue || 0;
-  var pipeline  = summary.teamPipelineCount || 0;
   var avgDeal   = dealCount > 0 ? Math.round(revenue / dealCount) : 0;
 
   var wrEl = document.getElementById('db-stat-winrate');
@@ -386,8 +385,6 @@ function _dbRenderKonversi(summary) {
   if (avgMarginEl) avgMarginEl.textContent = dealCount > 0 ? _pct(summary.teamAvgMarginDeal) : '—';
   var avgCycleEl = document.getElementById('db-stat-avgcycle');
   if (avgCycleEl) avgCycleEl.textContent = (summary.teamAvgSalesCycle != null) ? (Math.round(summary.teamAvgSalesCycle) + ' hari') : '—';
-  var pipEl = document.getElementById('db-stat-pipeline-count');
-  if (pipEl) pipEl.textContent = pipeline;
   var pctEl = document.getElementById('db-stat-winrate-pct');
   if (pctEl) pctEl.textContent = _pct(winRate);
   var bar = document.getElementById('db-stat-winrate-bar');
