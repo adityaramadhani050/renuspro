@@ -694,8 +694,8 @@ function _dbRenderLeaderboard(salesList) {
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + _rp(s.totalNilaiPenawaran) + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
-      + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-violet-600">' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '<span class="text-slate-300">—</span>') + '</td>'
+      + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
       + '</tr>';
