@@ -17,6 +17,19 @@ function _rp(n) {
   if (!n && n !== 0) return 'Rp 0';
   return 'Rp ' + Math.round(Number(n)).toLocaleString('id-ID');
 }
+// Format ringkas 1 baris: Rp 78,98Jt / Rp 2,52M / Rp 1,20T
+function _rpShort(n) {
+  var v = Number(n) || 0;
+  var abs = Math.abs(v);
+  var fmt = function(x, suf) {
+    return 'Rp ' + x.toFixed(2).replace(/\.?0+$/, '').replace('.', ',') + suf;
+  };
+  if (abs >= 1e12) return fmt(v / 1e12, 'T');
+  if (abs >= 1e9)  return fmt(v / 1e9,  'M');
+  if (abs >= 1e6)  return fmt(v / 1e6,  'Jt');
+  if (abs >= 1e3)  return fmt(v / 1e3,  'Rb');
+  return 'Rp ' + Math.round(v).toLocaleString('id-ID');
+}
 function _pct(n) {
   if (n === null || n === undefined) return '—';
   return Number(n).toFixed(1) + '%';
@@ -380,7 +393,7 @@ function _dbRenderKonversi(summary) {
   var wrEl = document.getElementById('db-stat-winrate');
   if (wrEl) wrEl.textContent = _pct(winRate);
   var avgEl = document.getElementById('db-stat-avgdeal');
-  if (avgEl) avgEl.textContent = avgDeal > 0 ? _rp(avgDeal) : '—';
+  if (avgEl) avgEl.textContent = avgDeal > 0 ? _rpShort(avgDeal) : '—';
   var avgMarginEl = document.getElementById('db-stat-avgmargin');
   if (avgMarginEl) avgMarginEl.textContent = dealCount > 0 ? _pct(summary.teamAvgMarginDeal) : '—';
   var avgCycleEl = document.getElementById('db-stat-avgcycle');
