@@ -483,20 +483,8 @@ function getSalesReportData(params) {
       : 0;
 
     // --- Step 4b: Pipeline Health (coverage, aging, stale) ---
-    // Umur penawaran On-Progress dihitung dari tanggal DIBUAT PERTAMA KALI
-    // (rev/tanggal paling awal per No Penawaran), bukan revisi terakhir.
-    var firstCreatedMap = {}; // noPenawaran -> Date paling awal
-    for (var fci = 1; fci < pData.length; fci++) {
-      var fcRow = pData[fci];
-      var fcNo = String(fcRow[0] || '').trim();
-      if (!fcNo) continue;
-      var fcTgl = parseTgl(fcRow[2]);
-      if (!fcTgl) continue;
-      if (!firstCreatedMap[fcNo] || fcTgl < firstCreatedMap[fcNo]) {
-        firstCreatedMap[fcNo] = fcTgl;
-      }
-    }
-
+    // Umur penawaran On-Progress dihitung dari tanggal REVISI TERAKHIR
+    // (tanggal pada rev tertinggi = agRow[2] di dedupedRows).
     var STALE_DAYS = 30; // ambang stale/expired
     // max besar & finite (bukan Infinity) — Infinity tidak bisa diserialisasi
     // oleh google.script.run dan membuat seluruh payload gagal terkirim.
@@ -521,9 +509,9 @@ function getSalesReportData(params) {
       } else if (!isAdmin && agDibuat !== namaUser) continue;
 
       var agNo = String(agRow[0] || '').trim();
-      var agFirst = firstCreatedMap[agNo] || parseTgl(agRow[2]);
-      if (!agFirst) continue;
-      var umur = Math.round((todayOnly.getTime() - dateOnly(agFirst).getTime()) / 86400000);
+      var agLast = parseTgl(agRow[2]); // tanggal revisi terakhir
+      if (!agLast) continue;
+      var umur = Math.round((todayOnly.getTime() - dateOnly(agLast).getTime()) / 86400000);
       if (umur < 0) umur = 0;
       var agNilai = Math.max(0, (parseFloat(agRow[7]) || 0) - (parseFloat(agRow[8]) || 0));
 
@@ -544,7 +532,7 @@ function getSalesReportData(params) {
           project:  agRow[4] || '',
           nilai:    agNilai,
           umurHari: umur,
-          tanggal:  formatTgl(agFirst)
+          tanggal:  formatTgl(agLast)
         });
       }
     }

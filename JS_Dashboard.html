@@ -876,18 +876,39 @@ function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
   var body = document.getElementById('db-ph-stale-body');
   if (body) {
     if (!ph.staleOffers || !ph.staleOffers.length) {
-      body.innerHTML = '<tr><td colspan="5" class="text-center text-xs text-slate-400 py-6 italic"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Tidak ada penawaran stale — pipeline sehat.</td></tr>';
+      body.innerHTML = '<tr><td colspan="4" class="text-center text-xs text-slate-400 py-6 italic"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Tidak ada penawaran stale — pipeline sehat.</td></tr>';
     } else {
-      body.innerHTML = ph.staleOffers.map(function(o) {
-        var umurCls = o.umurHari > 90 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
-        return '<tr class="hover:bg-slate-50 transition">'
-          + '<td class="px-3 py-2 text-xs"><div class="font-mono text-slate-600">' + _esc(o.id) + '</div><div class="text-slate-400 mt-0.5">' + (o.tanggal || '—') + '</div></td>'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _esc(o.sales || '-') + '</td>'
-          + '<td class="px-3 py-2 text-xs"><div class="text-slate-400">' + _esc(o.klien || '-') + '</div><div class="text-slate-700 font-medium">' + _esc(o.project || '-') + '</div></td>'
-          + '<td class="px-3 py-2 text-xs text-right text-slate-600 whitespace-nowrap">' + _rp(o.nilai || 0) + '</td>'
-          + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + umurCls + '">' + o.umurHari + ' hari</span></td>'
-          + '</tr>';
-      }).join('');
+      // Kelompokkan per sales
+      var groups = {}, order = [];
+      ph.staleOffers.forEach(function(o) {
+        var key = o.sales || '(Tanpa sales)';
+        if (!groups[key]) { groups[key] = { sales: key, offers: [], total: 0 }; order.push(key); }
+        groups[key].offers.push(o);
+        groups[key].total += (o.nilai || 0);
+      });
+      // Urutkan grup berdasarkan total nilai stale terbesar
+      order.sort(function(a, b) { return groups[b].total - groups[a].total; });
+
+      var html = '';
+      order.forEach(function(key) {
+        var g = groups[key];
+        html += '<tr class="bg-slate-50/80 border-y border-slate-100">'
+          + '<td colspan="4" class="px-3 py-1.5">'
+          + '<div class="flex items-center justify-between gap-2">'
+          + '<span class="text-xs font-bold text-slate-600"><i class="fa-solid fa-user text-[10px] text-slate-400 mr-1.5"></i>' + _esc(g.sales) + '</span>'
+          + '<span class="text-[10px] font-semibold text-slate-400 whitespace-nowrap">' + g.offers.length + ' penawaran · ' + _rpShort(g.total) + '</span>'
+          + '</div></td></tr>';
+        g.offers.forEach(function(o) {
+          var umurCls = o.umurHari > 90 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
+          html += '<tr class="hover:bg-slate-50 transition">'
+            + '<td class="px-3 py-2 text-xs"><div class="font-mono text-slate-600">' + _esc(o.id) + '</div><div class="text-slate-400 mt-0.5">' + (o.tanggal || '—') + '</div></td>'
+            + '<td class="px-3 py-2 text-xs"><div class="text-slate-400">' + _esc(o.klien || '-') + '</div><div class="text-slate-700 font-medium">' + _esc(o.project || '-') + '</div></td>'
+            + '<td class="px-3 py-2 text-xs text-right text-slate-600 whitespace-nowrap">' + _rp(o.nilai || 0) + '</td>'
+            + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + umurCls + '">' + o.umurHari + ' hari</span></td>'
+            + '</tr>';
+        });
+      });
+      body.innerHTML = html;
     }
   }
 }
