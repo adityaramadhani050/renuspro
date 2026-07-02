@@ -290,6 +290,7 @@ function _dbRenderAll(rawData, salesData) {
     _dbRenderDetailAccordion(salesList);
     _dbRenderWinLossFactors(salesList);
   }
+  _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null);
 
   document.getElementById('db-loading').classList.add('hidden');
   document.getElementById('db-main-content').classList.remove('hidden');
@@ -761,9 +762,10 @@ function _dbRenderDetailAccordion(salesList) {
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
       + '</div></button>'
       + '<div id="' + detailId + '" class="hidden border-t border-slate-100">'
-      + '<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 p-4 bg-slate-50">'
+      + '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 p-4 bg-slate-50">'
       + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
       + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
+      + _dbMiniKPI('Avg Nilai Penawaran', _rpShort(s.avgNilaiPenawaran || 0), 'text-blue-600 text-sm leading-tight')
       + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
       + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
       + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
@@ -801,6 +803,79 @@ function _dbToggleDetail(id) {
   if (!el) return;
   var hidden = el.classList.toggle('hidden');
   if (icon) icon.style.transform = hidden ? '' : 'rotate(180deg)';
+}
+
+// ── Pipeline Health (coverage + aging + stale) ─────────────────
+function _dbRenderPipelineHealth(ph) {
+  var section = document.getElementById('db-pipeline-health-section');
+  if (!section) return;
+  if (!ph) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+
+  // --- Coverage ---
+  var covVal  = document.getElementById('db-ph-coverage-val');
+  var covSub  = document.getElementById('db-ph-coverage-sub');
+  var covCard = document.getElementById('db-ph-coverage');
+  var baseCard = 'rounded-xl p-4 border flex flex-col justify-between min-h-[92px] ';
+  if (ph.targetTercapai) {
+    if (covVal) { covVal.textContent = 'Tercapai'; covVal.className = 'text-2xl font-extrabold leading-none my-1 text-emerald-600'; }
+    if (covSub) covSub.textContent = 'target sudah terpenuhi';
+    if (covCard) covCard.className = baseCard + 'bg-emerald-50/70 border-emerald-100/70';
+  } else if (ph.coverage == null) {
+    if (covVal) { covVal.textContent = '—'; covVal.className = 'text-2xl font-extrabold leading-none my-1 tabular-nums text-slate-700'; }
+    if (covSub) covSub.textContent = 'pipeline / sisa target';
+    if (covCard) covCard.className = baseCard + 'bg-slate-50 border-slate-100';
+  } else {
+    var cov = ph.coverage, color, bg, note;
+    if (cov >= 3)        { color = 'text-emerald-600'; bg = 'bg-emerald-50/70 border-emerald-100/70'; note = 'sehat (≥3×)'; }
+    else if (cov >= 1.5) { color = 'text-amber-600';   bg = 'bg-amber-50/70 border-amber-100/70';     note = 'cukup'; }
+    else                 { color = 'text-rose-600';    bg = 'bg-rose-50/70 border-rose-100/70';       note = 'kurang (<1,5×)'; }
+    if (covVal) { covVal.textContent = cov.toFixed(1).replace('.', ',') + '×'; covVal.className = 'text-2xl font-extrabold leading-none my-1 tabular-nums ' + color; }
+    if (covSub) covSub.textContent = 'pipeline / sisa target — ' + note;
+    if (covCard) covCard.className = baseCard + bg;
+  }
+
+  var pvEl = document.getElementById('db-ph-pipeline-val');
+  if (pvEl) pvEl.textContent = _rpShort(ph.pipelineValue || 0);
+  var pcEl = document.getElementById('db-ph-pipeline-count');
+  if (pcEl) pcEl.textContent = (ph.pipelineCount || 0) + ' penawaran On-Progress';
+  var stEl = document.getElementById('db-ph-sisatarget');
+  if (stEl) stEl.textContent = ph.targetTercapai ? 'Rp 0' : _rpShort(ph.sisaTarget || 0);
+
+  // --- Aging buckets ---
+  var agingWrap = document.getElementById('db-ph-aging');
+  if (agingWrap) {
+    var colorByIdx = ['text-emerald-600', 'text-blue-600', 'text-amber-600', 'text-rose-600'];
+    var bgByIdx    = ['bg-emerald-50/60', 'bg-blue-50/60', 'bg-amber-50/60', 'bg-rose-50/60'];
+    agingWrap.innerHTML = (ph.aging || []).map(function(b, i) {
+      return '<div class="rounded-xl p-3 border border-slate-100 ' + (bgByIdx[i] || 'bg-slate-50') + '">'
+        + '<p class="text-[10px] font-semibold text-slate-500 mb-1">' + b.label + '</p>'
+        + '<p class="text-xl font-extrabold leading-none ' + (colorByIdx[i] || 'text-slate-700') + '">' + b.count + '</p>'
+        + '<p class="text-[10px] text-slate-400 mt-1 leading-tight whitespace-nowrap">' + _rpShort(b.value || 0) + '</p>'
+        + '</div>';
+    }).join('');
+  }
+
+  // --- Stale / expired offers ---
+  var head = document.getElementById('db-ph-stale-head');
+  if (head) head.textContent = '(> ' + ph.staleDays + ' hari) — ' + (ph.staleCount || 0) + ' penawaran · ' + _rpShort(ph.staleValue || 0);
+  var body = document.getElementById('db-ph-stale-body');
+  if (body) {
+    if (!ph.staleOffers || !ph.staleOffers.length) {
+      body.innerHTML = '<tr><td colspan="5" class="text-center text-xs text-slate-400 py-6 italic"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Tidak ada penawaran stale — pipeline sehat.</td></tr>';
+    } else {
+      body.innerHTML = ph.staleOffers.map(function(o) {
+        var umurCls = o.umurHari > 90 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
+        return '<tr class="hover:bg-slate-50 transition">'
+          + '<td class="px-3 py-2 text-xs"><div class="font-mono text-slate-600">' + _esc(o.id) + '</div><div class="text-slate-400 mt-0.5">' + (o.tanggal || '—') + '</div></td>'
+          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _esc(o.sales || '-') + '</td>'
+          + '<td class="px-3 py-2 text-xs"><div class="text-slate-400">' + _esc(o.klien || '-') + '</div><div class="text-slate-700 font-medium">' + _esc(o.project || '-') + '</div></td>'
+          + '<td class="px-3 py-2 text-xs text-right text-slate-600 whitespace-nowrap">' + _rp(o.nilai || 0) + '</td>'
+          + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + umurCls + '">' + o.umurHari + ' hari</span></td>'
+          + '</tr>';
+      }).join('');
+    }
+  }
 }
 
 

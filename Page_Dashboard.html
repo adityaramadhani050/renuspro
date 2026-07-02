@@ -269,6 +269,69 @@
       <div id="db-sales-detail" class="space-y-3"></div>
     </div>
 
+    <!-- Pipeline Health -->
+    <div id="db-pipeline-health-section" class="mt-6">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <i class="fa-solid fa-heart-pulse mr-1"></i> Pipeline Health
+      </p>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 space-y-5">
+
+        <!-- Ringkasan: coverage + nilai pipeline + sisa target -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div id="db-ph-coverage" class="rounded-xl p-4 border flex flex-col justify-between min-h-[92px] bg-slate-50 border-slate-100">
+            <div class="flex items-center gap-1">
+              <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Pipeline Coverage</p>
+              <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+                data-tip="Nilai pipeline aktif dibagi sisa target (target − revenue deal). Ideal ≥ 3× agar target realistis tercapai dari pipeline yang ada.">
+                <i class="fa-solid fa-circle-info text-[10px]"></i>
+              </span>
+            </div>
+            <p id="db-ph-coverage-val" class="text-2xl font-extrabold leading-none my-1 tabular-nums text-slate-700">—</p>
+            <p id="db-ph-coverage-sub" class="text-[10px] text-slate-400 leading-tight">pipeline / sisa target</p>
+          </div>
+          <div class="rounded-xl p-4 border flex flex-col justify-between min-h-[92px] bg-amber-50/70 border-amber-100/70">
+            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Nilai Pipeline Aktif</p>
+            <p id="db-ph-pipeline-val" class="text-xl font-extrabold leading-none my-1 tabular-nums text-amber-600 whitespace-nowrap">—</p>
+            <p id="db-ph-pipeline-count" class="text-[10px] text-slate-400 leading-tight">penawaran On-Progress</p>
+          </div>
+          <div class="rounded-xl p-4 border flex flex-col justify-between min-h-[92px] bg-slate-50 border-slate-100">
+            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Sisa Target</p>
+            <p id="db-ph-sisatarget" class="text-xl font-extrabold leading-none my-1 tabular-nums text-slate-700 whitespace-nowrap">—</p>
+            <p class="text-[10px] text-slate-400 leading-tight">target − revenue deal</p>
+          </div>
+        </div>
+
+        <!-- Aging pipeline -->
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Aging Pipeline <span class="normal-case font-medium text-slate-400">(umur sejak penawaran dibuat pertama kali)</span>
+          </p>
+          <div id="db-ph-aging" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+        </div>
+
+        <!-- Stale / expired offers -->
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <i class="fa-solid fa-hourglass-end mr-1 text-rose-400"></i>
+            Penawaran Stale <span id="db-ph-stale-head" class="normal-case font-medium text-slate-400"></span>
+          </p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 border-b border-slate-100"><tr>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Sales</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien / Project</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-right whitespace-nowrap">Nilai</th>
+                <th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Umur</th>
+              </tr></thead>
+              <tbody id="db-ph-stale-body" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
 
   </div><!-- /#db-main-content -->
 

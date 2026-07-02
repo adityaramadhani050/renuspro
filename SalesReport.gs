@@ -371,6 +371,9 @@ function getSalesReportData(params) {
       // Rata-rata margin deal (value-weighted, konsisten dgn tim)
       sd.avgMarginDeal = sd.dealRevenue > 0 ? ((sd.dealRevenue - sd.dealHpp) / sd.dealRevenue) * 100 : null;
 
+      // Rata-rata nilai penawaran (dari penawaran yang dibuat periode ini)
+      sd.avgNilaiPenawaran = sd.totalPenawaran > 0 ? (sd.totalNilaiPenawaran / sd.totalPenawaran) : 0;
+
       // achievement
       sd.achievement = sd.targetBulanan > 0 ? (sd.dealRevenue / sd.targetBulanan) * 100 : null;
 
@@ -405,6 +408,7 @@ function getSalesReportData(params) {
         targetBulanan:       sd.targetBulanan,
         totalPenawaran:      sd.totalPenawaran,
         totalNilaiPenawaran: sd.totalNilaiPenawaran,
+        avgNilaiPenawaran:   sd.avgNilaiPenawaran,
         dealCount:           sd.dealCount,
         dealRevenue:         sd.dealRevenue,
         dealHpp:             sd.dealHpp,
@@ -477,6 +481,91 @@ function getSalesReportData(params) {
     var teamWinRate = teamPenawaran > 0
       ? (teamDealCohort / teamPenawaran) * 100
       : 0;
+
+    // --- Step 4b: Pipeline Health (coverage, aging, stale) ---
+    // Umur penawaran On-Progress dihitung dari tanggal DIBUAT PERTAMA KALI
+    // (rev/tanggal paling awal per No Penawaran), bukan revisi terakhir.
+    var firstCreatedMap = {}; // noPenawaran -> Date paling awal
+    for (var fci = 1; fci < pData.length; fci++) {
+      var fcRow = pData[fci];
+      var fcNo = String(fcRow[0] || '').trim();
+      if (!fcNo) continue;
+      var fcTgl = parseTgl(fcRow[2]);
+      if (!fcTgl) continue;
+      if (!firstCreatedMap[fcNo] || fcTgl < firstCreatedMap[fcNo]) {
+        firstCreatedMap[fcNo] = fcTgl;
+      }
+    }
+
+    var STALE_DAYS = 60; // ambang stale/expired
+    var agingBuckets = [
+      { label: '0–30 hari',  min: 0,  max: 30,       count: 0, value: 0 },
+      { label: '31–60 hari', min: 31, max: 60,       count: 0, value: 0 },
+      { label: '61–90 hari', min: 61, max: 90,       count: 0, value: 0 },
+      { label: '>90 hari',   min: 91, max: Infinity, count: 0, value: 0 }
+    ];
+    var staleOffers = [];
+    var todayOnly = dateOnly(today);
+
+    for (var agi = 0; agi < dedupedRows.length; agi++) {
+      var agRow = dedupedRows[agi];
+      var agStatus = String(agRow[16] || '').trim();
+      if (agStatus !== 'On-Progress') continue;
+
+      var agDibuat = String(agRow[6] || '').trim();
+      // Access control — konsisten dgn agregasi per-sales
+      if (params.role === 'leadsales') {
+        if (!teamNames || !teamNames.includes(agDibuat)) continue;
+      } else if (!isAdmin && agDibuat !== namaUser) continue;
+
+      var agNo = String(agRow[0] || '').trim();
+      var agFirst = firstCreatedMap[agNo] || parseTgl(agRow[2]);
+      if (!agFirst) continue;
+      var umur = Math.round((todayOnly.getTime() - dateOnly(agFirst).getTime()) / 86400000);
+      if (umur < 0) umur = 0;
+      var agNilai = Math.max(0, (parseFloat(agRow[7]) || 0) - (parseFloat(agRow[8]) || 0));
+
+      for (var bki = 0; bki < agingBuckets.length; bki++) {
+        if (umur >= agingBuckets[bki].min && umur <= agingBuckets[bki].max) {
+          agingBuckets[bki].count++;
+          agingBuckets[bki].value += agNilai;
+          break;
+        }
+      }
+
+      if (umur >= STALE_DAYS) {
+        var agKlienId = String(agRow[5] || '').trim();
+        staleOffers.push({
+          id:       agNo,
+          sales:    agDibuat,
+          klien:    klienMap[agKlienId] || agKlienId,
+          project:  agRow[4] || '',
+          nilai:    agNilai,
+          umurHari: umur,
+          tanggal:  formatTgl(agFirst)
+        });
+      }
+    }
+    staleOffers.sort(function(a, b) { return b.umurHari - a.umurHari; });
+
+    var sisaTarget = Math.max(0, teamTarget - teamRevenue);
+    // coverage = nilai pipeline / sisa target. null jika target sudah tercapai.
+    var coverage = sisaTarget > 0 ? (teamPipelineValue / sisaTarget) : null;
+    var staleValue = 0;
+    for (var svi = 0; svi < staleOffers.length; svi++) staleValue += staleOffers[svi].nilai;
+
+    var pipelineHealth = {
+      pipelineValue:  teamPipelineValue,
+      pipelineCount:  teamPipelineCount,
+      sisaTarget:     sisaTarget,
+      targetTercapai: sisaTarget <= 0,
+      coverage:       coverage,
+      aging:          agingBuckets,
+      staleDays:      STALE_DAYS,
+      staleCount:     staleOffers.length,
+      staleValue:     staleValue,
+      staleOffers:    staleOffers
+    };
 
     // --- Step 5: 3-month trend (team, by tanggalDeal) ---
     var months = lastThreeMonths();
@@ -558,6 +647,7 @@ function getSalesReportData(params) {
       trend:        trend,
       salesList:    salesList,
       recentDeals:  recentDeals,
+      pipelineHealth: pipelineHealth,
       isAdmin:      isAdmin
     };
 
