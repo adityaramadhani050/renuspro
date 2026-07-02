@@ -297,7 +297,7 @@ function _dbRenderAll(rawData, salesData) {
     annualTarget = (summary.teamTarget || 0) * 12;
   }
 
-  _dbRenderKPIs(summary, prev, salesList);
+  _dbRenderKPIs(summary, prev, salesList, items);
   _dbRenderTargetBar(summary, items, annualTarget);
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
@@ -321,7 +321,20 @@ function _dbRenderAll(rawData, salesData) {
 }
 
 // ── KPI Cards ──────────────────────────────────────────────────
-function _dbRenderKPIs(summary, prev, salesList) {
+// Hitung jumlah deal (by tanggalDeal) pada bulan kalender tertentu.
+function _dbDealCountInMonth(items, year, month) {
+  var fromMs = new Date(year, month, 1).getTime();
+  var toMs   = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+  var n = 0;
+  (items || []).forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (ts && ts >= fromMs && ts <= toMs) n++;
+  });
+  return n;
+}
+
+function _dbRenderKPIs(summary, prev, salesList, items) {
   var curRevenue = summary.teamRevenue || 0;
   var curDeals   = summary.teamDealCount || 0;
   var prevRevenue = prev.prevRevenue || 0;
@@ -358,6 +371,15 @@ function _dbRenderKPIs(summary, prev, salesList) {
   var winRateCalc = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
   var dealSub = document.getElementById('db-kpi-deal-sub');
   if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc);
+
+  // Jumlah deal bulan ini vs bulan lalu (by tanggal deal, per bulan kalender)
+  var _now = new Date();
+  var dealThisMonth = _dbDealCountInMonth(items, _now.getFullYear(), _now.getMonth());
+  var _prevM = _now.getMonth() - 1, _prevY = _now.getFullYear();
+  if (_prevM < 0) { _prevM = 11; _prevY--; }
+  var dealLastMonth = _dbDealCountInMonth(items, _prevY, _prevM);
+  var dealSub2 = document.getElementById('db-kpi-deal-sub2');
+  if (dealSub2) dealSub2.textContent = 'Bulan ini: ' + dealThisMonth + ' · Bulan lalu: ' + dealLastMonth;
 
   // Pipeline
   var pipEl = document.getElementById('db-kpi-pipeline');
