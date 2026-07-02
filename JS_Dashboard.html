@@ -757,9 +757,9 @@ function _dbRenderDetailAccordion(salesList) {
       + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
       + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
       + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
-      + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
-      + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
       + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
+      + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
+      + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
       + '</div>'
       + '<div class="overflow-x-auto">'
       + '<table class="w-full text-left border-collapse">'
