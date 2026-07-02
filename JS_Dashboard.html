@@ -379,14 +379,11 @@ function _dbRenderKPIs(summary, prev, salesList, items) {
     dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
       (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
   }
-  // Win rate berbasis kohort (dari backend) — hindari inflasi deal bulan lalu.
-  // Satu baris: win rate + rincian deal bulan ini menurut bulan pembuatan
-  // penawarannya (dari penawaran bulan ini vs bulan lalu).
-  var winRateCalc = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
+  // Rincian deal bulan ini menurut bulan pembuatan penawarannya
+  // (dari penawaran bulan ini vs bulan lalu).
   var split = _dbDealCohortSplit(items);
   var dealSub = document.getElementById('db-kpi-deal-sub');
-  if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc)
-    + ' · Deal dari penawaran bln ini: ' + split.fromThis + ', bln lalu: ' + split.fromLast;
+  if (dealSub) dealSub.textContent = 'Penawaran bulan ini: ' + split.fromThis + '. bulan lalu: ' + split.fromLast;
 
   // Pipeline
   var pipEl = document.getElementById('db-kpi-pipeline');
