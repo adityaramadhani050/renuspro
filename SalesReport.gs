@@ -498,11 +498,13 @@ function getSalesReportData(params) {
     }
 
     var STALE_DAYS = 60; // ambang stale/expired
+    // max besar & finite (bukan Infinity) — Infinity tidak bisa diserialisasi
+    // oleh google.script.run dan membuat seluruh payload gagal terkirim.
     var agingBuckets = [
-      { label: '0–30 hari',  min: 0,  max: 30,       count: 0, value: 0 },
-      { label: '31–60 hari', min: 31, max: 60,       count: 0, value: 0 },
-      { label: '61–90 hari', min: 61, max: 90,       count: 0, value: 0 },
-      { label: '>90 hari',   min: 91, max: Infinity, count: 0, value: 0 }
+      { label: '0–30 hari',  min: 0,  max: 30,     count: 0, value: 0 },
+      { label: '31–60 hari', min: 31, max: 60,     count: 0, value: 0 },
+      { label: '61–90 hari', min: 61, max: 90,     count: 0, value: 0 },
+      { label: '>90 hari',   min: 91, max: 3650000, count: 0, value: 0 }
     ];
     var staleOffers = [];
     var todayOnly = dateOnly(today);
@@ -554,13 +556,17 @@ function getSalesReportData(params) {
     var staleValue = 0;
     for (var svi = 0; svi < staleOffers.length; svi++) staleValue += staleOffers[svi].nilai;
 
+    var agingOut = agingBuckets.map(function(b) {
+      return { label: b.label, count: b.count, value: b.value };
+    });
+
     var pipelineHealth = {
       pipelineValue:  teamPipelineValue,
       pipelineCount:  teamPipelineCount,
       sisaTarget:     sisaTarget,
       targetTercapai: sisaTarget <= 0,
       coverage:       coverage,
-      aging:          agingBuckets,
+      aging:          agingOut,
       staleDays:      STALE_DAYS,
       staleCount:     staleOffers.length,
       staleValue:     staleValue,
