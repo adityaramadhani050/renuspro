@@ -387,12 +387,14 @@ function getSalesReportData(params) {
         return b.grandTotal - a.grandTotal;
       });
 
-      // Sales cycle per penawaran (Deal/Fail) + rata-rata per sales
+      // Sales cycle per penawaran + rata-rata per sales.
+      // Rata-rata HANYA dari penawaran Deal (Fail tidak dihitung),
+      // meski nilai cycle Fail tetap ditampilkan di tabel.
       var cycleSum = 0, cycleCount = 0;
       for (var pci = 0; pci < penawaranArr.length; pci++) {
         var cyc = hitungSalesCycle(penawaranArr[pci]);
         penawaranArr[pci].salesCycleDays = cyc;
-        if (cyc !== null) { cycleSum += cyc; cycleCount++; }
+        if (cyc !== null && penawaranArr[pci].status === 'Deal') { cycleSum += cyc; cycleCount++; }
       }
       sd.avgSalesCycle = cycleCount > 0 ? (cycleSum / cycleCount) : null;
       teamCycleSum += cycleSum;
