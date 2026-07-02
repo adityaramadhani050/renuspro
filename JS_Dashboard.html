@@ -683,7 +683,7 @@ function _dbRenderLeaderboard(salesList) {
   var tbody = document.getElementById('db-leaderboard-body');
   if (!tbody) return;
   if (!salesList || !salesList.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>';
     return;
   }
   tbody.innerHTML = salesList.map(function(s, idx) {
@@ -695,6 +695,7 @@ function _dbRenderLeaderboard(salesList) {
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-violet-600">' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
       + '</tr>';
@@ -745,8 +746,8 @@ function _dbRenderDetailAccordion(salesList) {
       + '</div>'
       + '<div class="flex flex-wrap items-center gap-2">'
       + '<span class="text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</span>'
-      + '<span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">WR ' + _pct(s.winRate) + '</span>'
       + '<span class="text-[10px] font-bold text-violet-500 whitespace-nowrap">Margin ' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—') + '</span>'
+      + '<span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">WR ' + _pct(s.winRate) + '</span>'
       + _achieveBadge(s.achievement)
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
       + '</div></button>'
