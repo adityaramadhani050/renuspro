@@ -265,9 +265,13 @@ function _dbRenderAll(rawData, salesData) {
 
   // Admin/leadsales sections
   document.getElementById('db-leaderboard-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
-  document.getElementById('db-detail-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
   var winlossSection = document.getElementById('db-winloss-section');
   if (winlossSection) winlossSection.classList.toggle('hidden', !(isAdmin || isLeadSales));
+
+  // Detail per sales: accordion (admin/leadsales) atau flat (sales) — tampil untuk semua
+  document.getElementById('db-detail-section').classList.remove('hidden');
+  var detailTitle = document.getElementById('db-detail-title');
+  if (detailTitle) detailTitle.textContent = (isAdmin || isLeadSales) ? 'Detail Per Sales' : 'Detail Penawaran Saya';
 
   var items   = (rawData && rawData.items) ? rawData.items : [];
   var summary = (salesData && salesData.summary) ? salesData.summary : {};
@@ -303,6 +307,9 @@ function _dbRenderAll(rawData, salesData) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
     _dbRenderWinLossFactors(salesList);
+  } else {
+    // Sales: detail penawaran sendiri, tampilan flat tanpa accordion
+    _dbRenderSalesOwnDetail(salesList);
   }
   _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null, annualTarget, _dbYtdRevenue(items));
 
@@ -733,7 +740,64 @@ function _dbRenderLeaderboard(salesList) {
   }).join('');
 }
 
-// ── Per-sales detail accordion ─────────────────────────────────
+// ── Per-sales detail ───────────────────────────────────────────
+// Baris tabel penawaran untuk 1 sales.
+function _dbDetailTableRows(s) {
+  if (!s.penawaran || !s.penawaran.length) {
+    return '<tr><td colspan="8" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
+  }
+  return s.penawaran.map(function(p) {
+    var marginClass = p.marginPersen < 25 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
+    return '<tr class="hover:bg-slate-50 transition' + (p.dealInPeriod ? ' bg-emerald-50/30' : '') + '">'
+      + '<td class="px-3 py-2 text-xs whitespace-nowrap"><div class="font-mono text-slate-600">' + _esc(p.id) + '</div><div class="text-slate-400 mt-0.5">' + (p.tanggal || '—') + '</div></td>'
+      + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
+      + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
+      + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
+      + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
+      + '<td class="px-3 py-2"><div class="flex items-center gap-1.5">' + _statusBadge(p.status)
+      + (p.status === 'Fail' && p.kodeLost
+          ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Analisa Lost"><i class="fa-solid fa-circle-info text-xs"></i></button>'
+          : '')
+      + (p.status === 'Deal' && p.kodeWin
+          ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Analisa Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
+          : '')
+      + '</div></td>'
+      + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.status === 'Deal' ? (p.tanggalDeal || '—') : (p.status === 'Fail' ? (p.tanggalFail || '—') : '—')) + '</td>'
+      + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap text-center">' + (p.salesCycleDays != null ? (p.salesCycleDays + ' hari') : '—') + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+// Konten detail (KPI grid + tabel) — dipakai oleh accordion & tampilan flat.
+function _dbDetailInner(s) {
+  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 p-4 bg-slate-50">'
+    + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
+    + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
+    + _dbMiniKPI('Avg Nilai Penawaran', _rpShort(s.avgNilaiPenawaran || 0), 'text-blue-600 text-sm leading-tight')
+    + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
+    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
+    + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
+    + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
+    + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
+    + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
+    + '</div>'
+    + '<div class="overflow-x-auto">'
+    + '<table class="w-full text-left border-collapse">'
+    + '<thead class="bg-slate-50 border-b border-slate-100"><tr>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal/Fail</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Sales Cycle</th>'
+    + '</tr></thead>'
+    + '<tbody class="divide-y divide-slate-50">' + _dbDetailTableRows(s) + '</tbody>'
+    + '</table></div>';
+}
+
+// Accordion per sales (admin & lead sales).
 function _dbRenderDetailAccordion(salesList) {
   var container = document.getElementById('db-sales-detail');
   if (!container) return;
@@ -743,32 +807,6 @@ function _dbRenderDetailAccordion(salesList) {
   }
   container.innerHTML = salesList.map(function(s, idx) {
     var detailId = 'db-detail-' + idx;
-    var tableRows = '';
-    if (s.penawaran && s.penawaran.length) {
-      tableRows = s.penawaran.map(function(p) {
-        var marginClass = p.marginPersen < 25 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
-        return '<tr class="hover:bg-slate-50 transition' + (p.dealInPeriod ? ' bg-emerald-50/30' : '') + '">'
-          + '<td class="px-3 py-2 text-xs whitespace-nowrap"><div class="font-mono text-slate-600">' + _esc(p.id) + '</div><div class="text-slate-400 mt-0.5">' + (p.tanggal || '—') + '</div></td>'
-          + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
-          + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) + '</td>'
-          + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + marginClass + '">' + _pct(p.marginPersen) + '</span></td>'
-          + '<td class="px-3 py-2"><div class="flex items-center gap-1.5">' + _statusBadge(p.status)
-          + (p.status === 'Fail' && p.kodeLost
-              ? '<button onclick="lihatCatatanFail(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeLost(p.kodeLost) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition" title="Lihat Analisa Lost"><i class="fa-solid fa-circle-info text-xs"></i></button>'
-              : '')
-          + (p.status === 'Deal' && p.kodeWin
-              ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Analisa Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
-              : '')
-          + '</div></td>'
-          + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.status === 'Deal' ? (p.tanggalDeal || '—') : (p.status === 'Fail' ? (p.tanggalFail || '—') : '—')) + '</td>'
-          + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap text-center">' + (p.salesCycleDays != null ? (p.salesCycleDays + ' hari') : '—') + '</td>'
-          + '</tr>';
-      }).join('');
-    } else {
-      tableRows = '<tr><td colspan="8" class="text-center text-xs text-slate-400 py-6 italic">Tidak ada penawaran pada periode ini.</td></tr>';
-    }
-
     return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
       + '<button type="button" onclick="_dbToggleDetail(\'' + detailId + '\')"'
       + ' class="w-full flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition focus:outline-none">'
@@ -784,31 +822,23 @@ function _dbRenderDetailAccordion(salesList) {
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
       + '</div></button>'
       + '<div id="' + detailId + '" class="hidden border-t border-slate-100">'
-      + '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 p-4 bg-slate-50">'
-      + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
-      + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
-      + _dbMiniKPI('Avg Nilai Penawaran', _rpShort(s.avgNilaiPenawaran || 0), 'text-blue-600 text-sm leading-tight')
-      + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
-      + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
-      + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
-      + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
-      + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
-      + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
-      + '</div>'
-      + '<div class="overflow-x-auto">'
-      + '<table class="w-full text-left border-collapse">'
-      + '<thead class="bg-slate-50 border-b border-slate-100"><tr>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Tanggal Deal/Fail</th>'
-      + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Sales Cycle</th>'
-      + '</tr></thead>'
-      + '<tbody class="divide-y divide-slate-50">' + tableRows + '</tbody>'
-      + '</table></div></div></div>';
+      + _dbDetailInner(s)
+      + '</div></div>';
+  }).join('');
+}
+
+// Tampilan flat tanpa accordion — untuk dashboard sales (data sendiri).
+function _dbRenderSalesOwnDetail(salesList) {
+  var container = document.getElementById('db-sales-detail');
+  if (!container) return;
+  if (!salesList || !salesList.length) {
+    container.innerHTML = '<p class="text-xs text-slate-400 italic">Belum ada data penawaran pada periode ini.</p>';
+    return;
+  }
+  container.innerHTML = salesList.map(function(s) {
+    return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
+      + _dbDetailInner(s)
+      + '</div>';
   }).join('');
 }
 
