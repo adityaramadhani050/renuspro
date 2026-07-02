@@ -497,7 +497,7 @@ function getSalesReportData(params) {
       }
     }
 
-    var STALE_DAYS = 60; // ambang stale/expired
+    var STALE_DAYS = 30; // ambang stale/expired
     // max besar & finite (bukan Infinity) — Infinity tidak bisa diserialisasi
     // oleh google.script.run dan membuat seluruh payload gagal terkirim.
     var agingBuckets = [
