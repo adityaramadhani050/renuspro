@@ -290,7 +290,7 @@ function _dbRenderAll(rawData, salesData) {
     _dbRenderDetailAccordion(salesList);
     _dbRenderWinLossFactors(salesList);
   }
-  _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null);
+  _dbRenderPipelineHealth(salesData ? salesData.pipelineHealth : null, DB_TARGET_TAHUNAN, _dbYtdRevenue(items));
 
   document.getElementById('db-loading').classList.add('hidden');
   document.getElementById('db-main-content').classList.remove('hidden');
@@ -346,6 +346,24 @@ function _dbRenderKPIs(summary, prev, salesList) {
 }
 
 // ── Target progress bar ────────────────────────────────────────
+// Target tahunan (fixed company-wide target) — dipakai bersama oleh
+// Capaian Target Tahunan & Pipeline Coverage.
+var DB_TARGET_TAHUNAN = 25000000000;
+
+// Total revenue deal tahun berjalan (YTD) dari raw cache.
+function _dbYtdRevenue(items) {
+  var now = new Date();
+  var fromMs = new Date(now.getFullYear(), 0, 1).getTime();
+  var toMs   = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+  var rev = 0;
+  (items || []).forEach(function(item) {
+    if (item.status !== 'Deal') return;
+    var ts = item.tanggalDeal || item.tanggal;
+    if (ts && ts >= fromMs && ts <= toMs) rev += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
+  });
+  return rev;
+}
+
 function _dbRenderTargetBar(summary, items) {
   var rev    = summary.teamRevenue || 0;
   var target = summary.teamTarget  || 0;
@@ -359,19 +377,9 @@ function _dbRenderTargetBar(summary, items) {
   var txt = document.getElementById('db-target-text');
   if (txt) txt.textContent = _rp(rev) + ' / ' + _rp(target);
 
-  // YTD revenue dari raw cache
-  var now = new Date();
-  var ytdFromMs = new Date(now.getFullYear(), 0, 1).getTime();
-  var ytdToMs   = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
-  var ytdRev = 0;
-  (items || []).forEach(function(item) {
-    if (item.status !== 'Deal') return;
-    var ts = item.tanggalDeal || item.tanggal;
-    if (ts && ts >= ytdFromMs && ts <= ytdToMs) ytdRev += (item.nilaiKontrak !== undefined ? item.nilaiKontrak : item.grandTotal);
-  });
-
-  // Target tahunan (fixed company-wide target)
-  var targetTahunan = 25000000000;
+  // YTD revenue vs target tahunan
+  var ytdRev = _dbYtdRevenue(items);
+  var targetTahunan = DB_TARGET_TAHUNAN;
   var ytdPct    = targetTahunan > 0 ? (ytdRev / targetTahunan * 100) : 0;
   var ytdBarPct = Math.min(ytdPct, 100);
 
@@ -806,32 +814,38 @@ function _dbToggleDetail(id) {
 }
 
 // ── Pipeline Health (coverage + aging + stale) ─────────────────
-function _dbRenderPipelineHealth(ph) {
+// annualTarget & yearRevenue → coverage & sisa target berbasis TAHUNAN.
+function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
   var section = document.getElementById('db-pipeline-health-section');
   if (!section) return;
   if (!ph) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
+
+  // Coverage & sisa target dihitung dari target tahunan − revenue tahun berjalan
+  var sisaTarget     = Math.max(0, (annualTarget || 0) - (yearRevenue || 0));
+  var targetTercapai = (annualTarget || 0) > 0 && sisaTarget <= 0;
+  var coverage       = sisaTarget > 0 ? ((ph.pipelineValue || 0) / sisaTarget) : null;
 
   // --- Coverage ---
   var covVal  = document.getElementById('db-ph-coverage-val');
   var covSub  = document.getElementById('db-ph-coverage-sub');
   var covCard = document.getElementById('db-ph-coverage');
   var baseCard = 'rounded-xl p-4 border flex flex-col justify-between min-h-[92px] ';
-  if (ph.targetTercapai) {
+  if (targetTercapai) {
     if (covVal) { covVal.textContent = 'Tercapai'; covVal.className = 'text-2xl font-extrabold leading-none my-1 text-emerald-600'; }
-    if (covSub) covSub.textContent = 'target sudah terpenuhi';
+    if (covSub) covSub.textContent = 'target tahunan sudah terpenuhi';
     if (covCard) covCard.className = baseCard + 'bg-emerald-50/70 border-emerald-100/70';
-  } else if (ph.coverage == null) {
+  } else if (coverage == null) {
     if (covVal) { covVal.textContent = '—'; covVal.className = 'text-2xl font-extrabold leading-none my-1 tabular-nums text-slate-700'; }
-    if (covSub) covSub.textContent = 'pipeline / sisa target';
+    if (covSub) covSub.textContent = 'pipeline / sisa target tahunan';
     if (covCard) covCard.className = baseCard + 'bg-slate-50 border-slate-100';
   } else {
-    var cov = ph.coverage, color, bg, note;
+    var cov = coverage, color, bg, note;
     if (cov >= 3)        { color = 'text-emerald-600'; bg = 'bg-emerald-50/70 border-emerald-100/70'; note = 'sehat (≥3×)'; }
     else if (cov >= 1.5) { color = 'text-amber-600';   bg = 'bg-amber-50/70 border-amber-100/70';     note = 'cukup'; }
     else                 { color = 'text-rose-600';    bg = 'bg-rose-50/70 border-rose-100/70';       note = 'kurang (<1,5×)'; }
     if (covVal) { covVal.textContent = cov.toFixed(1).replace('.', ',') + '×'; covVal.className = 'text-2xl font-extrabold leading-none my-1 tabular-nums ' + color; }
-    if (covSub) covSub.textContent = 'pipeline / sisa target — ' + note;
+    if (covSub) covSub.textContent = 'pipeline / sisa target tahunan — ' + note;
     if (covCard) covCard.className = baseCard + bg;
   }
 
@@ -840,7 +854,7 @@ function _dbRenderPipelineHealth(ph) {
   var pcEl = document.getElementById('db-ph-pipeline-count');
   if (pcEl) pcEl.textContent = (ph.pipelineCount || 0) + ' penawaran On-Progress';
   var stEl = document.getElementById('db-ph-sisatarget');
-  if (stEl) stEl.textContent = ph.targetTercapai ? 'Rp 0' : _rpShort(ph.sisaTarget || 0);
+  if (stEl) stEl.textContent = targetTercapai ? 'Rp 0' : _rpShort(sisaTarget);
 
   // --- Aging buckets ---
   var agingWrap = document.getElementById('db-ph-aging');
