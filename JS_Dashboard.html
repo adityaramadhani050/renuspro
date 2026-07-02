@@ -385,10 +385,6 @@ function _dbRenderKonversi(summary) {
   if (avgMarginEl) avgMarginEl.textContent = dealCount > 0 ? _pct(summary.teamAvgMarginDeal) : '—';
   var avgCycleEl = document.getElementById('db-stat-avgcycle');
   if (avgCycleEl) avgCycleEl.textContent = (summary.teamAvgSalesCycle != null) ? (Math.round(summary.teamAvgSalesCycle) + ' hari') : '—';
-  var pctEl = document.getElementById('db-stat-winrate-pct');
-  if (pctEl) pctEl.textContent = _pct(winRate);
-  var bar = document.getElementById('db-stat-winrate-bar');
-  if (bar) bar.style.width = Math.min(winRate, 100) + '%';
 }
 
 // ── Trend Chart (line, Jan–Des tahun berjalan) ─────────────────
