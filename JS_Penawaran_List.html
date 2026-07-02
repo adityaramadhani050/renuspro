@@ -108,14 +108,14 @@
                 <div class="flex items-center justify-center gap-1">
                 ${i.status === 'Deal'
                   ? `<button onclick='bukaCatatanWin(${JSON.stringify(i).replace(/'/g,"&#39;")})'
-                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="${i.kodeWin ? 'Edit' : 'Input'} Catatan Win">
-                      <i class="fa-solid fa-${i.kodeWin ? 'trophy' : 'comment-medical'}"></i>
+                      class="${i.kodeWin ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="${i.kodeWin ? 'Edit' : 'Input'} Catatan Win">
+                      <i class="fa-solid fa-trophy"></i>
                     </button>`
                   : ''}
                 ${i.status === 'Fail'
                   ? `<button onclick='bukaCatatanFail(${JSON.stringify(i).replace(/'/g,"&#39;")})'
-                      class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="${(i.catatanFail || i.kodeLost) ? 'Edit' : 'Input'} Catatan Lost">
-                      <i class="fa-solid fa-${(i.catatanFail || i.kodeLost) ? 'circle-info' : 'comment-medical'}"></i>
+                      class="${(i.catatanFail || i.kodeLost) ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="${(i.catatanFail || i.kodeLost) ? 'Edit' : 'Input'} Catatan Lost">
+                      <i class="fa-solid fa-circle-info"></i>
                     </button>`
                   : ''}
                 <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'
