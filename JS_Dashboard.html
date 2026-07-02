@@ -953,13 +953,22 @@ window.exportDashboardPDF = function() {
         }
       });
       y = doc.lastAutoTable.finalY + 5;
-
-      // Analisa Win & Lost per sales
-      var winRows  = sales.penawaran.filter(function(p){ return p.status==='Deal' && p.kodeWin; });
-      var lostRows = sales.penawaran.filter(function(p){ return p.status==='Fail' && p.kodeLost; });
-      if (winRows.length)  _analisaTable('ANALISA WIN — ' + sales.nama,  winRows,  true);
-      if (lostRows.length) _analisaTable('ANALISA LOST — ' + sales.nama, lostRows, false);
     });
+
+    // ── Analisa Win & Lost (section tersendiri di bagian akhir) ──
+    var adaAnalisa = list.some(function(s){ return (s.penawaran||[]).some(function(p){ return (p.status==='Deal'&&p.kodeWin)||(p.status==='Fail'&&p.kodeLost); }); });
+    if (adaAnalisa) {
+      doc.addPage(); y = 14;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text('ANALISA WIN & LOST', ML, y); y += 6;
+      list.forEach(function(sales) {
+        var pw = sales.penawaran || [];
+        var winRows  = pw.filter(function(p){ return p.status==='Deal' && p.kodeWin; });
+        var lostRows = pw.filter(function(p){ return p.status==='Fail' && p.kodeLost; });
+        if (winRows.length)  _analisaTable('ANALISA WIN — ' + sales.nama,  winRows,  true);
+        if (lostRows.length) _analisaTable('ANALISA LOST — ' + sales.nama, lostRows, false);
+      });
+    }
 
     var totalPages = doc.internal.getNumberOfPages();
     for (var i = 1; i <= totalPages; i++) {
