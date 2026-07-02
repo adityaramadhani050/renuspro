@@ -813,6 +813,38 @@ window.exportDashboardPDF = function() {
     var rp = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
     var pct= function(v) { return v != null ? Number(v).toFixed(1)+'%' : '-'; };
 
+    // Label kode Win/Lost (dari master di JS_Form_Penawaran)
+    var _winLbl = {}, _lostLbl = {};
+    (typeof KODE_WIN_LIST  !== 'undefined' ? KODE_WIN_LIST  : []).forEach(function(k){ _winLbl[k.kode]  = k.label; });
+    (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []).forEach(function(k){ _lostLbl[k.kode] = k.label; });
+    var _cycleDays = function(p) {
+      var parse = function(d){ if(!d) return null; var x=d.toString().split('/'); if(x.length!==3) return null; var dt=new Date(+x[2],+x[1]-1,+x[0]); return isNaN(dt)?null:dt; };
+      var a = parse(p.tanggal), b = parse(p.tanggalDeal);
+      if (!a || !b) return '-';
+      var days = Math.round((b - a) / 86400000);
+      return (days >= 0 ? days : 0) + ' hari';
+    };
+    var _analisaTable = function(title, rows, isWin) {
+      if (y > 248) { doc.addPage(); y = 14; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...(isWin?GREEN:RED));
+      doc.text(title, ML+3, y); y += 2.5;
+      doc.autoTable({
+        startY: y, margin: { left:ML, right:MR },
+        head: [['No','Project','Nilai','Sales Cycle', isWin?'Root Cause Win':'Root Cause Lost','Catatan']],
+        body: rows.map(function(p, i) {
+          var rc  = isWin ? (_winLbl[p.kodeWin]||p.kodeWin||'-') : (_lostLbl[p.kodeLost]||p.kodeLost||'-');
+          var cat = isWin ? (p.catatanWin||'-') : (p.catatanFail||'-');
+          return [i+1, p.namaProject||'-', rp(p.nilaiKontrak!==undefined?p.nilaiKontrak:p.grandTotal), _cycleDays(p), rc, cat];
+        }),
+        theme:'grid',
+        headStyles: { fillColor: isWin?GREEN:RED, textColor:WHITE, fontStyle:'bold', fontSize:6.5, halign:'center' },
+        bodyStyles: { fontSize:6.5, textColor:DARK, valign:'top' },
+        columnStyles: { 0:{halign:'center',cellWidth:8}, 1:{cellWidth:34,fontStyle:'bold'}, 2:{halign:'right',cellWidth:24}, 3:{halign:'center',cellWidth:18}, 4:{cellWidth:30}, 5:{cellWidth:'auto'} },
+        alternateRowStyles: { fillColor:[248,250,252] }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    };
+
     // Header
     doc.setFillColor(30,41,59); doc.rect(0,0,PW,24,'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(14);
@@ -922,6 +954,12 @@ window.exportDashboardPDF = function() {
         }
       });
       y = doc.lastAutoTable.finalY + 5;
+
+      // Analisa Win & Lost per sales
+      var winRows  = sales.penawaran.filter(function(p){ return p.status==='Deal' && p.kodeWin; });
+      var lostRows = sales.penawaran.filter(function(p){ return p.status==='Fail' && (p.kodeLost || p.catatanFail); });
+      if (winRows.length)  _analisaTable('ANALISA WIN — ' + sales.nama,  winRows,  true);
+      if (lostRows.length) _analisaTable('ANALISA LOST — ' + sales.nama, lostRows, false);
     });
 
     var totalPages = doc.internal.getNumberOfPages();
