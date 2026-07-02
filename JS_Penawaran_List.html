@@ -106,28 +106,16 @@
               </td>
               <td class="p-4 text-center rp-actions">
                 <div class="flex items-center justify-center gap-1">
-                ${i.status === 'Fail' && (i.catatanFail || i.kodeLost)
-                  ? `<button onclick="lihatCatatanFail('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Lost: ${(_ketKodeLost(i.kodeLost)||'-').replace(/'/g,"\\'")}\\n\\n${(i.catatanFail||'Tidak ada catatan.').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
-                      class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Lihat Catatan Fail">
-                      <i class="fa-solid fa-circle-info"></i>
+                ${i.status === 'Deal'
+                  ? `<button onclick='bukaCatatanWin(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="${i.kodeWin ? 'Edit' : 'Input'} Catatan Win">
+                      <i class="fa-solid fa-${i.kodeWin ? 'trophy' : 'comment-medical'}"></i>
                     </button>`
                   : ''}
-                ${i.status === 'Deal' && i.kodeWin
-                  ? `<button onclick="lihatKodeWin('${i.id}','${(i.namaProject||'').replace(/'/g,"\\'")}','Kode Win: ${(_ketKodeWin(i.kodeWin)||'-').replace(/'/g,"\\'")}\\n\\n${(i.catatanWin||'Tidak ada catatan.').replace(/'/g,"\\'").replace(/\n/g,' ')}')"
-                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Lihat Kode Win">
-                      <i class="fa-solid fa-trophy"></i>
-                    </button>`
-                  : ''}
-                ${i.status === 'Deal' && !i.kodeWin
-                  ? `<button onclick="inputCatatanWin('${i.id}','${i.rev}')"
-                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Input Catatan Win">
-                      <i class="fa-solid fa-comment-medical"></i>
-                    </button>`
-                  : ''}
-                ${i.status === 'Fail' && !(i.catatanFail || i.kodeLost)
-                  ? `<button onclick="inputCatatanFail('${i.id}','${i.rev}')"
-                      class="text-rose-400 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Input Catatan Lost">
-                      <i class="fa-solid fa-comment-medical"></i>
+                ${i.status === 'Fail'
+                  ? `<button onclick='bukaCatatanFail(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                      class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="${(i.catatanFail || i.kodeLost) ? 'Edit' : 'Input'} Catatan Lost">
+                      <i class="fa-solid fa-${(i.catatanFail || i.kodeLost) ? 'circle-info' : 'comment-medical'}"></i>
                     </button>`
                   : ''}
                 <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'

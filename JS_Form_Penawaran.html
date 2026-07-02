@@ -910,30 +910,30 @@
       _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru);
     }
 
-    // Input catatan Win/Lost untuk penawaran yang SUDAH Deal/Fail tapi belum ada catatan.
-    // Membuka modal yang sama, tanpa mengubah status (selectEl null).
-    window.inputCatatanWin = function(noPenawaran, rev) {
-      _kodeWinCtx = { noPenawaran: noPenawaran, rev: String(rev), selectEl: null, prevStatus: 'Deal' };
+    // Input/Edit catatan Win/Lost untuk penawaran Deal/Fail.
+    // Prefill dari item (edit); kosong = input baru. Tanpa mengubah status (selectEl null).
+    window.bukaCatatanWin = function(item) {
+      _kodeWinCtx = { noPenawaran: item.id, rev: String(item.rev), selectEl: null, prevStatus: 'Deal' };
       _populateKodeWinLostSelects();
       var sub = document.getElementById('kode-win-subtitle');
-      if (sub) sub.textContent = 'Pilih faktor kemenangan penawaran ' + noPenawaran + '.';
+      if (sub) sub.textContent = (item.kodeWin ? 'Ubah' : 'Pilih') + ' faktor kemenangan penawaran ' + item.id + '.';
       var selWin = document.getElementById('select-kode-win');
-      if (selWin) selWin.value = '';
+      if (selWin) selWin.value = item.kodeWin || '';
       var ta = document.getElementById('input-catatan-win');
-      if (ta) ta.value = '';
+      if (ta) ta.value = item.catatanWin || '';
       var modal = document.getElementById('modal-kode-win');
       if (modal) modal.classList.remove('hidden');
     };
 
-    window.inputCatatanFail = function(noPenawaran, rev) {
-      _catatanFailCtx = { noPenawaran: noPenawaran, rev: String(rev), selectEl: null, prevStatus: 'Fail' };
+    window.bukaCatatanFail = function(item) {
+      _catatanFailCtx = { noPenawaran: item.id, rev: String(item.rev), selectEl: null, prevStatus: 'Fail' };
       _populateKodeWinLostSelects();
       var sub = document.getElementById('catatan-fail-subtitle');
-      if (sub) sub.textContent = 'Masukkan catatan alasan penawaran ' + noPenawaran + ' ini fail.';
-      var ta = document.getElementById('input-catatan-fail');
-      if (ta) ta.value = '';
+      if (sub) sub.textContent = (item.kodeLost ? 'Ubah' : 'Masukkan') + ' catatan alasan penawaran ' + item.id + ' ini fail.';
       var selLost = document.getElementById('select-kode-lost');
-      if (selLost) selLost.value = '';
+      if (selLost) selLost.value = item.kodeLost || '';
+      var ta = document.getElementById('input-catatan-fail');
+      if (ta) ta.value = item.catatanFail || '';
       var modal = document.getElementById('modal-catatan-fail');
       if (modal) modal.classList.remove('hidden');
     };
@@ -984,6 +984,10 @@
       }
       const ta = document.getElementById('input-catatan-fail');
       const catatanFail = ta ? ta.value.trim() : '';
+      if (!catatanFail) {
+        showNotification('Catatan wajib diisi.', 'error');
+        return;
+      }
       const { noPenawaran, rev, selectEl } = _catatanFailCtx;
       const modal = document.getElementById('modal-catatan-fail');
       if (modal) modal.classList.add('hidden');
@@ -1010,8 +1014,8 @@
       }
       const ta = document.getElementById('input-catatan-win');
       const catatanWin = ta ? ta.value.trim() : '';
-      if (kodeWin === 'W12' && !catatanWin) {
-        showNotification('Kode "Faktor Lain" wajib dijelaskan di catatan.', 'error');
+      if (!catatanWin) {
+        showNotification('Catatan wajib diisi.', 'error');
         return;
       }
       const { noPenawaran, rev, selectEl } = _kodeWinCtx;
