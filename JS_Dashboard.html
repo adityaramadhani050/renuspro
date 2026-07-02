@@ -354,8 +354,8 @@ function _dbRenderKPIs(summary, prev, salesList) {
     dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
       (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
   }
-  var winRateCalc = (summary.teamPenawaran > 0)
-    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
+  // Win rate berbasis kohort (dari backend) — hindari inflasi deal bulan lalu
+  var winRateCalc = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
   var dealSub = document.getElementById('db-kpi-deal-sub');
   if (dealSub) dealSub.textContent = 'Win Rate: ' + _pct(winRateCalc);
 
@@ -414,8 +414,10 @@ function _dbRenderTargetBar(summary, items, annualTarget) {
 
 // ── Statistik Konversi ─────────────────────────────────────────
 function _dbRenderKonversi(summary) {
-  var winRate = (summary.teamPenawaran > 0)
-    ? (summary.teamDealCount / summary.teamPenawaran * 100) : 0;
+  // Win rate berbasis KOHORT (deal dari penawaran yang dibuat periode ini /
+  // total penawaran dibuat periode ini) — konsisten dgn win rate per-sales &
+  // menghindari inflasi dari deal penawaran bulan lalu. Dihitung di backend.
+  var winRate = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
   var dealCount = summary.teamDealCount || 0;
   var revenue   = summary.teamRevenue || 0;
   var avgDeal   = dealCount > 0 ? Math.round(revenue / dealCount) : 0;
