@@ -910,14 +910,44 @@
       _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru);
     }
 
+    // Input catatan Win/Lost untuk penawaran yang SUDAH Deal/Fail tapi belum ada catatan.
+    // Membuka modal yang sama, tanpa mengubah status (selectEl null).
+    window.inputCatatanWin = function(noPenawaran, rev) {
+      _kodeWinCtx = { noPenawaran: noPenawaran, rev: String(rev), selectEl: null, prevStatus: 'Deal' };
+      _populateKodeWinLostSelects();
+      var sub = document.getElementById('kode-win-subtitle');
+      if (sub) sub.textContent = 'Pilih faktor kemenangan penawaran ' + noPenawaran + '.';
+      var selWin = document.getElementById('select-kode-win');
+      if (selWin) selWin.value = '';
+      var ta = document.getElementById('input-catatan-win');
+      if (ta) ta.value = '';
+      var modal = document.getElementById('modal-kode-win');
+      if (modal) modal.classList.remove('hidden');
+    };
+
+    window.inputCatatanFail = function(noPenawaran, rev) {
+      _catatanFailCtx = { noPenawaran: noPenawaran, rev: String(rev), selectEl: null, prevStatus: 'Fail' };
+      _populateKodeWinLostSelects();
+      var sub = document.getElementById('catatan-fail-subtitle');
+      if (sub) sub.textContent = 'Masukkan catatan alasan penawaran ' + noPenawaran + ' ini fail.';
+      var ta = document.getElementById('input-catatan-fail');
+      if (ta) ta.value = '';
+      var selLost = document.getElementById('select-kode-lost');
+      if (selLost) selLost.value = '';
+      var modal = document.getElementById('modal-catatan-fail');
+      if (modal) modal.classList.remove('hidden');
+    };
+
     function _terapkanStatusPenawaran(noPenawaran, rev, selectEl, statusBaru, catatanFail, extra) {
       const statusConfig = {
         'On-Progress': 'bg-blue-100 text-blue-700',
         'Deal':        'bg-emerald-100 text-emerald-800',
         'Fail':        'bg-rose-100 text-rose-700'
       };
-      selectEl.className = `text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusConfig[statusBaru] || 'bg-slate-100 text-slate-600'}`;
-      selectEl.setAttribute('data-prev-status', statusBaru);
+      if (selectEl) {
+        selectEl.className = `text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusConfig[statusBaru] || 'bg-slate-100 text-slate-600'}`;
+        selectEl.setAttribute('data-prev-status', statusBaru);
+      }
 
       if (typeof google !== 'undefined') {
         google.script.run

@@ -118,6 +118,18 @@
                       <i class="fa-solid fa-trophy"></i>
                     </button>`
                   : ''}
+                ${i.status === 'Deal' && !i.kodeWin
+                  ? `<button onclick="inputCatatanWin('${i.id}','${i.rev}')"
+                      class="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Input Catatan Win">
+                      <i class="fa-solid fa-comment-medical"></i>
+                    </button>`
+                  : ''}
+                ${i.status === 'Fail' && !(i.catatanFail || i.kodeLost)
+                  ? `<button onclick="inputCatatanFail('${i.id}','${i.rev}')"
+                      class="text-rose-400 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Input Catatan Lost">
+                      <i class="fa-solid fa-comment-medical"></i>
+                    </button>`
+                  : ''}
                 <button onclick='salinPenawaran(${JSON.stringify(i).replace(/'/g,"&#39;")})'
                   class="text-teal-500 hover:bg-teal-50 p-1.5 rounded-lg transition" title="Salin sebagai Penawaran Baru">
                   <i class="fa-solid fa-copy"></i>
