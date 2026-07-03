@@ -753,12 +753,12 @@ function _dbRenderLeaderboard(salesList) {
       + '<td class="px-4 py-3"><span class="text-sm font-bold text-slate-800">' + _esc(s.nama) + '</span></td>'
       + '<td class="px-4 py-3 text-xs text-slate-600">' + s.totalPenawaran + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + _rp(s.totalNilaiPenawaran) + '</td>'
-      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
-      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
-      + '<td class="px-4 py-3 text-xs font-bold text-violet-600">' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '<span class="text-slate-300">—</span>') + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + (s.detailDealCount != null ? s.detailDealCount : s.dealCount) + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.detailDealRevenue != null ? s.detailDealRevenue : s.dealRevenue) + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-violet-600">' + (s.detailAvgMarginDeal != null ? _pct(s.detailAvgMarginDeal) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
-      + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
+      + '<td class="px-4 py-3">' + _achieveBadge(s.detailAchievement != null ? s.detailAchievement : s.achievement) + '</td>'
       + '</tr>';
   }).join('');
 }
@@ -1119,7 +1119,10 @@ window.exportDashboardPDF = function() {
       startY: y, margin: { left:ML, right:MR },
       head: [['#','Nama Sales','Penawaran','Nilai Total','Deal','Revenue Deal','Win Rate','Target','Capaian']],
       body: list.map(function(s, i) {
-        return [i+1, s.nama, s.totalPenawaran, rp(s.totalNilaiPenawaran), s.dealCount, rp(s.dealRevenue), pct(s.winRate), s.targetBulanan>0?rp(s.targetBulanan):'-', s.achievement!=null?pct(s.achievement):'No Target'];
+        var dCount = (s.detailDealCount != null) ? s.detailDealCount : s.dealCount;
+        var dRev   = (s.detailDealRevenue != null) ? s.detailDealRevenue : s.dealRevenue;
+        var dAch   = (s.detailAchievement != null) ? s.detailAchievement : s.achievement;
+        return [i+1, s.nama, s.totalPenawaran, rp(s.totalNilaiPenawaran), dCount, rp(dRev), pct(s.winRate), s.targetBulanan>0?rp(s.targetBulanan):'-', dAch!=null?pct(dAch):'No Target'];
       }),
       theme:'grid',
       headStyles: { fillColor:BLUE, textColor:WHITE, fontStyle:'bold', fontSize:7, halign:'center' },
@@ -1128,7 +1131,8 @@ window.exportDashboardPDF = function() {
       alternateRowStyles: { fillColor:[248,250,252] },
       didParseCell: function(d) {
         if (d.section==='body' && d.column.index===8 && d.row.index<list.length) {
-          var ach = list[d.row.index].achievement;
+          var _ls = list[d.row.index];
+          var ach = (_ls.detailAchievement != null) ? _ls.detailAchievement : _ls.achievement;
           if (ach>=100) d.cell.styles.textColor=GREEN; else if (ach>=50) d.cell.styles.textColor=BLUE; else if (ach!=null) d.cell.styles.textColor=RED;
         }
         if (d.section==='body' && d.column.index===5) d.cell.styles.textColor=GREEN;
@@ -1143,7 +1147,9 @@ window.exportDashboardPDF = function() {
       doc.roundedRect(ML,y,CW,10,2,2,'FD');
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
       doc.text(sales.nama, ML+3, y+6.5);
-      var rt = rp(sales.dealRevenue) + '   WR ' + pct(sales.winRate) + (sales.achievement!=null? '   Capaian ' + pct(sales.achievement) : '');
+      var _sRev = (sales.detailDealRevenue != null) ? sales.detailDealRevenue : sales.dealRevenue;
+      var _sAch = (sales.detailAchievement != null) ? sales.detailAchievement : sales.achievement;
+      var rt = rp(_sRev) + '   WR ' + pct(sales.winRate) + (_sAch!=null? '   Capaian ' + pct(_sAch) : '');
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...SLATE);
       doc.text(rt, ML+CW-2, y+6.5, { align:'right' }); y += 12;
 

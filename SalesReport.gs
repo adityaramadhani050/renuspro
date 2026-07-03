@@ -417,6 +417,7 @@ function getSalesReportData(params) {
       sd.detailDealRevenue   = kDealRev;
       sd.detailAvgMarginDeal = kDealRev > 0 ? ((kDealRev - kDealHpp) / kDealRev) * 100 : null;
       sd.detailAvgNilaiDeal  = kDealCount > 0 ? (kDealRev / kDealCount) : 0;
+      sd.detailAchievement   = sd.targetBulanan > 0 ? (kDealRev / sd.targetBulanan) * 100 : null;
       teamCycleSum += cycleSum;
       teamCycleCount += cycleCount;
 
@@ -433,6 +434,7 @@ function getSalesReportData(params) {
         detailDealRevenue:   sd.detailDealRevenue,   // kohort
         detailAvgMarginDeal: sd.detailAvgMarginDeal, // kohort
         detailAvgNilaiDeal:  sd.detailAvgNilaiDeal,  // kohort
+        detailAchievement:   sd.detailAchievement,   // kohort (capaian dari revenue kohort)
         pipelineCount:       sd.pipelineCount,
         pipelineValue:       sd.pipelineValue,
         failCount:           sd.failCount,
@@ -449,8 +451,12 @@ function getSalesReportData(params) {
       delete sd._penawaranPipeline;
     }
 
-    // Sort salesList by dealRevenue descending (leaderboard)
-    salesList.sort(function(a, b) { return b.dealRevenue - a.dealRevenue; });
+    // Sort salesList by revenue kohort descending (leaderboard = detail)
+    salesList.sort(function(a, b) {
+      var ar = (a.detailDealRevenue != null) ? a.detailDealRevenue : a.dealRevenue;
+      var br = (b.detailDealRevenue != null) ? b.detailDealRevenue : b.dealRevenue;
+      return br - ar;
+    });
 
     // --- Step 4: Team summary ---
     var teamRevenue      = 0;
