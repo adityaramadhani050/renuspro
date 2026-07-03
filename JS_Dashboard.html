@@ -771,7 +771,7 @@ function _dbDetailTableRows(s) {
   }
   return s.penawaran.map(function(p) {
     var marginClass = p.marginPersen < 25 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
-    return '<tr class="hover:bg-slate-50 transition' + (p.dealInPeriod ? ' bg-emerald-50/30' : '') + '">'
+    return '<tr class="hover:bg-slate-50 transition' + (p.dealLuarPeriode ? ' bg-amber-50/40' : '') + '">'
       + '<td class="px-3 py-2 text-xs whitespace-nowrap"><div class="font-mono text-slate-600">' + _esc(p.id) + '</div><div class="text-slate-400 mt-0.5">' + (p.tanggal || '—') + '</div></td>'
       + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaKlien) + '</td>'
       + '<td class="px-3 py-2 text-xs text-slate-700">' + _esc(p.namaProject) + '</td>'
@@ -784,6 +784,7 @@ function _dbDetailTableRows(s) {
       + (p.status === 'Deal' && p.kodeWin
           ? '<button onclick="lihatKodeWin(\'' + _esc(p.id) + '\',\'' + _esc(p.namaProject).replace(/'/g, "\\'") + '\',\'Root Cause: ' + _esc(_ketKodeWin(p.kodeWin) || '-').replace(/'/g, "\\'") + '\\n\\nLesson Learned: ' + _esc(p.lessonLearned || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\\n\\nAction: ' + _esc(p.action || '-').replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')" class="text-emerald-500 hover:bg-emerald-50 p-1 rounded-lg transition" title="Lihat Analisa Win"><i class="fa-solid fa-trophy text-xs"></i></button>'
           : '')
+      + (p.dealLuarPeriode ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 whitespace-nowrap" title="Penawaran dibuat periode ini, deal-nya di luar periode">Deal periode lain</span>' : '')
       + '</div></td>'
       + '<td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">' + (p.status === 'Deal' ? (p.tanggalDeal || '—') : (p.status === 'Fail' ? (p.tanggalFail || '—') : '—')) + '</td>'
       + '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap text-center">' + (p.salesCycleDays != null ? (p.salesCycleDays + ' hari') : '—') + '</td>'
@@ -793,16 +794,20 @@ function _dbDetailTableRows(s) {
 
 // Konten detail (KPI grid + tabel) — dipakai oleh accordion & tampilan flat.
 function _dbDetailInner(s) {
-  var avgNilaiDeal = (s.dealCount > 0) ? (s.dealRevenue / s.dealCount) : 0;
+  // Semua metrik detail berbasis KOHORT (penawaran dibuat periode ini)
+  var dDealCount  = (s.detailDealCount != null) ? s.detailDealCount : (s.dealCohort || 0);
+  var dDealRev    = (s.detailDealRevenue != null) ? s.detailDealRevenue : 0;
+  var dMargin     = (s.detailAvgMarginDeal != null) ? s.detailAvgMarginDeal : null;
+  var dAvgNilai   = (s.detailAvgNilaiDeal != null) ? s.detailAvgNilaiDeal : 0;
   return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50">'
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
     + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Nilai Penawaran', _rp(s.avgNilaiPenawaran || 0), 'text-blue-600 text-xs leading-tight')
-    + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
+    + _dbMiniKPI('Avg Margin Deal', (dMargin != null ? _pct(dMargin) : '—'), 'text-violet-600')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
-    + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
-    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
-    + _dbMiniKPI('Avg Nilai Deal', _rp(avgNilaiDeal), 'text-emerald-600 text-xs leading-tight')
+    + _dbMiniKPI('Deal', dDealCount, 'text-emerald-600')
+    + _dbMiniKPI('Revenue Deal', _rp(dDealRev), 'text-emerald-600 text-xs leading-tight')
+    + _dbMiniKPI('Avg Nilai Deal', _rp(dAvgNilai), 'text-emerald-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
     + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
     + '</div>'
@@ -840,8 +845,8 @@ function _dbRenderDetailAccordion(salesList) {
       + '<span class="font-bold text-slate-800 text-sm truncate">' + _esc(s.nama) + '</span>'
       + '</div>'
       + '<div class="flex flex-wrap items-center gap-2">'
-      + '<span class="text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</span>'
-      + '<span class="text-[10px] font-bold text-violet-500 whitespace-nowrap">Margin ' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—') + '</span>'
+      + '<span class="text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.detailDealRevenue != null ? s.detailDealRevenue : s.dealRevenue) + '</span>'
+      + '<span class="text-[10px] font-bold text-violet-500 whitespace-nowrap">Margin ' + (s.detailAvgMarginDeal != null ? _pct(s.detailAvgMarginDeal) : '—') + '</span>'
       + '<span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">WR ' + _pct(s.winRate) + '</span>'
       + _achieveBadge(s.achievement)
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
