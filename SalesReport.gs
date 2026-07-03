@@ -326,11 +326,10 @@ function getSalesReportData(params) {
         tanggalFail:  formatTgl(tanggalFail),
         lessonLearned: lessonLearned,
         action:       actionItem,
-        // Deal yang dibuat periode ini tapi CLOSING-nya di periode lain (untuk badge)
-        dealLuarPeriode: (status === 'Deal') && creationInRange && !dealInRange
+        dealInPeriod: dealInRange && !creationInRange  // penawaran dibuat di luar periode tapi deal dalam periode
       };
 
-      // Creation-date-based metrics (kohort)
+      // Creation-date-based metrics
       if (creationInRange) {
         sd.totalPenawaran++;
         sd.totalNilaiPenawaran += nilaiKontrak;
@@ -338,18 +337,17 @@ function getSalesReportData(params) {
         if (status === 'Deal') sd.dealCohort++;   // deal dari kohort periode ini
       }
 
-      // Daftar penawaran per sales = KOHORT: penawaran yang DIBUAT di periode ini
-      // (apa pun statusnya). Konsisten dgn "Penawaran Dibuat" & win rate; deal yang
-      // closing-nya di periode lain tetap tampil (diberi badge di UI).
-      var masukList = creationInRange;
+      // Masuk daftar penawaran:
+      // - Deal    → berdasarkan tanggal deal (meski penawaran dibuat di periode lain)
+      // - Non-Deal → berdasarkan tanggal pembuatan
+      var masukList = (status === 'Deal') ? dealInRange : creationInRange;
       if (masukList) {
         if (!sd._penawaranInRange[noPenawaran]) {
           sd._penawaranInRange[noPenawaran] = pObj;
         }
       }
 
-      // Deal-date-based metrics (realisasi) — untuk KPI headline, leaderboard,
-      // target achievement & trend (revenue dibukukan pada periode ini).
+      // Deal-date-based metrics
       if (dealInRange) {
         sd.dealCount++;
         sd.dealRevenue += nilaiKontrak;
@@ -396,28 +394,16 @@ function getSalesReportData(params) {
         return b.grandTotal - a.grandTotal;
       });
 
-      // Sales cycle + metrik DETAIL berbasis KOHORT (dari daftar penawaran yang
-      // dibuat periode ini). Rata-rata cycle & margin hanya dari penawaran Deal;
-      // nilai cycle Fail tetap ditampilkan di tabel tapi tidak masuk rata-rata.
+      // Sales cycle per penawaran + rata-rata per sales.
+      // Rata-rata HANYA dari penawaran Deal (Fail tidak dihitung),
+      // meski nilai cycle Fail tetap ditampilkan di tabel.
       var cycleSum = 0, cycleCount = 0;
-      var kDealCount = 0, kDealRev = 0, kDealHpp = 0;
       for (var pci = 0; pci < penawaranArr.length; pci++) {
-        var pp = penawaranArr[pci];
-        var cyc = hitungSalesCycle(pp);
-        pp.salesCycleDays = cyc;
-        if (pp.status === 'Deal') {
-          kDealCount++;
-          kDealRev += (pp.nilaiKontrak || 0);
-          kDealHpp += (pp.totalHpp || 0);
-          if (cyc !== null) { cycleSum += cyc; cycleCount++; }
-        }
+        var cyc = hitungSalesCycle(penawaranArr[pci]);
+        penawaranArr[pci].salesCycleDays = cyc;
+        if (cyc !== null && penawaranArr[pci].status === 'Deal') { cycleSum += cyc; cycleCount++; }
       }
-      sd.avgSalesCycle       = cycleCount > 0 ? (cycleSum / cycleCount) : null;
-      sd.detailDealCount     = kDealCount;                                  // = dealCohort
-      sd.detailDealRevenue   = kDealRev;
-      sd.detailAvgMarginDeal = kDealRev > 0 ? ((kDealRev - kDealHpp) / kDealRev) * 100 : null;
-      sd.detailAvgNilaiDeal  = kDealCount > 0 ? (kDealRev / kDealCount) : 0;
-      sd.detailAchievement   = sd.targetBulanan > 0 ? (kDealRev / sd.targetBulanan) * 100 : null;
+      sd.avgSalesCycle = cycleCount > 0 ? (cycleSum / cycleCount) : null;
       teamCycleSum += cycleSum;
       teamCycleCount += cycleCount;
 
@@ -427,20 +413,15 @@ function getSalesReportData(params) {
         totalPenawaran:      sd.totalPenawaran,
         totalNilaiPenawaran: sd.totalNilaiPenawaran,
         avgNilaiPenawaran:   sd.avgNilaiPenawaran,
-        dealCount:           sd.dealCount,       // realisasi (by tanggal deal)
-        dealRevenue:         sd.dealRevenue,     // realisasi
-        dealHpp:             sd.dealHpp,         // realisasi
-        detailDealCount:     sd.detailDealCount,     // kohort (dibuat periode ini)
-        detailDealRevenue:   sd.detailDealRevenue,   // kohort
-        detailAvgMarginDeal: sd.detailAvgMarginDeal, // kohort
-        detailAvgNilaiDeal:  sd.detailAvgNilaiDeal,  // kohort
-        detailAchievement:   sd.detailAchievement,   // kohort (capaian dari revenue kohort)
+        dealCount:           sd.dealCount,
+        dealRevenue:         sd.dealRevenue,
+        dealHpp:             sd.dealHpp,
         pipelineCount:       sd.pipelineCount,
         pipelineValue:       sd.pipelineValue,
         failCount:           sd.failCount,
         dealCohort:          sd.dealCohort,
         winRate:             sd.winRate,
-        avgMarginDeal:       sd.avgMarginDeal,   // realisasi (leaderboard)
+        avgMarginDeal:       sd.avgMarginDeal,
         avgSalesCycle:       sd.avgSalesCycle,
         achievement:         sd.achievement,
         penawaran:           penawaranArr
@@ -451,12 +432,8 @@ function getSalesReportData(params) {
       delete sd._penawaranPipeline;
     }
 
-    // Sort salesList by revenue kohort descending (leaderboard = detail)
-    salesList.sort(function(a, b) {
-      var ar = (a.detailDealRevenue != null) ? a.detailDealRevenue : a.dealRevenue;
-      var br = (b.detailDealRevenue != null) ? b.detailDealRevenue : b.dealRevenue;
-      return br - ar;
-    });
+    // Sort salesList by dealRevenue descending (leaderboard)
+    salesList.sort(function(a, b) { return b.dealRevenue - a.dealRevenue; });
 
     // --- Step 4: Team summary ---
     var teamRevenue      = 0;
