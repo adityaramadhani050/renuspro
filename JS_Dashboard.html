@@ -297,7 +297,7 @@ function _dbRenderAll(rawData, salesData) {
     annualTarget = (summary.teamTarget || 0) * 12;
   }
 
-  _dbRenderKPIs(summary, prev, salesList, items);
+  _dbRenderKPIs(summary, prev, salesList, items, ms);
   _dbRenderTargetBar(summary, items, annualTarget);
   _dbRenderKonversi(summary);
   _dbRenderTrend(items);
@@ -321,32 +321,24 @@ function _dbRenderAll(rawData, salesData) {
 }
 
 // ── KPI Cards ──────────────────────────────────────────────────
-// Deal BULAN INI dipecah berdasarkan bulan pembuatan penawarannya:
-// - fromThis: penawaran dibuat bulan ini yang deal bulan ini (kohort)
-// - fromLast: penawaran dibuat bulan lalu yang deal bulan ini
-function _dbDealCohortSplit(items) {
-  var now = new Date();
-  var curFrom  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  var curTo    = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
-  var pm = now.getMonth() - 1, py = now.getFullYear();
-  if (pm < 0) { pm = 11; py--; }
-  var lastFrom = new Date(py, pm, 1).getTime();
-  var lastTo   = new Date(py, pm + 1, 0, 23, 59, 59, 999).getTime();
-
+// Deal DALAM PERIODE dipecah berdasarkan kapan penawarannya dibuat:
+// - fromThis: penawaran dibuat DALAM periode yang deal dalam periode (kohort)
+// - fromLast: penawaran dibuat SEBELUM periode yang deal dalam periode
+// Mengikuti periode filter yang dipilih (bukan bulan berjalan).
+function _dbDealCohortSplit(items, fromMs, toMs) {
   var fromThis = 0, fromLast = 0;
   (items || []).forEach(function(it) {
     if (it.status !== 'Deal') return;
     var d = it.tanggalDeal || it.tanggal;          // tanggal deal
-    if (!d || d < curFrom || d > curTo) return;    // harus deal bulan ini
+    if (!d || d < fromMs || d > toMs) return;      // deal harus dalam periode
     var c = it.tanggal;                             // tanggal penawaran dibuat
-    if (c == null) return;
-    if (c >= curFrom && c <= curTo) fromThis++;
-    else if (c >= lastFrom && c <= lastTo) fromLast++;
+    if (c == null || c >= fromMs) fromThis++;       // dibuat dalam periode (c<=d<=toMs)
+    else fromLast++;                                // dibuat sebelum periode
   });
   return { fromThis: fromThis, fromLast: fromLast };
 }
 
-function _dbRenderKPIs(summary, prev, salesList, items) {
+function _dbRenderKPIs(summary, prev, salesList, items, ms) {
   var curRevenue = summary.teamRevenue || 0;
   var curDeals   = summary.teamDealCount || 0;
   var prevRevenue = prev.prevRevenue || 0;
@@ -379,11 +371,14 @@ function _dbRenderKPIs(summary, prev, salesList, items) {
     dealBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ' +
       (dealDiff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700');
   }
-  // Rincian deal bulan ini menurut bulan pembuatan penawarannya
-  // (dari penawaran bulan ini vs bulan lalu).
-  var split = _dbDealCohortSplit(items);
+  // Rincian deal DALAM PERIODE menurut kapan penawarannya dibuat
+  // (dibuat dalam periode vs sebelum periode) — ikut filter periode.
+  var _now = new Date();
+  var pFrom = (ms && ms.fromMs) ? ms.fromMs : new Date(_now.getFullYear(), _now.getMonth(), 1).getTime();
+  var pTo   = (ms && ms.toMs)   ? ms.toMs   : new Date(_now.getFullYear(), _now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+  var split = _dbDealCohortSplit(items, pFrom, pTo);
   var dealSub = document.getElementById('db-kpi-deal-sub');
-  if (dealSub) dealSub.textContent = 'Penawaran bulan ini: ' + split.fromThis + '. bulan lalu: ' + split.fromLast;
+  if (dealSub) dealSub.textContent = 'Penawaran periode ini: ' + split.fromThis + '. sebelumnya: ' + split.fromLast;
 
   // Pipeline
   var pipEl = document.getElementById('db-kpi-pipeline');
