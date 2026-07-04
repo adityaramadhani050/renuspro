@@ -111,7 +111,7 @@ function _renderLaporanProfit(res) {
       html += '<td class="p-3 text-center whitespace-nowrap">';
       html += '<div class="inline-flex items-center gap-3">';
       html += '<button onclick="exportLaporanPengeluaranWO(\'' + noWOEsc + '\')" title="Export Lap. Pengeluaran (PDF)" aria-label="Export Laporan Pengeluaran PDF" ';
-      html += 'class="inline-flex items-center justify-center h-10 w-10 text-red-500 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-xl transition"><i class="fa-solid fa-file-pdf text-sm"></i></button>';
+      html += 'class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"><i class="fa-solid fa-file-pdf"></i></button>';
       html += '<button onclick="toggleDetailKasWO(' + idx + ',\'' + noWOEsc + '\')" id="lp-detail-btn-' + idx + '" title="Detail pemasukan & pengeluaran" aria-label="Detail pemasukan & pengeluaran" ';
       html += 'class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-2.5 px-2">';
       html += '<i id="lp-caret-' + idx + '" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-200"></i> Detail</button>';
