@@ -73,10 +73,11 @@ function _renderLaporanProfit(res) {
       '<tr><td colspan="9" class="p-8 text-center text-slate-400">Tidak ada data untuk periode ini.</td></tr>';
   } else {
     var html = '';
-    rows.forEach(function(r) {
+    rows.forEach(function(r, idx) {
       var overBudget = r.isOverBudget;
       var rowClass   = overBudget ? 'bg-rose-50 hover:bg-rose-100' : 'hover:bg-slate-50';
       var selisihCls = r.selisih >= 0 ? 'text-emerald-600' : 'text-rose-600';
+      var noWOEsc    = _escLP(r.noWO).replace(/'/g, "\\'");
       html += '<tr class="' + rowClass + ' transition-colors">';
 
       // Kolom 1: No WO + Tanggal
@@ -106,13 +107,20 @@ function _renderLaporanProfit(res) {
       html += '<td class="p-4 text-right text-xs text-slate-500">' + _fmtPctLP(r.marginEstimasi) + '</td>';
       html += '<td class="p-4 text-right text-xs font-bold ' + (overBudget ? 'text-rose-600' : 'text-emerald-600') + '">' + _fmtPctLP(r.marginRealisasi) + '</td>';
 
-      // Kolom Aksi: export laporan pengeluaran WO ini
-      html += '<td class="p-4 text-center">';
-      html += '<button onclick="exportLaporanPengeluaranWO(\'' + _escLP(r.noWO).replace(/'/g, "\\'") + '\')" title="Lap. Pengeluaran" ';
+      // Kolom Aksi: expand detail kas + export laporan pengeluaran WO ini
+      html += '<td class="p-4 text-center whitespace-nowrap">';
+      html += '<div class="inline-flex items-center gap-1">';
+      html += '<button onclick="toggleDetailKasWO(' + idx + ',\'' + noWOEsc + '\')" title="Detail pemasukan & pengeluaran" ';
+      html += 'class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition"><i id="lp-caret-' + idx + '" class="fa-solid fa-chevron-right text-xs transition-transform"></i></button>';
+      html += '<button onclick="exportLaporanPengeluaranWO(\'' + noWOEsc + '\')" title="Lap. Pengeluaran" ';
       html += 'class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"><i class="fa-solid fa-file-pdf"></i></button>';
-      html += '</td>';
+      html += '</div></td>';
 
       html += '</tr>';
+
+      // Baris detail (lazy-load saat di-expand)
+      html += '<tr id="lp-detail-' + idx + '" class="hidden"><td colspan="9" class="p-0 border-b border-slate-100">';
+      html += '<div id="lp-detail-body-' + idx + '"></div></td></tr>';
     });
     document.getElementById('lp-table-profit').innerHTML = html;
   }
@@ -120,6 +128,63 @@ function _renderLaporanProfit(res) {
 
 function _escLP(s) {
   return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Detail pemasukan & pengeluaran per WO (lazy-load) ──────────────
+window.toggleDetailKasWO = function(idx, noWO) {
+  var row  = document.getElementById('lp-detail-' + idx);
+  var icon = document.getElementById('lp-caret-' + idx);
+  if (!row) return;
+  var isHidden = row.classList.toggle('hidden');
+  if (icon) icon.style.transform = isHidden ? '' : 'rotate(90deg)';
+  if (isHidden) return; // menutup — tidak perlu fetch
+
+  var body = document.getElementById('lp-detail-body-' + idx);
+  if (!body || body.getAttribute('data-loaded') === '1') return;
+  body.innerHTML = '<div class="p-4 text-xs text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat detail...</div>';
+  if (typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { body.innerHTML = '<div class="p-4 text-xs text-rose-500">Gagal memuat detail.</div>'; return; }
+      body.innerHTML = _renderDetailKasWO(res);
+      body.setAttribute('data-loaded', '1');
+    })
+    .withFailureHandler(function(e) { body.innerHTML = '<div class="p-4 text-xs text-rose-500">Error: ' + (e && e.message ? e.message : e) + '</div>'; })
+    .getDetailKasProjectWO(noWO);
+};
+
+function _renderDetailKasWO(res) {
+  var pemHtml = (res.pemasukan || []).map(function(p) {
+    return '<tr class="border-b border-slate-50">'
+      + '<td class="px-3 py-1.5 whitespace-nowrap text-slate-500">' + _escLP(p.tanggal) + '</td>'
+      + '<td class="px-3 py-1.5 text-slate-700">' + _escLP(p.deskripsi || p.noInvoice)
+      + '<div class="text-[10px] text-slate-400">' + _escLP(p.noInvoice) + (p.namaAkun ? ' &middot; ' + _escLP(p.namaAkun) : '') + '</div></td>'
+      + '<td class="px-3 py-1.5 text-right font-semibold text-emerald-600 whitespace-nowrap">' + _fmtRpLP(p.jumlah) + '</td></tr>';
+  }).join('') || '<tr><td colspan="3" class="px-3 py-4 text-center text-slate-400 italic">Belum ada pemasukan (pembayaran invoice) untuk WO ini.</td></tr>';
+
+  var engHtml = (res.pengeluaran || []).map(function(e) {
+    var meta = _escLP(e.sumber) + (e.noPO ? ' &middot; ' + _escLP(e.noPO) : '') + (e.namaAkun ? ' &middot; ' + _escLP(e.namaAkun) : '');
+    return '<tr class="border-b border-slate-50">'
+      + '<td class="px-3 py-1.5 whitespace-nowrap text-slate-500">' + _escLP(e.tanggal) + '</td>'
+      + '<td class="px-3 py-1.5 text-slate-700">' + _escLP(e.deskripsi)
+      + '<div class="text-[10px] text-slate-400">' + meta + '</div></td>'
+      + '<td class="px-3 py-1.5 text-right font-semibold text-rose-600 whitespace-nowrap">' + _fmtRpLP(e.total) + '</td></tr>';
+  }).join('') || '<tr><td colspan="3" class="px-3 py-4 text-center text-slate-400 italic">Belum ada pengeluaran untuk WO ini.</td></tr>';
+
+  return '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 bg-slate-50">'
+    + '<div class="bg-white rounded-xl border border-slate-100 overflow-hidden">'
+    +   '<div class="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">'
+    +     '<span class="text-xs font-bold text-emerald-700"><i class="fas fa-arrow-down mr-1"></i>Pemasukan (Pembayaran Invoice)</span>'
+    +     '<span class="text-xs font-extrabold text-emerald-700">' + _fmtRpLP(res.totalMasuk) + '</span></div>'
+    +   '<div class="overflow-x-auto"><table class="w-full text-xs"><tbody>' + pemHtml + '</tbody></table></div>'
+    + '</div>'
+    + '<div class="bg-white rounded-xl border border-slate-100 overflow-hidden">'
+    +   '<div class="px-3 py-2 bg-rose-50 border-b border-rose-100 flex items-center justify-between">'
+    +     '<span class="text-xs font-bold text-rose-700"><i class="fas fa-arrow-up mr-1"></i>Pengeluaran (Biaya Project)</span>'
+    +     '<span class="text-xs font-extrabold text-rose-700">' + _fmtRpLP(res.totalKeluar) + '</span></div>'
+    +   '<div class="overflow-x-auto"><table class="w-full text-xs"><tbody>' + engHtml + '</tbody></table></div>'
+    + '</div>'
+    + '</div>';
 }
 
 // ── Export PDF ─────────────────────────────────────────────────

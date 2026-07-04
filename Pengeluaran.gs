@@ -412,6 +412,85 @@ function _hapusPengeluaranByReferensi(idReferensi) {
 
 // ── Fase 3: Realisasi HPP & Margin per WO ────────────────────────────────────
 
+/**
+ * Detail arus kas per Project/WO untuk Laporan Profit Project:
+ *  - pengeluaran: semua biaya WO ini (Pembayaran PO, Penggunaan Stok, Langsung).
+ *  - pemasukan:   pembayaran invoice yang invoice-nya milik WO ini
+ *                 (Pemasukan.idReferensi = No Invoice → Invoice.noWO === WO).
+ */
+function getDetailKasProjectWO(noWO) {
+  try {
+    noWO = noWO ? noWO.toString().trim() : '';
+    if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+    var ss = getSpreadsheet();
+
+    // Pengeluaran (biaya) WO ini
+    var engSheet = _ensurePengeluaranSheet(ss);
+    var engData  = engSheet.getDataRange().getValues();
+    var pengeluaran = [], totalKeluar = 0;
+    for (var i = 1; i < engData.length; i++) {
+      var r = engData[i];
+      if (!r[0]) continue;
+      if ((r[1] || '').toString().trim() !== noWO) continue;
+      var total = parseFloat(r[12]) || 0;
+      totalKeluar += total;
+      pengeluaran.push({
+        id:        r[0].toString(),
+        tanggal:   _fmtTgl(r[2]),
+        sumber:    (r[3] || '').toString(),
+        noPO:      (r[4] || '').toString(),
+        namaAkun:  (r[7] || '').toString(),
+        deskripsi: (r[8] || '').toString(),
+        total:     total
+      });
+    }
+
+    // Invoice milik WO ini → himpunan No Invoice
+    var invSet = {};
+    var invSheet = ss.getSheetByName('Invoice_Main');
+    if (invSheet) {
+      var invData = invSheet.getDataRange().getValues();
+      for (var j = 1; j < invData.length; j++) {
+        var iNo = (invData[j][0] || '').toString().trim();
+        var iWO = (invData[j][1] || '').toString().trim();
+        if (iNo && iWO === noWO) invSet[iNo] = true;
+      }
+    }
+
+    // Pemasukan (pembayaran) yang referensinya = invoice WO ini
+    var pemasukan = [], totalMasuk = 0;
+    var pemSheet = _ensurePemasukanSheet(ss);
+    var pemData  = pemSheet.getDataRange().getValues();
+    for (var k = 1; k < pemData.length; k++) {
+      var p = pemData[k];
+      if (!p[0]) continue;
+      var ref = (p[7] || '').toString().trim();
+      if (!ref || !invSet[ref]) continue;
+      var jml = parseFloat(p[9]) || 0;
+      totalMasuk += jml;
+      pemasukan.push({
+        id:        p[0].toString(),
+        tanggal:   _fmtTgl(p[1]),
+        noInvoice: ref,
+        namaAkun:  (p[5] || '').toString(),
+        deskripsi: (p[8] || '').toString(),
+        jumlah:    jml
+      });
+    }
+
+    return {
+      success:     true,
+      noWO:        noWO,
+      pemasukan:   pemasukan,
+      pengeluaran: pengeluaran,
+      totalMasuk:  totalMasuk,
+      totalKeluar: totalKeluar
+    };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
 function getRealisasiHPP(noWO) {
   try {
     noWO = noWO ? noWO.toString().trim() : '';
