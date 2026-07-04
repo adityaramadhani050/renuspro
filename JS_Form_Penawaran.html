@@ -955,8 +955,15 @@
       }
 
       if (typeof google !== 'undefined') {
+        // Deal → backend membuat Work Order lalu memperbarui status
+        if (statusBaru === 'Deal') {
+          toggleLoader(true, 'Memproses Deal...', ['Membuat Work Order...', 'Memperbarui status penawaran...']);
+        } else {
+          toggleLoader(true, 'Memperbarui status penawaran...');
+        }
         google.script.run
           .withSuccessHandler(res => {
+            toggleLoader(false);
             if (res.success) {
               showNotification(res.message);
               loadPenawaran(); // ← reload tabel agar tombol edit terkunci/terbuka sesuai status baru
@@ -965,7 +972,7 @@
               loadPenawaran();
             }
           })
-          .withFailureHandler(err => { showNotification(err.message, "error"); loadPenawaran(); })
+          .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); loadPenawaran(); })
           .updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail || '', extra || {});
       }
     }
