@@ -62,16 +62,16 @@ window.loadMutasi = function() {
 };
 
 function _fetchPengeluaranThenBuild(pem) {
-  if (typeof google === 'undefined') { _buildMutasi(pem, []); return; }
+  if (typeof google === 'undefined') { _buildMutasi(pem, [], []); return; }
   google.script.run
     .withSuccessHandler(function(re) {
       var eng = (re && re.success) ? (re.list || []) : [];
       _expData = eng;
-      _buildMutasi(pem, eng);
+      _fetchTransferThenBuild(pem, eng);
     })
     .withFailureHandler(function(err) {
       _expData = [];
-      _buildMutasi(pem, []);
+      _fetchTransferThenBuild(pem, []);
       if (!pem.length) {
         var tb = document.getElementById('table-mutasi-kas');
         if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat data: ' + (err && err.message ? err.message : '') + '</td></tr>';
@@ -80,7 +80,18 @@ function _fetchPengeluaranThenBuild(pem) {
     .getPengeluaranList({});
 }
 
-function _buildMutasi(pem, eng) {
+function _fetchTransferThenBuild(pem, eng) {
+  if (typeof google === 'undefined') { _buildMutasi(pem, eng, []); return; }
+  google.script.run
+    .withSuccessHandler(function(rt) {
+      var tf = (rt && rt.success) ? (rt.list || []) : [];
+      _buildMutasi(pem, eng, tf);
+    })
+    .withFailureHandler(function() { _buildMutasi(pem, eng, []); })
+    .getAyatSilangList({});
+}
+
+function _buildMutasi(pem, eng, tf) {
   _mutData = [];
   (pem || []).forEach(function(p) {
     _mutData.push({ tipe:'masuk', id:p.id, tanggal:p.tanggal, jumlah:p.jumlah || 0,
@@ -92,6 +103,15 @@ function _buildMutasi(pem, eng) {
       deskripsi:e.deskripsi, sumber:e.sumber,
       kategori:(e.noWO ? (e.namaProject || e.noWO) : (e.kategori || '')),
       idAkun:e.idAkun, namaAkun:e.namaAkun, ref:(e.noPO || ''), editable:(e.sumber === 'Langsung') });
+  });
+  // Ayat silang → 2 baris: keluar dari asal, masuk ke tujuan
+  (tf || []).forEach(function(t) {
+    _mutData.push({ tipe:'keluar', id:t.id + '-OUT', txId:t.id, tanggal:t.tanggal, jumlah:t.jumlah || 0,
+      deskripsi:'Transfer ke ' + (t.namaTujuan || t.idAkunTujuan), sumber:'Ayat Silang', kategori:'Ayat Silang',
+      idAkun:t.idAkunAsal, namaAkun:t.namaAsal, ref:t.id, isTransfer:true, editable:false });
+    _mutData.push({ tipe:'masuk', id:t.id + '-IN', txId:t.id, tanggal:t.tanggal, jumlah:t.jumlah || 0,
+      deskripsi:'Transfer dari ' + (t.namaAsal || t.idAkunAsal), sumber:'Ayat Silang', kategori:'Ayat Silang',
+      idAkun:t.idAkunTujuan, namaAkun:t.namaTujuan, ref:t.id, isTransfer:true, editable:false });
   });
   filterMutasi();
 }
@@ -194,6 +214,9 @@ function _fillInAkunSelect(selId, selectedVal, withAll) {
 
 // ── Render mutasi + KPI + saldo berjalan ───────────────────────
 function _tipeBadgeMut(m) {
+  if (m.isTransfer) {
+    return '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700"><i class="fas fa-right-left text-[9px]"></i> Ayat Silang</span>';
+  }
   if (m.tipe === 'masuk') {
     var lblIn = (m.sumber === 'Invoice') ? 'Invoice' : (m.kategori || 'Pemasukan');
     return '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fas fa-arrow-down text-[9px]"></i> ' + _escIn(lblIn) + '</span>';
@@ -228,7 +251,9 @@ function _renderMutasi(list) {
   tbody.innerHTML = list.map(function(m) {
     var isMasuk = m.tipe === 'masuk';
     var aksi;
-    if (!m.editable) {
+    if (m.isTransfer) {
+      aksi = '<button onclick="hapusAyatSilangUI(\'' + _escIn(m.txId) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus ayat silang (kedua sisi)"><i class="fas fa-trash-can"></i></button>';
+    } else if (!m.editable) {
       aksi = '<span class="text-slate-300 p-1.5 inline-flex" title="Otomatis — kelola dari sumbernya"><i class="fas fa-lock text-xs"></i></span>';
     } else if (isMasuk) {
       aksi = '<button onclick="editPemasukan(\'' + _escIn(m.id) + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fas fa-pen-to-square"></i></button>'
@@ -417,6 +442,79 @@ window.hapusPemasukanUI = function(id) {
         })
         .withFailureHandler(function(e) { showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
         .hapusPemasukan(id);
+    }
+  });
+};
+
+// ── Ayat Silang (transfer antar akun) ──────────────────────────
+window.bukaFormAyatSilang = function() {
+  document.getElementById('tf-tanggal').value = _todayInput();
+  document.getElementById('tf-jumlah').value  = '';
+  document.getElementById('tf-catatan').value = '';
+  _fillInAkunSelect('tf-asal', '', false);
+  _fillInAkunSelect('tf-tujuan', '', false);
+  document.getElementById('modal-ayat-silang').classList.remove('hidden');
+};
+
+window.tutupFormAyatSilang = function() {
+  document.getElementById('modal-ayat-silang').classList.add('hidden');
+};
+
+window.submitAyatSilang = function() {
+  var selA = document.getElementById('tf-asal');
+  var selT = document.getElementById('tf-tujuan');
+  var idA  = selA.value, idT = selT.value;
+  var namaA = idA ? (selA.options[selA.selectedIndex].getAttribute('data-nama') || '') : '';
+  var namaT = idT ? (selT.options[selT.selectedIndex].getAttribute('data-nama') || '') : '';
+  var payload = {
+    tanggal:        _inputToTgl(document.getElementById('tf-tanggal').value),
+    idAkunAsal:     idA,
+    namaAkunAsal:   namaA,
+    idAkunTujuan:   idT,
+    namaAkunTujuan: namaT,
+    jumlah:         _parseCurrencyExp(document.getElementById('tf-jumlah').value),
+    catatan:        document.getElementById('tf-catatan').value.trim(),
+    dibuatOleh:     _inCurrentUserName()
+  };
+  if (!idA || !idT)     { showNotification('Akun asal & tujuan wajib dipilih.', 'error'); return; }
+  if (idA === idT)      { showNotification('Akun asal dan tujuan tidak boleh sama.', 'error'); return; }
+  if (payload.jumlah <= 0) { showNotification('Jumlah harus lebih dari 0.', 'error'); return; }
+
+  var btn = document.getElementById('tf-submit-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Memindahkan...'; }
+  var restore = function() { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-left text-xs"></i> Pindahkan'; } };
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      restore();
+      if (res && res.success) {
+        showNotification(res.message || 'Ayat silang tersimpan.');
+        tutupFormAyatSilang();
+        loadPemasukan();
+        loadSaldoPanel();
+      } else {
+        showNotification((res && res.message) || 'Gagal menyimpan ayat silang.', 'error');
+      }
+    })
+    .withFailureHandler(function(e) { restore(); showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+    .simpanAyatSilang(payload);
+};
+
+window.hapusAyatSilangUI = function(id) {
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Ayat Silang?',
+    message: 'Yakin menghapus transfer ' + id + '? Saldo kedua akun akan menyesuaikan.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showNotification((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
+          loadPemasukan();
+          loadSaldoPanel();
+        })
+        .withFailureHandler(function(e) { showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+        .hapusAyatSilang(id);
     }
   });
 };

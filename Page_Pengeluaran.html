@@ -47,6 +47,10 @@
                 class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
                 <i class="fas fa-arrow-up-long text-xs"></i> Pengeluaran
               </button>
+              <button onclick="bukaFormAyatSilang()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm whitespace-nowrap">
+                <i class="fas fa-right-left text-xs"></i> Ayat Silang
+              </button>
             </div>
           </div>
 
@@ -510,6 +514,46 @@
               <button onclick="tutupFormPemasukan()" class="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 px-5 rounded-xl font-bold text-sm transition">Batal</button>
               <button onclick="submitPemasukan()" id="in-submit-btn" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
                 <i class="fas fa-floppy-disk text-xs"></i> Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ MODAL: Ayat Silang (transfer antar akun) ══ -->
+        <div id="modal-ayat-silang" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fas fa-right-left text-indigo-600"></i> Ayat Silang</h3>
+              <button onclick="tutupFormAyatSilang()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400 -mt-2">Pindahkan saldo antar bank account. Tidak dihitung sebagai pemasukan/pengeluaran di laporan.</p>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal <span class="text-rose-500">*</span></label>
+              <input type="date" id="tf-tanggal" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-end gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dari Akun <span class="text-rose-500">*</span></label>
+                <select id="tf-asal" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white"></select>
+              </div>
+              <div class="hidden sm:flex items-center justify-center pb-2.5 text-indigo-500"><i class="fas fa-arrow-right-long"></i></div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ke Akun <span class="text-rose-500">*</span></label>
+                <select id="tf-tujuan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white"></select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jumlah <span class="text-rose-500">*</span></label>
+              <input type="text" id="tf-jumlah" inputmode="numeric" oninput="_fmtCurrencyExp(this)" placeholder="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 text-right font-bold">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan</label>
+              <textarea id="tf-catatan" rows="2" placeholder="mis. Pindah dana operasional" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 resize-none"></textarea>
+            </div>
+            <div class="flex flex-col sm:flex-row sm:justify-end gap-3 pt-1">
+              <button onclick="tutupFormAyatSilang()" class="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 px-5 rounded-xl font-bold text-sm transition">Batal</button>
+              <button onclick="submitAyatSilang()" id="tf-submit-btn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+                <i class="fas fa-right-left text-xs"></i> Pindahkan
               </button>
             </div>
           </div>

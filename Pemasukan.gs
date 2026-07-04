@@ -387,6 +387,18 @@ function getSaldoAkun() {
       akunMap[eAkun].keluar += parseFloat(engData[j][12]) || 0;
     }
 
+    // Ayat Silang → keluar dari akun asal, masuk ke akun tujuan (netral thd total)
+    var tfSheet = _ensureAyatSilangSheet(ss);
+    var tfData  = tfSheet.getDataRange().getValues();
+    for (var t = 1; t < tfData.length; t++) {
+      if (!tfData[t][0]) continue;
+      var tfAsal   = (tfData[t][2] || '').toString();
+      var tfTujuan = (tfData[t][4] || '').toString();
+      var tfJml    = parseFloat(tfData[t][6]) || 0;
+      if (akunMap[tfAsal])   akunMap[tfAsal].keluar   += tfJml;
+      if (akunMap[tfTujuan]) akunMap[tfTujuan].masuk += tfJml;
+    }
+
     var akunList = [];
     var totalMasuk = 0, totalKeluar = 0, totalSaldo = 0;
     for (var k = 0; k < akunOrder.length; k++) {
@@ -407,5 +419,138 @@ function getSaldoAkun() {
     };
   } catch(e) {
     return { success: false, message: e.toString(), akun: [], totalMasuk: 0, totalKeluar: 0, totalSaldo: 0 };
+  }
+}
+
+// ── Ayat Silang (transfer saldo antar bank account) ──────────────────────────
+// Disimpan di sheet terpisah agar TIDAK ikut terhitung sebagai pemasukan/
+// pengeluaran di laporan keuangan/profitabilitas — hanya memengaruhi saldo kas
+// (asal berkurang, tujuan bertambah; total kas tetap).
+//
+// Sheet AyatSilang — kolom (0-based):
+//  0 ID (TF-YYYYMM-NNN)  1 Tanggal  2 ID Akun Asal  3 Nama Asal
+//  4 ID Akun Tujuan  5 Nama Tujuan  6 Jumlah  7 Catatan
+//  8 Dibuat Oleh  9 Dibuat Pada
+
+function _ensureAyatSilangSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('AyatSilang');
+  if (!sheet) {
+    sheet = ss.insertSheet('AyatSilang');
+    sheet.appendRow([
+      'ID', 'Tanggal', 'ID Akun Asal', 'Nama Asal',
+      'ID Akun Tujuan', 'Nama Tujuan', 'Jumlah', 'Catatan',
+      'Dibuat Oleh', 'Dibuat Pada'
+    ]);
+    sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function _generateIdAyatSilang(sheet) {
+  SpreadsheetApp.flush();
+  var tz     = Session.getScriptTimeZone();
+  var prefix = 'TF-' + Utilities.formatDate(new Date(), tz, 'yyyyMM') + '-';
+  var data   = sheet.getDataRange().getValues();
+  var maxSeq = 0;
+  for (var i = 1; i < data.length; i++) {
+    var id = (data[i][0] || '').toString();
+    if (id.indexOf(prefix) === 0) {
+      var seq = parseInt(id.slice(prefix.length), 10) || 0;
+      if (seq > maxSeq) maxSeq = seq;
+    }
+  }
+  return prefix + ('000' + (maxSeq + 1)).slice(-3);
+}
+
+function getAyatSilangList(params) {
+  try {
+    params = params || {};
+    var ss    = getSpreadsheet();
+    var sheet = _ensureAyatSilangSheet(ss);
+    var data  = sheet.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      if (!r[0]) continue;
+      list.push({
+        id:            r[0].toString(),
+        tanggal:       _fmtTgl(r[1]),
+        idAkunAsal:    r[2] ? r[2].toString() : '',
+        namaAsal:      r[3] ? r[3].toString() : '',
+        idAkunTujuan:  r[4] ? r[4].toString() : '',
+        namaTujuan:    r[5] ? r[5].toString() : '',
+        jumlah:        parseFloat(r[6]) || 0,
+        catatan:       r[7] ? r[7].toString() : '',
+        dibuatOleh:    r[8] ? r[8].toString() : '',
+        dibuatPada:    r[9] ? r[9].toString() : ''
+      });
+    }
+    list.reverse();
+    return { success: true, list: list };
+  } catch(e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+function simpanAyatSilang(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    payload = payload || {};
+    var idAsal   = (payload.idAkunAsal   || '').toString();
+    var idTujuan = (payload.idAkunTujuan || '').toString();
+    if (!idAsal || !idTujuan)          return { success: false, message: 'Akun asal & tujuan wajib dipilih.' };
+    if (idAsal === idTujuan)           return { success: false, message: 'Akun asal dan tujuan tidak boleh sama.' };
+    if (idAsal === 'AP001' || idTujuan === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipakai untuk ayat silang.' };
+    var jumlah = parseFloat(payload.jumlah) || 0;
+    if (jumlah <= 0)                   return { success: false, message: 'Jumlah harus lebih dari 0.' };
+
+    var ss    = getSpreadsheet();
+    var sheet = _ensureAyatSilangSheet(ss);
+    var id    = _generateIdAyatSilang(sheet);
+    var tz    = Session.getScriptTimeZone();
+    var now   = new Date();
+    var nowStr  = Utilities.formatDate(now, tz, 'dd/MM/yyyy HH:mm:ss');
+    var tanggal = payload.tanggal || Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+
+    sheet.appendRow([
+      id, tanggal,
+      idAsal,   (payload.namaAkunAsal   || idAsal).toString(),
+      idTujuan, (payload.namaAkunTujuan || idTujuan).toString(),
+      jumlah,
+      (payload.catatan || '').toString(),
+      (payload.dibuatOleh || '').toString(),
+      nowStr
+    ]);
+    return { success: true, message: 'Ayat silang ' + id + ' berhasil dicatat.', id: id };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function hapusAyatSilang(id) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    id = (id || '').toString().trim();
+    if (!id) return { success: false, message: 'ID ayat silang wajib diisi.' };
+    var ss    = getSpreadsheet();
+    var sheet = _ensureAyatSilangSheet(ss);
+    SpreadsheetApp.flush();
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString() === id) {
+        sheet.deleteRow(i + 1);
+        return { success: true, message: 'Ayat silang ' + id + ' berhasil dihapus.' };
+      }
+    }
+    return { success: false, message: 'Ayat silang tidak ditemukan.' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
   }
 }
