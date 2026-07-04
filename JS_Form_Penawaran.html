@@ -97,7 +97,12 @@
     // =======================================================================
     
     function muatSeluruhDataAwal(showLoadingUI = true) {
-      if(showLoadingUI) toggleLoader(true, "Sinkronisasi ERP...");
+      if(showLoadingUI) toggleLoader(true, "Sinkronisasi ERP...", [
+        'Memuat master produk & jasa…',
+        'Menyiapkan data klien…',
+        'Menarik template paket…',
+        'Menyusun formulir penawaran…'
+      ]);
       if (typeof google !== 'undefined') {
         google.script.run.withSuccessHandler(res => {
           if (res.success) {

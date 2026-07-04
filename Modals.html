@@ -4,9 +4,24 @@
   </div>
   
   <!-- Overlay Loading -->
-  <div id="appLoader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[300] flex flex-col justify-center items-center text-white gap-4 transition-all duration-500 hidden">
-    <div class="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent shadow-2xl"></div>
-    <div class="text-center space-y-1"><p class="text-lg font-bold tracking-wider" id="loaderText">Menyinkronkan Database...</p></div>
+  <div id="appLoader" class="fixed inset-0 z-[300] flex flex-col justify-center items-center gap-5 bg-white/70 backdrop-blur-xl transition-opacity duration-300 hidden"
+       role="status" aria-live="polite" aria-busy="true">
+    <!-- Branded animated logo -->
+    <div class="loader-logo">
+      <span class="loader-ring"></span>
+      <span class="loader-badge">R</span>
+    </div>
+    <div class="text-center px-6">
+      <p id="loaderText" class="text-slate-800 text-base font-extrabold tracking-tight">Sinkronisasi ERP...</p>
+      <p id="loaderStep" class="text-slate-400 text-xs font-medium mt-1 h-4"></p>
+    </div>
+    <!-- Progress bar -->
+    <div class="loader-bar-track"><div id="loaderBar" class="loader-bar-fill"></div></div>
+    <!-- Slow-connection / timeout hint -->
+    <div id="loaderHint" class="hidden text-center mt-1">
+      <p class="text-amber-600 text-xs font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Koneksi lambat, masih memuat…</p>
+      <button onclick="location.reload()" class="mt-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 underline">Muat ulang halaman</button>
+    </div>
   </div>
 
   <!-- Modal Konfirmasi Global -->

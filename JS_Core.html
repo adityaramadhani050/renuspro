@@ -14,10 +14,83 @@
       setTimeout(() => { toast.classList.add('translate-x-full'); setTimeout(() => toast.classList.add('hidden'), 300); }, 3500);
     }
     
-    function toggleLoader(show, text = "Memuat...") {
+    // Loader state (timer refs + progress) untuk animasi ERP loader
+    var _loaderTimers = { step: null, creep: null, timeout: null, fade: null, minhold: null };
+    var _loaderProgress = 0;
+    var _loaderShownAt = 0;
+    function _loaderClearTimers() {
+      Object.keys(_loaderTimers).forEach(function(k) {
+        if (_loaderTimers[k]) { clearInterval(_loaderTimers[k]); clearTimeout(_loaderTimers[k]); _loaderTimers[k] = null; }
+      });
+    }
+    /**
+     * toggleLoader(show, text, steps?)
+     * @param {boolean} show
+     * @param {string}  text  — label utama
+     * @param {string[]} [steps] — pesan bertahap (dirotasi); dipakai utk sinkron ERP
+     */
+    function toggleLoader(show, text = "Memuat...", steps) {
       const l = document.getElementById('appLoader');
-      document.getElementById('loaderText').innerText = text;
-      show ? l.classList.remove('hidden') : l.classList.add('hidden');
+      if (!l) return;
+      const txtEl  = document.getElementById('loaderText');
+      const stepEl = document.getElementById('loaderStep');
+      const barEl  = document.getElementById('loaderBar');
+      const hintEl = document.getElementById('loaderHint');
+
+      if (show) {
+        _loaderClearTimers();
+        if (txtEl)  txtEl.innerText  = text || 'Memuat...';
+        if (stepEl) stepEl.innerText = (steps && steps.length) ? steps[0] : '';
+        if (hintEl) hintEl.classList.add('hidden');
+        l.setAttribute('aria-busy', 'true');
+        l.style.opacity = '';
+        l.classList.remove('hidden');
+        _loaderShownAt = Date.now();
+
+        // Progress creep 8% → 90% (snap ke 100% saat selesai)
+        _loaderProgress = 8;
+        if (barEl) barEl.style.width = '8%';
+        _loaderTimers.creep = setInterval(function() {
+          if (_loaderProgress < 90) {
+            _loaderProgress += Math.max(0.6, (90 - _loaderProgress) * 0.08);
+            if (barEl) barEl.style.width = Math.min(_loaderProgress, 90) + '%';
+          }
+        }, 200);
+
+        // Pesan bertahap (opsional)
+        if (steps && steps.length) {
+          var i = 0;
+          _loaderTimers.step = setInterval(function() {
+            i = (i + 1) % steps.length;
+            if (stepEl) stepEl.innerText = steps[i];
+          }, 1100);
+        }
+
+        // Hint koneksi lambat
+        _loaderTimers.timeout = setTimeout(function() {
+          if (hintEl) hintEl.classList.remove('hidden');
+        }, 15000);
+      } else {
+        var doHide = function() {
+          _loaderClearTimers();
+          if (barEl) barEl.style.width = '100%';
+          l.setAttribute('aria-busy', 'false');
+          l.style.opacity = '0';
+          _loaderTimers.fade = setTimeout(function() {
+            l.classList.add('hidden');
+            l.style.opacity = '';
+            if (barEl) barEl.style.width = '0%';
+          }, 280);
+        };
+        // Min-display ~400ms untuk cegah kedip pada operasi cepat
+        var elapsed = _loaderShownAt ? (Date.now() - _loaderShownAt) : 999;
+        if (elapsed < 400) {
+          _loaderClearTimers();
+          _loaderTimers.minhold = setTimeout(doHide, 400 - elapsed);
+        } else {
+          doHide();
+        }
+      }
     }
 
     // --- MODAL KONFIRMASI GLOBAL (pengganti window.confirm) ---
