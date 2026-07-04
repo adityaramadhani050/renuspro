@@ -81,7 +81,8 @@ function getFinanceReportData(filter) {
     var invByWO = {};   // noWO → [invoice, ...]
     var invByPen = {};  // noPenawaran → [invoice, ...] (pre-deal)
     var agingSummary = { current: 0, gte30: 0, gte60: 0, gte90: 0 };
-    var totalTagihan = 0, totalTerbayar = 0;
+    var totalTagihan = 0, totalTerbayar = 0;         // incl PPN (kolom Total)
+    var totalTagihanDpp = 0, totalTerbayarDpp = 0;   // excl PPN (DPP)
 
     for (var i = 1; i < invData.length; i++) {
       if (!invData[i][0]) continue;
@@ -128,7 +129,8 @@ function getFinanceReportData(filter) {
                   status: status, tglBayar: tglBayar };
 
       totalTagihan += total;
-      if (status === 'Lunas') totalTerbayar += total;
+      totalTagihanDpp += dpp;
+      if (status === 'Lunas') { totalTerbayar += total; totalTerbayarDpp += dpp; }
 
       // Aging hanya untuk yang belum lunas
       if (status !== 'Lunas') {
@@ -208,10 +210,15 @@ function getFinanceReportData(filter) {
     return {
       success:      true,
       summary: {
-        totalTagihan:   totalTagihan,
-        totalTerbayar:  totalTerbayar,
-        totalOutstanding: totalTagihan - totalTerbayar,
-        aging:          agingSummary
+        // Utama: tanpa PPN (DPP)
+        totalTagihanDpp:     totalTagihanDpp,
+        totalTerbayarDpp:    totalTerbayarDpp,
+        totalOutstandingDpp: totalTagihanDpp - totalTerbayarDpp,
+        // Termasuk PPN (untuk subtitle)
+        totalTagihan:        totalTagihan,
+        totalTerbayar:       totalTerbayar,
+        totalOutstanding:    totalTagihan - totalTerbayar,
+        aging:               agingSummary
       },
       rows: allRows
     };

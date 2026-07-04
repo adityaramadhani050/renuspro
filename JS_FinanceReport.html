@@ -73,12 +73,20 @@ function _frRender(data) {
   _frUpdatePeriodLabel();
 
   var s = data.summary;
-  var pct = s.totalTagihan > 0 ? Math.round(s.totalTerbayar / s.totalTagihan * 100) : 0;
+  // Nilai utama = tanpa PPN (DPP); fallback ke incl-PPN bila field DPP tak ada
+  var tagihanDpp  = (s.totalTagihanDpp     != null) ? s.totalTagihanDpp     : s.totalTagihan;
+  var terbayarDpp = (s.totalTerbayarDpp    != null) ? s.totalTerbayarDpp    : s.totalTerbayar;
+  var outstandDpp = (s.totalOutstandingDpp != null) ? s.totalOutstandingDpp : s.totalOutstanding;
+  var pct = tagihanDpp > 0 ? Math.round(terbayarDpp / tagihanDpp * 100) : 0;
 
-  // KPI
-  document.getElementById('fr-kpi-tagihan').textContent     = _frFmt(s.totalTagihan);
-  document.getElementById('fr-kpi-terbayar').textContent    = _frFmt(s.totalTerbayar);
-  document.getElementById('fr-kpi-outstanding').textContent = _frFmt(s.totalOutstanding);
+  // KPI utama (tanpa PPN)
+  document.getElementById('fr-kpi-tagihan').textContent     = _frFmt(tagihanDpp);
+  document.getElementById('fr-kpi-terbayar').textContent    = _frFmt(terbayarDpp);
+  document.getElementById('fr-kpi-outstanding').textContent = _frFmt(outstandDpp);
+  // Subtitle incl. PPN
+  document.getElementById('fr-kpi-tagihan-ppn').textContent     = _frFmt(s.totalTagihan);
+  document.getElementById('fr-kpi-terbayar-ppn').textContent    = _frFmt(s.totalTerbayar);
+  document.getElementById('fr-kpi-outstanding-ppn').textContent = _frFmt(s.totalOutstanding);
   document.getElementById('fr-kpi-pct').textContent         = pct + '%';
   document.getElementById('fr-collect-bar').style.width     = Math.min(pct, 100) + '%';
 
@@ -293,12 +301,15 @@ window.exportFinanceReportPDF = function() {
   // ── KPI boxes ────────────────────────────────────────────────
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
   doc.text('RINGKASAN PEMBAYARAN', ML, y); y += 5;
+  var _tagDpp = (s.totalTagihanDpp     != null) ? s.totalTagihanDpp     : s.totalTagihan;
+  var _bayDpp = (s.totalTerbayarDpp    != null) ? s.totalTerbayarDpp    : s.totalTerbayar;
+  var _outDpp = (s.totalOutstandingDpp != null) ? s.totalOutstandingDpp : s.totalOutstanding;
   var kpiItems = [
-    { label:'Total Tagihan',  value: rp(s.totalTagihan),     color: DARK  },
-    { label:'Terbayar',       value: rp(s.totalTerbayar),    color: GREEN },
-    { label:'Outstanding',    value: rp(s.totalOutstanding), color: RED   }
+    { label:'Total Tagihan (tanpa PPN)', value: rp(_tagDpp), ppn: rp(s.totalTagihan),     color: DARK  },
+    { label:'Terbayar (tanpa PPN)',      value: rp(_bayDpp), ppn: rp(s.totalTerbayar),    color: GREEN },
+    { label:'Outstanding (tanpa PPN)',   value: rp(_outDpp), ppn: rp(s.totalOutstanding), color: RED   }
   ];
-  var boxW = (CW - 5) / 3, boxH = 14, gap = 2.5;
+  var boxW = (CW - 5) / 3, boxH = 18, gap = 2.5;
   kpiItems.forEach(function(k, i) {
     var bx = ML + i * (boxW + gap), by = y;
     doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
@@ -307,6 +318,8 @@ window.exportFinanceReportPDF = function() {
     doc.text(k.label.toUpperCase(), bx + 3, by + 4.5);
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...k.color);
     doc.text(k.value, bx + 3, by + 10.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...SLATE);
+    doc.text('Incl. PPN ' + k.ppn, bx + 3, by + 15);
   });
   y += boxH + 8;
 
