@@ -99,6 +99,9 @@ function _buildMutasi(pem, eng, tf) {
       namaAkun:p.namaAkun, ref:(p.noRef || ''), editable:(p.sumber === 'Langsung') });
   });
   (eng || []).forEach(function(e) {
+    // Penggunaan Stok (akun sistem AP001) bukan arus kas riil — hanya untuk
+    // laporan profit project, jadi dikecualikan dari Cash Manager.
+    if (e.sumber === 'Penggunaan Stok' || e.idAkun === 'AP001') return;
     _mutData.push({ tipe:'keluar', id:e.id, tanggal:e.tanggal, jumlah:e.total || 0,
       deskripsi:e.deskripsi, sumber:e.sumber,
       kategori:(e.noWO ? (e.namaProject || e.noWO) : (e.kategori || '')),
