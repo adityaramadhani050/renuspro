@@ -18,8 +18,8 @@
         width: 100%; height: 100%;
         min-width: 100vw; min-height: 100vh;
         z-index: 99999;
-        background: #0f172a;
-        /* background-image: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%); */
+        background: #f1f5f9;
+        background-image: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #e0e7ff 100%);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -33,28 +33,28 @@
         pointer-events: none !important;
       }
       .login-card {
-        background: rgba(255,255,255,0.05);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255,255,255,0.12);
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
         border-radius: 24px;
         padding: 40px 36px;
         width: 100%; max-width: 400px;
-        box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+        box-shadow: 0 24px 48px rgba(15,23,42,0.12);
       }
       .login-input {
         width: 100%; padding: 12px 16px;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 12px; color: #fff;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px; color: #0f172a;
         font-family: 'Plus Jakarta Sans', sans-serif;
         font-size: 14px; outline: none;
-        transition: border-color 0.2s, background 0.2s;
+        transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
       }
       .login-input:focus {
-        border-color: #60a5fa;
-        background: rgba(255,255,255,0.12);
+        border-color: #2563eb;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
       }
-      .login-input::placeholder { color: rgba(255,255,255,0.35); }
+      .login-input::placeholder { color: #94a3b8; }
       .login-btn {
         width: 100%; padding: 13px;
         background: linear-gradient(135deg, #2563eb, #1d4ed8);
@@ -62,15 +62,15 @@
         font-family: 'Plus Jakarta Sans', sans-serif;
         font-size: 14px; font-weight: 700; cursor: pointer;
         transition: opacity 0.2s, transform 0.1s;
-        box-shadow: 0 8px 24px rgba(37,99,235,0.4);
+        box-shadow: 0 8px 24px rgba(37,99,235,0.3);
       }
       .login-btn:hover { opacity: 0.92; transform: translateY(-1px); }
       .login-btn:active { transform: translateY(0); }
       .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
       .login-error {
-        background: rgba(239,68,68,0.15);
-        border: 1px solid rgba(239,68,68,0.3);
-        color: #fca5a5; border-radius: 10px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626; border-radius: 10px;
         padding: 10px 14px; font-size: 13px;
         display: none;
       }
@@ -84,10 +84,10 @@
       .pw-wrap { position: relative; }
       .pw-toggle {
         position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-        background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.4);
+        background: none; border: none; cursor: pointer; color: #94a3b8;
         padding: 4px; transition: color 0.2s;
       }
-      .pw-toggle:hover { color: rgba(255,255,255,0.7); }
+      .pw-toggle:hover { color: #475569; }
 
       /* ── Ganti Password Modal ── */
       #modal-ganti-pw input { background: #f8fafc; }
