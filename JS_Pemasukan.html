@@ -140,7 +140,7 @@ function _renderSaldoPanel(res) {
   // Kartu total — klik = tampilkan semua akun
   html += '<div data-akun="" onclick="cmFilterByAkun(this.dataset.akun)" role="button" tabindex="0" title="Klik untuk lihat semua akun"'
     + ' class="cm-saldo-card bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-sm p-4 text-white cursor-pointer transition hover:brightness-105">'
-    + '<p class="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1"><i class="fa-solid fa-sack-dollar mr-1"></i>Total Uang Saat Ini</p>'
+    + '<p class="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1"><i class="fa-solid fa-sack-dollar mr-1"></i>Total Kas Saat Ini</p>'
     + '<p class="text-2xl font-extrabold">' + _fmtRpExp(res.totalSaldo) + '</p>'
     + '<p class="text-[11px] opacity-80 mt-1">Masuk ' + _fmtRpExp(res.totalMasuk) + ' &middot; Keluar ' + _fmtRpExp(res.totalKeluar) + '</p>'
     + '</div>';
