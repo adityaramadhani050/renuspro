@@ -20,6 +20,22 @@ function _inTglToMs(ddmmyyyy) {
   if (p.length !== 3) return null;
   return new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0])).getTime();
 }
+// Waktu dibuat (dd/MM/yyyy HH:mm:ss) → ms; fallback ke tanggal transaksi.
+function _mutCreatedMs(m) {
+  var s = (m.dibuatPada || '').toString().trim();
+  var mm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{1,2}):(\d{1,2}))?/);
+  if (mm) return new Date(+mm[3], +mm[2] - 1, +mm[1], +(mm[4] || 0), +(mm[5] || 0), +(mm[6] || 0)).getTime();
+  return _inTglToMs(m.tanggal) || 0;
+}
+// Urutan tampilan: tanggal transaksi terbaru dulu; tie → waktu dibuat terbaru;
+// tie → id (stabil & deterministik). Saldo berjalan pakai kebalikan urutan ini.
+function _mutCompareDesc(a, b) {
+  var ta = _inTglToMs(a.tanggal) || 0, tb = _inTglToMs(b.tanggal) || 0;
+  if (tb !== ta) return tb - ta;
+  var ca = _mutCreatedMs(a), cb = _mutCreatedMs(b);
+  if (cb !== ca) return cb - ca;
+  return (b.id || '').toString().localeCompare((a.id || '').toString(), undefined, { numeric: true });
+}
 function _inCurrentUserName() {
   return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : '';
 }
@@ -94,7 +110,7 @@ function _fetchTransferThenBuild(pem, eng) {
 function _buildMutasi(pem, eng, tf) {
   _mutData = [];
   (pem || []).forEach(function(p) {
-    _mutData.push({ tipe:'masuk', id:p.id, tanggal:p.tanggal, jumlah:p.jumlah || 0,
+    _mutData.push({ tipe:'masuk', id:p.id, tanggal:p.tanggal, dibuatPada:(p.dibuatPada || ''), jumlah:p.jumlah || 0,
       deskripsi:p.deskripsi, sumber:p.sumber, kategori:p.kategori, idAkun:p.idAkun,
       namaAkun:p.namaAkun, ref:(p.noRef || ''), editable:(p.sumber === 'Langsung') });
   });
@@ -102,17 +118,17 @@ function _buildMutasi(pem, eng, tf) {
     // Penggunaan Stok (akun sistem AP001) bukan arus kas riil — hanya untuk
     // laporan profit project, jadi dikecualikan dari Cash Manager.
     if (e.sumber === 'Penggunaan Stok' || e.idAkun === 'AP001') return;
-    _mutData.push({ tipe:'keluar', id:e.id, tanggal:e.tanggal, jumlah:e.total || 0,
+    _mutData.push({ tipe:'keluar', id:e.id, tanggal:e.tanggal, dibuatPada:(e.dibuatPada || ''), jumlah:e.total || 0,
       deskripsi:e.deskripsi, sumber:e.sumber,
       kategori:(e.noWO ? (e.namaProject || e.noWO) : (e.kategori || '')),
       idAkun:e.idAkun, namaAkun:e.namaAkun, ref:(e.noPO || ''), editable:(e.sumber === 'Langsung') });
   });
   // Ayat silang → 2 baris: keluar dari asal, masuk ke tujuan
   (tf || []).forEach(function(t) {
-    _mutData.push({ tipe:'keluar', id:t.id + '-OUT', txId:t.id, tanggal:t.tanggal, jumlah:t.jumlah || 0,
+    _mutData.push({ tipe:'keluar', id:t.id + '-OUT', txId:t.id, tanggal:t.tanggal, dibuatPada:(t.dibuatPada || ''), jumlah:t.jumlah || 0,
       deskripsi:'Transfer ke ' + (t.namaTujuan || t.idAkunTujuan), sumber:'Ayat Silang', kategori:'Ayat Silang',
       idAkun:t.idAkunAsal, namaAkun:t.namaAsal, ref:t.id, isTransfer:true, editable:false });
-    _mutData.push({ tipe:'masuk', id:t.id + '-IN', txId:t.id, tanggal:t.tanggal, jumlah:t.jumlah || 0,
+    _mutData.push({ tipe:'masuk', id:t.id + '-IN', txId:t.id, tanggal:t.tanggal, dibuatPada:(t.dibuatPada || ''), jumlah:t.jumlah || 0,
       deskripsi:'Transfer dari ' + (t.namaAsal || t.idAkunAsal), sumber:'Ayat Silang', kategori:'Ayat Silang',
       idAkun:t.idAkunTujuan, namaAkun:t.namaTujuan, ref:t.id, isTransfer:true, editable:false });
   });
@@ -235,15 +251,23 @@ function _renderMutasi(list) {
   var tbody = document.getElementById('table-mutasi-kas');
   if (!tbody) return;
 
-  // Saldo berjalan hanya bila tepat 1 akun dipilih (dihitung atas seluruh riwayat akun tsb)
+  // Saldo berjalan hanya bila tepat 1 akun dipilih (dihitung atas SELURUH riwayat
+  // akun tsb, bukan hanya baris yang tampil). Urutan = sama dgn tampilan (terbaru
+  // dulu) → saldo baris teratas = total kas akun, makin ke bawah makin kecil,
+  // sehingga kolom terbaca monoton seperti rekening koran.
   var akunFilter = _cmAkunFilter;
   var showSaldo = !!akunFilter;
   var saldoMap = {};
   if (showSaldo) {
     var acctAll = _mutData.filter(function(m){ return m.idAkun === akunFilter; }).slice()
-      .sort(function(a, b){ return (_inTglToMs(a.tanggal) || 0) - (_inTglToMs(b.tanggal) || 0); });
-    var run = 0;
-    acctAll.forEach(function(m){ run += (m.tipe === 'masuk' ? m.jumlah : -m.jumlah); saldoMap[m.id] = run; });
+      .sort(_mutCompareDesc);  // terbaru dulu (persis urutan tampilan)
+    var total = 0;
+    acctAll.forEach(function(m){ total += (m.tipe === 'masuk' ? m.jumlah : -m.jumlah); });
+    var running = total;
+    acctAll.forEach(function(m){
+      saldoMap[m.id] = running;                                   // saldo SETELAH transaksi ini
+      running -= (m.tipe === 'masuk' ? m.jumlah : -m.jumlah);     // mundur ke transaksi lebih lama
+    });
   }
 
   if (!list.length) {
@@ -315,7 +339,7 @@ function _applyMutFilter(data) {
     }
     return true;
   });
-  out.sort(function(a, b){ return (_inTglToMs(b.tanggal) || 0) - (_inTglToMs(a.tanggal) || 0); });  // terbaru dulu
+  out.sort(_mutCompareDesc);  // terbaru dulu (tanggal → waktu dibuat → id)
   return out;
 }
 
