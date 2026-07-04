@@ -107,14 +107,14 @@ function _renderLaporanProfit(res) {
       html += '<td class="p-4 text-right text-xs text-slate-500">' + _fmtPctLP(r.marginEstimasi) + '</td>';
       html += '<td class="p-4 text-right text-xs font-bold ' + (overBudget ? 'text-rose-600' : 'text-emerald-600') + '">' + _fmtPctLP(r.marginRealisasi) + '</td>';
 
-      // Kolom Aksi: expand detail kas + export laporan pengeluaran WO ini
+      // Kolom Aksi: export PDF (kiri) + expand detail kas (kanan)
       html += '<td class="p-3 text-center whitespace-nowrap">';
-      html += '<div class="inline-flex items-center gap-2">';
-      html += '<button onclick="toggleDetailKasWO(' + idx + ',\'' + noWOEsc + '\')" title="Detail pemasukan & pengeluaran" aria-label="Detail pemasukan & pengeluaran" ';
-      html += 'class="inline-flex items-center justify-center gap-1.5 h-10 min-w-[40px] px-2.5 bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300 rounded-xl transition font-bold text-xs">';
-      html += '<i id="lp-caret-' + idx + '" class="fa-solid fa-chevron-right text-sm transition-transform"></i><span class="hidden sm:inline">Detail</span></button>';
+      html += '<div class="inline-flex items-center gap-3">';
       html += '<button onclick="exportLaporanPengeluaranWO(\'' + noWOEsc + '\')" title="Export Lap. Pengeluaran (PDF)" aria-label="Export Laporan Pengeluaran PDF" ';
       html += 'class="inline-flex items-center justify-center h-10 w-10 text-red-500 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-xl transition"><i class="fa-solid fa-file-pdf text-sm"></i></button>';
+      html += '<button onclick="toggleDetailKasWO(' + idx + ',\'' + noWOEsc + '\')" id="lp-detail-btn-' + idx + '" title="Detail pemasukan & pengeluaran" aria-label="Detail pemasukan & pengeluaran" ';
+      html += 'class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-2.5 px-2">';
+      html += '<i id="lp-caret-' + idx + '" class="fa-solid fa-chevron-down text-[10px] transition-transform duration-200"></i> Detail</button>';
       html += '</div></td>';
 
       html += '</tr>';
@@ -137,7 +137,7 @@ window.toggleDetailKasWO = function(idx, noWO) {
   var icon = document.getElementById('lp-caret-' + idx);
   if (!row) return;
   var isHidden = row.classList.toggle('hidden');
-  if (icon) icon.style.transform = isHidden ? '' : 'rotate(90deg)';
+  if (icon) icon.style.transform = isHidden ? '' : 'rotate(180deg)';
   if (isHidden) return; // menutup — tidak perlu fetch
 
   var body = document.getElementById('lp-detail-body-' + idx);
