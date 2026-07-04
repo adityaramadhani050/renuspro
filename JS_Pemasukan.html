@@ -426,11 +426,10 @@ window.submitPemasukan = function() {
   if (!payload.deskripsi){ showNotification('Deskripsi wajib diisi.', 'error'); return; }
   if (payload.jumlah <= 0){ showNotification('Jumlah harus lebih dari 0.', 'error'); return; }
 
-  var btn = document.getElementById('in-submit-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+  toggleLoader(true, id ? 'Menyimpan perubahan...' : 'Menyimpan pemasukan...');
 
   var done = function(res) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk text-xs"></i> Simpan'; }
+    toggleLoader(false);
     if (res && res.success) {
       showNotification(res.message || 'Tersimpan.');
       tutupFormPemasukan();
@@ -441,7 +440,7 @@ window.submitPemasukan = function() {
     }
   };
   var fail = function(e) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk text-xs"></i> Simpan'; }
+    toggleLoader(false);
     showNotification('Error: ' + (e && e.message ? e.message : e), 'error');
   };
 
@@ -461,13 +460,15 @@ window.hapusPemasukanUI = function(id) {
     message: 'Yakin menghapus pemasukan ' + id + '? Saldo akun akan menyesuaikan.',
     confirmText: 'Ya, Hapus',
     onConfirm: function() {
+      toggleLoader(true, 'Menghapus pemasukan...');
       google.script.run
         .withSuccessHandler(function(res) {
+          toggleLoader(false);
           showNotification((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
           loadPemasukan();
           loadSaldoPanel();
         })
-        .withFailureHandler(function(e) { showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+        .withFailureHandler(function(e) { toggleLoader(false); showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
         .hapusPemasukan(id);
     }
   });
@@ -507,13 +508,10 @@ window.submitAyatSilang = function() {
   if (idA === idT)      { showNotification('Akun asal dan tujuan tidak boleh sama.', 'error'); return; }
   if (payload.jumlah <= 0) { showNotification('Jumlah harus lebih dari 0.', 'error'); return; }
 
-  var btn = document.getElementById('tf-submit-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Memindahkan...'; }
-  var restore = function() { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-left text-xs"></i> Pindahkan'; } };
-
+  toggleLoader(true, 'Memindahkan saldo...');
   google.script.run
     .withSuccessHandler(function(res) {
-      restore();
+      toggleLoader(false);
       if (res && res.success) {
         showNotification(res.message || 'Ayat silang tersimpan.');
         tutupFormAyatSilang();
@@ -523,7 +521,7 @@ window.submitAyatSilang = function() {
         showNotification((res && res.message) || 'Gagal menyimpan ayat silang.', 'error');
       }
     })
-    .withFailureHandler(function(e) { restore(); showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+    .withFailureHandler(function(e) { toggleLoader(false); showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
     .simpanAyatSilang(payload);
 };
 
@@ -534,13 +532,15 @@ window.hapusAyatSilangUI = function(id) {
     message: 'Yakin menghapus transfer ' + id + '? Saldo kedua akun akan menyesuaikan.',
     confirmText: 'Ya, Hapus',
     onConfirm: function() {
+      toggleLoader(true, 'Menghapus ayat silang...');
       google.script.run
         .withSuccessHandler(function(res) {
+          toggleLoader(false);
           showNotification((res && res.message) || 'Terhapus.', res && res.success ? 'success' : 'error');
           loadPemasukan();
           loadSaldoPanel();
         })
-        .withFailureHandler(function(e) { showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
+        .withFailureHandler(function(e) { toggleLoader(false); showNotification('Error: ' + (e && e.message ? e.message : e), 'error'); })
         .hapusAyatSilang(id);
     }
   });
