@@ -6,6 +6,7 @@
 var _inData     = [];
 var _inAkunList = [];
 var _cmSaldoData = null;
+var _cmAkunFilter = ''; // akun aktif utk filter mutasi (dipilih via klik kartu saldo)
 
 // ── Helpers ────────────────────────────────────────────────────
 function _escIn(s) {
@@ -140,13 +141,14 @@ function _renderSaldoPanel(res) {
   }
   container.innerHTML = html;
   // Sorot kartu sesuai filter akun yang sedang aktif
-  _cmHighlightAkun((document.getElementById('filter-mut-akun') || {}).value || '');
+  _cmHighlightAkun(_cmAkunFilter);
 }
 
-// Klik kartu saldo → set dropdown akun + filter tabel mutasi
+// Klik kartu saldo → filter tabel mutasi ke akun tsb (toggle bila diklik lagi)
 window.cmFilterByAkun = function(id) {
-  var sel = document.getElementById('filter-mut-akun');
-  if (sel) sel.value = id || '';
+  id = id || '';
+  // Klik kartu akun yang sama = matikan filter (kembali ke semua)
+  _cmAkunFilter = (id && _cmAkunFilter === id) ? '' : id;
   window.filterMutasi();
   // Gulir ke tabel mutasi agar hasil filter terlihat (terutama di mobile)
   var tb = document.getElementById('table-mutasi-kas');
@@ -172,7 +174,6 @@ function _loadInAkunOptions() {
       // Akun = Bank Account (data yang sama dengan invoice)
       var list = (res && res.accounts) ? res.accounts : [];
       _inAkunList = list.map(function(b) { return { id: b.id, namaAkun: b.label }; });
-      _fillInAkunSelect('filter-mut-akun', '', true);
       _fillInAkunSelect('in-akun', '', false);
     })
     .withFailureHandler(function() {})
@@ -209,7 +210,7 @@ function _renderMutasi(list) {
   if (!tbody) return;
 
   // Saldo berjalan hanya bila tepat 1 akun dipilih (dihitung atas seluruh riwayat akun tsb)
-  var akunFilter = (document.getElementById('filter-mut-akun') || {}).value || '';
+  var akunFilter = _cmAkunFilter;
   var showSaldo = !!akunFilter;
   var saldoMap = {};
   if (showSaldo) {
@@ -264,7 +265,7 @@ function _renderMutKPI(list) {
 
 // ── Filter mutasi (client-side) ────────────────────────────────
 function _applyMutFilter(data) {
-  var akun   = (document.getElementById('filter-mut-akun')   || {}).value || '';
+  var akun   = _cmAkunFilter;
   var tipe   = (document.getElementById('filter-mut-tipe')   || {}).value || '';
   var dari   = (document.getElementById('filter-mut-dari')   || {}).value || '';
   var sampai = (document.getElementById('filter-mut-sampai') || {}).value || '';
@@ -292,10 +293,11 @@ function _applyMutFilter(data) {
 
 window.filterMutasi = function() {
   _renderMutasi(_applyMutFilter(_mutData));
-  _cmHighlightAkun((document.getElementById('filter-mut-akun') || {}).value || '');
+  _cmHighlightAkun(_cmAkunFilter);
 };
 window.resetFilterMutasi = function() {
-  ['filter-mut-akun','filter-mut-tipe','filter-mut-dari','filter-mut-sampai','filter-mut-cari'].forEach(function(id) {
+  _cmAkunFilter = '';
+  ['filter-mut-tipe','filter-mut-dari','filter-mut-sampai','filter-mut-cari'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
   _renderMutasi(_applyMutFilter(_mutData));
