@@ -15,14 +15,29 @@ function _fmtPctLP(n) {
   return parseFloat(n).toFixed(1) + '%';
 }
 
+function _lpInitTahunSelect() {
+  var sel = document.getElementById('lp-tahun');
+  if (!sel || sel.options.length) return;
+  var thisYear = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (var y = thisYear; y >= thisYear - 4; y--) {
+    var opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  }
+}
+
+function _lpSelectedYear() {
+  var sel = document.getElementById('lp-tahun');
+  return (sel && sel.value) ? (parseInt(sel.value, 10) || new Date().getFullYear()) : new Date().getFullYear();
+}
+
 function _lpUpdatePeriodLabel() {
-  var el = document.getElementById('lp-period-label');
-  if (!el) return;
-  el.textContent = 'Tahun ' + new Date().getFullYear();
+  _lpInitTahunSelect();
 }
 
 function _lpBuildParams() {
-  var y = new Date().getFullYear();
+  var y = _lpSelectedYear();
   var fmt = function(d) {
     return d.getFullYear() + '-'
       + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
@@ -37,6 +52,7 @@ function _lpBuildParams() {
 // ── Load ─────────────────────────────────────────────────────────
 
 window.loadLaporanProfitabilitas = function() {
+  _lpInitTahunSelect();
   var params = _lpBuildParams();
 
   document.getElementById('lp-table-profit').innerHTML =
@@ -203,8 +219,7 @@ window.exportLaporanProfitPDF = function() {
 
     var rows     = _lpData.rows      || [];
     var s        = _lpData.summary   || {};
-    var periodLabel = document.getElementById('lp-period-label');
-    var periodText  = periodLabel ? periodLabel.textContent : '';
+    var periodText  = 'Tahun ' + _lpSelectedYear();
     var tglCetak    = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
 
     // ── Dark header ──────────────────────────────────────────────

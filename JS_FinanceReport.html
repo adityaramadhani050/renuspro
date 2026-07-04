@@ -5,8 +5,25 @@
 
 var _frData = null;
 
+function _frInitTahunSelect() {
+  var sel = document.getElementById('fr-tahun');
+  if (!sel || sel.options.length) return;
+  var thisYear = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (var y = thisYear; y >= thisYear - 4; y--) {
+    var opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  }
+}
+
+function _frSelectedYear() {
+  var sel = document.getElementById('fr-tahun');
+  return (sel && sel.value) ? (parseInt(sel.value, 10) || new Date().getFullYear()) : new Date().getFullYear();
+}
+
 function _frBuildFilterParam() {
-  var y = new Date().getFullYear();
+  var y = _frSelectedYear();
   var fmt = function(d) {
     return d.getFullYear() + '-'
       + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
@@ -16,13 +33,12 @@ function _frBuildFilterParam() {
 }
 
 function _frUpdatePeriodLabel() {
-  var el = document.getElementById('fr-period-label');
-  if (!el) return;
-  el.textContent = 'Tahun ' + new Date().getFullYear();
+  _frInitTahunSelect();
 }
 
 // ── Load ─────────────────────────────────────────────────────────
 window.loadFinanceReport = function() {
+  _frInitTahunSelect();
   _frAgingFilter = null;
   ['current','gte30','gte60','gte90'].forEach(function(k) {
     var c = document.getElementById('fr-aging-card-' + k);
@@ -256,8 +272,7 @@ window.exportFinanceReportPDF = function() {
   var GREEN = [5,150,105], RED   = [190,30,45],   WHITE = [255,255,255];
   var rp = function(v) { return 'Rp ' + Math.round(v||0).toLocaleString('id-ID'); };
 
-  var periodLabel = document.getElementById('fr-period-label');
-  var periodText  = periodLabel ? periodLabel.textContent : '';
+  var periodText  = 'Tahun ' + _frSelectedYear();
   var tglCetak    = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
 
   // ── Dark header ──────────────────────────────────────────────
