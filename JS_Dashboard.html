@@ -967,10 +967,15 @@ function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
       // Urutkan grup berdasarkan total nilai stale terbesar
       order.sort(function(a, b) { return groups[b].total - groups[a].total; });
 
+      // Akun sales: tampilkan statis (tanpa accordion) agar konsisten dgn
+      // "Detail Penawaran Saya". Admin/lead sales: tetap accordion per sales.
+      var _role = (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.role || '') : '';
+      var isSalesView = (_role !== 'admin' && _role !== 'owner' && _role !== 'leadsales');
+
       body.innerHTML = order.map(function(key, gi) {
         var g = groups[key];
         var accId = 'db-stale-' + gi;
-        var open = (gi === 0); // grup teratas terbuka default
+        var open = isSalesView || (gi === 0); // sales: selalu terbuka; lainnya: grup teratas
         var rows = g.offers.map(function(o) {
           var umurCls = _dbAgingBadgeCls(o.umurHari);
           return '<tr class="hover:bg-slate-50 transition">'
@@ -980,15 +985,16 @@ function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
             + '<td class="px-3 py-2 text-center whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + umurCls + '">' + o.umurHari + ' hari</span></td>'
             + '</tr>';
         }).join('');
-        return '<div class="border border-slate-150 rounded-xl overflow-hidden">'
-          + '<button type="button" onclick="_dbToggleDetail(\'' + accId + '\')"'
-          + ' class="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left bg-slate-50/70 hover:bg-slate-100 transition focus:outline-none">'
-          + '<span class="text-xs font-bold text-slate-700 truncate"><i class="fa-solid fa-user text-[10px] text-slate-400 mr-1.5"></i>' + _esc(g.sales) + '</span>'
+        var headerInner = '<span class="text-xs font-bold text-slate-700 truncate"><i class="fa-solid fa-user text-[10px] text-slate-400 mr-1.5"></i>' + _esc(g.sales) + '</span>'
           + '<span class="flex items-center gap-2 flex-shrink-0">'
           + '<span class="text-[10px] font-semibold text-slate-400 whitespace-nowrap">' + g.offers.length + ' penawaran · ' + _rpShort(g.total) + '</span>'
-          + '<i id="' + accId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"' + (open ? ' style="transform:rotate(180deg)"' : '') + '></i>'
-          + '</span>'
-          + '</button>'
+          + (isSalesView ? '' : '<i id="' + accId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"' + (open ? ' style="transform:rotate(180deg)"' : '') + '></i>')
+          + '</span>';
+        var header = isSalesView
+          ? '<div class="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50/70">' + headerInner + '</div>'
+          : '<button type="button" onclick="_dbToggleDetail(\'' + accId + '\')" class="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left bg-slate-50/70 hover:bg-slate-100 transition focus:outline-none">' + headerInner + '</button>';
+        return '<div class="border border-slate-150 rounded-xl overflow-hidden">'
+          + header
           + '<div id="' + accId + '" class="' + (open ? '' : 'hidden ') + 'border-t border-slate-100 overflow-x-auto">'
           + '<table class="w-full text-left border-collapse">'
           + '<thead class="bg-slate-50 border-b border-slate-100"><tr>'
