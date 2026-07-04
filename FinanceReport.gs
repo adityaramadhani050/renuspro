@@ -2,17 +2,24 @@
  * FinanceReport.gs — RenusPro
  * Laporan progress pembayaran untuk tim Finance & Admin.
  *
- * Invoice_Main kolom tambahan:
- *  21 tanggalBayar   Tanggal saat status diubah ke Lunas (dd/MM/yyyy)
+ * Invoice_Main kolom:
+ *  21 Bukti Bayar File Id | 22 Url | 23 Nama
+ *  24 Tanggal Bayar   Tanggal saat status diubah ke Lunas (dd/MM/yyyy)
+ *  (Sebelumnya keliru memakai kolom 21 sehingga bentrok dgn Bukti Bayar.)
  */
 
-// ── Pastikan kolom tanggalBayar ada di header ───────────────────────────────
+var _INV_TGL_BAYAR_COL = 24; // 1-based
+
+// ── Pastikan kolom Tanggal Bayar ada (kolom 24, terpisah dari Bukti Bayar) ──
 function _ensureTanggalBayarCol(ss) {
   const sheet = ss.getSheetByName('Invoice_Main');
   if (!sheet || sheet.getLastRow() < 1) return;
-  const lastCol = sheet.getLastColumn();
-  if (lastCol < 21) {
-    sheet.getRange(1, 21).setValue('Tanggal Bayar');
+  if (sheet.getMaxColumns() < _INV_TGL_BAYAR_COL) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), _INV_TGL_BAYAR_COL - sheet.getMaxColumns());
+  }
+  const hdr = (sheet.getRange(1, _INV_TGL_BAYAR_COL).getValue() || '').toString().toLowerCase();
+  if (hdr.indexOf('tanggal bayar') === -1) {
+    sheet.getRange(1, _INV_TGL_BAYAR_COL).setValue('Tanggal Bayar');
   }
 }
 
@@ -26,7 +33,7 @@ function catatTanggalBayar(idInvoice) {
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] && data[i][0].toString() === idInvoice) {
       const tglBayar = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
-      sheet.getRange(i + 1, 21).setValue(tglBayar);
+      sheet.getRange(i + 1, _INV_TGL_BAYAR_COL).setValue(tglBayar);
       SpreadsheetApp.flush();
       invalidateInvoiceCache();
       return;
@@ -88,7 +95,14 @@ function getFinanceReportData(filter) {
       var ppnNom  = parseFloat(invData[i][13]) || 0;
       var total   = parseFloat(invData[i][14]) || 0;
       var status  = invData[i][16] ? invData[i][16].toString() : 'Belum Lunas';
-      var tglBayar = invData[i][20] ? _fmtTgl(invData[i][20]) : '';
+      // Tanggal Bayar = kolom 24 (idx 23). Kolom 21 (idx 20) adalah "Bukti Bayar
+      // File Id" — dulu tanggal bayar keliru ditulis di sana; fallback hanya bila
+      // isinya benar-benar format tanggal (bukan file id).
+      var tglBayar = invData[i][23] ? _fmtTgl(invData[i][23]) : '';
+      if (!tglBayar) {
+        var legacyTB = (invData[i][20] || '').toString();
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(legacyTB)) tglBayar = _fmtTgl(legacyTB);
+      }
 
       // Filter periode: periksa tanggal invoice
       if (dateFrom || dateTo) {
