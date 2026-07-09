@@ -857,6 +857,7 @@ function _dbDetailInner(s, idx) {
     + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
     + _dbMiniKPI('Pipeline', _rp(s.pipelineValue), 'text-amber-600 text-xs leading-tight')
     + '</div>'
+    + factorBlock
     + '<div class="overflow-x-auto">'
     + '<table class="w-full text-left border-collapse">'
     + '<thead class="bg-slate-50 border-b border-slate-100"><tr>'
@@ -870,8 +871,7 @@ function _dbDetailInner(s, idx) {
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Sales Cycle</th>'
     + '</tr></thead>'
     + '<tbody class="divide-y divide-slate-50">' + _dbDetailTableRows(s) + '</tbody>'
-    + '</table></div>'
-    + factorBlock;
+    + '</table></div>';
 }
 
 // Accordion per sales (admin & lead sales).
