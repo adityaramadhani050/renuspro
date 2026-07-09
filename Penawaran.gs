@@ -375,19 +375,24 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra)
 
         // ── Otomasi No WO (Kolom 18) + Tanggal Deal (Kolom 19) ──
         let noWO = data[i][17] ? data[i][17].toString() : '';
+        const statusLama = data[i][16] ? data[i][16].toString() : ''; // status sebelumnya (kolom 17)
         if (statusBaru === 'Deal') {
-          // Status menjadi Deal → terbitkan No WO jika belum ada
-          if (!noWO) {
-            noWO = generateNextWONumber(sheet);
-            sheet.getRange(i + 1, 18).setValue(Number(noWO));
+          // Hanya jalankan otomasi Deal saat BENAR-BENAR transisi menjadi Deal.
+          // Jika sudah Deal sebelumnya (mis. sekadar edit/tambah catatan Win),
+          // JANGAN sentuh No WO & Tanggal Deal agar tidak diproses sebagai deal baru.
+          if (statusLama !== 'Deal') {
+            if (!noWO) {
+              noWO = generateNextWONumber(sheet);
+              sheet.getRange(i + 1, 18).setValue(Number(noWO));
+            }
+            // Catat tanggal deal (hanya isi jika belum ada, agar re-deal tidak reset tanggal)
+            const existingDealDate = data[i][18];
+            if (!existingDealDate) {
+              sheet.getRange(i + 1, 19).setValue(new Date());
+            }
+            // Link pre-deal invoices (noWO kosong) ke WO baru
+            _linkPredealInvoices(getSpreadsheet(), noPenawaran, noWO);
           }
-          // Catat tanggal deal (hanya isi jika belum ada, agar re-deal tidak reset tanggal)
-          const existingDealDate = data[i][18];
-          if (!existingDealDate) {
-            sheet.getRange(i + 1, 19).setValue(new Date());
-          }
-          // Link pre-deal invoices (noWO kosong) ke WO baru
-          _linkPredealInvoices(getSpreadsheet(), noPenawaran, noWO);
         } else {
           // Keluar dari Deal → kosongkan No WO dan tanggal deal
           if (noWO) {
@@ -398,8 +403,10 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra)
         }
 
         // ── Tanggal Fail (Kolom 26) — mirror Tanggal Deal ──
+        // Hanya stamp saat transisi menjadi Fail; edit/tambah catatan Lost pada
+        // penawaran yang sudah Fail tidak mengubah Tanggal Fail.
         if (statusBaru === 'Fail') {
-          if (!data[i][25]) sheet.getRange(i + 1, 26).setValue(new Date());
+          if (statusLama !== 'Fail' && !data[i][25]) sheet.getRange(i + 1, 26).setValue(new Date());
         } else {
           sheet.getRange(i + 1, 26).setValue('');
         }
