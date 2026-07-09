@@ -292,11 +292,11 @@ window.loadPenawaran = function() {
   if (typeof google !== 'undefined') {
     google.script.run.withSuccessHandler(function(data) {
       _cachedPenawaranData = data || [];
-      _isiDropdownFilterPenawaran(data);
-      _pgState.penawaran.data = data;
-      _pgState.penawaran.page = 1;
+      _isiDropdownFilterPenawaran(data);            // rebuild dropdown, nilai filter dipertahankan
       _injectPgBar('penawaran', '#table-penawaran');
-      _pgRender('penawaran');
+      // Terapkan ulang filter yang sedang aktif (bukan reset ke semua data),
+      // supaya pilihan filter tetap setelah tambah/edit/ubah status penawaran.
+      filterPenawaran();
     }).getPenawaranList();
   }
 };
