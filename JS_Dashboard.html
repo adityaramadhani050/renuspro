@@ -11,6 +11,11 @@ var _dbDonutChart   = null;
 var _dbChannelChart = null;
 var _dbWinChart     = null;
 var _dbLostChart    = null;
+var _dbSalesFactorCharts = {}; // idx → { win, lost } chart instances per sales
+
+// Palet warna slice pie faktor Win (hijau) & Lost (merah)
+var _DB_WIN_PALETTE  = ['#059669','#10B981','#34D399','#6EE7B7','#14B8A6','#22C55E','#84CC16','#2DD4BF'];
+var _DB_LOST_PALETTE = ['#DC2626','#EF4444','#F87171','#FB7185','#F43F5E','#FB923C','#F97316','#FBBF24'];
 
 // ── Formatting helpers ─────────────────────────────────────────
 function _rp(n) {
@@ -665,34 +670,64 @@ function _dbRenderChannel(items, fromMs, toMs) {
 function _dbAggWinLoss(salesList) {
   var win = {}, lost = {};
   (salesList || []).forEach(function(s) {
-    (s.penawaran || []).forEach(function(p) {
-      if (p.status === 'Deal' && p.kodeWin)  win[p.kodeWin]   = (win[p.kodeWin]   || 0) + 1;
-      if (p.status === 'Fail' && p.kodeLost) lost[p.kodeLost] = (lost[p.kodeLost] || 0) + 1;
-    });
+    var one = _dbAggWinLossOne(s);
+    Object.keys(one.win).forEach(function(k) { win[k] = (win[k] || 0) + one.win[k]; });
+    Object.keys(one.lost).forEach(function(k) { lost[k] = (lost[k] || 0) + one.lost[k]; });
   });
   return { win: win, lost: lost };
 }
 
-function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, color, setChart) {
+// Agregasi faktor Win/Lost untuk 1 sales
+function _dbAggWinLossOne(s) {
+  var win = {}, lost = {};
+  ((s && s.penawaran) || []).forEach(function(p) {
+    if (p.status === 'Deal' && p.kodeWin)  win[p.kodeWin]   = (win[p.kodeWin]   || 0) + 1;
+    if (p.status === 'Fail' && p.kodeLost) lost[p.kodeLost] = (lost[p.kodeLost] || 0) + 1;
+  });
+  return { win: win, lost: lost };
+}
+
+// Render pie faktor win & lost untuk 1 sales (dipanggil saat detail terlihat)
+function _dbRenderSalesFactorPie(idx, sales) {
+  if (!sales) {
+    var d = window._dbLastSalesData;
+    sales = (d && d.salesList) ? d.salesList[idx] : null;
+  }
+  if (!sales) return;
+  if (!document.getElementById('db-sfw-' + idx)) return; // blok faktor tidak dirender
+  var agg = _dbAggWinLossOne(sales);
+  if (!_dbSalesFactorCharts[idx]) _dbSalesFactorCharts[idx] = { win: null, lost: null };
+  var st = _dbSalesFactorCharts[idx];
+  _dbRenderFactorChart('db-sfw-' + idx, 'db-sfw-legend-' + idx, agg.win,
+    (typeof KODE_WIN_LIST !== 'undefined' ? KODE_WIN_LIST : []), _DB_WIN_PALETTE,
+    function(c) { if (st.win) { st.win.destroy(); st.win = null; } if (c) st.win = c; });
+  _dbRenderFactorChart('db-sfl-' + idx, 'db-sfl-legend-' + idx, agg.lost,
+    (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []), _DB_LOST_PALETTE,
+    function(c) { if (st.lost) { st.lost.destroy(); st.lost = null; } if (c) st.lost = c; });
+}
+
+function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, palette, setChart) {
+  palette = (palette && palette.length) ? palette : ['#64748B'];
   var rows = (kodeList || [])
     .filter(function(k) { return counts[k.kode] > 0; })
     .map(function(k) { return { kode: k.kode, label: k.label, count: counts[k.kode] }; })
     .sort(function(a, b) { return b.count - a.count; });
   var total = rows.reduce(function(s, r) { return s + r.count; }, 0);
+  var sliceColors = rows.map(function(r, i) { return palette[i % palette.length]; });
 
   var canvas = document.getElementById(canvasId);
   if (canvas) {
     setChart(null, canvas);  // destroy previous instance
     if (rows.length) {
       var chart = new Chart(canvas, {
-        type: 'bar',
+        type: 'pie',
         data: {
           labels: rows.map(function(r) { return r.kode; }),
           datasets: [{ data: rows.map(function(r) { return r.count; }),
-            backgroundColor: color, borderRadius: 6, borderSkipped: false, barThickness: 18 }]
+            backgroundColor: sliceColors, borderColor: '#fff', borderWidth: 2 }]
         },
         options: {
-          responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: { callbacks: { label: function(ctx) {
@@ -700,10 +735,6 @@ function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, color, setCh
               var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
               return ' ' + r.label + ': ' + r.count + ' (' + pct + '%)';
             }}}
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, stepSize: 1, precision: 0 }, border: { display: false } },
-            y: { grid: { display: false }, ticks: { font: { size: 10 } }, border: { display: false } }
           }
         }
       });
@@ -716,11 +747,13 @@ function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, color, setCh
     if (!rows.length) {
       legendEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Belum ada data pada periode ini.</p>';
     } else {
-      legendEl.innerHTML = rows.map(function(r) {
+      legendEl.innerHTML = rows.map(function(r, i) {
+        var c = sliceColors[i];
         var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
         return '<div class="flex items-center justify-between text-xs gap-2">'
           + '<div class="flex items-center gap-1.5 min-w-0">'
-          + '<span class="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style="background:' + color + '22;color:' + color + '">' + r.kode + '</span>'
+          + '<span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:' + c + '"></span>'
+          + '<span class="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style="background:' + c + '22;color:' + c + '">' + r.kode + '</span>'
           + '<span class="text-slate-600 truncate">' + _esc(r.label) + '</span></div>'
           + '<span class="font-bold text-slate-700 flex-shrink-0">' + r.count + ' <span class="text-slate-400 font-normal">(' + pct + '%)</span></span>'
           + '</div>';
@@ -732,10 +765,10 @@ function _dbRenderFactorChart(canvasId, legendId, counts, kodeList, color, setCh
 function _dbRenderWinLossFactors(salesList) {
   var agg = _dbAggWinLoss(salesList);
   _dbRenderFactorChart('db-winfactor-chart', 'db-winfactor-legend', agg.win,
-    (typeof KODE_WIN_LIST !== 'undefined' ? KODE_WIN_LIST : []), '#10B981',
+    (typeof KODE_WIN_LIST !== 'undefined' ? KODE_WIN_LIST : []), _DB_WIN_PALETTE,
     function(c) { if (_dbWinChart) { _dbWinChart.destroy(); _dbWinChart = null; } if (c) _dbWinChart = c; });
   _dbRenderFactorChart('db-lostfactor-chart', 'db-lostfactor-legend', agg.lost,
-    (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []), '#EF4444',
+    (typeof KODE_LOST_LIST !== 'undefined' ? KODE_LOST_LIST : []), _DB_LOST_PALETTE,
     function(c) { if (_dbLostChart) { _dbLostChart.destroy(); _dbLostChart = null; } if (c) _dbLostChart = c; });
 }
 
@@ -792,8 +825,26 @@ function _dbDetailTableRows(s) {
 }
 
 // Konten detail (KPI grid + tabel) — dipakai oleh accordion & tampilan flat.
-function _dbDetailInner(s) {
+function _dbDetailInner(s, idx) {
   var avgNilaiDeal = (s.dealCount > 0) ? (s.dealRevenue / s.dealCount) : 0;
+  var wl = _dbAggWinLossOne(s);
+  var hasFactors = Object.keys(wl.win).length || Object.keys(wl.lost).length;
+  var factorBlock = hasFactors
+    ? ('<div class="border-t border-slate-100 p-4">'
+        + '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-chart-pie mr-1"></i>Faktor Win / Lost</p>'
+        + '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">'
+        + '<div class="bg-white rounded-xl border border-slate-100 p-3">'
+        +   '<p class="text-[10px] font-bold text-emerald-600 mb-2"><i class="fa-solid fa-trophy mr-1"></i>Faktor Win</p>'
+        +   '<div class="relative" style="height:150px;"><canvas id="db-sfw-' + idx + '"></canvas></div>'
+        +   '<div id="db-sfw-legend-' + idx + '" class="mt-2 space-y-1"></div>'
+        + '</div>'
+        + '<div class="bg-white rounded-xl border border-slate-100 p-3">'
+        +   '<p class="text-[10px] font-bold text-rose-600 mb-2"><i class="fa-solid fa-circle-xmark mr-1"></i>Faktor Lost</p>'
+        +   '<div class="relative" style="height:150px;"><canvas id="db-sfl-' + idx + '"></canvas></div>'
+        +   '<div id="db-sfl-legend-' + idx + '" class="mt-2 space-y-1"></div>'
+        + '</div>'
+        + '</div></div>')
+    : '';
   return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50">'
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
     + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
@@ -819,7 +870,8 @@ function _dbDetailInner(s) {
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Sales Cycle</th>'
     + '</tr></thead>'
     + '<tbody class="divide-y divide-slate-50">' + _dbDetailTableRows(s) + '</tbody>'
-    + '</table></div>';
+    + '</table></div>'
+    + factorBlock;
 }
 
 // Accordion per sales (admin & lead sales).
@@ -847,9 +899,10 @@ function _dbRenderDetailAccordion(salesList) {
       + '<i id="' + detailId + '-icon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>'
       + '</div></button>'
       + '<div id="' + detailId + '" class="hidden border-t border-slate-100">'
-      + _dbDetailInner(s)
+      + _dbDetailInner(s, idx)
       + '</div></div>';
   }).join('');
+  // Chart faktor dirender lazy saat accordion dibuka (_dbToggleDetail)
 }
 
 // Tampilan flat tanpa accordion — untuk dashboard sales (data sendiri).
@@ -860,11 +913,13 @@ function _dbRenderSalesOwnDetail(salesList) {
     container.innerHTML = '<p class="text-xs text-slate-400 italic">Belum ada data penawaran pada periode ini.</p>';
     return;
   }
-  container.innerHTML = salesList.map(function(s) {
+  container.innerHTML = salesList.map(function(s, idx) {
     return '<div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">'
-      + _dbDetailInner(s)
+      + _dbDetailInner(s, idx)
       + '</div>';
   }).join('');
+  // Flat = selalu terlihat → render pie faktor langsung
+  salesList.forEach(function(s, idx) { _dbRenderSalesFactorPie(idx, s); });
 }
 
 function _dbMiniKPI(label, val, cls) {
@@ -880,6 +935,11 @@ function _dbToggleDetail(id) {
   if (!el) return;
   var hidden = el.classList.toggle('hidden');
   if (icon) icon.style.transform = hidden ? '' : 'rotate(180deg)';
+  // Detail per sales dibuka → render pie faktor win/lost (canvas kini punya ukuran)
+  if (!hidden) {
+    var mDet = id.match(/^db-detail-(\d+)$/);
+    if (mDet) _dbRenderSalesFactorPie(parseInt(mDet[1], 10));
+  }
 }
 
 // Warna badge umur sesuai klasifikasi aging (0-30 emerald, 31-60 blue,
