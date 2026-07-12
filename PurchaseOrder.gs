@@ -102,7 +102,8 @@ function _ensurePOItemCols(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('PO_Item');
   if (!sheet) return _ensurePOItemSheet(ss);
-  if (sheet.getLastColumn() < 9) sheet.getRange(1, 9).setValue('Qty Diterima');
+  if (sheet.getLastColumn() < 9)  sheet.getRange(1, 9).setValue('Qty Diterima');
+  if (sheet.getLastColumn() < 10) sheet.getRange(1, 10).setValue('ID Produk'); // kolom 10 (idx 9)
   return sheet;
 }
 
@@ -372,7 +373,8 @@ function getPODetail(noPO) {
           hargaBeli:   parseFloat(ir[5]) || 0,
           total:       parseFloat(ir[6]) || 0,
           catatan:     ir[7] ? ir[7].toString() : '',
-          qtyDiterima: parseFloat(ir[8]) || 0
+          qtyDiterima: parseFloat(ir[8]) || 0,
+          produkId:    ir[9] ? ir[9].toString() : ''
         });
       }
     }
@@ -478,7 +480,7 @@ function simpanPO(payload) {
 
     var ss = getSpreadsheet();
     var poSheet    = _ensurePOSheet(ss);
-    var itemSheet  = _ensurePOItemSheet(ss);
+    var itemSheet  = _ensurePOItemCols(ss);
 
     var noPO = _generateNoPO(poSheet);
     var now  = new Date();
@@ -548,7 +550,9 @@ function simpanPO(payload) {
         item.satuan    ? item.satuan.toString()    : '',
         hargaBeli,
         totalItem,
-        item.catatan   ? item.catatan.toString()   : ''
+        item.catatan   ? item.catatan.toString()   : '',
+        '',                                              // Qty Diterima (diisi saat penerimaan)
+        item.produkId  ? item.produkId.toString()  : '' // ID Produk (kosong utk item manual)
       ]);
     }
 
@@ -589,7 +593,7 @@ function editPO(payload) {
       return { success: false, message: 'Hanya PO berstatus Aktif yang dapat diedit.' };
     }
 
-    var itemSheet = _ensurePOItemSheet(ss);
+    var itemSheet = _ensurePOItemCols(ss);
     var itemData  = itemSheet.getDataRange().getValues();
 
     // Hapus item lama (loop dari bawah agar index tidak bergeser)
@@ -667,7 +671,9 @@ function editPO(payload) {
         item.satuan   ? item.satuan.toString()   : '',
         hargaBeli,
         totalItem,
-        item.catatan  ? item.catatan.toString()  : ''
+        item.catatan  ? item.catatan.toString()  : '',
+        '',                                             // Qty Diterima
+        item.produkId ? item.produkId.toString()  : '' // ID Produk
       ]);
     }
 

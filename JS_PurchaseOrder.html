@@ -5,6 +5,52 @@ let _cachedPOData   = [];
 let _poFormMode     = 'new'; // 'new' | 'edit'
 let _poItems        = [];
 let _currentPODetail = null;
+let _poSupplierProduk = []; // katalog produk supplier terpilih: [{ id, nama, unit, hargaBeli }]
+
+// Muat katalog produk supplier terpilih → dipakai dropdown item PO
+function _loadPOSupplierKatalog(idSupplier, cb) {
+  idSupplier = (idSupplier || '').toString().trim();
+  if (!idSupplier || typeof google === 'undefined') { _poSupplierProduk = []; if (cb) cb(); return; }
+  google.script.run
+    .withSuccessHandler(function(res) { _poSupplierProduk = (res && res.success) ? (res.list || []) : []; if (cb) cb(); })
+    .withFailureHandler(function() { _poSupplierProduk = []; if (cb) cb(); })
+    .getProdukBySupplier(idSupplier);
+}
+
+// Supplier di form PO berubah → muat katalognya lalu render ulang item
+function onPOSupplierChange() {
+  var id = (document.getElementById('sel-supplier-po').value || '').trim();
+  _loadPOSupplierKatalog(id, function() { renderItemsPO(); });
+}
+
+// Pilih produk dari dropdown item PO → auto-isi nama/satuan/harga beli
+function onPOItemSelect(idx, sel) {
+  if (!_poItems[idx]) return;
+  var val = sel.value;
+  if (val === '__manual__') {
+    _poItems[idx]._manual = true;
+    _poItems[idx].produkId = '';
+    _poItems[idx].namaItem = '';
+    renderItemsPO();
+    return;
+  }
+  if (!val) { _poItems[idx].produkId = ''; _poItems[idx].namaItem = ''; hitungTotalPO(); return; }
+  var opt = sel.options[sel.selectedIndex];
+  _poItems[idx].produkId = val;
+  _poItems[idx].namaItem = opt.getAttribute('data-nama') || opt.text;
+  _poItems[idx].satuan   = opt.getAttribute('data-unit') || '';
+  _poItems[idx].hargaBeli = parseFloat(opt.getAttribute('data-harga')) || 0;
+  _poItems[idx]._manual  = false;
+  renderItemsPO();
+  hitungTotalPO();
+}
+
+// Baris manual → kembali ke mode dropdown katalog
+function _poItemToDropdown(idx) {
+  if (!_poItems[idx]) return;
+  _poItems[idx]._manual = false;
+  renderItemsPO();
+}
 
 // ── Render tabel daftar PO ──────────────────────────────────────────────────
 function _pgRenderPurchaseOrder(data) {
@@ -138,6 +184,7 @@ function _renderPOKPI(list) {
 function bukaFormPO() {
   _poFormMode = 'new';
   _poItems    = [];
+  _poSupplierProduk = [];
   document.getElementById('form-po-title').innerText = 'Buat Purchase Order Baru';
   document.getElementById('po-no-field').value       = 'Auto-generate...';
   document.getElementById('po-edit-nopo') && (document.getElementById('po-edit-nopo').value = '');
@@ -282,7 +329,7 @@ function tutupFormPO() {
 
 // ── Items PO ─────────────────────────────────────────────────────────────────
 function tambahItemPO() {
-  _poItems.push({ namaItem: '', qty: 1, satuan: '', hargaBeli: 0, catatan: '' });
+  _poItems.push({ namaItem: '', qty: 1, satuan: '', hargaBeli: 0, catatan: '', produkId: '' });
   renderItemsPO();
 }
 
@@ -303,11 +350,29 @@ function renderItemsPO() {
     tbody.innerHTML = '<tr id="po-items-empty"><td colspan="6" class="px-4 py-6 text-center text-slate-400 text-sm italic">Klik "Tambah Item" untuk menambahkan item pembelian.</td></tr>';
     return;
   }
+  var supplierAda = _poSupplierProduk.length > 0;
   tbody.innerHTML = _poItems.map(function(item, idx) {
     var total = (parseFloat(item.qty) || 0) * (parseFloat(item.hargaBeli) || 0);
     var hargaDisplay = item.hargaBeli ? _fmtRp(item.hargaBeli) : '';
+    // Nama Item: dropdown katalog supplier (hybrid) atau input manual
+    var inCatalog = item.produkId && _poSupplierProduk.some(function(p) { return p.id === item.produkId; });
+    var pakaiDropdown = supplierAda && !item._manual && (!item.produkId || inCatalog);
+    var namaCell;
+    if (pakaiDropdown) {
+      var opts = '<option value="">— Pilih item —</option><option value="__manual__">✏️ Ketik manual…</option>';
+      _poSupplierProduk.forEach(function(p) {
+        var selAttr = (item.produkId && item.produkId === p.id) ? ' selected' : '';
+        opts += '<option value="' + p.id + '" data-nama="' + _escHtml(p.nama) + '" data-unit="' + _escHtml(p.unit || '') + '" data-harga="' + (p.hargaBeli || 0) + '"' + selAttr + '>' + _escHtml(p.nama) + '</option>';
+      });
+      namaCell = '<td class="px-2 py-1.5"><select onchange="onPOItemSelect(' + idx + ',this)" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white">' + opts + '</select></td>';
+    } else {
+      var manualHint = supplierAda
+        ? '<button type="button" onclick="_poItemToDropdown(' + idx + ')" class="text-[10px] text-orange-600 hover:underline mt-0.5"><i class="fas fa-list mr-0.5"></i>pilih dari katalog</button>'
+        : '<span class="text-[10px] text-slate-400 mt-0.5 block">Pilih supplier untuk katalog</span>';
+      namaCell = '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.namaItem) + '" oninput="_poItemChange(' + idx + ',\'namaItem\',this.value)" placeholder="Nama item..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white">' + manualHint + '</td>';
+    }
     return '<tr class="border-b border-slate-100">' +
-      '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.namaItem) + '" oninput="_poItemChange(' + idx + ',\'namaItem\',this.value)" placeholder="Nama item..." class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></td>' +
+      namaCell +
       '<td class="px-2 py-1.5"><input type="number" value="' + (item.qty || 1) + '" min="0" step="any" oninput="_poItemChange(' + idx + ',\'qty\',this.value);hitungTotalPO()" class="w-20 px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
       '<td class="px-2 py-1.5"><input type="text" value="' + _escHtml(item.satuan) + '" oninput="_poItemChange(' + idx + ',\'satuan\',this.value)" placeholder="pcs" class="w-20 px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-center"></td>' +
       '<td class="px-2 py-1.5"><input type="text" inputmode="numeric" value="' + hargaDisplay + '" oninput="_onHargaPoInput(this,' + idx + ')" placeholder="0" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-right font-medium"></td>' +
@@ -410,7 +475,7 @@ function submitPO() {
       return JSON.stringify(tc);
     })(),
     items:        _poItems.map(function(it) {
-      return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
+      return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '', produkId: it.produkId || '' };
     }),
     dibuatOleh: _currentUser ? _currentUser.nama : ''
   };
@@ -650,8 +715,9 @@ function bukaEditPO(noPO) {
       var po    = res.po;
       var items = res.items || [];
       _poFormMode = 'edit';
+      _poSupplierProduk = [];
       _poItems    = items.map(function(it) {
-        return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '', hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '' };
+        return { namaItem: it.namaItem || '', qty: it.qty || 0, satuan: it.satuan || '', hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '', produkId: it.produkId || '', _manual: !it.produkId };
       });
 
       document.getElementById('form-po-title').innerText    = 'Edit PO – ' + po.noPO;
@@ -685,6 +751,8 @@ function bukaEditPO(noPO) {
       _loadSupplierOptions('sel-supplier-po', po.idSupplier || '', _poLoadDoneEdit);
       _loadWOOptions('sel-wo-po', po.noWO || '', _poLoadDoneEdit);
       _loadPOTCDropdowns(po.termConditions, _poLoadDoneEdit);
+      // Muat katalog supplier → dropdown item ter-preselect utk item ber-produkId
+      _loadPOSupplierKatalog(po.idSupplier || '', function() { renderItemsPO(); });
 
       renderItemsPO();
       hitungTotalPO();
