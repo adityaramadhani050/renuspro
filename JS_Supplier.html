@@ -5,6 +5,96 @@
 
 let _cachedSupplierData = [];
 
+// ── Katalog Item Supplier ─────────────────────────────────────────
+let _katalogProdukAll = [];   // semua produk master (untuk picker)
+let _katalogItems     = [];   // item katalog supplier yg sedang diedit
+
+function _katFmtRp(n) { return 'Rp ' + Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
+function _katParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g, '')) || 0; }
+
+function _isiPickerProdukKatalog() {
+  const sel = document.getElementById('katalog-produk-picker');
+  if (!sel) return;
+  const dipakai = {};
+  _katalogItems.forEach(function(it) { dipakai[it.idProduk] = true; });
+  let opts = '<option value="">— Pilih produk untuk ditambahkan —</option>';
+  _katalogProdukAll
+    .filter(function(p) { return !dipakai[p.sku]; })
+    .sort(function(a, b) { return a.nama.localeCompare(b.nama); })
+    .forEach(function(p) {
+      opts += '<option value="' + p.sku + '">' + p.nama + (p.unit ? ' (' + p.unit + ')' : '') + '</option>';
+    });
+  sel.innerHTML = opts;
+}
+
+function _renderKatalogList() {
+  const box = document.getElementById('katalog-list');
+  if (!box) return;
+  if (!_katalogItems.length) {
+    box.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-3 bg-slate-50 rounded-xl">Belum ada item. Tambahkan produk yang dijual supplier ini.</p>';
+    return;
+  }
+  box.innerHTML = _katalogItems.map(function(it, idx) {
+    return '<div class="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">'
+      + '<div class="flex-1 min-w-0"><p class="text-xs font-bold text-slate-700 truncate">' + (it.nama || it.idProduk) + '</p>'
+      + '<p class="text-[10px] text-slate-400">' + (it.unit || '-') + ' · <span class="font-mono">' + it.idProduk + '</span></p></div>'
+      + '<div class="flex items-center gap-1"><span class="text-[10px] text-slate-400">Rp</span>'
+      + '<input type="text" inputmode="numeric" value="' + (it.hargaBeli ? Math.round(it.hargaBeli).toLocaleString("id-ID") : "") + '" '
+      + 'oninput="_onKatalogHargaInput(this,' + idx + ')" placeholder="Harga beli" '
+      + 'class="w-28 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
+      + '<button type="button" onclick="hapusKatalogItem(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fas fa-trash-can text-xs"></i></button>'
+      + '</div>';
+  }).join('');
+}
+
+function _onKatalogHargaInput(el, idx) {
+  _katalogItems[idx].hargaBeli = _katParseRp(el.value);
+}
+
+function tambahKatalogItem() {
+  const sel = document.getElementById('katalog-produk-picker');
+  const id = sel ? sel.value : '';
+  if (!id) { showNotification('Pilih produk terlebih dahulu.', 'error'); return; }
+  const p = _katalogProdukAll.filter(function(x) { return x.sku === id; })[0];
+  if (!p) return;
+  if (_katalogItems.some(function(it) { return it.idProduk === id; })) return;
+  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0) });
+  _isiPickerProdukKatalog();
+  _renderKatalogList();
+}
+
+function hapusKatalogItem(idx) {
+  _katalogItems.splice(idx, 1);
+  _isiPickerProdukKatalog();
+  _renderKatalogList();
+}
+
+// Muat produk master + katalog supplier saat modal edit dibuka
+function _muatKatalogSupplier(idSupplier) {
+  _katalogItems = [];
+  _renderKatalogList();
+  if (typeof google === 'undefined') return;
+  const afterProduk = function() {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        _katalogItems = (res && res.success) ? (res.list || []).map(function(it) {
+          return { idProduk: it.idProduk, nama: it.nama, unit: it.unit, hargaBeli: (it.hargaBeli != null ? it.hargaBeli : (it.hpp || 0)) };
+        }) : [];
+        _isiPickerProdukKatalog();
+        _renderKatalogList();
+      })
+      .withFailureHandler(function() { _isiPickerProdukKatalog(); _renderKatalogList(); })
+      .getSupplierKatalog(idSupplier);
+  };
+  if (_katalogProdukAll.length) { afterProduk(); }
+  else {
+    google.script.run
+      .withSuccessHandler(function(list) { _katalogProdukAll = list || []; afterProduk(); })
+      .withFailureHandler(function() { _katalogProdukAll = []; afterProduk(); })
+      .getProdukList();
+  }
+}
+
 // ── Render tabel supplier ─────────────────────────────────────────
 function _pgRenderSupplier(data) {
   const tbody = document.getElementById('table-supplier');
@@ -117,6 +207,8 @@ function bukaModalEditSupplier(supplierJson) {
   document.getElementById('edit-supplier-catatan').value = supplier.catatan || '';
   document.getElementById('edit-supplier-status').value  = supplier.status  || 'Aktif';
 
+  _muatKatalogSupplier(supplier.id || '');
+
   document.getElementById('modal-edit-supplier').classList.remove('hidden');
 }
 
@@ -141,14 +233,22 @@ function submitEditSupplier(event) {
   toggleLoader(true, 'Menyimpan perubahan...');
 
   if (typeof google !== 'undefined') {
+    var katalogPayload = _katalogItems.map(function(it) {
+      return { idProduk: it.idProduk, hargaBeli: (it.hargaBeli || 0) };
+    });
+    var _simpanKatalogLalu = function(msg) {
+      google.script.run
+        .withSuccessHandler(function() { toggleLoader(false); showNotification(msg); loadSupplier(); })
+        .withFailureHandler(function(e) { toggleLoader(false); showNotification('Supplier tersimpan, tapi katalog gagal: ' + (e && e.message ? e.message : e), 'error'); loadSupplier(); })
+        .saveSupplierKatalog(id, katalogPayload);
+    };
     google.script.run
       .withSuccessHandler(function(res) {
-        toggleLoader(false);
         if (res && res.success === false) {
+          toggleLoader(false);
           showNotification(res.message || 'Gagal menyimpan perubahan.', 'error');
         } else {
-          showNotification(res && res.message ? res.message : 'Data supplier berhasil diperbarui.');
-          loadSupplier();
+          _simpanKatalogLalu(res && res.message ? res.message : 'Data supplier berhasil diperbarui.');
         }
       })
       .withFailureHandler(function(err) {

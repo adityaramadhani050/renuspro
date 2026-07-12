@@ -83,8 +83,8 @@
         </div>
 
         <!-- MODAL EDIT SUPPLIER -->
-        <div id="modal-edit-supplier" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4">
-          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">
+        <div id="modal-edit-supplier" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl max-h-[90vh] overflow-y-auto">
 
             <!-- Header -->
             <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
@@ -137,6 +137,19 @@
                       <option value="Non-Aktif">Non-Aktif</option>
                     </select>
                   </div>
+                </div>
+
+                <!-- Katalog Item Supplier -->
+                <div class="mt-5 border-t border-slate-100 pt-4">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-box-open mr-1 text-orange-500"></i>Katalog Item
+                  </label>
+                  <p class="text-[11px] text-slate-400 mb-2">Produk yang dijual supplier ini — akan muncul di dropdown saat membuat Purchase Order.</p>
+                  <div class="flex gap-2 mb-3">
+                    <select id="katalog-produk-picker" class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-orange-400"></select>
+                    <button type="button" onclick="tambahKatalogItem()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-sm font-bold whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Tambah</button>
+                  </div>
+                  <div id="katalog-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
                 </div>
               </div>
 
