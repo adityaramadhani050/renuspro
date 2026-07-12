@@ -37,6 +37,7 @@
  *  6  Total
  *  7  Catatan
  *  8  Qty Diterima  (ditambah Modul Inventory)
+ *  9  ID Produk     (link ke Master_Produk; kosong utk item manual)
  *
  * Sheet Pembayaran_PO — kolom (0-based):
  *  0  ID Bayar
@@ -92,7 +93,7 @@ function _ensurePOItemSheet(ss) {
     sheet = ss.insertSheet('PO_Item');
     sheet.appendRow([
       'ID Item', 'No PO', 'Nama Item', 'Qty', 'Satuan',
-      'Harga Beli Satuan', 'Total', 'Catatan', 'Qty Diterima'
+      'Harga Beli Satuan', 'Total', 'Catatan', 'Qty Diterima', 'ID Produk'
     ]);
   }
   return sheet;
