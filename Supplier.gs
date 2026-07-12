@@ -164,3 +164,117 @@ function hapusSupplier(id) {
     try { lock.releaseLock(); } catch (e) {}
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATALOG ITEM SUPPLIER (relasi supplier ↔ produk, many-to-many)
+//  Sheet Supplier_Produk kolom (0-based):
+//   0 ID Supplier | 1 ID Produk | 2 Harga Beli (opsional) | 3 Dibuat Pada
+// ═══════════════════════════════════════════════════════════════════════════
+
+function _ensureSupplierProdukSheet(ss) {
+  ss = ss || getSpreadsheet();
+  const existing = ss.getSheetByName('Supplier_Produk');
+  if (existing) return existing;
+  const sheet = ss.insertSheet('Supplier_Produk');
+  sheet.appendRow(['ID Supplier', 'ID Produk', 'Harga Beli', 'Dibuat Pada']);
+  sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+  return sheet;
+}
+
+// Map ID Produk → { nama, unit, hpp } dari Master_Produk (via getProdukList)
+function _mapProdukById() {
+  const map = {};
+  try {
+    (getProdukList() || []).forEach(function (p) {
+      map[p.sku] = { nama: p.nama, unit: p.unit, hpp: p.hpp };
+    });
+  } catch (e) { /* ignore */ }
+  return map;
+}
+
+// Daftar produk yang di-assign ke supplier (untuk UI kurasi katalog).
+function getSupplierKatalog(idSupplier) {
+  try {
+    idSupplier = (idSupplier || '').toString().trim();
+    if (!idSupplier) return { success: true, list: [] };
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    const data = sheet.getDataRange().getValues();
+    const prod = _mapProdukById();
+    const list = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][0] || data[i][0].toString().trim() !== idSupplier) continue;
+      const idProduk = data[i][1] ? data[i][1].toString() : '';
+      const p = prod[idProduk];
+      if (!p) continue; // produk sudah dihapus dari master → lewati
+      list.push({
+        idProduk:  idProduk,
+        nama:      p.nama,
+        unit:      p.unit,
+        hpp:       p.hpp,
+        hargaBeli: (data[i][2] !== '' && data[i][2] != null) ? (parseFloat(data[i][2]) || 0) : null
+      });
+    }
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Item siap-dropdown untuk form PO: { id, nama, unit, hargaBeli }.
+// hargaBeli = harga beli spesifik supplier bila ada, else fallback ke HPP produk.
+function getProdukBySupplier(idSupplier) {
+  try {
+    const res = getSupplierKatalog(idSupplier);
+    if (!res.success) return res;
+    const list = res.list.map(function (it) {
+      return {
+        id:        it.idProduk,
+        nama:      it.nama,
+        unit:      it.unit,
+        hargaBeli: (it.hargaBeli != null) ? it.hargaBeli : (it.hpp || 0)
+      };
+    }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Tulis ulang katalog satu supplier. items = [{ idProduk, hargaBeli? }].
+function saveSupplierKatalog(idSupplier, items) {
+  const lock = LockService.getScriptLock();
+  try {
+    idSupplier = (idSupplier || '').toString().trim();
+    if (!idSupplier) return { success: false, message: 'ID supplier wajib diisi.' };
+    items = items || [];
+
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    SpreadsheetApp.flush();
+
+    // Hapus baris lama supplier ini (dari bawah ke atas)
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][0] && data[i][0].toString().trim() === idSupplier) sheet.deleteRow(i + 1);
+    }
+
+    // Insert baru (dedup ID Produk)
+    const when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    const seen = {};
+    for (let j = 0; j < items.length; j++) {
+      const idProduk = (items[j].idProduk || '').toString().trim();
+      if (!idProduk || seen[idProduk]) continue;
+      seen[idProduk] = true;
+      const hb = (items[j].hargaBeli != null && items[j].hargaBeli !== '')
+        ? (parseFloat(items[j].hargaBeli) || 0) : '';
+      sheet.appendRow([idSupplier, idProduk, hb, when]);
+    }
+    return { success: true, message: 'Katalog supplier tersimpan (' + Object.keys(seen).length + ' item).' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
