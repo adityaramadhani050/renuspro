@@ -217,6 +217,9 @@
         tb.appendChild(tr);
       });
       tb.querySelectorAll('.baris-item').forEach((b, i) => b.querySelector('.item-index').innerText = i + 1);
+      // Upgrade select produk hasil paket menjadi searchable dropdown (sama
+      // seperti penambahan item manual). Idempoten — aman meski dipanggil ganda.
+      setTimeout(function() { _initSelectProdukDiBaris(tb); }, 30);
       hitungKalkulasiGabungan();
     }
 
@@ -1197,5 +1200,8 @@
       const spanSubK = div.querySelector('.txt-subtotal-kelompok');
       spanSubK.innerText            = subK.toLocaleString('id-ID');
       spanSubK.dataset.rawSubtotal  = subK;   // ← key yang dibaca hitungKalkulasiGabungan()
-    }  
+
+      // Upgrade select produk menjadi searchable dropdown (konsisten dgn item manual)
+      setTimeout(function() { _initSelectProdukDiBaris(div); }, 30);
+    }
 </script>
