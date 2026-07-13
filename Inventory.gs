@@ -504,6 +504,39 @@ function _syncHPPProduk(ss, idProduk, hargaBeli) {
   if (updated) invalidateProdukCache();
 }
 
+// Stok ID yang saat ini tertaut ke sebuah produk (kolom 7 / idx 6), atau ''.
+function _getProdukStokId(ss, idProduk) {
+  ss = ss || getSpreadsheet();
+  _ensureStokLinkKolom(ss);
+  var sheet = ss.getSheetByName('Master_Produk');
+  if (!sheet) return '';
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if ((data[i][0] || '').toString().trim() === idProduk.toString().trim()) {
+      return (data[i][6] || '').toString().trim();
+    }
+  }
+  return '';
+}
+
+// Tautkan produk ke stok (kolom 7) HANYA bila belum tertaut. Idempoten.
+function _ensureProdukStokLink(ss, idProduk, idStok) {
+  ss = ss || getSpreadsheet();
+  _ensureStokLinkKolom(ss);
+  var sheet = ss.getSheetByName('Master_Produk');
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if ((data[i][0] || '').toString().trim() === idProduk.toString().trim()) {
+      if (!(data[i][6] || '').toString().trim()) {
+        sheet.getRange(i + 1, 7).setValue(idStok); // col[6] = Stok ID
+        invalidateProdukCache();
+      }
+      return;
+    }
+  }
+}
+
 // ── Read Functions ───────────────────────────────────────────────────────────
 
 function getStokList() {
@@ -882,9 +915,13 @@ function terimaPOItems(payload) {
         satuanProduk = produkMap[it2.idProduk].satuan;
       }
 
-      var idStokItem = (it2.idStok || it2.idProduk || '').toString().trim();
+      var idProduk2  = (it2.idProduk || '').toString().trim();
+      var idStokItem = (it2.idStok || '').toString().trim();
+      // Item dari katalog (punya produkId) tapi belum tautkan stok manual:
+      // pakai Stok ID yang sudah tertaut ke produk bila ada.
+      if (!idStokItem && idProduk2) idStokItem = _getProdukStokId(ss, idProduk2);
       if (!idStokItem) {
-        // Auto-create stok dari data PO item
+        // Auto-create stok dari data PO item (STK-###)
         var autoNama   = it2.namaItem || ('Item PO ' + it2.idItem);
         var autoSatuan = it2.satuan || 'unit';
         var autoId     = _generateIdStok(sSheet);
@@ -905,6 +942,11 @@ function terimaPOItems(payload) {
           keteranganMutasi,
           namaUser, nowStr
         ]);
+        // Auto-assign stok ke produk katalog + update harga beli (HPP) terakhir
+        if (idProduk2) {
+          _ensureProdukStokLink(ss, idProduk2, idStokItem);
+          _syncHPPProduk(ss, idProduk2, harga2);
+        }
         _syncQtyTersediaProduk(ss, idStokItem, saldoBaru);
       }
 
