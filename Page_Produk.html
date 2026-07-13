@@ -1,19 +1,31 @@
       <section id="page-produk" class="page-section">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Katalog Material & Jasa</h2>
-          <div class="flex items-center gap-3 w-full sm:w-auto">
-            <div class="relative flex-1 sm:w-56">
+          <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-56 min-w-[10rem]">
               <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
               <input type="text" id="search-produk" oninput="filterTabel('produk')"
-                placeholder="Cari nama, ID..."
+                placeholder="Cari nama, ID, spesifikasi..."
                 class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
             </div>
+            <select id="filter-produk-kategori" onchange="filterTabel('produk')"
+              class="py-2.5 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white text-slate-600">
+              <option value="">Semua Kategori</option>
+            </select>
+            <select id="filter-produk-merek" onchange="filterTabel('produk')"
+              class="py-2.5 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white text-slate-600">
+              <option value="">Semua Merek</option>
+            </select>
             <button id="btn-tambah-produk" onclick="bukaFormTambahProduk()"
               class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-plus"></i> Tambah Item Baru
             </button>
           </div>
         </div>
+
+        <!-- Datalist bersama untuk input Kategori & Merek -->
+        <datalist id="dl-kategori-produk"></datalist>
+        <datalist id="dl-merek-produk"></datalist>
 
         <!-- MODAL TAMBAH PRODUK -->
         <div id="modal-produk" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
@@ -54,6 +66,18 @@
                       <option value="Jasa">Jasa (tidak ada stok)</option>
                     </select>
                   </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori</label>
+                    <input type="text" id="modal-produk-kategori" list="dl-kategori-produk" class="input-field text-sm" placeholder="Contoh: Panel Surya, Inverter">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Merek</label>
+                    <input type="text" id="modal-produk-merek" list="dl-merek-produk" class="input-field text-sm" placeholder="Contoh: Solana, Zamdon">
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Spesifikasi / Tipe</label>
+                    <input type="text" id="modal-produk-spesifikasi" class="input-field text-sm" placeholder="Contoh: Panel Mono (Black), ZDTID12212-H60">
+                  </div>
                   <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Beli (Rp) <span class="text-slate-400 font-normal normal-case ml-1">Auto ter-update saat penerimaan barang</span></label>
                     <div class="relative">
@@ -90,11 +114,13 @@
 
         <!-- TABEL PRODUK -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-x-auto">
-          <table class="w-full min-w-[900px] text-left border-collapse rp-table">
+          <table class="w-full min-w-[1040px] text-left border-collapse rp-table">
             <thead>
               <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                 <th class="p-4">ID</th>
                 <th class="p-4">Nama Item</th>
+                <th class="p-4">Kategori</th>
+                <th class="p-4">Merek</th>
                 <th class="p-4 text-center">Unit</th>
                 <th class="p-4 text-center">Tipe</th>
                 <th class="p-4 text-center">Stok Terkait</th>
@@ -105,7 +131,7 @@
               </tr>
             </thead>
             <tbody id="table-produk" class="text-sm">
-              <tr><td colspan="9" class="p-8 text-center text-slate-500">
+              <tr><td colspan="11" class="p-8 text-center text-slate-500">
                 <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data produk...
               </td></tr>
             </tbody>

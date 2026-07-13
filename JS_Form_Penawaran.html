@@ -441,8 +441,9 @@
     function bukaFormTambahProduk() {
       var form = document.querySelector('#modal-produk form');
       if (form) form.reset();
-      var hppEl = document.getElementById('modal-produk-hpp');
-      if (hppEl) hppEl.value = '';
+      ['modal-produk-hpp','modal-produk-kategori','modal-produk-merek','modal-produk-spesifikasi'].forEach(function(id){
+        var el = document.getElementById(id); if (el) el.value = '';
+      });
       var tipeEl = document.getElementById('modal-produk-tipe');
       if (tipeEl) tipeEl.value = '';
       document.getElementById('modal-produk').classList.remove('hidden');
@@ -455,6 +456,9 @@
       const unit  = form.querySelector('[name="unit"]').value.trim();
       const hpp   = pN(document.getElementById('modal-produk-hpp').value);
       const tipe  = (document.getElementById('modal-produk-tipe') || {}).value || '';
+      const kategori    = (document.getElementById('modal-produk-kategori') || {}).value || '';
+      const merek       = (document.getElementById('modal-produk-merek') || {}).value || '';
+      const spesifikasi = (document.getElementById('modal-produk-spesifikasi') || {}).value || '';
 
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
 
@@ -466,7 +470,9 @@
             if (!res.success) { showNotification(res.message, "error"); return; }
             showNotification(res.message);
             form.reset();
-            document.getElementById('modal-produk-hpp').value = '';
+            ['modal-produk-hpp','modal-produk-kategori','modal-produk-merek','modal-produk-spesifikasi'].forEach(function(id){
+              var el = document.getElementById(id); if (el) el.value = '';
+            });
             if (document.getElementById('modal-produk-tipe')) document.getElementById('modal-produk-tipe').value = '';
             document.getElementById('modal-produk').classList.add('hidden');
             loadProduk();
@@ -476,7 +482,7 @@
             toggleLoader(false);
             showNotification("Gagal: " + (err && err.message ? err.message : err), "error");
           })
-          .simpanProduk(nama, unit, 0, hpp, tipe, '');
+          .simpanProduk(nama, unit, 0, hpp, tipe, '', kategori.trim(), merek.trim(), spesifikasi.trim());
       }
     }
 
@@ -488,6 +494,9 @@
       document.getElementById('edit-produk-hpp').value   = formatNominalRupiah(item.hpp);
       var tipeEl = document.getElementById('edit-produk-tipe');
       if (tipeEl) tipeEl.value = item.tipe || '';
+      var katEl = document.getElementById('edit-produk-kategori'); if (katEl) katEl.value = item.kategori || '';
+      var merEl = document.getElementById('edit-produk-merek'); if (merEl) merEl.value = item.merek || '';
+      var speEl = document.getElementById('edit-produk-spesifikasi'); if (speEl) speEl.value = item.spesifikasi || '';
 
       // Info stok tertaut (read-only)
       var infoEl = document.getElementById('edit-produk-stok-info');
@@ -516,6 +525,9 @@
       const unit  = document.getElementById('edit-produk-unit').value.trim();
       const hpp   = pN(document.getElementById('edit-produk-hpp').value);
       const tipe  = (document.getElementById('edit-produk-tipe') || {}).value || '';
+      const kategori    = ((document.getElementById('edit-produk-kategori') || {}).value || '').trim();
+      const merek       = ((document.getElementById('edit-produk-merek') || {}).value || '').trim();
+      const spesifikasi = ((document.getElementById('edit-produk-spesifikasi') || {}).value || '').trim();
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
       toggleLoader(true, "Menyimpan Perubahan...");
       google.script.run
@@ -528,7 +540,7 @@
           muatSeluruhDataAwal(false);
         })
         .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
-        .updateProdukProcurement(id, nama, unit, hpp, tipe);
+        .updateProdukProcurement(id, nama, unit, hpp, tipe, kategori, merek, spesifikasi);
     }
 
     // --- SET HARGA JUAL (Sales/Admin) ---

@@ -307,7 +307,7 @@ let _cachedProdukData = [];
 function _pgRenderProduk(data) {
   const tbody = document.getElementById('table-produk');
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">
+    tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-slate-400">
       <i class="fas fa-search mr-2"></i>Tidak ada data produk.</td></tr>`;
     return;
   }
@@ -322,9 +322,18 @@ function _pgRenderProduk(data) {
     const stokHtml = i.stokId
       ? `<div class="font-mono text-[10px] text-indigo-600 font-bold">${i.stokId}</div><div class="text-[10px] text-slate-400">${(i.qtyTersedia||0).toLocaleString('id-ID')} ${i.unit}</div>`
       : `<span class="text-[10px] text-slate-300">—</span>`;
+    const spesiHtml = i.spesifikasi ? `<div class="text-[10px] text-slate-400 font-normal">${i.spesifikasi}</div>` : '';
+    const katHtml = i.kategori
+      ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${i.kategori}</span>`
+      : `<span class="text-[10px] text-slate-300">—</span>`;
+    const merekHtml = i.merek
+      ? `<span class="text-xs text-slate-600">${i.merek}</span>`
+      : `<span class="text-[10px] text-slate-300">—</span>`;
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600" data-label="ID">${i.sku}</td>
-      <td class="p-4 font-semibold" data-label="Nama Item">${i.nama}</td>
+      <td class="p-4 font-semibold" data-label="Nama Item">${i.nama}${spesiHtml}</td>
+      <td class="p-4" data-label="Kategori">${katHtml}</td>
+      <td class="p-4" data-label="Merek">${merekHtml}</td>
       <td class="p-4 text-slate-500 text-center" data-label="Unit">${i.unit}</td>
       <td class="p-4 text-center" data-label="Tipe">${tipeHtml}</td>
       <td class="p-4 text-center" data-label="Stok Terkait">${stokHtml}</td>
@@ -351,12 +360,43 @@ function _prodComputeRole() {
   if (btn) btn.classList.toggle('hidden', !window._prodCanManage);
 }
 
+function _prodPopulateAtribut(data) {
+  var kategoriSet = {}, merekSet = {};
+  (data || []).forEach(function(i) {
+    if (i.kategori) kategoriSet[i.kategori] = true;
+    if (i.merek) merekSet[i.merek] = true;
+  });
+  var kategoriList = Object.keys(kategoriSet).sort(function(a,b){ return a.localeCompare(b,'id'); });
+  var merekList = Object.keys(merekSet).sort(function(a,b){ return a.localeCompare(b,'id'); });
+  // Datalist untuk input modal
+  var dlK = document.getElementById('dl-kategori-produk');
+  if (dlK) dlK.innerHTML = kategoriList.map(function(k){ return '<option value="' + k.replace(/"/g,'&quot;') + '">'; }).join('');
+  var dlM = document.getElementById('dl-merek-produk');
+  if (dlM) dlM.innerHTML = merekList.map(function(m){ return '<option value="' + m.replace(/"/g,'&quot;') + '">'; }).join('');
+  // Dropdown filter (pertahankan pilihan aktif jika masih ada)
+  var fK = document.getElementById('filter-produk-kategori');
+  if (fK) {
+    var curK = fK.value;
+    fK.innerHTML = '<option value="">Semua Kategori</option>' + kategoriList.map(function(k){ return '<option value="' + k.replace(/"/g,'&quot;') + '">' + k + '</option>'; }).join('');
+    if (kategoriList.indexOf(curK) !== -1) fK.value = curK;
+  }
+  var fM = document.getElementById('filter-produk-merek');
+  if (fM) {
+    var curM = fM.value;
+    fM.innerHTML = '<option value="">Semua Merek</option>' + merekList.map(function(m){ return '<option value="' + m.replace(/"/g,'&quot;') + '">' + m + '</option>'; }).join('');
+    if (merekList.indexOf(curM) !== -1) fM.value = curM;
+  }
+}
+
 window.loadProduk = function() {
   _prodComputeRole();
   if (typeof google !== 'undefined') {
     google.script.run.withSuccessHandler(function(data) {
       _cachedProdukData = data || [];
+      _prodPopulateAtribut(_cachedProdukData);
       resetSearch('produk');
+      var fK = document.getElementById('filter-produk-kategori'); if (fK) fK.value = '';
+      var fM = document.getElementById('filter-produk-merek'); if (fM) fM.value = '';
       _pgState.produk.data = data;
       _pgState.produk.page = 1;
       _injectPgBar('produk', '#table-produk');
@@ -455,8 +495,14 @@ window.loadCustomer = function() {
 window.filterTabel = function(tipe) {
   if (tipe === 'produk') {
     const q = document.getElementById('search-produk').value.toLowerCase().trim();
-    _pgState.produk.data = _cachedProdukData.filter(i =>
-      (i.sku + i.nama + i.unit).toLowerCase().includes(q));
+    const fK = (document.getElementById('filter-produk-kategori') || {}).value || '';
+    const fM = (document.getElementById('filter-produk-merek') || {}).value || '';
+    _pgState.produk.data = _cachedProdukData.filter(i => {
+      const matchSearch = !q || (i.sku + i.nama + i.unit + (i.kategori||'') + (i.merek||'') + (i.spesifikasi||'')).toLowerCase().includes(q);
+      const matchKat = !fK || (i.kategori || '') === fK;
+      const matchMer = !fM || (i.merek || '') === fM;
+      return matchSearch && matchKat && matchMer;
+    });
     _pgState.produk.page = 1;
     _pgRender('produk');
     return;
