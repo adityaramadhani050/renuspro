@@ -1,7 +1,8 @@
 /**
  * RenusPro - PT. RENUS GLOBAL INDONESIA
  * Modul Produk/Jasa: list, simpan, edit, hapus.
- * Kolom: [0]ID, [1]Nama, [2]Unit, [3]Harga Jual, [4]HPP, [5]Tipe (Material/Jasa/kosong)
+ * Kolom: [0]ID, [1]Nama, [2]Unit, [3]Harga Jual, [4]HPP, [5]Tipe (Material/Jasa/kosong),
+ *        [6]Stok ID, [7]Qty Tersedia, [8]Kategori, [9]Merek, [10]Spesifikasi
  */
 
 /**
@@ -30,6 +31,21 @@ function _ensureStokLinkKolom(ss) {
   if (lastCol < 8) sheet.getRange(1, 8).setValue('Qty Tersedia');
 }
 
+/**
+ * Pastikan kolom atribut katalog Kategori [8], Merek [9], Spesifikasi [10] ada.
+ * (Kolom 1-based 9/10/11.) Dipanggil sebelum simpan/update item.
+ */
+function _ensureKatalogAtributKolom(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Master_Produk');
+  if (!sheet) return;
+  _ensureStokLinkKolom(ss);
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 9)  sheet.getRange(1, 9).setValue('Kategori');
+  if (lastCol < 10) sheet.getRange(1, 10).setValue('Merek');
+  if (lastCol < 11) sheet.getRange(1, 11).setValue('Spesifikasi');
+}
+
 function getProdukList() {
   try {
     const data = _cachedProduk();
@@ -44,7 +60,10 @@ function getProdukList() {
           hpp:          Number(data[i][4]) || 0,
           tipe:         data[i][5] ? data[i][5].toString() : '',
           stokId:       data[i][6] ? data[i][6].toString() : '',
-          qtyTersedia:  Number(data[i][7]) || 0
+          qtyTersedia:  Number(data[i][7]) || 0,
+          kategori:     data[i][8] ? data[i][8].toString() : '',
+          merek:        data[i][9] ? data[i][9].toString() : '',
+          spesifikasi:  data[i][10] ? data[i][10].toString() : ''
         });
       }
     }
@@ -52,14 +71,14 @@ function getProdukList() {
   } catch(e) { return []; }
 }
 
-function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
+function simpanProduk(nama, unit, harga, hpp, tipe, stokId, kategori, merek, spesifikasi) {
   try {
     if (!nama || !unit) {
       return { success: false, message: "Data nama/unit tidak boleh kosong." };
     }
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk') || buatSheetProdukDefault(ss);
-    _ensureStokLinkKolom(ss);
+    _ensureKatalogAtributKolom(ss);
     SpreadsheetApp.flush();
 
     const lastRow = sheet.getLastRow();
@@ -92,7 +111,7 @@ function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
       }
     }
 
-    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia]);
+    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia, kategori || '', merek || '', spesifikasi || '']);
     invalidateProdukCache();
     return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!", id: nextId };
   } catch (error) {
@@ -140,21 +159,22 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// ── Role-split: Procurement kelola item (nama/unit/harga beli/tipe) ──────────
-// Tulis Nama(2), Unit(3), HPP/harga beli(5), Tipe(6). PERTAHANKAN Harga Jual(4),
-// Stok ID(7), Qty(8). Stok kini otomatis ditautkan saat penerimaan barang.
-function updateProdukProcurement(id, nama, unit, hpp, tipe) {
+// ── Role-split: Procurement kelola item (nama/unit/harga beli/tipe/atribut) ──
+// Tulis Nama(2), Unit(3), HPP/harga beli(5), Tipe(6), Kategori(9), Merek(10),
+// Spesifikasi(11). PERTAHANKAN Harga Jual(4), Stok ID(7), Qty(8).
+function updateProdukProcurement(id, nama, unit, hpp, tipe, kategori, merek, spesifikasi) {
   try {
     if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk');
     if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
-    _ensureStokLinkKolom(ss);
+    _ensureKatalogAtributKolom(ss);
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
         sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, unit]]);      // Nama, Unit
         sheet.getRange(i + 1, 5, 1, 2).setValues([[Number(hpp) || 0, tipe || '']]); // HPP, Tipe (Harga Jual col 4 tak disentuh)
+        sheet.getRange(i + 1, 9, 1, 3).setValues([[kategori || '', merek || '', spesifikasi || '']]); // Kategori, Merek, Spesifikasi
         invalidateProdukCache();
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
       }
