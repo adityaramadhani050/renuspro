@@ -193,7 +193,7 @@
         const s  = tr.querySelector('.select-produk');
         erpState.produk.forEach(p => {
           const o = document.createElement('option');
-          o.value = p.id; o.text = p.nama;
+          o.value = p.id; o.text = p.nama + (p.ready === false ? ' (belum ready)' : '');
           o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
           if (p.id === it.produkId) o.selected = true;
           s.add(o);
@@ -229,7 +229,7 @@
       const s = tr.querySelector('.select-produk');
       // Sort produk by name
       const sortedProduk = [...(erpState.produk || [])].sort((a,b) => a.nama.localeCompare(b.nama,'id'));
-      sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama; o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
+      sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama + (p.ready === false ? ' (belum ready)' : ''); o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
       tb.appendChild(tr);
       tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1);
       // Init searchable pada select yang baru ditambahkan
@@ -1246,7 +1246,7 @@
         const s  = tr.querySelector('.select-produk');
         erpState.produk.forEach(p => {
           const o = document.createElement('option');
-          o.value = p.id; o.text = p.nama;
+          o.value = p.id; o.text = p.nama + (p.ready === false ? ' (belum ready)' : '');
           o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
           if (p.id === si.produkId) o.selected = true;
           s.add(o);

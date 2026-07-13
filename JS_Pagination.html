@@ -329,6 +329,11 @@ function _pgRenderProduk(data) {
     const merekHtml = i.merek
       ? `<span class="text-xs text-slate-600">${i.merek}</span>`
       : `<span class="text-[10px] text-slate-300">—</span>`;
+    const readyHtml = (i.tipe === 'Material')
+      ? (i.ready
+          ? `<div class="text-[9px] font-extrabold text-emerald-600 mt-0.5"><i class="fa-solid fa-circle-check"></i> READY</div>`
+          : `<div class="text-[9px] font-extrabold text-slate-400 mt-0.5"><i class="fa-regular fa-circle"></i> BELUM READY</div>`)
+      : '';
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600" data-label="ID">${i.sku}</td>
       <td class="p-4 font-semibold" data-label="Nama Item">${i.nama}${spesiHtml}</td>
@@ -338,7 +343,7 @@ function _pgRenderProduk(data) {
       <td class="p-4 text-center" data-label="Tipe">${tipeHtml}</td>
       <td class="p-4 text-center" data-label="Stok Terkait">${stokHtml}</td>
       <td class="p-4 text-right font-bold text-slate-800" data-label="Harga Jual">Rp ${i.harga.toLocaleString('id-ID')}</td>
-      <td class="p-4 text-right font-medium text-rose-600" data-label="HPP">Rp ${i.hpp.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right font-medium text-rose-600" data-label="HPP">Rp ${i.hpp.toLocaleString('id-ID')}${readyHtml}</td>
       <td class="p-4 text-right" data-label="Margin"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
       <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">

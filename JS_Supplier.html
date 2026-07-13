@@ -64,6 +64,9 @@ function _renderKatalogList() {
       +     '<input id="kat-harga-' + idx + '" type="text" inputmode="numeric" value="' + (hargaTampil ? hargaTampil.toLocaleString("id-ID") : "") + '" '
       +     'oninput="_onKatalogHargaInput(this,' + idx + ')" placeholder="Harga beli" '
       +     'class="w-28 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
+      +   '<label class="flex items-center gap-1 cursor-pointer select-none" title="Supplier siap memasok item ini → dipakai untuk HPP">'
+      +     '<input type="checkbox" ' + (it.ready ? 'checked' : '') + ' onchange="_onKatalogReadyToggle(this,' + idx + ')" class="accent-emerald-500">'
+      +     '<span class="text-[10px] font-extrabold ' + (it.ready ? 'text-emerald-600' : 'text-slate-500') + '">READY</span></label>'
       +   '<label class="flex items-center gap-1 cursor-pointer select-none">'
       +     '<input type="checkbox" ' + (it.termasukPPN ? 'checked' : '') + ' onchange="_onKatalogPPNToggle(this,' + idx + ')" class="accent-orange-500">'
       +     '<span class="text-[10px] font-semibold text-slate-500">Termasuk PPN</span></label>'
@@ -98,6 +101,7 @@ function _onKatalogPPNToggle(cb, idx) {
 
 function _onKatalogLeadInput(el, idx) { _katalogItems[idx].leadTime = el.value; }
 function _onKatalogMasaInput(el, idx) { _katalogItems[idx].masaBerlaku = el.value; }
+function _onKatalogReadyToggle(cb, idx) { _katalogItems[idx].ready = cb.checked; _renderKatalogList(); }
 
 function tambahKatalogItem() {
   const sel = document.getElementById('katalog-produk-picker');
@@ -106,7 +110,7 @@ function tambahKatalogItem() {
   const p = _katalogProdukAll.filter(function(x) { return x.sku === id; })[0];
   if (!p) return;
   if (_katalogItems.some(function(it) { return it.idProduk === id; })) return;
-  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0), leadTime: '', masaBerlaku: '', termasukPPN: false });
+  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0), leadTime: '', masaBerlaku: '', termasukPPN: false, ready: false });
   _isiPickerProdukKatalog();
   _renderKatalogList();
 }
@@ -145,7 +149,7 @@ function _muatKatalogSupplier(idSupplier) {
         _katalogItems = (res && res.success) ? (res.list || []).map(function(it) {
           return { idProduk: it.idProduk, nama: it.nama, unit: it.unit,
                    hargaBeli: (it.hargaBeli != null ? it.hargaBeli : (it.hpp || 0)),
-                   leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN };
+                   leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN, ready: !!it.ready };
         }) : [];
         _isiPickerProdukKatalog();
         _renderKatalogList();
@@ -302,7 +306,7 @@ function submitEditSupplier(event) {
   if (typeof google !== 'undefined') {
     var katalogPayload = _katalogItems.map(function(it) {
       return { idProduk: it.idProduk, hargaBeli: (it.hargaBeli || 0),
-               leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN };
+               leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN, ready: !!it.ready };
     });
     var _simpanKatalogLalu = function(msg) {
       google.script.run

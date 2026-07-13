@@ -191,12 +191,16 @@ function getInitialData() {
     const produkList = [];
     for (let i = 1; i < produkData.length; i++) {
       if (produkData[i][0]) {
+        var pTipe = produkData[i][5] ? produkData[i][5].toString() : '';
+        var pHpp  = Number(produkData[i][4]) || 0;
         produkList.push({
           id: produkData[i][0].toString(),
           nama: produkData[i][1].toString(),
           unit: produkData[i][2].toString(),
           harga: Number(produkData[i][3]) || 0,
-          hpp: Number(produkData[i][4]) || 0
+          hpp: pHpp,
+          // Material dianggap "ready" bila HPP turunan > 0 (dari supplier ready/stok). Jasa selalu ready.
+          ready: (pTipe === 'Material') ? (pHpp > 0) : true
         });
       }
     }
