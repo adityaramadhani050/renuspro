@@ -59,10 +59,10 @@
                     <input type="text" name="unit" required class="input-field text-sm" placeholder="Contoh: unit, m, Ls, set, kWp">
                   </div>
                   <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe <span class="text-slate-300 font-normal normal-case ml-1">Wajib untuk inventory stok</span></label>
-                    <select id="modal-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe</label>
+                    <select id="modal-produk-tipe" onchange="onTipeProdukChange('add')" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                       <option value="">-- Belum Ditentukan --</option>
-                      <option value="Material">Material (punya stok)</option>
+                      <option value="Material">Material (punya stok & supplier)</option>
                       <option value="Jasa">Jasa (tidak ada stok)</option>
                     </select>
                   </div>
@@ -78,8 +78,15 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Spesifikasi / Tipe</label>
                     <input type="text" id="modal-produk-spesifikasi" class="input-field text-sm" placeholder="Contoh: Panel Mono (Black), ZDTID12212-H60">
                   </div>
-                  <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Beli (Rp) <span class="text-slate-400 font-normal normal-case ml-1">Auto ter-update saat penerimaan barang</span></label>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] font-bold">Rp</span>
+                      <input type="text" id="modal-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0" oninput="formatModalProdukHarga(this)">
+                    </div>
+                  </div>
+                  <div id="modal-produk-hpp-wrap">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Estimasi Biaya (Rp)</label>
                     <div class="relative">
                       <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">Rp</span>
                       <input type="text" id="modal-produk-hpp" class="input-field text-sm pl-8 text-right font-bold border-rose-200 bg-rose-50" placeholder="0"
@@ -88,10 +95,10 @@
                   </div>
                 </div>
 
-                <!-- Info supplier (read-only) -->
-                <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
-                  <i class="fa-solid fa-circle-info text-slate-400 mt-0.5"></i>
-                  <p class="text-[11px] text-slate-500 leading-relaxed">Setelah item tersimpan, tautkan ke supplier lewat menu <b class="text-slate-700">Supplier &rsaquo; Katalog Item</b> — di sana harga beli per supplier juga bisa diatur.</p>
+                <!-- Hint Material (HPP dari supplier) -->
+                <div id="modal-produk-material-hint" class="hidden bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                  <i class="fa-solid fa-circle-info text-sky-400 mt-0.5"></i>
+                  <p class="text-[11px] text-sky-800 leading-relaxed">Item <b>Material</b>: HPP diisi <b>otomatis</b> dari harga beli supplier yang <b>ready</b> (atau stok). Setelah item disimpan, tautkan supplier lewat <b>Kelola Item</b> atau menu <b>Supplier &rsaquo; Katalog Item</b>.</p>
                 </div>
               </div>
 
@@ -138,39 +145,4 @@
           </table>
         </div>
 
-        <!-- MODAL SET HARGA JUAL (Sales) -->
-        <div id="modal-harga-jual" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md">
-            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
-              <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center"><i class="fa-solid fa-tag"></i></span>
-              <div>
-                <h3 class="text-base font-bold text-slate-800">Set Harga Jual</h3>
-                <p class="text-xs text-slate-400">Tetapkan nilai jual item</p>
-              </div>
-              <button onclick="document.getElementById('modal-harga-jual').classList.add('hidden')" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div class="px-6 py-5 space-y-4">
-              <input type="hidden" id="hj-id">
-              <div class="bg-slate-50 rounded-xl px-4 py-3">
-                <p class="text-sm font-bold text-slate-700" id="hj-nama">—</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">Harga Beli (HPP): <span id="hj-hpp" class="font-semibold text-rose-600">Rp 0</span></p>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
-                <div class="relative">
-                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
-                  <input type="text" id="hj-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0" oninput="formatHargaJualInput(this); hitungMarginHJ()">
-                </div>
-              </div>
-              <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                <span class="text-xs font-bold text-amber-900 uppercase tracking-wide"><i class="fa-solid fa-chart-line mr-1"></i> Margin</span>
-                <span id="hj-margin-badge" class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-400">0%</span>
-              </div>
-            </div>
-            <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
-              <button onclick="document.getElementById('modal-harga-jual').classList.add('hidden')" class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
-              <button onclick="submitHargaJual()" class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
-            </div>
-          </div>
-        </div>
       </section>

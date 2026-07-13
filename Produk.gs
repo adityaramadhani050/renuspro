@@ -229,10 +229,12 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// ── Role-split: Procurement kelola item (nama/unit/harga beli/tipe/atribut) ──
-// Tulis Nama(2), Unit(3), HPP/harga beli(5), Tipe(6), Kategori(9), Merek(10),
-// Spesifikasi(11). PERTAHANKAN Harga Jual(4), Stok ID(7), Qty(8).
-function updateProdukProcurement(id, nama, unit, hpp, tipe, kategori, merek, spesifikasi) {
+// ── Katalog jual (shared): kelola item sisi-jual ────────────────────────────
+// Tulis Nama(2), Unit(3), Harga Jual(4), Tipe(6), Kategori(9), Merek(10),
+// Spesifikasi(11). HPP(5): untuk Jasa/non-Material = input manual; untuk
+// Material = TIDAK ditulis (nilai turunan via _recomputeHPPProduk).
+// PERTAHANKAN Stok ID(7), Qty(8).
+function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hppJasa, kategori, merek, spesifikasi) {
   try {
     if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
     const ss    = getSpreadsheet();
@@ -242,30 +244,19 @@ function updateProdukProcurement(id, nama, unit, hpp, tipe, kategori, merek, spe
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
-        sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, unit]]);      // Nama, Unit
-        sheet.getRange(i + 1, 5, 1, 2).setValues([[Number(hpp) || 0, tipe || '']]); // HPP, Tipe (Harga Jual col 4 tak disentuh)
-        sheet.getRange(i + 1, 9, 1, 3).setValues([[kategori || '', merek || '', spesifikasi || '']]); // Kategori, Merek, Spesifikasi
-        invalidateProdukCache();
+        tipe = tipe || '';
+        sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, unit]]);   // Nama, Unit
+        sheet.getRange(i + 1, 4).setValue(Number(hargaJual) || 0);  // Harga Jual
+        sheet.getRange(i + 1, 6).setValue(tipe);                    // Tipe
+        sheet.getRange(i + 1, 9, 1, 3).setValues([[kategori || '', merek || '', spesifikasi || '']]);
+        if (tipe === 'Material') {
+          invalidateProdukCache();
+          _recomputeHPPProduk(ss, id);      // HPP turunan (stok/supplier ready)
+        } else {
+          sheet.getRange(i + 1, 5).setValue(Number(hppJasa) || 0);  // HPP manual (Jasa)
+          invalidateProdukCache();
+        }
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
-      }
-    }
-    return { success: false, message: 'ID produk tidak ditemukan.' };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-// ── Role-split: Sales set nilai jual saja ───────────────────────────────────
-// Tulis HANYA Harga Jual (kolom 4). Field lain tidak disentuh.
-function updateHargaJual(id, hargaJual) {
-  try {
-    const ss    = getSpreadsheet();
-    const sheet = ss.getSheetByName('Master_Produk');
-    if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0].toString().trim() === id.toString().trim()) {
-        sheet.getRange(i + 1, 4).setValue(Number(hargaJual) || 0);
-        invalidateProdukCache();
-        return { success: true, message: 'Harga jual ' + id + ' berhasil diperbarui.' };
       }
     }
     return { success: false, message: 'ID produk tidak ditemukan.' };
