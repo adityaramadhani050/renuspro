@@ -335,12 +335,16 @@ function _syncQtyTersediaProduk(ss, idStok, qtyBaru) {
   var pSheet = ss.getSheetByName('Master_Produk');
   if (!pSheet) return;
   var data = pSheet.getDataRange().getValues();
+  var terdampak = [];
   for (var i = 1; i < data.length; i++) {
     if ((data[i][6] || '').toString().trim() === idStok) {
       pSheet.getRange(i + 1, 8).setValue(qtyBaru);
+      if (data[i][0]) terdampak.push(data[i][0].toString().trim());
     }
   }
   invalidateProdukCache();
+  // Qty berubah (mis. jadi 0) → HPP turunan bisa berpindah ke supplier ready
+  terdampak.forEach(function (idp) { try { _recomputeHPPProduk(ss, idp); } catch (e) {} });
 }
 
 // ── Internal Helpers ─────────────────────────────────────────────────────────

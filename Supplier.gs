@@ -177,18 +177,19 @@ function _ensureSupplierProdukSheet(ss) {
   const existing = ss.getSheetByName('Supplier_Produk');
   if (existing) { _ensureSupplierProdukKolom(existing); return existing; }
   const sheet = ss.insertSheet('Supplier_Produk');
-  sheet.appendRow(['ID Supplier', 'ID Produk', 'Harga Beli', 'Dibuat Pada', 'Lead Time', 'Masa Berlaku Harga', 'Termasuk PPN']);
-  sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+  sheet.appendRow(['ID Supplier', 'ID Produk', 'Harga Beli', 'Dibuat Pada', 'Lead Time', 'Masa Berlaku Harga', 'Termasuk PPN', 'Ready']);
+  sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
   return sheet;
 }
 
-// Migrasi lazy: tambah kolom Lead Time [4], Masa Berlaku [5], Termasuk PPN [6].
+// Migrasi lazy: Lead Time [4], Masa Berlaku [5], Termasuk PPN [6], Ready [7].
 function _ensureSupplierProdukKolom(sheet) {
   if (!sheet) return;
   var lastCol = sheet.getLastColumn();
   if (lastCol < 5) sheet.getRange(1, 5).setValue('Lead Time');
   if (lastCol < 6) sheet.getRange(1, 6).setValue('Masa Berlaku Harga');
   if (lastCol < 7) sheet.getRange(1, 7).setValue('Termasuk PPN');
+  if (lastCol < 8) sheet.getRange(1, 8).setValue('Ready');
 }
 
 // Map ID Produk → { nama, unit, hpp } dari Master_Produk (via getProdukList)
@@ -225,7 +226,8 @@ function getSupplierKatalog(idSupplier) {
         hargaBeli:   (data[i][2] !== '' && data[i][2] != null) ? (parseFloat(data[i][2]) || 0) : null,
         leadTime:    data[i][4] != null ? data[i][4].toString() : '',
         masaBerlaku: data[i][5] != null ? data[i][5].toString() : '',
-        termasukPPN: (data[i][6] != null && data[i][6].toString().trim().toLowerCase() === 'ya')
+        termasukPPN: (data[i][6] != null && data[i][6].toString().trim().toLowerCase() === 'ya'),
+        ready:       (data[i][7] != null && data[i][7].toString().trim().toLowerCase() === 'ya')
       });
     }
     return { success: true, list: list };
@@ -246,7 +248,8 @@ function getProdukBySupplier(idSupplier) {
         nama:      it.nama,
         unit:      it.unit,
         hargaBeli: (it.hargaBeli != null) ? it.hargaBeli : (it.hpp || 0),
-        leadTime:  it.leadTime || ''
+        leadTime:  it.leadTime || '',
+        ready:     !!it.ready
       };
     }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });
     return { success: true, list: list };
@@ -270,10 +273,16 @@ function saveSupplierKatalog(idSupplier, items) {
     const sheet = _ensureSupplierProdukSheet(ss);
     SpreadsheetApp.flush();
 
+    // Kumpulkan idProduk terdampak (lama + baru) untuk recompute HPP
+    const affected = {};
+
     // Hapus baris lama supplier ini (dari bawah ke atas)
     const data = sheet.getDataRange().getValues();
     for (let i = data.length - 1; i >= 1; i--) {
-      if (data[i][0] && data[i][0].toString().trim() === idSupplier) sheet.deleteRow(i + 1);
+      if (data[i][0] && data[i][0].toString().trim() === idSupplier) {
+        if (data[i][1]) affected[data[i][1].toString().trim()] = true;
+        sheet.deleteRow(i + 1);
+      }
     }
 
     // Insert baru (dedup ID Produk)
@@ -283,13 +292,19 @@ function saveSupplierKatalog(idSupplier, items) {
       const idProduk = (items[j].idProduk || '').toString().trim();
       if (!idProduk || seen[idProduk]) continue;
       seen[idProduk] = true;
+      affected[idProduk] = true;
       const hb = (items[j].hargaBeli != null && items[j].hargaBeli !== '')
         ? (parseFloat(items[j].hargaBeli) || 0) : '';
       const leadTime    = (items[j].leadTime || '').toString();
       const masaBerlaku = (items[j].masaBerlaku || '').toString();
       const ppn         = items[j].termasukPPN ? 'Ya' : 'Tidak';
-      sheet.appendRow([idSupplier, idProduk, hb, when, leadTime, masaBerlaku, ppn]);
+      const ready       = items[j].ready ? 'Ya' : 'Tidak';
+      sheet.appendRow([idSupplier, idProduk, hb, when, leadTime, masaBerlaku, ppn, ready]);
     }
+
+    // Perbarui HPP turunan tiap produk terdampak
+    Object.keys(affected).forEach(function (idp) { try { _recomputeHPPProduk(ss, idp); } catch (e) {} });
+
     return { success: true, message: 'Katalog supplier tersimpan (' + Object.keys(seen).length + ' item).' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -316,11 +331,72 @@ function getSuppliersForProduk(produkId) {
       if (!data[i][1] || data[i][1].toString().trim() !== produkId) continue;
       const idSupplier = data[i][0] ? data[i][0].toString() : '';
       if (!idSupplier) continue;
-      list.push({ idSupplier: idSupplier, nama: supMap[idSupplier] || idSupplier });
+      list.push({
+        idSupplier: idSupplier,
+        nama:       supMap[idSupplier] || idSupplier,
+        hargaBeli:  (data[i][2] !== '' && data[i][2] != null) ? (parseFloat(data[i][2]) || 0) : null,
+        leadTime:   data[i][4] != null ? data[i][4].toString() : '',
+        ready:      (data[i][7] != null && data[i][7].toString().trim().toLowerCase() === 'ya')
+      });
     }
     return { success: true, list: list };
   } catch (e) {
     return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Tautkan 1 supplier ke 1 produk tanpa merusak baris lain (append bila belum ada).
+// Harga beli/ready diisi procurement di halaman Supplier. Memicu recompute HPP.
+function addSupplierToProduk(produkId, idSupplier) {
+  const lock = LockService.getScriptLock();
+  try {
+    produkId   = (produkId || '').toString().trim();
+    idSupplier = (idSupplier || '').toString().trim();
+    if (!produkId || !idSupplier) return { success: false, message: 'ID produk & supplier wajib diisi.' };
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === idSupplier &&
+          (data[i][1] || '').toString().trim() === produkId) {
+        return { success: true, message: 'Sudah tertaut.' }; // idempotent
+      }
+    }
+    const when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.appendRow([idSupplier, produkId, '', when, '', '', 'Tidak', 'Tidak']);
+    try { _recomputeHPPProduk(ss, produkId); } catch (e) {}
+    return { success: true, message: 'Supplier ditautkan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// Lepas tautan 1 supplier dari 1 produk. Memicu recompute HPP.
+function removeSupplierFromProduk(produkId, idSupplier) {
+  const lock = LockService.getScriptLock();
+  try {
+    produkId   = (produkId || '').toString().trim();
+    idSupplier = (idSupplier || '').toString().trim();
+    if (!produkId || !idSupplier) return { success: false, message: 'ID produk & supplier wajib diisi.' };
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if ((data[i][0] || '').toString().trim() === idSupplier &&
+          (data[i][1] || '').toString().trim() === produkId) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+    try { _recomputeHPPProduk(ss, produkId); } catch (e) {}
+    return { success: true, message: 'Tautan supplier dilepas.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
   }
 }
 
