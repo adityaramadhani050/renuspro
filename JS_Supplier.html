@@ -27,6 +27,21 @@ function _isiPickerProdukKatalog() {
   sel.innerHTML = opts;
 }
 
+// hargaBeli disimpan NET (exclude PPN). Field menampilkan nilai "sebagaimana
+// dikutip": jika termasukPPN → gross (net×1,11), else = net.
+function _katHargaDitampilkan(it) {
+  var net = parseFloat(it.hargaBeli) || 0;
+  return it.termasukPPN ? Math.round(net * 1.11) : Math.round(net);
+}
+
+function _katNoteHtml(it) {
+  var net = parseFloat(it.hargaBeli) || 0;
+  if (it.termasukPPN) {
+    return '<span class="text-[10px] font-semibold text-amber-600"><i class="fa-solid fa-circle-info mr-0.5"></i>Incl. PPN · Net disimpan: Rp ' + Math.round(net).toLocaleString('id-ID') + '</span>';
+  }
+  return '<span class="text-[10px] text-slate-400">Harga tanpa PPN (net)</span>';
+}
+
 function _renderKatalogList() {
   const box = document.getElementById('katalog-list');
   if (!box) return;
@@ -35,21 +50,54 @@ function _renderKatalogList() {
     return;
   }
   box.innerHTML = _katalogItems.map(function(it, idx) {
-    return '<div class="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">'
-      + '<div class="flex-1 min-w-0"><p class="text-xs font-bold text-slate-700 truncate">' + (it.nama || it.idProduk) + '</p>'
-      + '<p class="text-[10px] text-slate-400">' + (it.unit || '-') + ' · <span class="font-mono">' + it.idProduk + '</span></p></div>'
-      + '<div class="flex items-center gap-1"><span class="text-[10px] text-slate-400">Rp</span>'
-      + '<input type="text" inputmode="numeric" value="' + (it.hargaBeli ? Math.round(it.hargaBeli).toLocaleString("id-ID") : "") + '" '
-      + 'oninput="_onKatalogHargaInput(this,' + idx + ')" placeholder="Harga beli" '
-      + 'class="w-28 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
-      + '<button type="button" onclick="hapusKatalogItem(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fas fa-trash-can text-xs"></i></button>'
+    var hargaTampil = _katHargaDitampilkan(it);
+    return '<div class="bg-slate-50 rounded-xl px-3 py-2.5">'
+      // Baris atas: nama + hapus
+      + '<div class="flex items-start gap-2">'
+      +   '<div class="flex-1 min-w-0"><p class="text-xs font-bold text-slate-700 truncate">' + (it.nama || it.idProduk) + '</p>'
+      +   '<p class="text-[10px] text-slate-400">' + (it.unit || '-') + ' · <span class="font-mono">' + it.idProduk + '</span></p></div>'
+      +   '<button type="button" onclick="hapusKatalogItem(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fas fa-trash-can text-xs"></i></button>'
+      + '</div>'
+      // Baris kontrol
+      + '<div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2">'
+      +   '<div class="flex items-center gap-1"><span class="text-[10px] text-slate-400">Rp</span>'
+      +     '<input id="kat-harga-' + idx + '" type="text" inputmode="numeric" value="' + (hargaTampil ? hargaTampil.toLocaleString("id-ID") : "") + '" '
+      +     'oninput="_onKatalogHargaInput(this,' + idx + ')" placeholder="Harga beli" '
+      +     'class="w-28 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
+      +   '<label class="flex items-center gap-1 cursor-pointer select-none">'
+      +     '<input type="checkbox" ' + (it.termasukPPN ? 'checked' : '') + ' onchange="_onKatalogPPNToggle(this,' + idx + ')" class="accent-orange-500">'
+      +     '<span class="text-[10px] font-semibold text-slate-500">Termasuk PPN</span></label>'
+      +   '<div class="flex items-center gap-1"><i class="fa-regular fa-clock text-[10px] text-slate-400"></i>'
+      +     '<input type="text" value="' + (it.leadTime || '').replace(/"/g,"&quot;") + '" oninput="_onKatalogLeadInput(this,' + idx + ')" placeholder="Lead time" '
+      +     'class="w-24 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
+      +   '<div class="flex items-center gap-1"><i class="fa-regular fa-calendar text-[10px] text-slate-400"></i>'
+      +     '<input type="date" value="' + (it.masaBerlaku || '') + '" onchange="_onKatalogMasaInput(this,' + idx + ')" '
+      +     'class="px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-slate-600"></div>'
+      + '</div>'
+      + '<div id="kat-note-' + idx + '" class="mt-1">' + _katNoteHtml(it) + '</div>'
       + '</div>';
   }).join('');
 }
 
 function _onKatalogHargaInput(el, idx) {
-  _katalogItems[idx].hargaBeli = _katParseRp(el.value);
+  var it = _katalogItems[idx];
+  var q = _katParseRp(el.value);                       // nilai sebagaimana dikutip
+  it.hargaBeli = it.termasukPPN ? (q / 1.11) : q;      // simpan net
+  var note = document.getElementById('kat-note-' + idx);
+  if (note) note.innerHTML = _katNoteHtml(it);
 }
+
+function _onKatalogPPNToggle(cb, idx) {
+  var it = _katalogItems[idx];
+  it.termasukPPN = cb.checked;
+  var field = document.getElementById('kat-harga-' + idx);
+  var q = field ? _katParseRp(field.value) : _katHargaDitampilkan(it);
+  it.hargaBeli = it.termasukPPN ? (q / 1.11) : q;      // reinterpretasi angka yang sama
+  _renderKatalogList();
+}
+
+function _onKatalogLeadInput(el, idx) { _katalogItems[idx].leadTime = el.value; }
+function _onKatalogMasaInput(el, idx) { _katalogItems[idx].masaBerlaku = el.value; }
 
 function tambahKatalogItem() {
   const sel = document.getElementById('katalog-produk-picker');
@@ -58,7 +106,7 @@ function tambahKatalogItem() {
   const p = _katalogProdukAll.filter(function(x) { return x.sku === id; })[0];
   if (!p) return;
   if (_katalogItems.some(function(it) { return it.idProduk === id; })) return;
-  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0) });
+  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0), leadTime: '', masaBerlaku: '', termasukPPN: false });
   _isiPickerProdukKatalog();
   _renderKatalogList();
 }
@@ -78,7 +126,9 @@ function _muatKatalogSupplier(idSupplier) {
     google.script.run
       .withSuccessHandler(function(res) {
         _katalogItems = (res && res.success) ? (res.list || []).map(function(it) {
-          return { idProduk: it.idProduk, nama: it.nama, unit: it.unit, hargaBeli: (it.hargaBeli != null ? it.hargaBeli : (it.hpp || 0)) };
+          return { idProduk: it.idProduk, nama: it.nama, unit: it.unit,
+                   hargaBeli: (it.hargaBeli != null ? it.hargaBeli : (it.hpp || 0)),
+                   leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN };
         }) : [];
         _isiPickerProdukKatalog();
         _renderKatalogList();
@@ -234,7 +284,8 @@ function submitEditSupplier(event) {
 
   if (typeof google !== 'undefined') {
     var katalogPayload = _katalogItems.map(function(it) {
-      return { idProduk: it.idProduk, hargaBeli: (it.hargaBeli || 0) };
+      return { idProduk: it.idProduk, hargaBeli: (it.hargaBeli || 0),
+               leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN };
     });
     var _simpanKatalogLalu = function(msg) {
       google.script.run

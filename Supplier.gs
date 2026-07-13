@@ -168,17 +168,27 @@ function hapusSupplier(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  KATALOG ITEM SUPPLIER (relasi supplier ↔ produk, many-to-many)
 //  Sheet Supplier_Produk kolom (0-based):
-//   0 ID Supplier | 1 ID Produk | 2 Harga Beli (opsional) | 3 Dibuat Pada
+//   0 ID Supplier | 1 ID Produk | 2 Harga Beli (net/exclude PPN) | 3 Dibuat Pada
+//   4 Lead Time | 5 Masa Berlaku Harga | 6 Termasuk PPN (Ya/Tidak = sumber inc-PPN)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function _ensureSupplierProdukSheet(ss) {
   ss = ss || getSpreadsheet();
   const existing = ss.getSheetByName('Supplier_Produk');
-  if (existing) return existing;
+  if (existing) { _ensureSupplierProdukKolom(existing); return existing; }
   const sheet = ss.insertSheet('Supplier_Produk');
-  sheet.appendRow(['ID Supplier', 'ID Produk', 'Harga Beli', 'Dibuat Pada']);
-  sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+  sheet.appendRow(['ID Supplier', 'ID Produk', 'Harga Beli', 'Dibuat Pada', 'Lead Time', 'Masa Berlaku Harga', 'Termasuk PPN']);
+  sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
   return sheet;
+}
+
+// Migrasi lazy: tambah kolom Lead Time [4], Masa Berlaku [5], Termasuk PPN [6].
+function _ensureSupplierProdukKolom(sheet) {
+  if (!sheet) return;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 5) sheet.getRange(1, 5).setValue('Lead Time');
+  if (lastCol < 6) sheet.getRange(1, 6).setValue('Masa Berlaku Harga');
+  if (lastCol < 7) sheet.getRange(1, 7).setValue('Termasuk PPN');
 }
 
 // Map ID Produk → { nama, unit, hpp } dari Master_Produk (via getProdukList)
@@ -208,11 +218,14 @@ function getSupplierKatalog(idSupplier) {
       const p = prod[idProduk];
       if (!p) continue; // produk sudah dihapus dari master → lewati
       list.push({
-        idProduk:  idProduk,
-        nama:      p.nama,
-        unit:      p.unit,
-        hpp:       p.hpp,
-        hargaBeli: (data[i][2] !== '' && data[i][2] != null) ? (parseFloat(data[i][2]) || 0) : null
+        idProduk:    idProduk,
+        nama:        p.nama,
+        unit:        p.unit,
+        hpp:         p.hpp,
+        hargaBeli:   (data[i][2] !== '' && data[i][2] != null) ? (parseFloat(data[i][2]) || 0) : null,
+        leadTime:    data[i][4] != null ? data[i][4].toString() : '',
+        masaBerlaku: data[i][5] != null ? data[i][5].toString() : '',
+        termasukPPN: (data[i][6] != null && data[i][6].toString().trim().toLowerCase() === 'ya')
       });
     }
     return { success: true, list: list };
@@ -232,7 +245,8 @@ function getProdukBySupplier(idSupplier) {
         id:        it.idProduk,
         nama:      it.nama,
         unit:      it.unit,
-        hargaBeli: (it.hargaBeli != null) ? it.hargaBeli : (it.hpp || 0)
+        hargaBeli: (it.hargaBeli != null) ? it.hargaBeli : (it.hpp || 0),
+        leadTime:  it.leadTime || ''
       };
     }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });
     return { success: true, list: list };
@@ -241,7 +255,9 @@ function getProdukBySupplier(idSupplier) {
   }
 }
 
-// Tulis ulang katalog satu supplier. items = [{ idProduk, hargaBeli? }].
+// Tulis ulang katalog satu supplier.
+// items = [{ idProduk, hargaBeli?(net), leadTime?, masaBerlaku?, termasukPPN? }].
+// Harga Beli disimpan sudah net (exclude PPN) — dinormalkan di sisi UI.
 function saveSupplierKatalog(idSupplier, items) {
   const lock = LockService.getScriptLock();
   try {
@@ -269,7 +285,10 @@ function saveSupplierKatalog(idSupplier, items) {
       seen[idProduk] = true;
       const hb = (items[j].hargaBeli != null && items[j].hargaBeli !== '')
         ? (parseFloat(items[j].hargaBeli) || 0) : '';
-      sheet.appendRow([idSupplier, idProduk, hb, when]);
+      const leadTime    = (items[j].leadTime || '').toString();
+      const masaBerlaku = (items[j].masaBerlaku || '').toString();
+      const ppn         = items[j].termasukPPN ? 'Ya' : 'Tidak';
+      sheet.appendRow([idSupplier, idProduk, hb, when, leadTime, masaBerlaku, ppn]);
     }
     return { success: true, message: 'Katalog supplier tersimpan (' + Object.keys(seen).length + ' item).' };
   } catch (e) {
