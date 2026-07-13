@@ -421,63 +421,20 @@
         .getTCOptions();
     }
 
-    // ── ASSIGN SUPPLIER (dari sisi produk) ────────────────────────────
-    var _prodSuppliersAll = null;              // cache daftar semua supplier [{id,nama}]
-    var _prodSupSel = { add: [], edit: [] };   // id supplier terpilih per mode
-
-    function _prodEnsureSuppliers(cb) {
-      if (_prodSuppliersAll) { if (cb) cb(); return; }
-      if (typeof google === 'undefined') { _prodSuppliersAll = []; if (cb) cb(); return; }
-      google.script.run.withSuccessHandler(function(list) {
-        _prodSuppliersAll = (list || []).map(function(s){ return { id: s.id, nama: s.nama }; });
-        if (cb) cb();
-      }).withFailureHandler(function(){ _prodSuppliersAll = []; if (cb) cb(); }).getSupplierList();
-    }
-
-    function _prodSupFillPicker(mode) {
-      var sel = document.getElementById(mode === 'edit' ? 'prod-edit-sup-picker' : 'prod-add-sup-picker');
-      if (!sel) return;
-      var chosen = _prodSupSel[mode] || [];
-      var opts = '<option value="">— Pilih supplier —</option>';
-      (_prodSuppliersAll || []).forEach(function(s) {
-        if (chosen.indexOf(s.id) !== -1) return;   // sudah terpilih, sembunyikan
-        opts += '<option value="' + s.id + '">' + (s.nama || s.id) + '</option>';
-      });
-      sel.innerHTML = opts;
-    }
-
-    function _prodSupRenderList(mode) {
-      var box = document.getElementById(mode === 'edit' ? 'prod-edit-sup-list' : 'prod-add-sup-list');
+    // ── SUPPLIER ITEM (read-only, kelola dari menu Supplier) ─────────
+    function _prodSupRenderReadonly(list) {
+      var box = document.getElementById('prod-edit-sup-list');
       if (!box) return;
-      var chosen = _prodSupSel[mode] || [];
-      if (!chosen.length) {
-        box.innerHTML = '<span class="text-[11px] text-slate-400 italic">Belum ada supplier terpilih.</span>';
+      list = list || [];
+      if (!list.length) {
+        box.innerHTML = '<span class="text-[11px] text-slate-400 italic">Belum ada supplier untuk item ini.</span>';
         return;
       }
-      var nameOf = {};
-      (_prodSuppliersAll || []).forEach(function(s){ nameOf[s.id] = s.nama || s.id; });
-      box.innerHTML = chosen.map(function(id) {
+      box.innerHTML = list.map(function(s) {
+        var nama = (s.nama || s.idSupplier || '').toString();
         return '<span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-700 text-[11px] font-bold px-2.5 py-1 rounded-lg mr-1.5 mb-1.5 border border-orange-100">' +
-          '<i class="fa-solid fa-truck text-[9px]"></i>' + (nameOf[id] || id) +
-          '<button type="button" onclick="_prodSupRemove(\'' + mode + '\',\'' + id + '\')" class="text-orange-400 hover:text-rose-500 ml-0.5"><i class="fa-solid fa-xmark"></i></button>' +
-          '</span>';
+          '<i class="fa-solid fa-truck text-[9px]"></i>' + nama + '</span>';
       }).join('');
-    }
-
-    function _prodSupAdd(mode) {
-      var sel = document.getElementById(mode === 'edit' ? 'prod-edit-sup-picker' : 'prod-add-sup-picker');
-      if (!sel || !sel.value) return;
-      var id = sel.value;
-      if (!_prodSupSel[mode]) _prodSupSel[mode] = [];
-      if (_prodSupSel[mode].indexOf(id) === -1) _prodSupSel[mode].push(id);
-      _prodSupFillPicker(mode);
-      _prodSupRenderList(mode);
-    }
-
-    function _prodSupRemove(mode, id) {
-      _prodSupSel[mode] = (_prodSupSel[mode] || []).filter(function(x){ return x !== id; });
-      _prodSupFillPicker(mode);
-      _prodSupRenderList(mode);
     }
 
     // ── TAMBAH ITEM (Procurement/Admin) ──────────────────────────────
@@ -488,11 +445,6 @@
       if (hppEl) hppEl.value = '';
       var tipeEl = document.getElementById('modal-produk-tipe');
       if (tipeEl) tipeEl.value = '';
-      _prodSupSel.add = [];
-      _prodEnsureSuppliers(function() {
-        _prodSupFillPicker('add');
-        _prodSupRenderList('add');
-      });
       document.getElementById('modal-produk').classList.remove('hidden');
     }
 
@@ -503,7 +455,6 @@
       const unit  = form.querySelector('[name="unit"]').value.trim();
       const hpp   = pN(document.getElementById('modal-produk-hpp').value);
       const tipe  = (document.getElementById('modal-produk-tipe') || {}).value || '';
-      const supIds = (_prodSupSel.add || []).slice();
 
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
 
@@ -511,29 +462,15 @@
       if (typeof google !== 'undefined') {
         google.script.run
           .withSuccessHandler(res => {
-            if (!res.success) {
-              toggleLoader(false);
-              showNotification(res.message, "error");
-              return;
-            }
-            const newId = res.id;
-            const done = function() {
-              toggleLoader(false);
-              showNotification(res.message);
-              form.reset();
-              document.getElementById('modal-produk-hpp').value = '';
-              if (document.getElementById('modal-produk-tipe')) document.getElementById('modal-produk-tipe').value = '';
-              _prodSupSel.add = [];
-              document.getElementById('modal-produk').classList.add('hidden');
-              loadProduk();
-              muatSeluruhDataAwal(false);
-            };
-            if (newId && supIds.length) {
-              google.script.run
-                .withSuccessHandler(done)
-                .withFailureHandler(function(){ done(); })
-                .setSuppliersForProduk(newId, supIds);
-            } else { done(); }
+            toggleLoader(false);
+            if (!res.success) { showNotification(res.message, "error"); return; }
+            showNotification(res.message);
+            form.reset();
+            document.getElementById('modal-produk-hpp').value = '';
+            if (document.getElementById('modal-produk-tipe')) document.getElementById('modal-produk-tipe').value = '';
+            document.getElementById('modal-produk').classList.add('hidden');
+            loadProduk();
+            muatSeluruhDataAwal(false);
           })
           .withFailureHandler(err => {
             toggleLoader(false);
@@ -562,21 +499,13 @@
         }
       }
 
-      // Muat supplier terpilih untuk produk ini
-      _prodSupSel.edit = [];
-      _prodEnsureSuppliers(function() {
-        _prodSupFillPicker('edit');
-        _prodSupRenderList('edit');
-        if (typeof google !== 'undefined') {
-          google.script.run.withSuccessHandler(function(res) {
-            if (res && res.success) {
-              _prodSupSel.edit = (res.list || []).map(function(x){ return x.idSupplier; });
-            }
-            _prodSupFillPicker('edit');
-            _prodSupRenderList('edit');
-          }).withFailureHandler(function(){}).getSuppliersForProduk(item.sku);
-        }
-      });
+      // Supplier item ini (read-only)
+      _prodSupRenderReadonly([]);
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(res) {
+          _prodSupRenderReadonly((res && res.success) ? (res.list || []) : []);
+        }).withFailureHandler(function(){ _prodSupRenderReadonly([]); }).getSuppliersForProduk(item.sku);
+      }
 
       document.getElementById('modal-edit-produk').classList.remove('hidden');
     }
@@ -587,23 +516,16 @@
       const unit  = document.getElementById('edit-produk-unit').value.trim();
       const hpp   = pN(document.getElementById('edit-produk-hpp').value);
       const tipe  = (document.getElementById('edit-produk-tipe') || {}).value || '';
-      const supIds = (_prodSupSel.edit || []).slice();
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
       toggleLoader(true, "Menyimpan Perubahan...");
       google.script.run
         .withSuccessHandler(res => {
-          if (!res.success) { toggleLoader(false); showNotification(res.message, "error"); return; }
-          const done = function() {
-            toggleLoader(false);
-            showNotification(res.message);
-            document.getElementById('modal-edit-produk').classList.add('hidden');
-            loadProduk();
-            muatSeluruhDataAwal(false);
-          };
-          google.script.run
-            .withSuccessHandler(done)
-            .withFailureHandler(function(){ done(); })
-            .setSuppliersForProduk(id, supIds);
+          toggleLoader(false);
+          if (!res.success) { showNotification(res.message, "error"); return; }
+          showNotification(res.message);
+          document.getElementById('modal-edit-produk').classList.add('hidden');
+          loadProduk();
+          muatSeluruhDataAwal(false);
         })
         .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
         .updateProdukProcurement(id, nama, unit, hpp, tipe);
