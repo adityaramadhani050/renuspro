@@ -333,15 +333,26 @@ function _pgRenderProduk(data) {
       <td class="p-4 text-right" data-label="Margin"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
       <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
-          <button onclick='bukaModalEditProduk(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-          <button onclick="konfirmasiHapus('produk','${i.sku}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
+          ${window._prodCanPrice ? `<button onclick='bukaModalHargaJual(${JSON.stringify(i)})' class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition" title="Set Harga Jual"><i class="fa-solid fa-tag"></i></button>` : ''}
+          ${window._prodCanManage ? `<button onclick='bukaModalEditProduk(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Kelola Item"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
+          ${window._prodCanManage ? `<button onclick="konfirmasiHapus('produk','${i.sku}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>` : ''}
+          ${(!window._prodCanPrice && !window._prodCanManage) ? `<span class="text-[10px] text-slate-300">—</span>` : ''}
         </div>
       </td>
     </tr>`;
   }).join('');
 }
 
+function _prodComputeRole() {
+  var role = (window._currentUser && window._currentUser.role) || '';
+  window._prodCanManage = (role === 'procurement' || role === 'admin');
+  window._prodCanPrice  = (role === 'sales' || role === 'leadsales' || role === 'admin');
+  var btn = document.getElementById('btn-tambah-produk');
+  if (btn) btn.classList.toggle('hidden', !window._prodCanManage);
+}
+
 window.loadProduk = function() {
+  _prodComputeRole();
   if (typeof google !== 'undefined') {
     google.script.run.withSuccessHandler(function(data) {
       _cachedProdukData = data || [];

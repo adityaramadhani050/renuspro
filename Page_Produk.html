@@ -8,7 +8,7 @@
                 placeholder="Cari nama, ID..."
                 class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
             </div>
-            <button onclick="document.getElementById('modal-produk').classList.remove('hidden'); _loadStokOptionsForProdukModal('modal-produk-stok-id','')"
+            <button id="btn-tambah-produk" onclick="bukaFormTambahProduk()"
               class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-plus"></i> Tambah Item Baru
             </button>
@@ -55,45 +55,23 @@
                     </select>
                   </div>
                   <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tautkan ke Item Stok <span class="text-slate-400 font-normal normal-case ml-1">Opsional — HPP & Qty Tersedia auto-sync</span></label>
-                  <div class="flex gap-2">
-                    <select id="modal-produk-stok-id" onchange="_onStokLinkChange('modal-produk-stok-id','modal-produk-hpp', hitungMarginModalProduk)" class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 bg-white">
-                      <option value="">— Tidak terhubung ke stok —</option>
-                    </select>
-                    <button type="button" onclick="_onStokLinkChange('modal-produk-stok-id','modal-produk-hpp', hitungMarginModalProduk)"
-                      title="Sync HPP dari stok terpilih"
-                      class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-slate-200 transition text-sm">
-                      <i class="fa-solid fa-rotate"></i>
-                    </button>
-                  </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Beli (Rp) <span class="text-slate-400 font-normal normal-case ml-1">Auto ter-update saat penerimaan barang</span></label>
                     <div class="relative">
-                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
-                      <input type="text" id="modal-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0"
-                        oninput="formatModalProdukHarga(this); hitungMarginModalProduk()">
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Modal (Rp)</label>
-                    <div class="relative">
-                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">HPP</span>
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">Rp</span>
                       <input type="text" id="modal-produk-hpp" class="input-field text-sm pl-8 text-right font-bold border-rose-200 bg-rose-50" placeholder="0"
-                        oninput="formatModalProdukHpp(this); hitungMarginModalProduk()">
+                        oninput="formatModalProdukHpp(this)">
                     </div>
                   </div>
                 </div>
 
-                <!-- Preview Margin -->
-                <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                  <span class="text-xs font-bold text-amber-900 uppercase tracking-wide">
-                    <i class="fa-solid fa-chart-line mr-1"></i> Margin
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <span id="modal-produk-target-status" class="text-[10px] font-extrabold"></span>
-                    <span id="modal-produk-margin-badge" class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-400">0%</span>
+                <!-- Assign Supplier -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-truck mr-1 text-orange-500"></i>Assign Supplier</label>
+                  <div class="flex gap-2 mb-2">
+                    <select id="prod-add-sup-picker" class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"></select>
+                    <button type="button" onclick="_prodSupAdd('add')" class="px-3 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-bold whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Tambah</button>
                   </div>
+                  <div id="prod-add-sup-list" class="flex flex-wrap"></div>
                 </div>
               </div>
 
@@ -136,5 +114,41 @@
               </td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- MODAL SET HARGA JUAL (Sales) -->
+        <div id="modal-harga-jual" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center"><i class="fa-solid fa-tag"></i></span>
+              <div>
+                <h3 class="text-base font-bold text-slate-800">Set Harga Jual</h3>
+                <p class="text-xs text-slate-400">Tetapkan nilai jual item</p>
+              </div>
+              <button onclick="document.getElementById('modal-harga-jual').classList.add('hidden')" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+              <input type="hidden" id="hj-id">
+              <div class="bg-slate-50 rounded-xl px-4 py-3">
+                <p class="text-sm font-bold text-slate-700" id="hj-nama">—</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Harga Beli (HPP): <span id="hj-hpp" class="font-semibold text-rose-600">Rp 0</span></p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Harga Jual (Rp)</label>
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                  <input type="text" id="hj-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0" oninput="formatHargaJualInput(this); hitungMarginHJ()">
+                </div>
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                <span class="text-xs font-bold text-amber-900 uppercase tracking-wide"><i class="fa-solid fa-chart-line mr-1"></i> Margin</span>
+                <span id="hj-margin-badge" class="text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-400">0%</span>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+              <button onclick="document.getElementById('modal-harga-jual').classList.add('hidden')" class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button onclick="submitHargaJual()" class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+            </div>
+          </div>
         </div>
       </section>
