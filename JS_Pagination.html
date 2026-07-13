@@ -353,7 +353,7 @@ function _pgRenderProduk(data) {
 }
 
 function _prodComputeRole() {
-  var role = (window._currentUser && window._currentUser.role) || '';
+  var role = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) || '';
   window._prodCanManage = (role === 'procurement' || role === 'admin');
   window._prodCanPrice  = (role === 'sales' || role === 'leadsales' || role === 'admin');
   var btn = document.getElementById('btn-tambah-produk');
