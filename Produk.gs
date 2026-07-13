@@ -94,7 +94,7 @@ function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
 
     sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia]);
     invalidateProdukCache();
-    return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!" };
+    return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!", id: nextId };
   } catch (error) {
     return { success: false, message: error.toString() };
   }
@@ -137,6 +137,48 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
       }
     }
     return { success: false, message: "ID produk tidak ditemukan." };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ── Role-split: Procurement kelola item (nama/unit/harga beli/tipe) ──────────
+// Tulis Nama(2), Unit(3), HPP/harga beli(5), Tipe(6). PERTAHANKAN Harga Jual(4),
+// Stok ID(7), Qty(8). Stok kini otomatis ditautkan saat penerimaan barang.
+function updateProdukProcurement(id, nama, unit, hpp, tipe) {
+  try {
+    if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
+    const ss    = getSpreadsheet();
+    const sheet = ss.getSheetByName('Master_Produk');
+    if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+    _ensureStokLinkKolom(ss);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0].toString().trim() === id.toString().trim()) {
+        sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, unit]]);      // Nama, Unit
+        sheet.getRange(i + 1, 5, 1, 2).setValues([[Number(hpp) || 0, tipe || '']]); // HPP, Tipe (Harga Jual col 4 tak disentuh)
+        invalidateProdukCache();
+        return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'ID produk tidak ditemukan.' };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ── Role-split: Sales set nilai jual saja ───────────────────────────────────
+// Tulis HANYA Harga Jual (kolom 4). Field lain tidak disentuh.
+function updateHargaJual(id, hargaJual) {
+  try {
+    const ss    = getSpreadsheet();
+    const sheet = ss.getSheetByName('Master_Produk');
+    if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0].toString().trim() === id.toString().trim()) {
+        sheet.getRange(i + 1, 4).setValue(Number(hargaJual) || 0);
+        invalidateProdukCache();
+        return { success: true, message: 'Harga jual ' + id + ' berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'ID produk tidak ditemukan.' };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

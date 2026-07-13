@@ -278,3 +278,65 @@ function saveSupplierKatalog(idSupplier, items) {
     try { lock.releaseLock(); } catch (e) {}
   }
 }
+
+// ── Assign supplier dari sisi PRODUK (arah balik dari Supplier_Produk) ────────
+// Dipakai halaman Katalog Produk (procurement) untuk assign supplier ke 1 item.
+
+function getSuppliersForProduk(produkId) {
+  try {
+    produkId = (produkId || '').toString().trim();
+    if (!produkId) return { success: true, list: [] };
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    const data = sheet.getDataRange().getValues();
+    // Peta id supplier → nama
+    const supMap = {};
+    try { (getSupplierList() || []).forEach(function (s) { supMap[s.id] = s.nama; }); } catch (e) {}
+    const list = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][1] || data[i][1].toString().trim() !== produkId) continue;
+      const idSupplier = data[i][0] ? data[i][0].toString() : '';
+      if (!idSupplier) continue;
+      list.push({ idSupplier: idSupplier, nama: supMap[idSupplier] || idSupplier });
+    }
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Tulis ulang mapping supplier untuk satu produk. supplierIds = ['S001', ...].
+// Harga Beli dikosongkan → getProdukBySupplier fallback ke HPP produk.
+function setSuppliersForProduk(produkId, supplierIds) {
+  const lock = LockService.getScriptLock();
+  try {
+    produkId = (produkId || '').toString().trim();
+    if (!produkId) return { success: false, message: 'ID produk wajib diisi.' };
+    supplierIds = supplierIds || [];
+
+    lock.waitLock(15000);
+    const ss = getSpreadsheet();
+    const sheet = _ensureSupplierProdukSheet(ss);
+    SpreadsheetApp.flush();
+
+    // Hapus baris lama untuk produk ini (dari bawah ke atas)
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][1] && data[i][1].toString().trim() === produkId) sheet.deleteRow(i + 1);
+    }
+
+    const when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    const seen = {};
+    for (let j = 0; j < supplierIds.length; j++) {
+      const idSupplier = (supplierIds[j] || '').toString().trim();
+      if (!idSupplier || seen[idSupplier]) continue;
+      seen[idSupplier] = true;
+      sheet.appendRow([idSupplier, produkId, '', when]);
+    }
+    return { success: true, message: 'Supplier item tersimpan (' + Object.keys(seen).length + ' supplier).' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
