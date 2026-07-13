@@ -390,6 +390,9 @@ function _prodPopulateAtribut(data) {
 
 window.loadProduk = function() {
   _prodComputeRole();
+  // Bersihkan tabel lama agar tombol aksi role sebelumnya tidak sempat tampil
+  var _tbProd = document.getElementById('table-produk');
+  if (_tbProd) _tbProd.innerHTML = '<tr><td colspan="11" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data produk...</td></tr>';
   if (typeof google !== 'undefined') {
     google.script.run.withSuccessHandler(function(data) {
       _cachedProdukData = data || [];
