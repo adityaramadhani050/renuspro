@@ -68,6 +68,7 @@ function renderPricelist() {
     var rows = g.items.map(function(it) {
       return '<tr class="border-b border-slate-100 hover:bg-slate-50">'
         + '<td class="p-2.5"><div class="font-semibold text-slate-700">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
+        + '<td class="p-2.5 text-center">' + (it.ready ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check"></i> READY</span>' : '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">BELUM</span>') + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.kategori || '-') + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.merek || '-') + '</td>'
         + '<td class="p-2.5 text-center text-slate-500">' + _plEsc(it.satuan || '-') + '</td>'
@@ -86,9 +87,9 @@ function renderPricelist() {
       +   '<i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + ' text-slate-400"></i>'
       + '</button>'
       + (open
-          ? '<div class="overflow-x-auto border-t border-slate-100"><table class="w-full min-w-[820px] text-xs text-left">'
+          ? '<div class="overflow-x-auto border-t border-slate-100"><table class="w-full min-w-[900px] text-xs text-left">'
             + '<thead><tr class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">'
-            + '<th class="p-2.5">Material</th><th class="p-2.5">Kategori</th><th class="p-2.5">Merek</th><th class="p-2.5 text-center">Satuan</th><th class="p-2.5 text-right">Harga Beli</th><th class="p-2.5">Lead Time</th><th class="p-2.5">Masa Berlaku</th><th class="p-2.5 text-center">Aksi</th>'
+            + '<th class="p-2.5">Material</th><th class="p-2.5 text-center">Ready</th><th class="p-2.5">Kategori</th><th class="p-2.5">Merek</th><th class="p-2.5 text-center">Satuan</th><th class="p-2.5 text-right">Harga Beli</th><th class="p-2.5">Lead Time</th><th class="p-2.5">Masa Berlaku</th><th class="p-2.5 text-center">Aksi</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           : '')
       + '</div>';
@@ -104,6 +105,7 @@ function bukaFormTambahPricelist() {
   ['pl-kategori','pl-merek','pl-nama','pl-spesifikasi','pl-satuan','pl-leadtime','pl-harga','pl-masa'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  document.getElementById('pl-ready').checked = false;
   _isiPickerSupplierPl();
   document.getElementById('pl-supplier').value = '';
   document.getElementById('modal-pricelist').classList.remove('hidden');
@@ -124,6 +126,7 @@ function bukaFormEditPricelist(id) {
   document.getElementById('pl-leadtime').value = it.leadTime || '';
   document.getElementById('pl-masa').value = it.masaBerlaku || '';
   document.getElementById('pl-harga').value = _plFmtRp(it.hargaBeli);
+  document.getElementById('pl-ready').checked = !!it.ready;
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
 
@@ -143,7 +146,8 @@ function simpanPricelistItem() {
     hargaBeli:    _plParseRp(document.getElementById('pl-harga').value),
     termasukPPN:  false,
     leadTime:     document.getElementById('pl-leadtime').value.trim(),
-    masaBerlaku:  document.getElementById('pl-masa').value
+    masaBerlaku:  document.getElementById('pl-masa').value,
+    ready:        document.getElementById('pl-ready').checked
   };
   toggleLoader(true, 'Menyimpan item...');
   var done = function(res) {

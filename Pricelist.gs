@@ -10,12 +10,18 @@
 function _ensurePricelistSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('Pricelist_Supplier');
-  if (sheet) return sheet;
+  if (sheet) { _ensurePricelistKolom(sheet); return sheet; }
   sheet = ss.insertSheet('Pricelist_Supplier');
   sheet.appendRow(['ID', 'ID Supplier', 'Kategori', 'Nama Material', 'Spesifikasi', 'Merek',
-    'Satuan', 'Harga Beli', 'Termasuk PPN', 'Lead Time', 'Masa Berlaku Harga', 'Dibuat Pada']);
-  sheet.getRange(1, 1, 1, 12).setFontWeight('bold');
+    'Satuan', 'Harga Beli', 'Termasuk PPN', 'Lead Time', 'Masa Berlaku Harga', 'Dibuat Pada', 'Ready']);
+  sheet.getRange(1, 1, 1, 13).setFontWeight('bold');
   return sheet;
+}
+
+// Migrasi lazy: kolom Ready [12] (1-based 13).
+function _ensurePricelistKolom(sheet) {
+  if (!sheet) return;
+  if (sheet.getLastColumn() < 13) sheet.getRange(1, 13).setValue('Ready');
 }
 
 // Normalisasi nilai tanggal (Date object atau teks) → 'yyyy-MM-dd'.
@@ -67,7 +73,8 @@ function getPricelistAll() {
         hargaBeli:    Number(data[i][7]) || 0,
         termasukPPN:  (data[i][8] != null && data[i][8].toString().trim().toLowerCase() === 'ya'),
         leadTime:     data[i][9] ? data[i][9].toString() : '',
-        masaBerlaku:  _plToIsoDate(data[i][10])
+        masaBerlaku:  _plToIsoDate(data[i][10]),
+        ready:        (data[i][12] != null && data[i][12].toString().trim().toLowerCase() === 'ya')
       });
     }
     return { success: true, list: list };
@@ -101,7 +108,7 @@ function tambahPricelistItem(payload) {
       id, payload.idSupplier, payload.kategori || '', payload.namaMaterial || '',
       payload.spesifikasi || '', payload.merek || '', payload.satuan || '',
       Number(payload.hargaBeli) || 0, payload.termasukPPN ? 'Ya' : 'Tidak',
-      payload.leadTime || '', payload.masaBerlaku || '', when
+      payload.leadTime || '', payload.masaBerlaku || '', when, payload.ready ? 'Ya' : 'Tidak'
     ]);
     return { success: true, message: 'Item pricelist ' + id + ' ditambahkan.', id: id };
   } catch (e) {
@@ -130,6 +137,7 @@ function updatePricelistItem(id, payload) {
           Number(payload.hargaBeli) || 0, payload.termasukPPN ? 'Ya' : 'Tidak',
           payload.leadTime || '', payload.masaBerlaku || ''
         ]]);
+        sheet.getRange(i + 1, 13).setValue(payload.ready ? 'Ya' : 'Tidak'); // Ready
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
       }
     }
