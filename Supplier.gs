@@ -237,19 +237,19 @@ function getSupplierKatalog(idSupplier) {
 }
 
 // Item siap-dropdown untuk form PO: { id, nama, unit, hargaBeli }.
-// hargaBeli = harga beli spesifik supplier bila ada, else fallback ke HPP produk.
+// Sumber = Pricelist_Supplier (standalone, lihat Pricelist.gs).
 function getProdukBySupplier(idSupplier) {
   try {
-    const res = getSupplierKatalog(idSupplier);
+    var res = getPricelistBySupplier(idSupplier);
     if (!res.success) return res;
-    const list = res.list.map(function (it) {
+    var list = res.list.map(function (it) {
+      var label = it.namaMaterial + (it.spesifikasi ? ' - ' + it.spesifikasi : '');
       return {
-        id:        it.idProduk,
-        nama:      it.nama,
-        unit:      it.unit,
-        hargaBeli: (it.hargaBeli != null) ? it.hargaBeli : (it.hpp || 0),
-        leadTime:  it.leadTime || '',
-        ready:     !!it.ready
+        id:        it.id,
+        nama:      label,
+        unit:      it.satuan || '',
+        hargaBeli: Number(it.hargaBeli) || 0,
+        leadTime:  it.leadTime || ''
       };
     }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });
     return { success: true, list: list };
