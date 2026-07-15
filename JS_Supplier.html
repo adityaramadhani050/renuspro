@@ -5,6 +5,55 @@
 
 let _cachedSupplierData = [];
 
+// ── Dropdown detail pricelist per supplier ────────────────────────
+let _supPricelist = {};        // idSupplier -> [item pricelist]
+let _supPricelistLoaded = false;
+let _supOpen = {};             // idSupplier -> expanded?
+
+function _supEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+function _loadSupPricelist(cb) {
+  if (_supPricelistLoaded) { if (cb) cb(); return; }
+  if (typeof google === 'undefined') { _supPricelistLoaded = true; if (cb) cb(); return; }
+  google.script.run.withSuccessHandler(function(res) {
+    _supPricelist = {};
+    (((res && res.success) ? res.list : []) || []).forEach(function(it) {
+      if (!_supPricelist[it.idSupplier]) _supPricelist[it.idSupplier] = [];
+      _supPricelist[it.idSupplier].push(it);
+    });
+    _supPricelistLoaded = true;
+    if (cb) cb();
+  }).withFailureHandler(function() { _supPricelistLoaded = true; if (cb) cb(); }).getPricelistAll();
+}
+
+function toggleSupplierDetail(id) {
+  _supOpen[id] = !_supOpen[id];
+  if (_supOpen[id] && !_supPricelistLoaded) _loadSupPricelist(function() { _pgRender('supplier'); });
+  else _pgRender('supplier');
+}
+
+function _renderSupplierPricelistDetail(idSupplier) {
+  if (!_supPricelistLoaded) return '<div class="text-[11px] text-slate-400 py-2 pl-2"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat pricelist...</div>';
+  var items = _supPricelist[idSupplier] || [];
+  if (!items.length) return '<div class="text-[11px] text-slate-400 italic py-2 pl-2">Belum ada item pricelist untuk supplier ini. Tambahkan di menu <b>Pricelist Supplier</b>.</div>';
+  var rows = items.map(function(it) {
+    var ready = it.ready
+      ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">READY</span>'
+      : '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">BELUM</span>';
+    return '<tr class="border-b border-slate-100">'
+      + '<td class="p-2"><div class="font-semibold text-slate-700">' + _supEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _supEsc(it.spesifikasi) + '</div>' : '') + '</td>'
+      + '<td class="p-2 text-slate-500">' + _supEsc(it.kategori || '-') + '</td>'
+      + '<td class="p-2 text-slate-500">' + _supEsc(it.merek || '-') + '</td>'
+      + '<td class="p-2 text-center text-slate-500">' + _supEsc(it.satuan || '-') + '</td>'
+      + '<td class="p-2 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + (Math.round(it.hargaBeli || 0)).toLocaleString('id-ID') + '</td>'
+      + '<td class="p-2 text-center">' + ready + '</td></tr>';
+  }).join('');
+  return '<div class="rounded-xl border border-slate-200 overflow-x-auto bg-white">'
+    + '<table class="w-full min-w-[600px] text-xs text-left"><thead><tr class="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">'
+    + '<th class="p-2">Material</th><th class="p-2">Kategori</th><th class="p-2">Merek</th><th class="p-2 text-center">Satuan</th><th class="p-2 text-right">Harga Beli</th><th class="p-2 text-center">Ready</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
 // ── Render tabel supplier ─────────────────────────────────────────
 function _pgRenderSupplier(data) {
   const tbody = document.getElementById('table-supplier');
@@ -17,9 +66,13 @@ function _pgRenderSupplier(data) {
     const statusBadge = i.status === 'Aktif'
       ? 'bg-emerald-100 text-emerald-700'
       : 'bg-rose-100 text-rose-600';
-    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+    const open = !!_supOpen[i.id];
+    const mainRow = `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600" data-label="ID">${i.id}</td>
-      <td class="p-4 font-bold text-slate-800" data-label="Nama Supplier">${i.nama}</td>
+      <td class="p-4 font-bold text-slate-800" data-label="Nama Supplier">
+        <button onclick="toggleSupplierDetail('${i.id}')" class="mr-1.5 text-slate-400 hover:text-orange-500 transition" title="Lihat pricelist"><i class="fa-solid fa-chevron-${open ? 'up' : 'down'} text-xs"></i></button>
+        ${i.nama}
+      </td>
       <td class="p-4 text-slate-600" data-label="PIC">${i.pic || '-'}</td>
       <td class="p-4 text-slate-600" data-label="Telepon">${i.telepon || '-'}</td>
       <td class="p-4 text-slate-600" data-label="Email">${i.email || '-'}</td>
@@ -35,6 +88,8 @@ function _pgRenderSupplier(data) {
         </div>
       </td>
     </tr>`;
+    const detailRow = open ? `<tr class="bg-slate-50"><td colspan="7" class="px-4 pb-4 pt-1">${_renderSupplierPricelistDetail(i.id)}</td></tr>` : '';
+    return mainRow + detailRow;
   }).join('');
 }
 
@@ -43,6 +98,7 @@ window.loadSupplier = function() {
   if (typeof google !== 'undefined') {
     google.script.run.withSuccessHandler(function(data) {
       _cachedSupplierData = data || [];
+      _supPricelistLoaded = false; _supPricelist = {}; _supOpen = {};  // refresh detail cache
       if (typeof resetSearch === 'function') resetSearch('supplier');
       _pgState.supplier.data = _cachedSupplierData;
       _pgState.supplier.page = 1;
