@@ -425,7 +425,7 @@
     function bukaFormTambahProduk() {
       var form = document.querySelector('#modal-produk form');
       if (form) form.reset();
-      ['modal-produk-harga','modal-produk-hpp','modal-produk-kategori','modal-produk-merek','modal-produk-spesifikasi'].forEach(function(id){
+      ['modal-produk-harga','modal-produk-hpp'].forEach(function(id){
         var el = document.getElementById(id); if (el) el.value = '';
       });
       var tipeEl = document.getElementById('modal-produk-tipe');
@@ -441,9 +441,6 @@
       const tipe  = (document.getElementById('modal-produk-tipe') || {}).value || '';
       const hargaJual = pN(document.getElementById('modal-produk-harga').value);
       const hpp   = pN(document.getElementById('modal-produk-hpp').value);
-      const kategori    = (document.getElementById('modal-produk-kategori') || {}).value || '';
-      const merek       = (document.getElementById('modal-produk-merek') || {}).value || '';
-      const spesifikasi = (document.getElementById('modal-produk-spesifikasi') || {}).value || '';
 
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
 
@@ -462,7 +459,7 @@
             toggleLoader(false);
             showNotification("Gagal: " + (err && err.message ? err.message : err), "error");
           })
-          .simpanProduk(nama, unit, hargaJual, hpp, tipe, '', kategori.trim(), merek.trim(), spesifikasi.trim());
+          .simpanProduk(nama, unit, hargaJual, hpp, tipe, '');
       }
     }
 
@@ -475,20 +472,6 @@
       document.getElementById('edit-produk-hpp').value   = formatNominalRupiah(item.hpp);
       var tipeEl = document.getElementById('edit-produk-tipe');
       if (tipeEl) tipeEl.value = item.tipe || '';
-      var katEl = document.getElementById('edit-produk-kategori'); if (katEl) katEl.value = item.kategori || '';
-      var merEl = document.getElementById('edit-produk-merek'); if (merEl) merEl.value = item.merek || '';
-      var speEl = document.getElementById('edit-produk-spesifikasi'); if (speEl) speEl.value = item.spesifikasi || '';
-
-      // Info stok tertaut (read-only)
-      var infoEl = document.getElementById('edit-produk-stok-info');
-      if (infoEl) {
-        if (item.stokId) {
-          infoEl.innerHTML = '<i class="fa-solid fa-link mr-1 text-indigo-500"></i>Stok tertaut: <span class="font-mono font-bold text-indigo-600">' + item.stokId + '</span> · Qty <b>' + (Number(item.qtyTersedia)||0).toLocaleString('id-ID') + '</b> ' + (item.unit||'');
-        } else {
-          infoEl.innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i>Belum tertaut ke stok. Otomatis dibuat saat penerimaan barang.';
-        }
-      }
-
       document.getElementById('modal-edit-produk').classList.remove('hidden');
     }
 
@@ -499,9 +482,6 @@
       const tipe  = (document.getElementById('edit-produk-tipe') || {}).value || '';
       const hargaJual = pN(document.getElementById('edit-produk-harga').value);
       const hpp       = pN(document.getElementById('edit-produk-hpp').value);
-      const kategori    = ((document.getElementById('edit-produk-kategori') || {}).value || '').trim();
-      const merek       = ((document.getElementById('edit-produk-merek') || {}).value || '').trim();
-      const spesifikasi = ((document.getElementById('edit-produk-spesifikasi') || {}).value || '').trim();
       if (!nama || !unit) return showNotification("Nama dan unit wajib diisi!", "error");
       toggleLoader(true, "Menyimpan Perubahan...");
       google.script.run
@@ -514,7 +494,7 @@
           muatSeluruhDataAwal(false);
         })
         .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
-        .updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp, kategori, merek, spesifikasi);
+        .updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp);
     }
 
     // --- EDIT & DELETE CUSTOMER ---

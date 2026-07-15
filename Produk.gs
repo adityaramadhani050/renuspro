@@ -60,10 +60,7 @@ function getProdukList() {
           hpp:          Number(data[i][4]) || 0,
           tipe:         data[i][5] ? data[i][5].toString() : '',
           stokId:       data[i][6] ? data[i][6].toString() : '',
-          qtyTersedia:  Number(data[i][7]) || 0,
-          kategori:     data[i][8] ? data[i][8].toString() : '',
-          merek:        data[i][9] ? data[i][9].toString() : '',
-          spesifikasi:  data[i][10] ? data[i][10].toString() : ''
+          qtyTersedia:  Number(data[i][7]) || 0
         });
       }
     }
@@ -71,14 +68,14 @@ function getProdukList() {
   } catch(e) { return []; }
 }
 
-function simpanProduk(nama, unit, harga, hpp, tipe, stokId, kategori, merek, spesifikasi) {
+function simpanProduk(nama, unit, harga, hpp, tipe, stokId) {
   try {
     if (!nama || !unit) {
       return { success: false, message: "Data nama/unit tidak boleh kosong." };
     }
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk') || buatSheetProdukDefault(ss);
-    _ensureKatalogAtributKolom(ss);
+    _ensureStokLinkKolom(ss);
     SpreadsheetApp.flush();
 
     const lastRow = sheet.getLastRow();
@@ -111,7 +108,7 @@ function simpanProduk(nama, unit, harga, hpp, tipe, stokId, kategori, merek, spe
       }
     }
 
-    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia, kategori || '', merek || '', spesifikasi || '']);
+    sheet.appendRow([nextId, nama, unit, Number(harga) || 0, hppFinal, tipe || '', stokId || '', qtyTersedia]);
     invalidateProdukCache();
     return { success: true, message: "Produk " + nextId + " berhasil ditambahkan!", id: nextId };
   } catch (error) {
@@ -160,17 +157,16 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
 }
 
 // ── Katalog jual (sales): kelola item sisi-jual ─────────────────────────────
-// Tulis Nama(2), Unit(3), Harga Jual(4), HPP(5, manual), Tipe(6), Kategori(9),
-// Merek(10), Spesifikasi(11). PERTAHANKAN Stok ID(7), Qty(8).
-// Catatan: HPP untuk item Material tetap bisa ter-update otomatis dari
-// penerimaan barang (_syncHPPProduk), tapi bukan dari Pricelist Supplier.
-function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp, kategori, merek, spesifikasi) {
+// Tulis Nama(2), Unit(3), Harga Jual(4), HPP(5, manual), Tipe(6).
+// PERTAHANKAN Stok ID(7), Qty(8). HPP item Material tetap bisa ter-update
+// otomatis dari penerimaan barang (_syncHPPProduk).
+function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp) {
   try {
     if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
     const ss    = getSpreadsheet();
     const sheet = ss.getSheetByName('Master_Produk');
     if (!sheet) return { success: false, message: 'Sheet tidak ditemukan.' };
-    _ensureKatalogAtributKolom(ss);
+    _ensureStokLinkKolom(ss);
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
@@ -178,7 +174,6 @@ function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp, kategori, mer
         sheet.getRange(i + 1, 4).setValue(Number(hargaJual) || 0);  // Harga Jual
         sheet.getRange(i + 1, 5).setValue(Number(hpp) || 0);        // HPP (manual)
         sheet.getRange(i + 1, 6).setValue(tipe || '');              // Tipe
-        sheet.getRange(i + 1, 9, 1, 3).setValues([[kategori || '', merek || '', spesifikasi || '']]);
         invalidateProdukCache();
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
       }
