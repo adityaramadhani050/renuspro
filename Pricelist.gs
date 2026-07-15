@@ -18,6 +18,17 @@ function _ensurePricelistSheet(ss) {
   return sheet;
 }
 
+// Normalisasi nilai tanggal (Date object atau teks) → 'yyyy-MM-dd'.
+function _plToIsoDate(v) {
+  if (v === '' || v == null) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  var s = v.toString().trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[1] + '-' + m[2] + '-' + m[3]) : s;
+}
+
 function _pricelistNextId(sheet) {
   var lastRow = sheet.getLastRow();
   var maxNum = 0;
@@ -56,7 +67,7 @@ function getPricelistAll() {
         hargaBeli:    Number(data[i][7]) || 0,
         termasukPPN:  (data[i][8] != null && data[i][8].toString().trim().toLowerCase() === 'ya'),
         leadTime:     data[i][9] ? data[i][9].toString() : '',
-        masaBerlaku:  data[i][10] ? data[i][10].toString() : ''
+        masaBerlaku:  _plToIsoDate(data[i][10])
       });
     }
     return { success: true, list: list };

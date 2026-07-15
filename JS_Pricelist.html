@@ -13,6 +13,7 @@ function _plFmtRp(n) { return Math.round(parseFloat(n) || 0).toLocaleString('id-
 function _plEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
 function formatPlHarga(el) { el.value = _plFmtRp(_plParseRp(el.value)); }
+function _plFmtTgl(s) { var m = (s || '').toString().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : (s || '-'); }
 
 // ── Load ──────────────────────────────────────────────────────────
 window.loadPricelist = function() {
@@ -72,7 +73,7 @@ function renderPricelist() {
         + '<td class="p-2.5 text-center text-slate-500">' + _plEsc(it.satuan || '-') + '</td>'
         + '<td class="p-2.5 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.leadTime || '-') + '</td>'
-        + '<td class="p-2.5 text-slate-500 whitespace-nowrap">' + _plEsc(it.masaBerlaku || '-') + '</td>'
+        + '<td class="p-2.5 text-slate-500 whitespace-nowrap">' + (it.masaBerlaku ? _plFmtTgl(it.masaBerlaku) : '-') + '</td>'
         + '<td class="p-2.5 text-center whitespace-nowrap">'
         +   '<button onclick="bukaFormEditPricelist(\'' + it.id + '\')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>'
         +   '<button onclick="hapusPricelist(\'' + it.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>'
