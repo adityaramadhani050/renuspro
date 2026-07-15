@@ -58,7 +58,7 @@ function _renderSupplierPricelistDetail(idSupplier) {
 function _pgRenderSupplier(data) {
   const tbody = document.getElementById('table-supplier');
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">
+    tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">
       <i class="fas fa-search mr-2"></i>Tidak ada data supplier.</td></tr>`;
     return;
   }
@@ -69,10 +69,7 @@ function _pgRenderSupplier(data) {
     const open = !!_supOpen[i.id];
     const mainRow = `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600" data-label="ID">${i.id}</td>
-      <td class="p-4 font-bold text-slate-800" data-label="Nama Supplier">
-        <button onclick="toggleSupplierDetail('${i.id}')" class="mr-1.5 text-slate-400 hover:text-orange-500 transition" title="Lihat pricelist"><i class="fa-solid fa-chevron-${open ? 'up' : 'down'} text-xs"></i></button>
-        ${i.nama}
-      </td>
+      <td class="p-4 font-bold text-slate-800" data-label="Nama Supplier">${i.nama}</td>
       <td class="p-4 text-slate-600" data-label="PIC">${i.pic || '-'}</td>
       <td class="p-4 text-slate-600" data-label="Telepon">${i.telepon || '-'}</td>
       <td class="p-4 text-slate-600" data-label="Email">${i.email || '-'}</td>
@@ -81,6 +78,11 @@ function _pgRenderSupplier(data) {
           ${i.status || 'Aktif'}
         </span>
       </td>
+      <td class="p-4 text-center" data-label="Item">
+        <button onclick="toggleSupplierDetail('${i.id}')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-2 px-2" title="Lihat item pricelist">
+          <i class="fa-solid fa-chevron-${open ? 'up' : 'down'} text-[10px] transition-transform duration-200"></i> Detail
+        </button>
+      </td>
       <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           <button onclick='bukaModalEditSupplier(JSON.stringify(${JSON.stringify(i).replace(/'/g, "&#39;")}))' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -88,7 +90,7 @@ function _pgRenderSupplier(data) {
         </div>
       </td>
     </tr>`;
-    const detailRow = open ? `<tr class="bg-slate-50"><td colspan="7" class="px-4 pb-4 pt-1">${_renderSupplierPricelistDetail(i.id)}</td></tr>` : '';
+    const detailRow = open ? `<tr class="bg-slate-50"><td colspan="8" class="px-4 pb-4 pt-1">${_renderSupplierPricelistDetail(i.id)}</td></tr>` : '';
     return mainRow + detailRow;
   }).join('');
 }
@@ -106,7 +108,7 @@ window.loadSupplier = function() {
       _pgRender('supplier');
     }).withFailureHandler(function(err) {
       const tbody = document.getElementById('table-supplier');
-      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-rose-400">
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-400">
         <i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat data supplier.</td></tr>`;
     }).getSupplierList();
   }

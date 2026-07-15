@@ -35,13 +35,15 @@ function _plToIsoDate(v) {
   return m ? (m[1] + '-' + m[2] + '-' + m[3]) : s;
 }
 
-// Normalisasi timestamp (Date object atau teks) → 'dd/MM/yyyy HH:mm'.
+// Normalisasi timestamp (Date object atau teks) → 'dd/MM/yyyy'.
 function _plToDateTime(v) {
   if (v === '' || v == null) return '';
   if (Object.prototype.toString.call(v) === '[object Date]') {
-    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
   }
-  return v.toString().trim();
+  var s = v.toString().trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // ambil bagian tanggal saja
+  return m ? m[0] : s.split(' ')[0];
 }
 
 function _pricelistNextId(sheet) {
