@@ -450,7 +450,8 @@ function submitPO() {
   }
 
   var sel = document.getElementById('sel-supplier-po');
-  var namaSupplier = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : idSupplier;
+  var _optSup = sel.options[sel.selectedIndex];
+  var namaSupplier = _optSup ? (_optSup.getAttribute('data-nama') || _optSup.text) : idSupplier;
 
   var payload = {
     tanggal:      document.getElementById('po-tanggal').value,
@@ -778,6 +779,7 @@ function _loadSupplierOptions(selId, selectedId, onDone) {
       (Array.isArray(res) ? res : (res.list || [])).filter(function(s){ return s.status === 'Aktif'; }).forEach(function(s) {
         var opt = document.createElement('option');
         opt.value = s.id;
+        opt.setAttribute('data-nama', s.nama || '');
         opt.textContent = s.nama + (s.pic ? ' - ' + s.pic : '');
         if (s.id === selectedId) opt.selected = true;
         sel.appendChild(opt);

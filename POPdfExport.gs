@@ -49,7 +49,7 @@ function exportPODariTemplate(noPO) {
     _isiHeaderPO(cache, po, supplier);
 
     var rowSetelahItem = _sisipkanBarisItemPO(sheet, cache, items);
-    var lastFooterRow  = _sisipkanFooterPO(sheet, rowSetelahItem, po, tc, tcOptions);
+    var lastFooterRow  = _sisipkanFooterPO(sheet, rowSetelahItem, po, tc, tcOptions, supplier);
 
     SpreadsheetApp.flush();
 
@@ -475,7 +475,7 @@ function _poSummaryRow(sheet, r, label, value, isDash, isBold) {
 
 // ── Footer utama ──────────────────────────────────────────────────────────────
 
-function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
+function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions, supplier) {
   var SC      = 2;          // kolom B
   var NCOLS   = 6;          // B–G
   var row     = startRow;
@@ -627,7 +627,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.getRange(row, 5, 1, 3).merge()
-    .setValue('')  // nama PIC/supplier tidak dicetak di signature
+    .setValue((supplier && supplier.nama) || po.namaSupplier || '')  // nama supplier saja (tanpa PIC)
     .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.setRowHeight(row, 18);
