@@ -9,6 +9,7 @@ const _pgState = {
   template:      { page: 1, perPage: 10, data: [] },
   customer:      { page: 1, perPage: 10, data: [] },
   supplier:      { page: 1, perPage: 10, data: [] },
+  pricelist:     { page: 1, perPage: 10, data: [] },
   purchaseorder: { page: 1, perPage: 10, data: [] },
   stok:          { page: 1, perPage: 20, data: [] },
   mutasi:        { page: 1, perPage: 20, data: [] },
@@ -210,6 +211,7 @@ function _pgRender(tipe) {
   if (tipe === 'template')      _pgRenderTemplate(sliced);
   if (tipe === 'customer')      _pgRenderCustomer(sliced);
   if (tipe === 'supplier')      _pgRenderSupplier(sliced);
+  if (tipe === 'pricelist')     _pgRenderPricelist(sliced);
   if (tipe === 'purchaseorder') _pgRenderPurchaseOrder(sliced);
   if (tipe === 'stok')          _pgRenderStok(sliced);
   if (tipe === 'mutasi')        _pgRenderMutasi(sliced);

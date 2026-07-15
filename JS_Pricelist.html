@@ -1,35 +1,92 @@
 <script>
 // ================================================================
-//  PRICELIST SUPPLIER — standalone (tidak terhubung Katalog Produk/Jasa)
-//  Form tambah item + list supplier accordion. Sumber item dropdown PO.
+//  PRICELIST SUPPLIER — daftar item (flat, paginated) + form tambah/edit.
+//  Sumber item dropdown Purchase Order.
 // ================================================================
 
-let _pricelistAll = [];        // semua item pricelist [{id, idSupplier, namaSupplier, ...}]
-let _pricelistSuppliers = [];  // daftar supplier (master) untuk dropdown form
-let _pricelistOpen = {};       // idSupplier -> expanded?
+let _cachedPricelist = [];      // semua item pricelist
+let _pricelistSuppliers = [];   // daftar supplier (master) untuk dropdown form
 
 function _plParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g, '')) || 0; }
 function _plFmtRp(n) { return Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
 function _plEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
-
 function formatPlHarga(el) { el.value = _plFmtRp(_plParseRp(el.value)); }
-function _plFmtTgl(s) { var m = (s || '').toString().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : (s || '-'); }
 
 // ── Load ──────────────────────────────────────────────────────────
 window.loadPricelist = function() {
-  var box = document.getElementById('pricelist-list');
-  if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pricelist...</div>';
   if (typeof google === 'undefined') return;
   google.script.run.withSuccessHandler(function(list) {
     _pricelistSuppliers = list || [];
     _isiPickerSupplierPl();
   }).withFailureHandler(function() {}).getSupplierList();
+
+  var tb = document.getElementById('table-pricelist');
+  if (tb) tb.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pricelist...</td></tr>';
   google.script.run.withSuccessHandler(function(res) {
-    _pricelistAll = (res && res.success) ? (res.list || []) : [];
-    renderPricelist();
-  }).withFailureHandler(function() { _pricelistAll = []; renderPricelist(); }).getPricelistAll();
+    _cachedPricelist = (res && res.success) ? (res.list || []) : [];
+    if (typeof resetSearch === 'function') resetSearch('pricelist');
+    _pgState.pricelist.data = _cachedPricelist;
+    _pgState.pricelist.page = 1;
+    _injectPgBar('pricelist', '#table-pricelist');
+    _pgRender('pricelist');
+  }).withFailureHandler(function() {
+    var t = document.getElementById('table-pricelist');
+    if (t) t.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-rose-400"><i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat pricelist.</td></tr>';
+  }).getPricelistAll();
 };
 
+window.filterPricelist = function() {
+  var q = ((document.getElementById('search-pricelist') || {}).value || '').toLowerCase().trim();
+  _pgState.pricelist.data = _cachedPricelist.filter(function(it) {
+    if (!q) return true;
+    return (it.namaMaterial + it.kategori + it.merek + it.spesifikasi + it.namaSupplier + it.satuan).toLowerCase().indexOf(q) !== -1;
+  });
+  _pgState.pricelist.page = 1;
+  _pgRender('pricelist');
+};
+
+// ── Render tabel (dipanggil _pgRender) ───────────────────────────
+function _pgRenderPricelist(data) {
+  var tbody = document.getElementById('table-pricelist');
+  if (!tbody) return;
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fa-solid fa-tags mr-2"></i>Belum ada item pricelist.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(it) {
+    return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">'
+      + '<td class="p-4 font-semibold text-slate-700" data-label="Supplier">' + _plEsc(it.namaSupplier) + '</td>'
+      + '<td class="p-4" data-label="Material"><div class="font-semibold text-slate-800">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
+      + '<td class="p-4 text-slate-500" data-label="Kategori">' + _plEsc(it.kategori || '-') + '</td>'
+      + '<td class="p-4 text-slate-500" data-label="Merek">' + _plEsc(it.merek || '-') + '</td>'
+      + '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _plEsc(it.satuan || '-') + '</td>'
+      + '<td class="p-4 text-right font-bold text-rose-600" data-label="Harga Beli">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
+      + '<td class="p-4 text-slate-500 text-[11px] whitespace-nowrap" data-label="Update Terakhir">' + _plEsc(it.updateTerakhir || '-') + '</td>'
+      + '<td class="p-4 text-center rp-actions">'
+      +   '<div class="flex items-center justify-center gap-1.5">'
+      +     '<label class="flex items-center gap-1 cursor-pointer select-none" title="Material ready">'
+      +       '<input type="checkbox" ' + (it.ready ? 'checked' : '') + ' onchange="togglePricelistReady(\'' + it.id + '\', this.checked)" class="accent-emerald-500">'
+      +       '<span class="text-[10px] font-extrabold ' + (it.ready ? 'text-emerald-600' : 'text-slate-400') + '">READY</span>'
+      +     '</label>'
+      +     '<button onclick="bukaFormEditPricelist(\'' + it.id + '\')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>'
+      +     '<button onclick="hapusPricelist(\'' + it.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>'
+      +   '</div>'
+      + '</td></tr>';
+  }).join('');
+}
+
+function togglePricelistReady(id, checked) {
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success === false) { showNotification(res.message, 'error'); loadPricelist(); return; }
+    var it = _cachedPricelist.filter(function(x) { return x.id === id; })[0];
+    if (it) it.ready = checked;
+  }).withFailureHandler(function(err) {
+    showNotification((err && err.message) || 'Gagal memperbarui status ready.', 'error');
+    loadPricelist();
+  }).setPricelistReady(id, checked);
+}
+
+// ── Form supplier dropdown ────────────────────────────────────────
 function _isiPickerSupplierPl() {
   var sel = document.getElementById('pl-supplier');
   if (!sel) return;
@@ -42,77 +99,20 @@ function _isiPickerSupplierPl() {
   if (cur) sel.value = cur;
 }
 
-// ── Render list (grup per supplier, accordion) ───────────────────
-function renderPricelist() {
-  var box = document.getElementById('pricelist-list');
-  if (!box) return;
-  var q = ((document.getElementById('search-pricelist') || {}).value || '').toLowerCase().trim();
-  var items = _pricelistAll.filter(function(it) {
-    if (!q) return true;
-    return (it.namaMaterial + it.kategori + it.merek + it.spesifikasi + it.namaSupplier + it.satuan).toLowerCase().indexOf(q) !== -1;
-  });
-  if (!items.length) {
-    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-10 text-center text-slate-400"><i class="fa-solid fa-tags text-2xl mb-2"></i><p class="text-sm">' +
-      (q ? 'Tidak ada item yang cocok.' : 'Belum ada item pricelist. Klik <b>Tambah Item</b> untuk menambahkan.') + '</p></div>';
-    return;
-  }
-  var groups = {};
-  items.forEach(function(it) {
-    if (!groups[it.idSupplier]) groups[it.idSupplier] = { nama: it.namaSupplier, items: [] };
-    groups[it.idSupplier].items.push(it);
-  });
-  var ids = Object.keys(groups).sort(function(a, b) { return groups[a].nama.localeCompare(groups[b].nama); });
-  box.innerHTML = ids.map(function(sid) {
-    var g = groups[sid];
-    var open = !!_pricelistOpen[sid] || !!q;   // auto-buka saat mencari
-    var rows = g.items.map(function(it) {
-      return '<tr class="border-b border-slate-100 hover:bg-slate-50">'
-        + '<td class="p-2.5"><div class="font-semibold text-slate-700">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
-        + '<td class="p-2.5 text-center">' + (it.ready ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check"></i> READY</span>' : '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">BELUM</span>') + '</td>'
-        + '<td class="p-2.5 text-slate-500">' + _plEsc(it.kategori || '-') + '</td>'
-        + '<td class="p-2.5 text-slate-500">' + _plEsc(it.merek || '-') + '</td>'
-        + '<td class="p-2.5 text-center text-slate-500">' + _plEsc(it.satuan || '-') + '</td>'
-        + '<td class="p-2.5 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
-        + '<td class="p-2.5 text-slate-500">' + _plEsc(it.leadTime || '-') + '</td>'
-        + '<td class="p-2.5 text-slate-500 whitespace-nowrap">' + (it.masaBerlaku ? _plFmtTgl(it.masaBerlaku) : '-') + '</td>'
-        + '<td class="p-2.5 text-center whitespace-nowrap">'
-        +   '<button onclick="bukaFormEditPricelist(\'' + it.id + '\')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>'
-        +   '<button onclick="hapusPricelist(\'' + it.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>'
-        + '</td></tr>';
-    }).join('');
-    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
-      + '<button onclick="togglePricelistSupplier(\'' + sid + '\')" class="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 transition text-left">'
-      +   '<span class="bg-purple-50 text-purple-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-truck"></i></span>'
-      +   '<div class="flex-1 min-w-0"><p class="font-bold text-slate-800 truncate">' + _plEsc(g.nama) + '</p><p class="text-[11px] text-slate-400">' + g.items.length + ' item</p></div>'
-      +   '<i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + ' text-slate-400"></i>'
-      + '</button>'
-      + (open
-          ? '<div class="overflow-x-auto border-t border-slate-100"><table class="w-full min-w-[900px] text-xs text-left">'
-            + '<thead><tr class="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">'
-            + '<th class="p-2.5">Material</th><th class="p-2.5 text-center">Ready</th><th class="p-2.5">Kategori</th><th class="p-2.5">Merek</th><th class="p-2.5 text-center">Satuan</th><th class="p-2.5 text-right">Harga Beli</th><th class="p-2.5">Lead Time</th><th class="p-2.5">Masa Berlaku</th><th class="p-2.5 text-center">Aksi</th>'
-            + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-          : '')
-      + '</div>';
-  }).join('');
-}
-
-function togglePricelistSupplier(sid) { _pricelistOpen[sid] = !_pricelistOpen[sid]; renderPricelist(); }
-
 // ── Tambah / Edit ─────────────────────────────────────────────────
 function bukaFormTambahPricelist() {
   document.getElementById('pricelist-modal-title').innerText = 'Tambah Item Pricelist';
   document.getElementById('pl-id').value = '';
-  ['pl-kategori','pl-merek','pl-nama','pl-spesifikasi','pl-satuan','pl-leadtime','pl-harga','pl-masa'].forEach(function(id) {
+  ['pl-kategori','pl-merek','pl-nama','pl-spesifikasi','pl-satuan','pl-harga'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  document.getElementById('pl-ready').checked = false;
   _isiPickerSupplierPl();
   document.getElementById('pl-supplier').value = '';
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
 
 function bukaFormEditPricelist(id) {
-  var it = _pricelistAll.filter(function(x) { return x.id === id; })[0];
+  var it = _cachedPricelist.filter(function(x) { return x.id === id; })[0];
   if (!it) return;
   document.getElementById('pricelist-modal-title').innerText = 'Edit Item Pricelist';
   document.getElementById('pl-id').value = it.id;
@@ -123,10 +123,7 @@ function bukaFormEditPricelist(id) {
   document.getElementById('pl-nama').value = it.namaMaterial || '';
   document.getElementById('pl-spesifikasi').value = it.spesifikasi || '';
   document.getElementById('pl-satuan').value = it.satuan || '';
-  document.getElementById('pl-leadtime').value = it.leadTime || '';
-  document.getElementById('pl-masa').value = it.masaBerlaku || '';
   document.getElementById('pl-harga').value = _plFmtRp(it.hargaBeli);
-  document.getElementById('pl-ready').checked = !!it.ready;
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
 
@@ -143,11 +140,7 @@ function simpanPricelistItem() {
     spesifikasi:  document.getElementById('pl-spesifikasi').value.trim(),
     merek:        document.getElementById('pl-merek').value.trim(),
     satuan:       document.getElementById('pl-satuan').value.trim(),
-    hargaBeli:    _plParseRp(document.getElementById('pl-harga').value),
-    termasukPPN:  false,
-    leadTime:     document.getElementById('pl-leadtime').value.trim(),
-    masaBerlaku:  document.getElementById('pl-masa').value,
-    ready:        document.getElementById('pl-ready').checked
+    hargaBeli:    _plParseRp(document.getElementById('pl-harga').value)
   };
   toggleLoader(true, 'Menyimpan item...');
   var done = function(res) {
@@ -155,7 +148,6 @@ function simpanPricelistItem() {
     if (res && res.success === false) { showNotification(res.message, 'error'); return; }
     showNotification(res && res.message ? res.message : 'Item tersimpan.');
     document.getElementById('modal-pricelist').classList.add('hidden');
-    if (idSupplier) _pricelistOpen[idSupplier] = true;
     loadPricelist();
   };
   var fail = function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan item.', 'error'); };
@@ -164,7 +156,7 @@ function simpanPricelistItem() {
 }
 
 function hapusPricelist(id) {
-  var it = _pricelistAll.filter(function(x) { return x.id === id; })[0];
+  var it = _cachedPricelist.filter(function(x) { return x.id === id; })[0];
   var nm = it ? it.namaMaterial : id;
   if (!confirm('Hapus item "' + nm + '" dari pricelist?')) return;
   toggleLoader(true, 'Menghapus item...');

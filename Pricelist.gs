@@ -72,8 +72,7 @@ function getPricelistAll() {
         satuan:       data[i][6] ? data[i][6].toString() : '',
         hargaBeli:    Number(data[i][7]) || 0,
         termasukPPN:  (data[i][8] != null && data[i][8].toString().trim().toLowerCase() === 'ya'),
-        leadTime:     data[i][9] ? data[i][9].toString() : '',
-        masaBerlaku:  _plToIsoDate(data[i][10]),
+        updateTerakhir: data[i][11] ? data[i][11].toString() : '',
         ready:        (data[i][12] != null && data[i][12].toString().trim().toLowerCase() === 'ya')
       });
     }
@@ -108,7 +107,7 @@ function tambahPricelistItem(payload) {
       id, payload.idSupplier, payload.kategori || '', payload.namaMaterial || '',
       payload.spesifikasi || '', payload.merek || '', payload.satuan || '',
       Number(payload.hargaBeli) || 0, payload.termasukPPN ? 'Ya' : 'Tidak',
-      payload.leadTime || '', payload.masaBerlaku || '', when, payload.ready ? 'Ya' : 'Tidak'
+      '', '', when, payload.ready ? 'Ya' : 'Tidak'
     ]);
     return { success: true, message: 'Item pricelist ' + id + ' ditambahkan.', id: id };
   } catch (e) {
@@ -128,17 +127,42 @@ function updatePricelistItem(id, payload) {
     lock.waitLock(15000);
     var ss = getSpreadsheet();
     var sheet = _ensurePricelistSheet(ss);
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === id) {
-        sheet.getRange(i + 1, 2, 1, 10).setValues([[
+        sheet.getRange(i + 1, 2, 1, 7).setValues([[
           payload.idSupplier || data[i][1], payload.kategori || '', payload.namaMaterial || '',
           payload.spesifikasi || '', payload.merek || '', payload.satuan || '',
-          Number(payload.hargaBeli) || 0, payload.termasukPPN ? 'Ya' : 'Tidak',
-          payload.leadTime || '', payload.masaBerlaku || ''
+          Number(payload.hargaBeli) || 0
         ]]);
-        sheet.getRange(i + 1, 13).setValue(payload.ready ? 'Ya' : 'Tidak'); // Ready
+        sheet.getRange(i + 1, 12).setValue(when);                            // Update Terakhir
+        if (payload.ready != null) sheet.getRange(i + 1, 13).setValue(payload.ready ? 'Ya' : 'Tidak');
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
+      }
+    }
+    return { success: false, message: 'Item tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// Toggle status Ready 1 item (dipakai tombol centang di kolom Aksi).
+function setPricelistReady(id, ready) {
+  var lock = LockService.getScriptLock();
+  try {
+    id = (id || '').toString().trim();
+    if (!id) return { success: false, message: 'ID item wajib.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _ensurePricelistSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === id) {
+        sheet.getRange(i + 1, 13).setValue(ready ? 'Ya' : 'Tidak');
+        return { success: true, message: 'Status ready diperbarui.' };
       }
     }
     return { success: false, message: 'Item tidak ditemukan.' };
