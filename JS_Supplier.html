@@ -41,16 +41,16 @@ function _renderSupplierPricelistDetail(idSupplier) {
       ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">READY</span>'
       : '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">BELUM</span>';
     return '<tr class="border-b border-slate-100">'
-      + '<td class="p-2"><div class="font-semibold text-slate-700">' + _supEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _supEsc(it.spesifikasi) + '</div>' : '') + '</td>'
       + '<td class="p-2 text-slate-500">' + _supEsc(it.kategori || '-') + '</td>'
       + '<td class="p-2 text-slate-500">' + _supEsc(it.merek || '-') + '</td>'
+      + '<td class="p-2"><div class="font-semibold text-slate-700">' + _supEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _supEsc(it.spesifikasi) + '</div>' : '') + '</td>'
       + '<td class="p-2 text-center text-slate-500">' + _supEsc(it.satuan || '-') + '</td>'
-      + '<td class="p-2 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + (Math.round(it.hargaBeli || 0)).toLocaleString('id-ID') + '</td>'
+      + '<td class="p-2 text-slate-500 whitespace-nowrap">' + _supEsc(it.updateTerakhir || '-') + '</td>'
       + '<td class="p-2 text-center">' + ready + '</td></tr>';
   }).join('');
   return '<div class="rounded-xl border border-slate-200 overflow-x-auto bg-white">'
     + '<table class="w-full min-w-[600px] text-xs text-left"><thead><tr class="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">'
-    + '<th class="p-2">Material</th><th class="p-2">Kategori</th><th class="p-2">Merek</th><th class="p-2 text-center">Satuan</th><th class="p-2 text-right">Harga Beli</th><th class="p-2 text-center">Ready</th>'
+    + '<th class="p-2">Kategori</th><th class="p-2">Merek</th><th class="p-2">Nama Material</th><th class="p-2 text-center">Satuan</th><th class="p-2">Update Terakhir</th><th class="p-2 text-center">Status</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
