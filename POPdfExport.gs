@@ -627,7 +627,7 @@ function _sisipkanFooterPO(sheet, startRow, po, tc, tcOptions) {
     .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.getRange(row, 5, 1, 3).merge()
-    .setValue(po.namaSupplier || '')
+    .setValue('')  // nama PIC/supplier tidak dicetak di signature
     .setFontWeight('bold').setFontSize(10).setBackground(WHITE)
     .setHorizontalAlignment('left').setVerticalAlignment('bottom');
   sheet.setRowHeight(row, 18);
