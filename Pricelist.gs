@@ -35,6 +35,15 @@ function _plToIsoDate(v) {
   return m ? (m[1] + '-' + m[2] + '-' + m[3]) : s;
 }
 
+// Normalisasi timestamp (Date object atau teks) → 'dd/MM/yyyy HH:mm'.
+function _plToDateTime(v) {
+  if (v === '' || v == null) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  }
+  return v.toString().trim();
+}
+
 function _pricelistNextId(sheet) {
   var lastRow = sheet.getLastRow();
   var maxNum = 0;
@@ -72,7 +81,7 @@ function getPricelistAll() {
         satuan:       data[i][6] ? data[i][6].toString() : '',
         hargaBeli:    Number(data[i][7]) || 0,
         termasukPPN:  (data[i][8] != null && data[i][8].toString().trim().toLowerCase() === 'ya'),
-        updateTerakhir: data[i][11] ? data[i][11].toString() : '',
+        updateTerakhir: _plToDateTime(data[i][11]),
         ready:        (data[i][12] != null && data[i][12].toString().trim().toLowerCase() === 'ya')
       });
     }
