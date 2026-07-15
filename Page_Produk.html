@@ -60,9 +60,9 @@
                   </div>
                   <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe</label>
-                    <select id="modal-produk-tipe" onchange="onTipeProdukChange('add')" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+                    <select id="modal-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                       <option value="">-- Belum Ditentukan --</option>
-                      <option value="Material">Material (punya stok & supplier)</option>
+                      <option value="Material">Material (punya stok)</option>
                       <option value="Jasa">Jasa (tidak ada stok)</option>
                     </select>
                   </div>
@@ -85,7 +85,7 @@
                       <input type="text" id="modal-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0" oninput="formatModalProdukHarga(this)">
                     </div>
                   </div>
-                  <div id="modal-produk-hpp-wrap">
+                  <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Estimasi Biaya (Rp)</label>
                     <div class="relative">
                       <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">Rp</span>
@@ -93,12 +93,6 @@
                         oninput="formatModalProdukHpp(this)">
                     </div>
                   </div>
-                </div>
-
-                <!-- Hint Material (HPP dari supplier) -->
-                <div id="modal-produk-material-hint" class="hidden bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
-                  <i class="fa-solid fa-circle-info text-sky-400 mt-0.5"></i>
-                  <p class="text-[11px] text-sky-800 leading-relaxed">Item <b>Material</b>: HPP diisi <b>otomatis</b> dari harga beli supplier yang <b>ready</b> (atau stok). Setelah item disimpan, tautkan supplier lewat <b>Kelola Item</b> atau menu <b>Supplier &rsaquo; Katalog Item</b>.</p>
                 </div>
               </div>
 

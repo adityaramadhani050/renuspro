@@ -104,9 +104,9 @@
             </div>
             <div class="md:col-span-2">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe</label>
-              <select id="edit-produk-tipe" onchange="onTipeProdukChange('edit')" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+              <select id="edit-produk-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                 <option value="">-- Belum Ditentukan --</option>
-                <option value="Material">Material (punya stok & supplier)</option>
+                <option value="Material">Material (punya stok)</option>
                 <option value="Jasa">Jasa (tidak ada stok)</option>
               </select>
             </div>
@@ -129,26 +129,14 @@
                 <input type="text" id="edit-produk-harga" class="input-field text-sm pl-8 text-right font-bold" placeholder="0" oninput="formatEditProdukHarga(this)">
               </div>
             </div>
-            <div id="edit-produk-hpp-wrap">
+            <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">HPP / Estimasi Biaya (Rp)</label>
               <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 text-[9px] font-bold">Rp</span>
                 <input type="text" id="edit-produk-hpp" class="input-field text-sm pl-8 text-right font-bold border-rose-200 bg-rose-50" placeholder="0"
                   oninput="formatEditProdukHpp(this)">
               </div>
-              <p id="edit-produk-hpp-hint" class="hidden text-[10px] text-slate-400 mt-1"></p>
             </div>
-          </div>
-
-          <!-- Tautkan ke Pricelist Supplier (khusus Material) -->
-          <div id="edit-produk-link-wrap" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-truck mr-1 text-orange-500"></i>Tautkan ke Pricelist Supplier</label>
-            <div class="flex gap-2 mb-2">
-              <select id="prod-link-sup-picker" class="flex-1 min-w-0 px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"></select>
-              <button type="button" onclick="_prodLinkAddSupplier()" class="px-3 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-bold whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Tautkan</button>
-            </div>
-            <div id="prod-edit-sup-list" class="space-y-1.5"></div>
-            <p class="text-[10px] text-slate-400 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>Harga beli & status <b>Ready</b> diatur procurement di menu <b>Supplier &rsaquo; Katalog Item</b>. HPP mengikuti supplier <b>ready</b> termurah.</p>
           </div>
 
           <!-- Info stok tertaut (read-only, otomatis saat penerimaan) -->

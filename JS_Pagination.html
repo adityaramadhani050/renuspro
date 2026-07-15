@@ -313,8 +313,6 @@ function _pgRenderProduk(data) {
   }
   const tipeBadge = { 'Material': 'bg-teal-100 text-teal-700', 'Jasa': 'bg-violet-100 text-violet-700' };
   tbody.innerHTML = data.map(i => {
-    // HPP belum diketahui (Material belum ready) → margin tak bermakna
-    const hppUnknown = (i.tipe === 'Material') && !i.ready;
     const margin = i.harga > 0 ? (((i.harga - i.hpp) / i.harga) * 100).toFixed(1) : 0;
     const mc = margin >= 25 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700';
     const tc = i.tipe ? (tipeBadge[i.tipe] || 'bg-slate-100 text-slate-600') : '';
@@ -331,11 +329,6 @@ function _pgRenderProduk(data) {
     const merekHtml = i.merek
       ? `<span class="text-xs text-slate-600">${i.merek}</span>`
       : `<span class="text-[10px] text-slate-300">—</span>`;
-    const readyHtml = (i.tipe === 'Material')
-      ? (i.ready
-          ? `<div class="text-[9px] font-extrabold text-emerald-600 mt-0.5"><i class="fa-solid fa-circle-check"></i> READY</div>`
-          : `<div class="text-[9px] font-extrabold text-slate-400 mt-0.5"><i class="fa-regular fa-circle"></i> BELUM READY</div>`)
-      : '';
     return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
       <td class="p-4 font-bold text-slate-600" data-label="ID">${i.sku}</td>
       <td class="p-4 font-semibold" data-label="Nama Item">${i.nama}${spesiHtml}</td>
@@ -345,8 +338,8 @@ function _pgRenderProduk(data) {
       <td class="p-4 text-center" data-label="Tipe">${tipeHtml}</td>
       <td class="p-4 text-center" data-label="Stok Terkait">${stokHtml}</td>
       <td class="p-4 text-right font-bold text-slate-800" data-label="Harga Jual">Rp ${i.harga.toLocaleString('id-ID')}</td>
-      <td class="p-4 text-right font-medium text-rose-600" data-label="HPP">${hppUnknown ? '<span class="text-slate-300">—</span>' : 'Rp ' + i.hpp.toLocaleString('id-ID')}${readyHtml}</td>
-      <td class="p-4 text-right" data-label="Margin">${hppUnknown ? '<span class="text-[10px] text-slate-300">—</span>' : `<span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span>`}</td>
+      <td class="p-4 text-right font-medium text-rose-600" data-label="HPP">Rp ${i.hpp.toLocaleString('id-ID')}</td>
+      <td class="p-4 text-right" data-label="Margin"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ${mc}">${margin}%</span></td>
       <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           ${window._prodCanManage ? `<button onclick='bukaModalEditProduk(${JSON.stringify(i)})' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Kelola Item"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
@@ -360,8 +353,8 @@ function _pgRenderProduk(data) {
 
 function _prodComputeRole() {
   var role = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) || '';
-  // Katalog jual dikelola bersama: sales, leadsales, procurement, admin.
-  window._prodCanManage = (role === 'sales' || role === 'leadsales' || role === 'procurement' || role === 'admin');
+  // Katalog jual = alat sales: sales, leadsales, admin.
+  window._prodCanManage = (role === 'sales' || role === 'leadsales' || role === 'admin');
   var btn = document.getElementById('btn-tambah-produk');
   if (btn) btn.classList.toggle('hidden', !window._prodCanManage);
 }

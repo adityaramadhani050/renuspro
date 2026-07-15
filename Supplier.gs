@@ -302,9 +302,6 @@ function saveSupplierKatalog(idSupplier, items) {
       sheet.appendRow([idSupplier, idProduk, hb, when, leadTime, masaBerlaku, ppn, ready]);
     }
 
-    // Perbarui HPP turunan tiap produk terdampak
-    Object.keys(affected).forEach(function (idp) { try { _recomputeHPPProduk(ss, idp); } catch (e) {} });
-
     return { success: true, message: 'Katalog supplier tersimpan (' + Object.keys(seen).length + ' item).' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -365,7 +362,6 @@ function addSupplierToProduk(produkId, idSupplier) {
     }
     const when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
     sheet.appendRow([idSupplier, produkId, '', when, '', '', 'Tidak', 'Tidak']);
-    try { _recomputeHPPProduk(ss, produkId); } catch (e) {}
     return { success: true, message: 'Supplier ditautkan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -391,7 +387,6 @@ function removeSupplierFromProduk(produkId, idSupplier) {
         sheet.deleteRow(i + 1);
       }
     }
-    try { _recomputeHPPProduk(ss, produkId); } catch (e) {}
     return { success: true, message: 'Tautan supplier dilepas.' };
   } catch (e) {
     return { success: false, message: e.toString() };

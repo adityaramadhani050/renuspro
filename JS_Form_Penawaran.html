@@ -193,7 +193,7 @@
         const s  = tr.querySelector('.select-produk');
         erpState.produk.forEach(p => {
           const o = document.createElement('option');
-          o.value = p.id; o.text = p.nama + (p.ready === false ? ' (belum ready)' : '');
+          o.value = p.id; o.text = p.nama;
           o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
           if (p.id === it.produkId) o.selected = true;
           s.add(o);
@@ -229,7 +229,7 @@
       const s = tr.querySelector('.select-produk');
       // Sort produk by name
       const sortedProduk = [...(erpState.produk || [])].sort((a,b) => a.nama.localeCompare(b.nama,'id'));
-      sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama + (p.ready === false ? ' (belum ready)' : ''); o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
+      sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama; o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
       tb.appendChild(tr);
       tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1);
       // Init searchable pada select yang baru ditambahkan
@@ -421,30 +421,7 @@
         .getTCOptions();
     }
 
-    // ── Toggle field modal berdasar Tipe (Material vs Jasa) ──────────
-    function onTipeProdukChange(mode) {
-      var isMaterial = ((document.getElementById(mode + '-produk-tipe') || {}).value || '') === 'Material';
-      var hppWrap  = document.getElementById(mode + '-produk-hpp-wrap');
-      var hppEl    = document.getElementById(mode + '-produk-hpp');
-      if (mode === 'add') {
-        var hint = document.getElementById('modal-produk-material-hint');
-        if (hint) hint.classList.toggle('hidden', !isMaterial);
-        if (hppWrap) hppWrap.classList.toggle('hidden', isMaterial); // Material: HPP otomatis → sembunyikan input
-      } else {
-        var linkWrap = document.getElementById('edit-produk-link-wrap');
-        if (linkWrap) linkWrap.classList.toggle('hidden', !isMaterial);
-        var hint2 = document.getElementById('edit-produk-hpp-hint');
-        if (isMaterial) {
-          if (hppEl) { hppEl.readOnly = true; hppEl.classList.add('bg-slate-100','text-slate-500'); }
-          if (hint2) { hint2.classList.remove('hidden'); hint2.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>HPP otomatis dari supplier ready / stok (read-only).'; }
-        } else {
-          if (hppEl) { hppEl.readOnly = false; hppEl.classList.remove('bg-slate-100','text-slate-500'); }
-          if (hint2) hint2.classList.add('hidden');
-        }
-      }
-    }
-
-    // ── TAMBAH ITEM (shared: sales/leadsales/procurement/admin) ──────
+    // ── TAMBAH ITEM (sales/leadsales/admin) ──────────────────────────
     function bukaFormTambahProduk() {
       var form = document.querySelector('#modal-produk form');
       if (form) form.reset();
@@ -453,7 +430,6 @@
       });
       var tipeEl = document.getElementById('modal-produk-tipe');
       if (tipeEl) tipeEl.value = '';
-      onTipeProdukChange('add');
       document.getElementById('modal-produk').classList.remove('hidden');
     }
 
@@ -464,8 +440,7 @@
       const unit  = form.querySelector('[name="unit"]').value.trim();
       const tipe  = (document.getElementById('modal-produk-tipe') || {}).value || '';
       const hargaJual = pN(document.getElementById('modal-produk-harga').value);
-      // Material: HPP awal 0 (turunan setelah tautan/ready). Jasa: HPP manual.
-      const hpp   = (tipe === 'Material') ? 0 : pN(document.getElementById('modal-produk-hpp').value);
+      const hpp   = pN(document.getElementById('modal-produk-hpp').value);
       const kategori    = (document.getElementById('modal-produk-kategori') || {}).value || '';
       const merek       = (document.getElementById('modal-produk-merek') || {}).value || '';
       const spesifikasi = (document.getElementById('modal-produk-spesifikasi') || {}).value || '';
@@ -491,11 +466,8 @@
       }
     }
 
-    // ── KELOLA ITEM (shared) ─────────────────────────────────────────
-    var _prodEditItem = null;   // item yang sedang diedit (untuk hitung HPP turunan display)
-
+    // ── KELOLA ITEM ──────────────────────────────────────────────────
     function bukaModalEditProduk(item) {
-      _prodEditItem = item;
       document.getElementById('edit-produk-id').value    = item.sku;
       document.getElementById('edit-produk-nama').value  = item.nama;
       document.getElementById('edit-produk-unit').value  = item.unit;
@@ -517,11 +489,6 @@
         }
       }
 
-      onTipeProdukChange('edit');           // toggle HPP mode + section tautan
-      _prodLinkRenderList([]);              // reset
-      _prodLinkFillPicker();
-      _prodLinkRefresh(item.sku);           // muat supplier tertaut (harga beli + ready)
-
       document.getElementById('modal-edit-produk').classList.remove('hidden');
     }
 
@@ -531,7 +498,7 @@
       const unit  = document.getElementById('edit-produk-unit').value.trim();
       const tipe  = (document.getElementById('edit-produk-tipe') || {}).value || '';
       const hargaJual = pN(document.getElementById('edit-produk-harga').value);
-      const hppJasa   = pN(document.getElementById('edit-produk-hpp').value); // dipakai hanya bila non-Material
+      const hpp       = pN(document.getElementById('edit-produk-hpp').value);
       const kategori    = ((document.getElementById('edit-produk-kategori') || {}).value || '').trim();
       const merek       = ((document.getElementById('edit-produk-merek') || {}).value || '').trim();
       const spesifikasi = ((document.getElementById('edit-produk-spesifikasi') || {}).value || '').trim();
@@ -547,106 +514,7 @@
           muatSeluruhDataAwal(false);
         })
         .withFailureHandler(err => { toggleLoader(false); showNotification(err.message, "error"); })
-        .updateProdukKatalog(id, nama, unit, tipe, hargaJual, hppJasa, kategori, merek, spesifikasi);
-    }
-
-    // ── Tautkan item ↔ pricelist supplier (Material) ─────────────────
-    var _prodAllSuppliers = null;
-
-    function _prodLinkFillPicker() {
-      var sel = document.getElementById('prod-link-sup-picker');
-      if (!sel) return;
-      var fill = function() {
-        var opts = '<option value="">— Pilih supplier —</option>';
-        (_prodAllSuppliers || []).forEach(function(s){ opts += '<option value="' + s.id + '">' + (s.nama || s.id) + '</option>'; });
-        sel.innerHTML = opts;
-      };
-      if (_prodAllSuppliers) { fill(); return; }
-      if (typeof google === 'undefined') { _prodAllSuppliers = []; fill(); return; }
-      google.script.run.withSuccessHandler(function(list){
-        _prodAllSuppliers = (list || []).map(function(s){ return { id: s.id, nama: s.nama }; });
-        fill();
-      }).withFailureHandler(function(){ _prodAllSuppliers = []; fill(); }).getSupplierList();
-    }
-
-    function _prodLinkRenderList(list) {
-      var box = document.getElementById('prod-edit-sup-list');
-      if (!box) return;
-      list = list || [];
-      if (!list.length) {
-        box.innerHTML = '<span class="text-[11px] text-slate-400 italic">Belum ada supplier tertaut. Tambahkan supplier di atas.</span>';
-        return;
-      }
-      box.innerHTML = list.map(function(s) {
-        var nama = (s.nama || s.idSupplier || '').toString();
-        var hb = (s.hargaBeli != null && s.hargaBeli !== '') ? ('Rp ' + Math.round(s.hargaBeli).toLocaleString('id-ID')) : '<span class="italic text-slate-400">harga belum diisi</span>';
-        var badge = s.ready
-          ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">READY</span>'
-          : '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">BELUM READY</span>';
-        return '<div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">' +
-          '<div class="flex-1 min-w-0"><p class="text-xs font-bold text-slate-700 truncate">' + nama + '</p>' +
-          '<p class="text-[10px] text-slate-500">' + hb + '</p></div>' + badge +
-          '<button type="button" onclick="_prodLinkRemoveSupplier(\'' + s.idSupplier + '\')" class="text-rose-400 hover:text-rose-600 p-1"><i class="fas fa-xmark"></i></button>' +
-          '</div>';
-      }).join('');
-    }
-
-    // Hitung & tampilkan HPP turunan display dari list supplier + stok item
-    function _prodUpdateHppDisplay(list) {
-      var hppEl = document.getElementById('edit-produk-hpp');
-      if (!hppEl) return;
-      var it = _prodEditItem || {};
-      var derived = 0;
-      if (it.stokId && Number(it.qtyTersedia) > 0) {
-        derived = Number(it.hpp) || 0;              // stock-first (server authoritative saat modal dibuka)
-      } else {
-        var termurah = null;
-        (list || []).forEach(function(s){
-          if (s.ready && s.hargaBeli != null && s.hargaBeli > 0) {
-            if (termurah === null || s.hargaBeli < termurah) termurah = s.hargaBeli;
-          }
-        });
-        derived = (termurah !== null) ? termurah : 0;
-      }
-      hppEl.value = formatNominalRupiah(derived);
-    }
-
-    function _prodLinkRefresh(idProduk) {
-      idProduk = idProduk || document.getElementById('edit-produk-id').value;
-      if (typeof google === 'undefined') return;
-      google.script.run.withSuccessHandler(function(res){
-        var list = (res && res.success) ? (res.list || []) : [];
-        _prodLinkRenderList(list);
-        if (((document.getElementById('edit-produk-tipe')||{}).value||'') === 'Material') _prodUpdateHppDisplay(list);
-      }).withFailureHandler(function(){ _prodLinkRenderList([]); }).getSuppliersForProduk(idProduk);
-    }
-
-    function _prodLinkAddSupplier() {
-      var id = document.getElementById('edit-produk-id').value;
-      var sel = document.getElementById('prod-link-sup-picker');
-      if (!sel || !sel.value) return;
-      var supId = sel.value;
-      toggleLoader(true, "Menautkan supplier...");
-      google.script.run.withSuccessHandler(function(res){
-        toggleLoader(false);
-        if (!res.success) { showNotification(res.message, "error"); return; }
-        sel.value = '';
-        _prodLinkRefresh(id);
-        loadProduk();
-      }).withFailureHandler(function(err){ toggleLoader(false); showNotification(err.message, "error"); })
-        .addSupplierToProduk(id, supId);
-    }
-
-    function _prodLinkRemoveSupplier(supId) {
-      var id = document.getElementById('edit-produk-id').value;
-      toggleLoader(true, "Melepas tautan...");
-      google.script.run.withSuccessHandler(function(res){
-        toggleLoader(false);
-        if (!res.success) { showNotification(res.message, "error"); return; }
-        _prodLinkRefresh(id);
-        loadProduk();
-      }).withFailureHandler(function(err){ toggleLoader(false); showNotification(err.message, "error"); })
-        .removeSupplierFromProduk(id, supId);
+        .updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp, kategori, merek, spesifikasi);
     }
 
     // --- EDIT & DELETE CUSTOMER ---
@@ -1246,7 +1114,7 @@
         const s  = tr.querySelector('.select-produk');
         erpState.produk.forEach(p => {
           const o = document.createElement('option');
-          o.value = p.id; o.text = p.nama + (p.ready === false ? ' (belum ready)' : '');
+          o.value = p.id; o.text = p.nama;
           o.dataset.unit = p.unit; o.dataset.harga = p.harga; o.dataset.hpp = p.hpp;
           if (p.id === si.produkId) o.selected = true;
           s.add(o);

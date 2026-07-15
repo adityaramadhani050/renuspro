@@ -46,74 +46,6 @@ function _ensureKatalogAtributKolom(ss) {
   if (lastCol < 11) sheet.getRange(1, 11).setValue('Spesifikasi');
 }
 
-/**
- * Hitung ulang HPP turunan untuk 1 produk Material lalu tulis ke Master_Produk[4].
- * Aturan: stok dulu (bila Stok ID & Qty>0 → harga beli terakhir stok),
- * else harga beli TERMURAH dari supplier ber-status Ready. Bila tak ada → 0.
- * Jasa & item non-Material dilewati (HPP-nya manual).
- * Dipanggil saat: pricelist supplier berubah, tautan supplier berubah,
- * stok berubah/nol, dan saat Tipe item diubah ke Material.
- */
-function _recomputeHPPProduk(ss, idProduk) {
-  ss = ss || getSpreadsheet();
-  idProduk = (idProduk || '').toString().trim();
-  if (!idProduk) return;
-  var pSheet = ss.getSheetByName('Master_Produk');
-  if (!pSheet) return;
-  var pData = pSheet.getDataRange().getValues();
-  var rowIdx = -1, tipe = '', stokId = '', qty = 0;
-  for (var i = 1; i < pData.length; i++) {
-    if ((pData[i][0] || '').toString().trim() === idProduk) {
-      rowIdx = i;
-      tipe   = (pData[i][5] || '').toString().trim();
-      stokId = (pData[i][6] || '').toString().trim();
-      qty    = Number(pData[i][7]) || 0;
-      break;
-    }
-  }
-  if (rowIdx < 0) return;
-  if (tipe !== 'Material') return; // HPP jasa/non-material manual → jangan disentuh
-
-  var hpp = 0;
-
-  // 1) Stock-first: bila tertaut stok & masih ada qty → harga beli terakhir stok
-  if (stokId && qty > 0) {
-    var stokSheet = ss.getSheetByName('Stok');
-    if (stokSheet) {
-      var sData = stokSheet.getDataRange().getValues();
-      for (var j = 1; j < sData.length; j++) {
-        if ((sData[j][0] || '').toString().trim() === stokId) {
-          hpp = Number(sData[j][4]) || 0; // [4] hargaBeliTerakhir
-          break;
-        }
-      }
-    }
-  }
-
-  // 2) Else: harga beli termurah dari supplier yang Ready (Supplier_Produk)
-  if (!hpp) {
-    var spSheet = ss.getSheetByName('Supplier_Produk');
-    if (spSheet) {
-      var spData = spSheet.getDataRange().getValues();
-      var termurah = null;
-      for (var k = 1; k < spData.length; k++) {
-        if ((spData[k][1] || '').toString().trim() !== idProduk) continue;
-        var ready = (spData[k][7] != null && spData[k][7].toString().trim().toLowerCase() === 'ya');
-        if (!ready) continue;
-        var hb = (spData[k][2] !== '' && spData[k][2] != null) ? (parseFloat(spData[k][2]) || 0) : 0;
-        if (hb > 0 && (termurah === null || hb < termurah)) termurah = hb;
-      }
-      if (termurah !== null) hpp = termurah;
-    }
-  }
-
-  var current = Number(pData[rowIdx][4]) || 0;
-  if (current !== hpp) {
-    pSheet.getRange(rowIdx + 1, 5).setValue(hpp); // kolom 5 = HPP
-    invalidateProdukCache();
-  }
-}
-
 function getProdukList() {
   try {
     const data = _cachedProduk();
@@ -131,9 +63,7 @@ function getProdukList() {
           qtyTersedia:  Number(data[i][7]) || 0,
           kategori:     data[i][8] ? data[i][8].toString() : '',
           merek:        data[i][9] ? data[i][9].toString() : '',
-          spesifikasi:  data[i][10] ? data[i][10].toString() : '',
-          // Material dianggap "ready" bila HPP turunan > 0 (dari stok / supplier ready). Jasa selalu ready.
-          ready:        ((data[i][5] ? data[i][5].toString() : '') === 'Material') ? ((Number(data[i][4]) || 0) > 0) : true
+          spesifikasi:  data[i][10] ? data[i][10].toString() : ''
         });
       }
     }
@@ -229,12 +159,12 @@ function editProduk(id, nama, unit, harga, hpp, tipe, stokId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// ── Katalog jual (shared): kelola item sisi-jual ────────────────────────────
-// Tulis Nama(2), Unit(3), Harga Jual(4), Tipe(6), Kategori(9), Merek(10),
-// Spesifikasi(11). HPP(5): untuk Jasa/non-Material = input manual; untuk
-// Material = TIDAK ditulis (nilai turunan via _recomputeHPPProduk).
-// PERTAHANKAN Stok ID(7), Qty(8).
-function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hppJasa, kategori, merek, spesifikasi) {
+// ── Katalog jual (sales): kelola item sisi-jual ─────────────────────────────
+// Tulis Nama(2), Unit(3), Harga Jual(4), HPP(5, manual), Tipe(6), Kategori(9),
+// Merek(10), Spesifikasi(11). PERTAHANKAN Stok ID(7), Qty(8).
+// Catatan: HPP untuk item Material tetap bisa ter-update otomatis dari
+// penerimaan barang (_syncHPPProduk), tapi bukan dari Pricelist Supplier.
+function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hpp, kategori, merek, spesifikasi) {
   try {
     if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
     const ss    = getSpreadsheet();
@@ -244,18 +174,12 @@ function updateProdukKatalog(id, nama, unit, tipe, hargaJual, hppJasa, kategori,
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString().trim() === id.toString().trim()) {
-        tipe = tipe || '';
         sheet.getRange(i + 1, 2, 1, 2).setValues([[nama, unit]]);   // Nama, Unit
         sheet.getRange(i + 1, 4).setValue(Number(hargaJual) || 0);  // Harga Jual
-        sheet.getRange(i + 1, 6).setValue(tipe);                    // Tipe
+        sheet.getRange(i + 1, 5).setValue(Number(hpp) || 0);        // HPP (manual)
+        sheet.getRange(i + 1, 6).setValue(tipe || '');              // Tipe
         sheet.getRange(i + 1, 9, 1, 3).setValues([[kategori || '', merek || '', spesifikasi || '']]);
-        if (tipe === 'Material') {
-          invalidateProdukCache();
-          _recomputeHPPProduk(ss, id);      // HPP turunan (stok/supplier ready)
-        } else {
-          sheet.getRange(i + 1, 5).setValue(Number(hppJasa) || 0);  // HPP manual (Jasa)
-          invalidateProdukCache();
-        }
+        invalidateProdukCache();
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
       }
     }
