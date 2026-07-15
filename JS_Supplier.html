@@ -5,167 +5,6 @@
 
 let _cachedSupplierData = [];
 
-// ── Katalog Item Supplier ─────────────────────────────────────────
-let _katalogProdukAll = [];   // semua produk master (untuk picker)
-let _katalogItems     = [];   // item katalog supplier yg sedang diedit
-
-function _katFmtRp(n) { return 'Rp ' + Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
-function _katParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g, '')) || 0; }
-
-function _isiPickerProdukKatalog() {
-  const sel = document.getElementById('katalog-produk-picker');
-  if (!sel) return;
-  const dipakai = {};
-  _katalogItems.forEach(function(it) { dipakai[it.idProduk] = true; });
-  let opts = '<option value="">— Pilih produk untuk ditambahkan —</option>';
-  _katalogProdukAll
-    .filter(function(p) { return !dipakai[p.sku]; })
-    .sort(function(a, b) { return a.nama.localeCompare(b.nama); })
-    .forEach(function(p) {
-      opts += '<option value="' + p.sku + '">' + p.nama + (p.unit ? ' (' + p.unit + ')' : '') + '</option>';
-    });
-  sel.innerHTML = opts;
-}
-
-// hargaBeli disimpan NET (exclude PPN). Field menampilkan nilai "sebagaimana
-// dikutip": jika termasukPPN → gross (net×1,11), else = net.
-function _katHargaDitampilkan(it) {
-  var net = parseFloat(it.hargaBeli) || 0;
-  return it.termasukPPN ? Math.round(net * 1.11) : Math.round(net);
-}
-
-function _katNoteHtml(it) {
-  var net = parseFloat(it.hargaBeli) || 0;
-  if (it.termasukPPN) {
-    return '<span class="text-[10px] font-semibold text-amber-600"><i class="fa-solid fa-circle-info mr-0.5"></i>Incl. PPN · Net disimpan: Rp ' + Math.round(net).toLocaleString('id-ID') + '</span>';
-  }
-  return '<span class="text-[10px] text-slate-400">Harga tanpa PPN (net)</span>';
-}
-
-function _renderKatalogList() {
-  const box = document.getElementById('katalog-list');
-  if (!box) return;
-  if (!_katalogItems.length) {
-    box.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-3 bg-slate-50 rounded-xl">Belum ada item. Tambahkan produk yang dijual supplier ini.</p>';
-    return;
-  }
-  box.innerHTML = _katalogItems.map(function(it, idx) {
-    var hargaTampil = _katHargaDitampilkan(it);
-    return '<div class="bg-slate-50 rounded-xl px-3 py-2.5">'
-      // Baris atas: nama + hapus
-      + '<div class="flex items-start gap-2">'
-      +   '<div class="flex-1 min-w-0"><p class="text-xs font-bold text-slate-700 truncate">' + (it.nama || it.idProduk) + '</p>'
-      +   '<p class="text-[10px] text-slate-400">' + (it.unit || '-') + ' · <span class="font-mono">' + it.idProduk + '</span></p></div>'
-      +   '<button type="button" onclick="hapusKatalogItem(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fas fa-trash-can text-xs"></i></button>'
-      + '</div>'
-      // Baris kontrol
-      + '<div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2">'
-      +   '<div class="flex items-center gap-1"><span class="text-[10px] text-slate-400">Rp</span>'
-      +     '<input id="kat-harga-' + idx + '" type="text" inputmode="numeric" value="' + (hargaTampil ? hargaTampil.toLocaleString("id-ID") : "") + '" '
-      +     'oninput="_onKatalogHargaInput(this,' + idx + ')" placeholder="Harga beli" '
-      +     'class="w-28 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
-      +   '<label class="flex items-center gap-1 cursor-pointer select-none" title="Supplier siap memasok item ini → dipakai untuk HPP">'
-      +     '<input type="checkbox" ' + (it.ready ? 'checked' : '') + ' onchange="_onKatalogReadyToggle(this,' + idx + ')" class="accent-emerald-500">'
-      +     '<span class="text-[10px] font-extrabold ' + (it.ready ? 'text-emerald-600' : 'text-slate-500') + '">READY</span></label>'
-      +   '<label class="flex items-center gap-1 cursor-pointer select-none">'
-      +     '<input type="checkbox" ' + (it.termasukPPN ? 'checked' : '') + ' onchange="_onKatalogPPNToggle(this,' + idx + ')" class="accent-orange-500">'
-      +     '<span class="text-[10px] font-semibold text-slate-500">Termasuk PPN</span></label>'
-      +   '<div class="flex items-center gap-1"><i class="fa-regular fa-clock text-[10px] text-slate-400"></i>'
-      +     '<input type="text" value="' + (it.leadTime || '').replace(/"/g,"&quot;") + '" oninput="_onKatalogLeadInput(this,' + idx + ')" placeholder="Lead time" '
-      +     'class="w-24 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white"></div>'
-      +   '<div class="flex items-center gap-1"><i class="fa-regular fa-calendar text-[10px] text-slate-400"></i>'
-      +     '<input type="date" value="' + (it.masaBerlaku || '') + '" onchange="_onKatalogMasaInput(this,' + idx + ')" '
-      +     'class="px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white text-slate-600"></div>'
-      + '</div>'
-      + '<div id="kat-note-' + idx + '" class="mt-1">' + _katNoteHtml(it) + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-function _onKatalogHargaInput(el, idx) {
-  var it = _katalogItems[idx];
-  var q = _katParseRp(el.value);                       // nilai sebagaimana dikutip
-  it.hargaBeli = it.termasukPPN ? (q / 1.11) : q;      // simpan net
-  var note = document.getElementById('kat-note-' + idx);
-  if (note) note.innerHTML = _katNoteHtml(it);
-}
-
-function _onKatalogPPNToggle(cb, idx) {
-  var it = _katalogItems[idx];
-  it.termasukPPN = cb.checked;
-  var field = document.getElementById('kat-harga-' + idx);
-  var q = field ? _katParseRp(field.value) : _katHargaDitampilkan(it);
-  it.hargaBeli = it.termasukPPN ? (q / 1.11) : q;      // reinterpretasi angka yang sama
-  _renderKatalogList();
-}
-
-function _onKatalogLeadInput(el, idx) { _katalogItems[idx].leadTime = el.value; }
-function _onKatalogMasaInput(el, idx) { _katalogItems[idx].masaBerlaku = el.value; }
-function _onKatalogReadyToggle(cb, idx) { _katalogItems[idx].ready = cb.checked; _renderKatalogList(); }
-
-function tambahKatalogItem() {
-  const sel = document.getElementById('katalog-produk-picker');
-  const id = sel ? sel.value : '';
-  if (!id) { showNotification('Pilih produk terlebih dahulu.', 'error'); return; }
-  const p = _katalogProdukAll.filter(function(x) { return x.sku === id; })[0];
-  if (!p) return;
-  if (_katalogItems.some(function(it) { return it.idProduk === id; })) return;
-  _katalogItems.push({ idProduk: id, nama: p.nama, unit: p.unit, hargaBeli: (p.hpp || 0), leadTime: '', masaBerlaku: '', termasukPPN: false, ready: false });
-  _isiPickerProdukKatalog();
-  _renderKatalogList();
-}
-
-function hapusKatalogItem(idx) {
-  _katalogItems.splice(idx, 1);
-  _isiPickerProdukKatalog();
-  _renderKatalogList();
-}
-
-// Tampilkan skeleton loading pada daftar katalog item supplier
-function _renderKatalogLoading() {
-  var box = document.getElementById('katalog-list');
-  if (!box) return;
-  var row = '<div class="bg-slate-50 rounded-xl px-3 py-2.5 animate-pulse">'
-    + '<div class="flex items-start gap-2"><div class="flex-1 min-w-0">'
-    +   '<div class="h-3 bg-slate-200 rounded w-2/5 mb-1.5"></div>'
-    +   '<div class="h-2 bg-slate-200 rounded w-1/4"></div></div>'
-    +   '<div class="h-5 w-5 bg-slate-200 rounded"></div></div>'
-    + '<div class="flex flex-wrap items-center gap-2 mt-2">'
-    +   '<div class="h-6 w-28 bg-slate-200 rounded-lg"></div>'
-    +   '<div class="h-6 w-24 bg-slate-200 rounded-lg"></div>'
-    +   '<div class="h-6 w-24 bg-slate-200 rounded-lg"></div></div>'
-    + '</div>';
-  box.innerHTML = '<div class="space-y-2"><div class="flex items-center gap-2 text-[11px] text-slate-400 px-1"><i class="fas fa-spinner fa-spin"></i> Memuat katalog item...</div>' + row + row + '</div>';
-}
-
-// Muat produk master + katalog supplier saat modal edit dibuka
-function _muatKatalogSupplier(idSupplier) {
-  _katalogItems = [];
-  _renderKatalogLoading();
-  if (typeof google === 'undefined') { _renderKatalogList(); return; }
-  const afterProduk = function() {
-    google.script.run
-      .withSuccessHandler(function(res) {
-        _katalogItems = (res && res.success) ? (res.list || []).map(function(it) {
-          return { idProduk: it.idProduk, nama: it.nama, unit: it.unit,
-                   hargaBeli: (it.hargaBeli != null ? it.hargaBeli : (it.hpp || 0)),
-                   leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN, ready: !!it.ready };
-        }) : [];
-        _isiPickerProdukKatalog();
-        _renderKatalogList();
-      })
-      .withFailureHandler(function() { _isiPickerProdukKatalog(); _renderKatalogList(); })
-      .getSupplierKatalog(idSupplier);
-  };
-  if (_katalogProdukAll.length) { afterProduk(); }
-  else {
-    google.script.run
-      .withSuccessHandler(function(list) { _katalogProdukAll = list || []; afterProduk(); })
-      .withFailureHandler(function() { _katalogProdukAll = []; afterProduk(); })
-      .getProdukList();
-  }
-}
-
 // ── Render tabel supplier ─────────────────────────────────────────
 function _pgRenderSupplier(data) {
   const tbody = document.getElementById('table-supplier');
@@ -278,8 +117,6 @@ function bukaModalEditSupplier(supplierJson) {
   document.getElementById('edit-supplier-catatan').value = supplier.catatan || '';
   document.getElementById('edit-supplier-status').value  = supplier.status  || 'Aktif';
 
-  _muatKatalogSupplier(supplier.id || '');
-
   document.getElementById('modal-edit-supplier').classList.remove('hidden');
 }
 
@@ -304,23 +141,14 @@ function submitEditSupplier(event) {
   toggleLoader(true, 'Menyimpan perubahan...');
 
   if (typeof google !== 'undefined') {
-    var katalogPayload = _katalogItems.map(function(it) {
-      return { idProduk: it.idProduk, hargaBeli: (it.hargaBeli || 0),
-               leadTime: it.leadTime || '', masaBerlaku: it.masaBerlaku || '', termasukPPN: !!it.termasukPPN, ready: !!it.ready };
-    });
-    var _simpanKatalogLalu = function(msg) {
-      google.script.run
-        .withSuccessHandler(function() { toggleLoader(false); showNotification(msg); loadSupplier(); })
-        .withFailureHandler(function(e) { toggleLoader(false); showNotification('Supplier tersimpan, tapi katalog gagal: ' + (e && e.message ? e.message : e), 'error'); loadSupplier(); })
-        .saveSupplierKatalog(id, katalogPayload);
-    };
     google.script.run
       .withSuccessHandler(function(res) {
+        toggleLoader(false);
         if (res && res.success === false) {
-          toggleLoader(false);
           showNotification(res.message || 'Gagal menyimpan perubahan.', 'error');
         } else {
-          _simpanKatalogLalu(res && res.message ? res.message : 'Data supplier berhasil diperbarui.');
+          showNotification(res && res.message ? res.message : 'Data supplier berhasil diperbarui.');
+          loadSupplier();
         }
       })
       .withFailureHandler(function(err) {
