@@ -6,14 +6,20 @@
 function _ensureSupplierSheet(ss) {
   ss = ss || getSpreadsheet();
   const existing = ss.getSheetByName('Supplier');
-  if (existing) return existing;
+  if (existing) { _ensureSupplierAliasKolom(existing); return existing; }
   const sheet = ss.insertSheet('Supplier');
   sheet.appendRow([
     'ID Supplier', 'Nama', 'PIC', 'Telepon', 'Email',
     'Alamat', 'Catatan', 'Status',
-    'Dibuat Oleh', 'Dibuat Pada', 'Diubah Oleh', 'Diubah Pada'
+    'Dibuat Oleh', 'Dibuat Pada', 'Diubah Oleh', 'Diubah Pada', 'Nama Alias'
   ]);
   return sheet;
+}
+
+// Migrasi lazy: kolom Nama Alias [12] (1-based 13).
+function _ensureSupplierAliasKolom(sheet) {
+  if (!sheet) return;
+  if (sheet.getLastColumn() < 13) sheet.getRange(1, 13).setValue('Nama Alias');
 }
 
 function getSupplierList() {
@@ -35,7 +41,8 @@ function getSupplierList() {
           catatan:    data[i][6].toString(),
           status:     data[i][7].toString(),
           dibuatOleh: data[i][8].toString(),
-          dibuatPada: data[i][9].toString()
+          dibuatPada: data[i][9].toString(),
+          alias:      data[i][12] ? data[i][12].toString() : ''
         });
       }
     }
@@ -79,7 +86,8 @@ function simpanSupplier(payload) {
       payload.dibuatOleh || '',
       when,
       '',
-      ''
+      '',
+      payload.alias || ''
     ]);
 
     invalidateSupplierCache();
@@ -118,6 +126,8 @@ function editSupplier(payload) {
           payload.diubahOleh || '',
           when
         ]]);
+        _ensureSupplierAliasKolom(sheet);
+        sheet.getRange(i + 1, 13).setValue(payload.alias || ''); // Nama Alias
         invalidateSupplierCache();
         return { success: true, message: 'Supplier ' + payload.id + ' berhasil diperbarui!' };
       }

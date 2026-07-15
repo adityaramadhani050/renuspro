@@ -67,7 +67,7 @@ function getPricelistAll() {
     var sheet = _ensurePricelistSheet(ss);
     var data = sheet.getDataRange().getValues();
     var supMap = {};
-    try { (getSupplierList() || []).forEach(function (s) { supMap[s.id] = s.nama; }); } catch (e) {}
+    try { (getSupplierList() || []).forEach(function (s) { supMap[s.id] = (s.alias && s.alias.trim()) ? s.alias : s.nama; }); } catch (e) {}
     var list = [];
     for (var i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;

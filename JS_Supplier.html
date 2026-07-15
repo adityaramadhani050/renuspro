@@ -120,6 +120,7 @@ function submitTambahSupplier(event) {
   event.preventDefault();
   const form   = event.target;
   const nama   = (form.nama.value   || '').trim();
+  const alias  = (form.alias.value  || '').trim();
   const pic    = (form.pic.value    || '').trim();
   const telepon = (form.telepon.value || '').trim();
   const email  = (form.email.value  || '').trim();
@@ -150,7 +151,7 @@ function submitTambahSupplier(event) {
         toggleLoader(false);
         showNotification(err.message || 'Gagal menyimpan supplier.', 'error');
       })
-      .simpanSupplier({ nama, pic, telepon, email, alamat, catatan, dibuatOleh: _currentUser ? _currentUser.nama : '' });
+      .simpanSupplier({ nama, alias, pic, telepon, email, alamat, catatan, dibuatOleh: _currentUser ? _currentUser.nama : '' });
   } else {
     toggleLoader(false);
     showNotification('Tidak terhubung ke server.', 'error');
@@ -169,6 +170,7 @@ function bukaModalEditSupplier(supplierJson) {
 
   document.getElementById('edit-supplier-id').value      = supplier.id      || '';
   document.getElementById('edit-supplier-nama').value    = supplier.nama    || '';
+  document.getElementById('edit-supplier-alias').value   = supplier.alias   || '';
   document.getElementById('edit-supplier-pic').value     = supplier.pic     || '';
   document.getElementById('edit-supplier-telepon').value = supplier.telepon || '';
   document.getElementById('edit-supplier-email').value   = supplier.email   || '';
@@ -184,6 +186,7 @@ function submitEditSupplier(event) {
   event.preventDefault();
   const id      = document.getElementById('edit-supplier-id').value.trim();
   const nama    = document.getElementById('edit-supplier-nama').value.trim();
+  const alias   = document.getElementById('edit-supplier-alias').value.trim();
   const pic     = document.getElementById('edit-supplier-pic').value.trim();
   const telepon = document.getElementById('edit-supplier-telepon').value.trim();
   const email   = document.getElementById('edit-supplier-email').value.trim();
@@ -214,7 +217,7 @@ function submitEditSupplier(event) {
         toggleLoader(false);
         showNotification(err.message || 'Gagal menyimpan perubahan.', 'error');
       })
-      .editSupplier({ id, nama, pic, telepon, email, alamat, catatan, status, diubahOleh: _currentUser ? _currentUser.nama : '' });
+      .editSupplier({ id, nama, alias, pic, telepon, email, alamat, catatan, status, diubahOleh: _currentUser ? _currentUser.nama : '' });
   } else {
     toggleLoader(false);
     showNotification('Tidak terhubung ke server.', 'error');
