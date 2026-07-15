@@ -12,19 +12,7 @@ function _plParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g
 function _plFmtRp(n) { return Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
 function _plEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
-function formatPlHarga(el) { el.value = _plFmtRp(_plParseRp(el.value)); renderPlPpnNote(); }
-
-function renderPlPpnNote() {
-  var note = document.getElementById('pl-ppn-note');
-  if (!note) return;
-  var inc = document.getElementById('pl-ppn').checked;
-  var val = _plParseRp(document.getElementById('pl-harga').value);
-  if (inc) {
-    note.innerHTML = '<i class="fa-solid fa-circle-info mr-0.5 text-amber-500"></i>Disimpan tanpa PPN (net): Rp ' + Math.round(val / 1.11).toLocaleString('id-ID');
-  } else {
-    note.innerHTML = 'Harga disimpan tanpa PPN (net).';
-  }
-}
+function formatPlHarga(el) { el.value = _plFmtRp(_plParseRp(el.value)); }
 
 // ── Load ──────────────────────────────────────────────────────────
 window.loadPricelist = function() {
@@ -77,13 +65,12 @@ function renderPricelist() {
     var g = groups[sid];
     var open = !!_pricelistOpen[sid] || !!q;   // auto-buka saat mencari
     var rows = g.items.map(function(it) {
-      var ppn = it.termasukPPN ? ' <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">incl. PPN</span>' : '';
       return '<tr class="border-b border-slate-100 hover:bg-slate-50">'
         + '<td class="p-2.5"><div class="font-semibold text-slate-700">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.kategori || '-') + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.merek || '-') + '</td>'
         + '<td class="p-2.5 text-center text-slate-500">' + _plEsc(it.satuan || '-') + '</td>'
-        + '<td class="p-2.5 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + _plFmtRp(it.hargaBeli) + ppn + '</td>'
+        + '<td class="p-2.5 text-right font-bold text-rose-600 whitespace-nowrap">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
         + '<td class="p-2.5 text-slate-500">' + _plEsc(it.leadTime || '-') + '</td>'
         + '<td class="p-2.5 text-slate-500 whitespace-nowrap">' + _plEsc(it.masaBerlaku || '-') + '</td>'
         + '<td class="p-2.5 text-center whitespace-nowrap">'
@@ -116,10 +103,8 @@ function bukaFormTambahPricelist() {
   ['pl-kategori','pl-merek','pl-nama','pl-spesifikasi','pl-satuan','pl-leadtime','pl-harga','pl-masa'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  document.getElementById('pl-ppn').checked = false;
   _isiPickerSupplierPl();
   document.getElementById('pl-supplier').value = '';
-  renderPlPpnNote();
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
 
@@ -137,11 +122,7 @@ function bukaFormEditPricelist(id) {
   document.getElementById('pl-satuan').value = it.satuan || '';
   document.getElementById('pl-leadtime').value = it.leadTime || '';
   document.getElementById('pl-masa').value = it.masaBerlaku || '';
-  document.getElementById('pl-ppn').checked = !!it.termasukPPN;
-  // tampilkan harga sebagaimana dikutip: gross bila termasuk PPN
-  var display = it.termasukPPN ? Math.round(it.hargaBeli * 1.11) : Math.round(it.hargaBeli);
-  document.getElementById('pl-harga').value = _plFmtRp(display);
-  renderPlPpnNote();
+  document.getElementById('pl-harga').value = _plFmtRp(it.hargaBeli);
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
 
@@ -151,9 +132,6 @@ function simpanPricelistItem() {
   var nama = document.getElementById('pl-nama').value.trim();
   if (!idSupplier) return showNotification('Pilih supplier terlebih dahulu.', 'error');
   if (!nama) return showNotification('Nama material wajib diisi.', 'error');
-  var inc = document.getElementById('pl-ppn').checked;
-  var quoted = _plParseRp(document.getElementById('pl-harga').value);
-  var net = inc ? (quoted / 1.11) : quoted;   // simpan net (exclude PPN)
   var payload = {
     idSupplier:   idSupplier,
     kategori:     document.getElementById('pl-kategori').value.trim(),
@@ -161,8 +139,8 @@ function simpanPricelistItem() {
     spesifikasi:  document.getElementById('pl-spesifikasi').value.trim(),
     merek:        document.getElementById('pl-merek').value.trim(),
     satuan:       document.getElementById('pl-satuan').value.trim(),
-    hargaBeli:    net,
-    termasukPPN:  inc,
+    hargaBeli:    _plParseRp(document.getElementById('pl-harga').value),
+    termasukPPN:  false,
     leadTime:     document.getElementById('pl-leadtime').value.trim(),
     masaBerlaku:  document.getElementById('pl-masa').value
   };
