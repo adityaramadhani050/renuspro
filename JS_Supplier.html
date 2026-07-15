@@ -78,16 +78,16 @@ function _pgRenderSupplier(data) {
           ${i.status || 'Aktif'}
         </span>
       </td>
-      <td class="p-4 text-center" data-label="Item">
-        <button onclick="toggleSupplierDetail('${i.id}')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-2 px-2" title="Lihat item pricelist">
-          <i class="fa-solid fa-chevron-${open ? 'up' : 'down'} text-[10px] transition-transform duration-200"></i> Detail
-        </button>
-      </td>
       <td class="p-4 text-center rp-actions">
         <div class="flex items-center justify-center gap-2">
           <button onclick='bukaModalEditSupplier(JSON.stringify(${JSON.stringify(i).replace(/'/g, "&#39;")}))' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
           <button onclick="konfirmasiHapus('supplier','${i.id}','${i.nama}')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
         </div>
+      </td>
+      <td class="p-4 text-center" data-label="Item">
+        <button onclick="toggleSupplierDetail('${i.id}')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-2 px-2" title="Lihat item pricelist">
+          <i class="fa-solid fa-chevron-${open ? 'up' : 'down'} text-[10px] transition-transform duration-200"></i> Detail
+        </button>
       </td>
     </tr>`;
     const detailRow = open ? `<tr class="bg-slate-50"><td colspan="8" class="px-4 pb-4 pt-1">${_renderSupplierPricelistDetail(i.id)}</td></tr>` : '';

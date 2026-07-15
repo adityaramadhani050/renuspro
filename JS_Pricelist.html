@@ -21,7 +21,7 @@ window.loadPricelist = function() {
   }).withFailureHandler(function() {}).getSupplierList();
 
   var tb = document.getElementById('table-pricelist');
-  if (tb) tb.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pricelist...</td></tr>';
+  if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pricelist...</td></tr>';
   google.script.run.withSuccessHandler(function(res) {
     _cachedPricelist = (res && res.success) ? (res.list || []) : [];
     if (typeof resetSearch === 'function') resetSearch('pricelist');
@@ -31,7 +31,7 @@ window.loadPricelist = function() {
     _pgRender('pricelist');
   }).withFailureHandler(function() {
     var t = document.getElementById('table-pricelist');
-    if (t) t.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-rose-400"><i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat pricelist.</td></tr>';
+    if (t) t.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400"><i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat pricelist.</td></tr>';
   }).getPricelistAll();
 };
 
@@ -50,15 +50,15 @@ function _pgRenderPricelist(data) {
   var tbody = document.getElementById('table-pricelist');
   if (!tbody) return;
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400"><i class="fa-solid fa-tags mr-2"></i>Belum ada item pricelist.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fa-solid fa-tags mr-2"></i>Belum ada item pricelist.</td></tr>';
     return;
   }
   tbody.innerHTML = data.map(function(it) {
+    var merekHtml = it.merek ? '<div class="text-[10px] font-bold text-orange-500 uppercase tracking-wide">' + _plEsc(it.merek) + '</div>' : '';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">'
       + '<td class="p-4 font-semibold text-slate-700" data-label="Supplier">' + _plEsc(it.namaSupplier) + '</td>'
-      + '<td class="p-4" data-label="Material"><div class="font-semibold text-slate-800">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
+      + '<td class="p-4" data-label="Material">' + merekHtml + '<div class="font-semibold text-slate-800">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
       + '<td class="p-4 text-slate-500" data-label="Kategori">' + _plEsc(it.kategori || '-') + '</td>'
-      + '<td class="p-4 text-slate-500" data-label="Merek">' + _plEsc(it.merek || '-') + '</td>'
       + '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _plEsc(it.satuan || '-') + '</td>'
       + '<td class="p-4 text-right font-bold text-rose-600" data-label="Harga Beli">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
       + '<td class="p-4 text-slate-500 text-[11px] whitespace-nowrap" data-label="Update Terakhir">' + _plEsc(it.updateTerakhir || '-') + '</td>'
