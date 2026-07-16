@@ -31,7 +31,10 @@
 
         <!-- DETAIL: checklist per Work Order -->
         <div id="qc-detail" class="hidden">
-          <button onclick="kembaliQCHome()" class="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar</button>
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <button onclick="kembaliQCHome()" class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar</button>
+            <div id="qc-detail-actions"></div>
+          </div>
           <div id="qc-detail-head" class="bg-white rounded-2xl border border-slate-150 p-5 mb-4"></div>
           <div id="qc-detail-body" class="space-y-5"></div>
         </div>
