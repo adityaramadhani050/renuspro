@@ -379,10 +379,25 @@ function uploadQCFoto(payload) {
     var noWO = (payload.noWO || '').toString().trim();
     var kode = (payload.kode || '').toString().trim();
     var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
-    var fileName = payload.fileName ? payload.fileName.toString() : ('qc-' + kode + '.jpg');
     var mimeType = payload.mimeType ? payload.mimeType.toString() : 'image/jpeg';
     if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
     if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+
+    // Ekstensi file dari nama asli / mime type
+    var origName = payload.fileName ? payload.fileName.toString() : '';
+    var ext = (origName.indexOf('.') !== -1) ? origName.split('.').pop().toLowerCase() : '';
+    if (!ext) ext = (mimeType.split('/')[1] || 'jpg').toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+
+    lock.waitLock(20000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureQCItemSheet(ss);
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    var found = _qcFindItemRow(sheet, noWO, kode);
+    var existing = found ? _qcParseFoto(found.row[3]) : [];
+
+    // Nama file berdasarkan kode subitem QC (mis. A1-1.jpg, A1-2.jpg)
+    var fileName = kode + '-' + (existing.length + 1) + '.' + ext;
 
     // Upload ke Drive
     var bytes = Utilities.base64Decode(base64Data);
@@ -390,16 +405,11 @@ function uploadQCFoto(payload) {
     var file = _getQCFolder(noWO).createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     var foto = { fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName,
-                 by: (payload.oleh || '').toString(), at: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm') };
+                 by: (payload.oleh || '').toString(), at: when };
 
-    lock.waitLock(20000);
-    var ss = getSpreadsheet();
-    var sheet = _ensureQCItemSheet(ss);
-    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
-    var found = _qcFindItemRow(sheet, noWO, kode);
     var arr;
     if (found) {
-      arr = _qcParseFoto(found.row[3]); arr.push(foto);
+      arr = existing; arr.push(foto);
       sheet.getRange(found.rowIdx, 4).setValue(JSON.stringify(arr));      // Foto
       sheet.getRange(found.rowIdx, 5).setValue('Pending');                // Status
       sheet.getRange(found.rowIdx, 7, 1, 2).setValues([[foto.by, when]]); // Diupload Oleh/Pada

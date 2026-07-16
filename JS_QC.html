@@ -197,8 +197,8 @@ function _qcItemHtml(it) {
   var thumbs = foto.map(function(f) {
     var del = (canUp && it.status !== 'NA') ? '<button onclick="event.stopPropagation();_qcHapusFoto(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>' : '';
     return '<div class="relative">'
-      + '<a href="' + _qcEsc(f.fileUrl) + '" target="_blank" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">'
-      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></a>' + del + '</div>';
+      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
+      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + del + '</div>';
   }).join('');
 
   var rejectNote = (it.status === 'Rejected' && it.catatanSPV)
@@ -279,6 +279,21 @@ function _qcHapusFoto(kode, fileId) {
     }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
       .hapusQCFoto(_qcWO.noWO, kode, fileId);
   } });
+}
+
+// Preview foto in-app (lightbox) — tanpa membuka Google Drive.
+function _qcViewFoto(fileId, fileUrl) {
+  var v = document.getElementById('qc-photo-viewer');
+  if (!v) return;
+  document.getElementById('qc-photo-viewer-img').src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
+  document.getElementById('qc-photo-viewer-link').href = fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
+  v.classList.remove('hidden');
+}
+function _qcCloseFoto() {
+  var v = document.getElementById('qc-photo-viewer');
+  if (!v) return;
+  v.classList.add('hidden');
+  document.getElementById('qc-photo-viewer-img').src = '';
 }
 
 function _qcToggleNA(kode, checked) {
