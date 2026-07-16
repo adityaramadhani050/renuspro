@@ -48,7 +48,7 @@ const _ROLE_NAV = {
   procurement: ['workorder','purchaseorder','supplier','pricelist'],
   warehouse:   ['workorder','inventory'],
   siteengineer:['workorder','qc'],
-  spvengineer: ['workorder','qc'],
+  leadengineer:['workorder','qc'],
   owner:       ['dashboard','workorder','qc']
 };
 const _ROLE_BADGE = {
@@ -59,10 +59,10 @@ const _ROLE_BADGE = {
   procurement: 'bg-amber-100 text-amber-700',
   warehouse:   'bg-cyan-100 text-cyan-700',
   siteengineer:'bg-teal-100 text-teal-700',
-  spvengineer: 'bg-indigo-100 text-indigo-700',
+  leadengineer:'bg-indigo-100 text-indigo-700',
   owner:       'bg-rose-100 text-rose-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', spvengineer: 'SPV ENGINEER', owner: 'OWNER' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', leadengineer: 'LEAD ENGINEER', owner: 'OWNER' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {

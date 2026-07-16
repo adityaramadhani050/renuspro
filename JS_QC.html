@@ -8,11 +8,14 @@ let _qcWOList = [];      // daftar Work Order
 let _qcDash   = null;    // ringkasan dashboard
 let _qcWO     = null;    // WO yang sedang dibuka
 let _qcItems  = [];      // checklist item WO terbuka
+let _qcSiteEngineers = null; // cache daftar site engineer (untuk penugasan)
 
 function _qcUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _qcRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _qcUserId() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r === 'admin'; }
-function _qcCanReview() { var r = _qcRole(); return r === 'spvengineer' || r === 'admin'; }
+function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
+function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function _qcThumb(fileId) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'; }
 
@@ -28,11 +31,13 @@ function _qcBadge(st) { var m = _QC_STATUS[st] || _QC_STATUS['Belum Upload']; re
 // ── Load ──────────────────────────────────────────────────────────
 window.loadQC = function() {
   var hint = document.getElementById('qc-role-hint');
-  if (hint) hint.innerText = _qcCanUpload() && _qcCanReview() ? 'Admin' : (_qcCanUpload() ? 'Mode Upload' : (_qcCanReview() ? 'Mode Review' : 'Lihat'));
+  if (hint) hint.innerText = (_qcCanUpload() && _qcCanReview()) ? 'Admin' : (_qcCanReview() ? 'Lead Engineer' : (_qcCanUpload() ? 'Site Engineer' : 'Lihat'));
   document.getElementById('qc-detail').classList.add('hidden');
   document.getElementById('qc-home').classList.remove('hidden');
   document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
   if (typeof google === 'undefined') return;
+  // Site engineer hanya melihat WO yang di-assign; admin/lead lihat semua.
+  var arg = (_qcRole() === 'siteengineer') ? { siteUserId: _qcUserId() } : {};
   google.script.run.withSuccessHandler(function(res) {
     _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _qcWOList = _qcDash.perWO || [];
@@ -40,7 +45,7 @@ window.loadQC = function() {
     _qcRenderWOList();
   }).withFailureHandler(function() {
     document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-rose-400">Gagal memuat data QC.</div>';
-  }).getQCDashboard();
+  }).getQCDashboard(arg);
 };
 
 function _qcCard(label, val, cls, icon) {
@@ -66,7 +71,9 @@ function _qcRenderWOList() {
     return ((w.noWO || '') + (w.namaProject || '') + (w.namaKlien || '')).toLowerCase().indexOf(q) !== -1;
   });
   if (!list.length) {
-    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + (q ? 'Tidak ada WO cocok.' : 'Belum ada Work Order.') + '</div>';
+    var emptyMsg = q ? 'Tidak ada WO cocok.'
+      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada Work Order.');
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
   box.innerHTML = list.map(function(w) {
@@ -79,6 +86,7 @@ function _qcRenderWOList() {
       +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span></div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _qcEsc(w.namaProject || '-') + '</div>'
       +   '<div class="text-[11px] text-slate-400 truncate">' + _qcEsc(w.namaKlien || '') + '</div>'
+      +   ((w.assigned && w.assigned.length) ? '<div class="text-[10px] text-indigo-500 mt-0.5 truncate"><i class="fa-solid fa-user-helmet-safety mr-1"></i>' + _qcEsc(w.assigned.map(function(a){return a.nama;}).join(', ')) + '</div>' : '')
       + '</div>'
       + '<div class="flex items-center gap-3">'
       +   '<div class="w-28"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
@@ -131,6 +139,17 @@ function _qcRenderDetail(summary) {
     +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (summary.belum || 0) + ' Belum</span>'
     +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
     + '</div>';
+
+  // Penugasan site engineer
+  var assigned = _qcWO.assigned || [];
+  var assignedHtml = assigned.length
+    ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 mr-1 mb-1 inline-block">' + _qcEsc(a.nama) + '</span>'; }).join('')
+    : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
+  var assignBtn = _qcCanAssign() ? '<button onclick="_qcOpenAssign()" class="text-[11px] font-bold text-orange-600 hover:text-orange-700 ml-2"><i class="fa-solid fa-user-pen mr-1"></i>Atur</button>' : '';
+  head.innerHTML += '<div class="mt-3 border-t border-slate-100 pt-3 flex items-center flex-wrap">'
+    + '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2"><i class="fa-solid fa-user-helmet-safety mr-1"></i>Site Engineer</span>'
+    + assignedHtml + assignBtn + '</div>'
+    + '<div id="qc-assign-panel" class="hidden"></div>';
 
   // Group by section
   var groups = [];
@@ -257,5 +276,43 @@ function _qcReview(kode, keputusan) {
     _qcReloadDetail();
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal review.', 'error'); })
     .reviewQCItem(_qcWO.noWO, kode, keputusan, catatan, _qcUserNama());
+}
+
+// ── Penugasan Site Engineer (Lead Engineer / Admin) ───────────────
+function _qcOpenAssign() {
+  var panel = document.getElementById('qc-assign-panel');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+  panel.innerHTML = '<div class="mt-3 text-xs text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat daftar site engineer...</div>';
+  var render = function() {
+    var assignedIds = (_qcWO.assigned || []).map(function(a) { return a.id; });
+    var rows = (_qcSiteEngineers || []).map(function(u) {
+      return '<label class="flex items-center gap-2 py-1 cursor-pointer">'
+        + '<input type="checkbox" value="' + u.id + '" ' + (assignedIds.indexOf(u.id) !== -1 ? 'checked' : '') + ' class="accent-orange-500 qc-assign-cb">'
+        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + ' <span class="text-[10px] text-slate-400">@' + _qcEsc(u.username) + '</span></span></label>';
+    }).join('') || '<div class="text-xs text-slate-400 italic py-1">Belum ada user Site Engineer. Buat di menu Users.</div>';
+    panel.innerHTML = '<div class="mt-3 border-t border-slate-100 pt-3">'
+      + '<p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tugaskan Site Engineer</p>'
+      + '<div class="max-h-48 overflow-y-auto">' + rows + '</div>'
+      + '<div class="flex gap-2 mt-3"><button onclick="_qcSaveAssign()" class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>'
+      + '<button onclick="document.getElementById(\'qc-assign-panel\').classList.add(\'hidden\')" class="text-xs font-bold text-slate-500 px-3 py-2">Batal</button></div></div>';
+  };
+  if (_qcSiteEngineers) { render(); return; }
+  google.script.run.withSuccessHandler(function(res) { _qcSiteEngineers = (res && res.success) ? (res.list || []) : []; render(); })
+    .withFailureHandler(function() { _qcSiteEngineers = []; render(); }).getSiteEngineerList();
+}
+
+function _qcSaveAssign() {
+  var ids = [];
+  Array.prototype.forEach.call(document.querySelectorAll('.qc-assign-cb'), function(cb) { if (cb.checked) ids.push(cb.value); });
+  toggleLoader(true, 'Menyimpan penugasan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Penugasan tersimpan.');
+    _qcWO.assigned = (_qcSiteEngineers || []).filter(function(u) { return ids.indexOf(u.id) !== -1; }).map(function(u) { return { id: u.id, nama: u.nama }; });
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan penugasan.', 'error'); })
+    .setQCAssignment(_qcWO.noWO, ids, _qcUserNama());
 }
 </script>

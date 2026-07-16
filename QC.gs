@@ -344,14 +344,92 @@ function setQCItemNA(noWO, kode, isNA, oleh) {
   }
 }
 
-// ── Dashboard: ringkasan seluruh WO ─────────────────────────────────────────
-function getQCDashboard() {
+// ── Penugasan WO → Site Engineer (Lead Engineer yang assign) ────────────────
+function _qcAssignmentSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('QC_Assignment');
+  if (sheet) return sheet;
+  sheet = ss.insertSheet('QC_Assignment');
+  sheet.appendRow(['No WO', 'ID User', 'Nama User', 'Assigned By', 'Assigned At']);
+  sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+  return sheet;
+}
+
+// Daftar user role Site Engineer (aktif) untuk dropdown penugasan.
+function getSiteEngineerList() {
+  try {
+    var list = (getUserList() || [])
+      .filter(function (u) { return u.role === 'siteengineer' && u.aktif; })
+      .map(function (u) { return { id: u.id, nama: u.nama, username: u.username }; });
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Map noWO -> [{id, nama}] site engineer yang ditugaskan.
+function _qcAssignedMap() {
+  var map = {};
+  try {
+    var sheet = _qcAssignmentSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var w = (data[i][0] || '').toString().trim();
+      if (!w) continue;
+      if (!map[w]) map[w] = [];
+      map[w].push({ id: (data[i][1] || '').toString(), nama: (data[i][2] || '').toString() });
+    }
+  } catch (e) {}
+  return map;
+}
+
+function getQCAssignment(noWO) {
+  try {
+    var m = _qcAssignedMap();
+    return { success: true, list: m[(noWO || '').toString().trim()] || [] };
+  } catch (e) { return { success: false, list: [], message: e.toString() }; }
+}
+
+// Tulis ulang penugasan 1 WO. userIds = ['U001', ...].
+function setQCAssignment(noWO, userIds, assignedBy) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    userIds = userIds || [];
+    if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _qcAssignmentSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = data.length - 1; i >= 1; i--) {
+      if ((data[i][0] || '').toString().trim() === noWO) sheet.deleteRow(i + 1);
+    }
+    var userMap = {};
+    try { (getUserList() || []).forEach(function (u) { userMap[u.id] = u.nama; }); } catch (e) {}
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    var seen = {};
+    for (var j = 0; j < userIds.length; j++) {
+      var uid = (userIds[j] || '').toString().trim();
+      if (!uid || seen[uid]) continue;
+      seen[uid] = true;
+      sheet.appendRow([noWO, uid, userMap[uid] || uid, (assignedBy || '').toString(), when]);
+    }
+    return { success: true, message: 'Penugasan diperbarui (' + Object.keys(seen).length + ' engineer).' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// ── Dashboard: ringkasan WO (opsional filter utk site engineer) ─────────────
+// opts.siteUserId → hanya WO yang di-assign ke user itu.
+function getQCDashboard(opts) {
   try {
     var ss = getSpreadsheet();
     var masterCount = getQCChecklist().list.length;
     var itemSheet = _ensureQCItemSheet(ss);
     var data = itemSheet.getDataRange().getValues();
-    // group by noWO -> {status: count}
     var byWO = {};
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][1] || '').toString().trim();
@@ -364,8 +442,15 @@ function getQCDashboard() {
       else if (st === 'Rejected') byWO[w].rejected++;
       else if (st === 'NA') byWO[w].na++;
     }
+    var assignedMap = _qcAssignedMap();
+    var siteUserId = (opts && opts.siteUserId) ? opts.siteUserId.toString().trim() : '';
     var woList = [];
     try { woList = getWorkOrderList() || []; } catch (e) {}
+    if (siteUserId) {
+      woList = woList.filter(function (wo) {
+        return (assignedMap[wo.noWO] || []).some(function (a) { return a.id === siteUserId; });
+      });
+    }
     var global = { totalWO: 0, approved: 0, pending: 0, rejected: 0, belum: 0 };
     var perWO = woList.map(function (wo) {
       var g = byWO[wo.noWO] || { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0 };
@@ -375,7 +460,8 @@ function getQCDashboard() {
       global.rejected += g.rejected; global.belum += belum;
       return {
         noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status,
-        total: masterCount, approved: g.approved, pending: g.pending, rejected: g.rejected, na: g.na, belum: belum, pct: pct
+        total: masterCount, approved: g.approved, pending: g.pending, rejected: g.rejected, na: g.na, belum: belum, pct: pct,
+        assigned: assignedMap[wo.noWO] || []
       };
     });
     perWO.sort(function (a, b) { return (b.pending + b.rejected) - (a.pending + a.rejected); });
