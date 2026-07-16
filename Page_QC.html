@@ -35,4 +35,27 @@
           <div id="qc-detail-head" class="bg-white rounded-2xl border border-slate-150 p-5 mb-4"></div>
           <div id="qc-detail-body" class="space-y-5"></div>
         </div>
+
+        <!-- MODAL: Tambah / Edit Item & Subitem QC -->
+        <div id="modal-qc-item" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-orange-100 text-orange-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-list-check text-sm"></i></span>
+              <h3 id="qc-item-modal-title" class="text-base font-extrabold text-slate-800">Tambah Item QC</h3>
+            </div>
+            <form onsubmit="_qcSaveItemModal(event)">
+              <label id="qc-item-modal-label" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Item QC</label>
+              <input type="text" id="qc-item-modal-input" autocomplete="off"
+                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                placeholder="mis. Sebelum Instalasi">
+              <label id="qc-item-modal-wajib-wrap" class="hidden mt-3 flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer select-none">
+                <input type="checkbox" id="qc-item-modal-wajib" class="accent-orange-500"> Wajib diisi
+              </label>
+              <div class="flex justify-end gap-3 mt-5">
+                <button type="button" onclick="_qcCloseItemModal()" class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+                <button type="submit" class="px-6 py-2.5 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md transition"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </section>

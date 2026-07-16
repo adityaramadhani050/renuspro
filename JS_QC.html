@@ -131,11 +131,16 @@ function _qcRenderDetail(summary) {
   summary = summary || {};
   var head = document.getElementById('qc-detail-head');
   var pct = summary.pct || 0;
-  head.innerHTML = '<div class="flex flex-wrap items-center justify-between gap-3">'
+  var assignBtn = _qcCanAssign()
+    ? '<button onclick="_qcOpenAssign()" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer</button>'
+    : '';
+  head.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-3">'
     + '<div><div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
     +   '<div class="font-bold text-slate-800">' + _qcEsc(_qcWO.namaProject || '-') + '</div>'
     +   '<div class="text-xs text-slate-400">' + _qcEsc(_qcWO.namaKlien || '') + '</div></div>'
-    + '<div class="text-right"><div class="text-2xl font-extrabold text-slate-800">' + pct + '%</div><div class="text-[10px] text-slate-400 uppercase tracking-wider">Wajib selesai</div></div>'
+    + '<div class="flex items-center gap-4">' + assignBtn
+    +   '<div class="text-right"><div class="text-2xl font-extrabold text-slate-800">' + pct + '%</div><div class="text-[10px] text-slate-400 uppercase tracking-wider">Wajib selesai</div></div>'
+    + '</div>'
     + '</div>'
     + '<div class="h-2 rounded-full bg-slate-100 overflow-hidden mt-3"><div class="h-2 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400') + '" style="width:' + pct + '%"></div></div>'
     + '<div class="flex flex-wrap gap-3 mt-3 text-[11px] font-bold">'
@@ -146,15 +151,14 @@ function _qcRenderDetail(summary) {
     +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
     + '</div>';
 
-  // Penugasan site engineer
+  // Penugasan site engineer (daftar nama; tombol Atur ada di kanan atas)
   var assigned = _qcWO.assigned || [];
   var assignedHtml = assigned.length
     ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 mr-1 mb-1 inline-block">' + _qcEsc(a.nama) + '</span>'; }).join('')
     : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
-  var assignBtn = _qcCanAssign() ? '<button onclick="_qcOpenAssign()" class="text-[11px] font-bold text-orange-600 hover:text-orange-700 ml-2"><i class="fa-solid fa-user-pen mr-1"></i>Atur</button>' : '';
   head.innerHTML += '<div class="mt-3 border-t border-slate-100 pt-3 flex items-center flex-wrap">'
     + '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2"><i class="fa-solid fa-user-helmet-safety mr-1"></i>Site Engineer</span>'
-    + assignedHtml + assignBtn + '</div>'
+    + assignedHtml + '</div>'
     + '<div id="qc-assign-panel" class="hidden"></div>';
 
   _qcRenderDetailBody();
@@ -266,14 +270,15 @@ function _qcUpload(kode, input) {
 }
 
 function _qcHapusFoto(kode, fileId) {
-  if (!confirm('Hapus foto ini?')) return;
-  toggleLoader(true, 'Menghapus foto...');
-  google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
-    _qcReloadDetail();
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
-    .hapusQCFoto(_qcWO.noWO, kode, fileId);
+  showConfirm({ title: 'Hapus Foto', message: 'Hapus foto ini?', confirmText: 'Ya, Hapus', onConfirm: function() {
+    toggleLoader(true, 'Menghapus foto...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      _qcReloadDetail();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+      .hapusQCFoto(_qcWO.noWO, kode, fileId);
+  } });
 }
 
 function _qcToggleNA(kode, checked) {
@@ -388,35 +393,48 @@ function _qcMgmtCall(fn, args, okMsg) {
   r[fn].apply(r, args);
 }
 
-function _qcAddSection() {
-  var label = prompt('Nama Item QC (mis. Sebelum Instalasi):', '');
-  if (label == null) return; label = label.trim(); if (!label) return;
-  _qcMgmtCall('tambahQCSection', [label], 'Item QC ditambahkan.');
+// Modal tambah/edit item & subitem (konsisten dgn modal lain di app).
+var _qcItemModal = null; // { mode, kode, sectionKode }
+function _qcOpenItemModal(cfg) {
+  _qcItemModal = cfg;
+  var isSub = cfg.mode === 'add-sub' || cfg.mode === 'edit-sub';
+  document.getElementById('qc-item-modal-title').innerText = cfg.title;
+  document.getElementById('qc-item-modal-label').innerText = isSub ? 'Nama Subitem QC' : 'Nama Item QC';
+  var input = document.getElementById('qc-item-modal-input');
+  input.value = cfg.value || '';
+  input.placeholder = isSub ? 'mis. Foto - Depan bangunan' : 'mis. Sebelum Instalasi';
+  document.getElementById('qc-item-modal-wajib-wrap').classList.toggle('hidden', !isSub);
+  document.getElementById('qc-item-modal-wajib').checked = isSub ? (cfg.wajib !== false) : false;
+  document.getElementById('modal-qc-item').classList.remove('hidden');
+  setTimeout(function() { input.focus(); }, 50);
 }
-function _qcEditSection(kode, cur) {
-  var label = prompt('Ubah nama Item QC:', cur || '');
-  if (label == null) return; label = label.trim(); if (!label) return;
-  _qcMgmtCall('updateQCSection', [kode, label], 'Item QC diperbarui.');
+function _qcCloseItemModal() { document.getElementById('modal-qc-item').classList.add('hidden'); _qcItemModal = null; }
+function _qcSaveItemModal(e) {
+  if (e) e.preventDefault();
+  var m = _qcItemModal; if (!m) return;
+  var label = (document.getElementById('qc-item-modal-input').value || '').trim();
+  if (!label) return showNotification('Nama tidak boleh kosong.', 'error');
+  var wajib = document.getElementById('qc-item-modal-wajib').checked;
+  _qcCloseItemModal();
+  if (m.mode === 'add-section') _qcMgmtCall('tambahQCSection', [label], 'Item QC ditambahkan.');
+  else if (m.mode === 'edit-section') _qcMgmtCall('updateQCSection', [m.kode, label], 'Item QC diperbarui.');
+  else if (m.mode === 'add-sub') _qcMgmtCall('tambahQCSubItem', [m.sectionKode, label, wajib], 'Subitem ditambahkan.');
+  else if (m.mode === 'edit-sub') _qcMgmtCall('updateQCSubItem', [m.kode, label, wajib], 'Subitem diperbarui.');
 }
+
+function _qcAddSection() { _qcOpenItemModal({ mode: 'add-section', title: 'Tambah Item QC' }); }
+function _qcEditSection(kode, cur) { _qcOpenItemModal({ mode: 'edit-section', kode: kode, value: cur, title: 'Ubah Item QC' }); }
 function _qcDelSection(kode, label) {
-  if (!confirm('Hapus item "' + kode + '. ' + label + '" beserta SEMUA subitemnya?')) return;
-  _qcMgmtCall('hapusQCSection', [kode], 'Item QC dihapus.');
+  showConfirm({ title: 'Hapus Item QC', message: 'Hapus item "' + kode + '. ' + label + '" beserta SEMUA subitemnya?', confirmText: 'Ya, Hapus',
+    onConfirm: function() { _qcMgmtCall('hapusQCSection', [kode], 'Item QC dihapus.'); } });
 }
-function _qcAddSub(sectionKode) {
-  var label = prompt('Nama Subitem QC (mis. Foto - Depan bangunan):', '');
-  if (label == null) return; label = label.trim(); if (!label) return;
-  _qcMgmtCall('tambahQCSubItem', [sectionKode, label, true], 'Subitem ditambahkan.');
-}
-function _qcEditSub(kode, cur, wajib) {
-  var label = prompt('Ubah nama Subitem:', cur || '');
-  if (label == null) return; label = label.trim(); if (!label) return;
-  _qcMgmtCall('updateQCSubItem', [kode, label, wajib], 'Subitem diperbarui.');
-}
+function _qcAddSub(sectionKode) { _qcOpenItemModal({ mode: 'add-sub', sectionKode: sectionKode, wajib: true, title: 'Tambah Subitem QC' }); }
+function _qcEditSub(kode, cur, wajib) { _qcOpenItemModal({ mode: 'edit-sub', kode: kode, value: cur, wajib: wajib, title: 'Ubah Subitem QC' }); }
 function _qcToggleSubWajib(kode, label, checked) {
   _qcMgmtCall('updateQCSubItem', [kode, label, checked], 'Subitem diperbarui.');
 }
 function _qcDelSub(kode, label) {
-  if (!confirm('Hapus subitem "' + kode + ' - ' + label + '"?')) return;
-  _qcMgmtCall('hapusQCSubItem', [kode], 'Subitem dihapus.');
+  showConfirm({ title: 'Hapus Subitem', message: 'Hapus subitem "' + kode + ' - ' + label + '"?', confirmText: 'Ya, Hapus',
+    onConfirm: function() { _qcMgmtCall('hapusQCSubItem', [kode], 'Subitem dihapus.'); } });
 }
 </script>
