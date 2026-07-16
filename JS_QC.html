@@ -204,7 +204,7 @@ function _qcItemHtml(it) {
   }).join('');
 
   var rejectNote = (it.status === 'Rejected' && it.catatanSPV)
-    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi SPV:</b> ' + _qcEsc(it.catatanSPV) + '</div>' : '';
+    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi Lead:</b> ' + _qcEsc(it.catatanSPV) + '</div>' : '';
   var approvedNote = (it.status === 'Approved' && it.catatanSPV)
     ? '<div class="mt-2 text-[11px] text-emerald-600"><i class="fa-solid fa-comment mr-1"></i>' + _qcEsc(it.catatanSPV) + '</div>' : '';
 
