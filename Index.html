@@ -74,6 +74,12 @@
           <i class="fas fa-boxes-stacked w-6"></i> Inventory
         </button>
 
+        <p id="nav-group-lapangan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lapangan</p>
+        <button onclick="navigate('qc')" id="nav-qc"
+          class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-clipboard-check w-6"></i> Quality Control
+        </button>
+
         <p id="nav-group-keuangan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Keuangan & Laporan</p>
         <button onclick="navigate('pengeluaran')" id="nav-pengeluaran"
           class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
@@ -177,6 +183,7 @@
       <?!= include('Page_Pricelist'); ?>
       <?!= include('Page_PurchaseOrder'); ?>
       <?!= include('Page_Inventory'); ?>
+      <?!= include('Page_QC'); ?>
       <?!= include('Page_Pengeluaran'); ?>
       <?!= include('Page_LaporanProfitabilitas'); ?>
       <?!= include('Page_LaporanKeuangan'); ?>
@@ -211,6 +218,7 @@
   <?!= include('JS_Pricelist'); ?>
   <?!= include('JS_PurchaseOrder'); ?>
   <?!= include('JS_Inventory'); ?>
+  <?!= include('JS_QC'); ?>
   <?!= include('JS_Pengeluaran'); ?>
   <?!= include('JS_Pemasukan'); ?>
   <?!= include('JS_LaporanProfitabilitas'); ?>

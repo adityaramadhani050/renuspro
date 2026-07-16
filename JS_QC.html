@@ -1,0 +1,261 @@
+<script>
+// ================================================================
+//  QUALITY CONTROL (QC) — dokumentasi foto lapangan per Work Order.
+//  Site Engineer upload; SPV approve/reject; dashboard ringkasan.
+// ================================================================
+
+let _qcWOList = [];      // daftar Work Order
+let _qcDash   = null;    // ringkasan dashboard
+let _qcWO     = null;    // WO yang sedang dibuka
+let _qcItems  = [];      // checklist item WO terbuka
+
+function _qcUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _qcRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r === 'admin'; }
+function _qcCanReview() { var r = _qcRole(); return r === 'spvengineer' || r === 'admin'; }
+function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function _qcThumb(fileId) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'; }
+
+var _QC_STATUS = {
+  'Approved':     { c: 'bg-emerald-100 text-emerald-700', t: 'Approved' },
+  'Pending':      { c: 'bg-amber-100 text-amber-700',     t: 'Pending' },
+  'Rejected':     { c: 'bg-rose-100 text-rose-700',       t: 'Rejected' },
+  'NA':           { c: 'bg-slate-200 text-slate-500',     t: 'N/A' },
+  'Belum Upload': { c: 'bg-slate-100 text-slate-400',     t: 'Belum Upload' }
+};
+function _qcBadge(st) { var m = _QC_STATUS[st] || _QC_STATUS['Belum Upload']; return '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + m.c + '">' + m.t + '</span>'; }
+
+// ── Load ──────────────────────────────────────────────────────────
+window.loadQC = function() {
+  var hint = document.getElementById('qc-role-hint');
+  if (hint) hint.innerText = _qcCanUpload() && _qcCanReview() ? 'Admin' : (_qcCanUpload() ? 'Mode Upload' : (_qcCanReview() ? 'Mode Review' : 'Lihat'));
+  document.getElementById('qc-detail').classList.add('hidden');
+  document.getElementById('qc-home').classList.remove('hidden');
+  document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res) {
+    _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
+    _qcWOList = _qcDash.perWO || [];
+    _qcRenderCards();
+    _qcRenderWOList();
+  }).withFailureHandler(function() {
+    document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-rose-400">Gagal memuat data QC.</div>';
+  }).getQCDashboard();
+};
+
+function _qcCard(label, val, cls, icon) {
+  return '<div class="bg-white rounded-2xl border border-slate-150 p-4">'
+    + '<div class="flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1"><i class="fa-solid ' + icon + ' ' + cls + '"></i>' + label + '</div>'
+    + '<div class="text-2xl font-extrabold text-slate-800">' + val + '</div></div>';
+}
+function _qcRenderCards() {
+  var g = (_qcDash && _qcDash.global) || {};
+  document.getElementById('qc-cards').innerHTML =
+      _qcCard('Work Order', g.totalWO || 0, 'text-blue-500', 'fa-clipboard-check')
+    + _qcCard('Approved', g.approved || 0, 'text-emerald-500', 'fa-circle-check')
+    + _qcCard('Pending', g.pending || 0, 'text-amber-500', 'fa-clock')
+    + _qcCard('Rejected', g.rejected || 0, 'text-rose-500', 'fa-circle-xmark');
+}
+
+function _qcRenderWOList() {
+  var box = document.getElementById('qc-wo-list');
+  if (!box) return;
+  var q = ((document.getElementById('qc-search') || {}).value || '').toLowerCase().trim();
+  var list = _qcWOList.filter(function(w) {
+    if (!q) return true;
+    return ((w.noWO || '') + (w.namaProject || '') + (w.namaKlien || '')).toLowerCase().indexOf(q) !== -1;
+  });
+  if (!list.length) {
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + (q ? 'Tidak ada WO cocok.' : 'Belum ada Work Order.') + '</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(w) {
+    var badge = (w.pending + w.rejected) === 0 && w.pct === 100 ? 'bg-emerald-100 text-emerald-700'
+      : (w.rejected ? 'bg-rose-100 text-rose-700' : (w.pending ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'));
+    var barCls = w.pct >= 100 ? 'bg-emerald-500' : (w.pct > 0 ? 'bg-orange-400' : 'bg-slate-200');
+    return '<button onclick="bukaQCDetail(\'' + _qcEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3">'
+      + '<div class="flex-1 min-w-0">'
+      +   '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700">' + _qcEsc(w.noWO) + '</span>'
+      +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span></div>'
+      +   '<div class="font-bold text-slate-800 truncate">' + _qcEsc(w.namaProject || '-') + '</div>'
+      +   '<div class="text-[11px] text-slate-400 truncate">' + _qcEsc(w.namaKlien || '') + '</div>'
+      + '</div>'
+      + '<div class="flex items-center gap-3">'
+      +   '<div class="w-28"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
+      +     '<div class="text-[10px] text-slate-400 mt-1">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
+      + '</div></button>';
+  }).join('');
+}
+
+// ── Detail per WO ─────────────────────────────────────────────────
+function bukaQCDetail(noWO) {
+  _qcWO = _qcWOList.filter(function(w) { return w.noWO === noWO; })[0] || { noWO: noWO, namaProject: '', namaKlien: '' };
+  document.getElementById('qc-home').classList.add('hidden');
+  document.getElementById('qc-detail').classList.remove('hidden');
+  document.getElementById('qc-detail-body').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat checklist...</div>';
+  _qcReloadDetail();
+}
+
+function kembaliQCHome() {
+  document.getElementById('qc-detail').classList.add('hidden');
+  document.getElementById('qc-home').classList.remove('hidden');
+  loadQC(); // refresh ringkasan
+}
+
+function _qcReloadDetail() {
+  if (!_qcWO) return;
+  google.script.run.withSuccessHandler(function(res) {
+    _qcItems = (res && res.success) ? (res.list || []) : [];
+    _qcRenderDetail(res && res.summary);
+  }).withFailureHandler(function() {
+    document.getElementById('qc-detail-body').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat checklist.</div>';
+  }).getQCByWO(_qcWO.noWO);
+}
+
+function _qcRenderDetail(summary) {
+  summary = summary || {};
+  var head = document.getElementById('qc-detail-head');
+  var pct = summary.pct || 0;
+  head.innerHTML = '<div class="flex flex-wrap items-center justify-between gap-3">'
+    + '<div><div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
+    +   '<div class="font-bold text-slate-800">' + _qcEsc(_qcWO.namaProject || '-') + '</div>'
+    +   '<div class="text-xs text-slate-400">' + _qcEsc(_qcWO.namaKlien || '') + '</div></div>'
+    + '<div class="text-right"><div class="text-2xl font-extrabold text-slate-800">' + pct + '%</div><div class="text-[10px] text-slate-400 uppercase tracking-wider">Wajib selesai</div></div>'
+    + '</div>'
+    + '<div class="h-2 rounded-full bg-slate-100 overflow-hidden mt-3"><div class="h-2 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400') + '" style="width:' + pct + '%"></div></div>'
+    + '<div class="flex flex-wrap gap-3 mt-3 text-[11px] font-bold">'
+    +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (summary.approved || 0) + ' Approved</span>'
+    +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (summary.pending || 0) + ' Pending</span>'
+    +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (summary.rejected || 0) + ' Rejected</span>'
+    +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (summary.belum || 0) + ' Belum</span>'
+    +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
+    + '</div>';
+
+  // Group by section
+  var groups = [];
+  var idx = {};
+  _qcItems.forEach(function(it) {
+    if (idx[it.section] == null) { idx[it.section] = groups.length; groups.push({ section: it.section, label: it.sectionLabel, items: [] }); }
+    groups[idx[it.section]].items.push(it);
+  });
+  document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
+      + '<div class="px-5 py-3 bg-slate-50 border-b border-slate-150 font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</div>'
+      + '<div class="divide-y divide-slate-100">' + g.items.map(_qcItemHtml).join('') + '</div></div>';
+  }).join('');
+}
+
+function _qcItemHtml(it) {
+  var canUp = _qcCanUpload(), canRev = _qcCanReview();
+  var foto = it.foto || [];
+  var thumbs = foto.map(function(f) {
+    var del = (canUp && it.status !== 'NA') ? '<button onclick="event.stopPropagation();_qcHapusFoto(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>' : '';
+    return '<div class="relative">'
+      + '<a href="' + _qcEsc(f.fileUrl) + '" target="_blank" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">'
+      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></a>' + del + '</div>';
+  }).join('');
+
+  var rejectNote = (it.status === 'Rejected' && it.catatanSPV)
+    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi SPV:</b> ' + _qcEsc(it.catatanSPV) + '</div>' : '';
+  var approvedNote = (it.status === 'Approved' && it.catatanSPV)
+    ? '<div class="mt-2 text-[11px] text-emerald-600"><i class="fa-solid fa-comment mr-1"></i>' + _qcEsc(it.catatanSPV) + '</div>' : '';
+
+  // Upload / N/A (site engineer)
+  var uploadCtrl = '';
+  if (canUp && it.status !== 'NA') {
+    uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Ambil / Upload Foto'
+      + '<input type="file" accept="image/*" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>';
+  }
+  if (canUp && !it.wajib) {
+    var naOn = it.status === 'NA';
+    uploadCtrl += '<label class="inline-flex items-center gap-1.5 ml-2 text-xs font-semibold text-slate-500 cursor-pointer select-none"><input type="checkbox" ' + (naOn ? 'checked' : '') + ' onchange="_qcToggleNA(\'' + it.kode + '\', this.checked)" class="accent-slate-500"> Tidak Ada (N/A)</label>';
+  }
+
+  // Review (SPV)
+  var reviewCtrl = '';
+  if (canRev && foto.length) {
+    reviewCtrl = '<div class="mt-3 border-t border-slate-100 pt-3">'
+      + '<textarea id="qc-note-' + it.kode + '" rows="2" placeholder="Catatan / instruksi revisi (opsional)..." class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-orange-400">' + _qcEsc(it.catatanSPV || '') + '</textarea>'
+      + '<div class="flex gap-2 mt-2">'
+      +   '<button onclick="_qcReview(\'' + it.kode + '\', \'Approved\')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-check mr-1"></i>Approve</button>'
+      +   '<button onclick="_qcReview(\'' + it.kode + '\', \'Rejected\')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-xmark mr-1"></i>Reject</button>'
+      + '</div></div>';
+  }
+
+  return '<div class="px-5 py-3">'
+    + '<div class="flex items-start justify-between gap-3">'
+    +   '<div class="flex-1 min-w-0"><span class="font-mono text-[10px] font-bold text-slate-400 mr-1">' + it.kode + '</span><span class="text-sm font-semibold text-slate-700">' + _qcEsc(it.label) + '</span>'
+    +     (it.wajib ? '' : '<span class="ml-1 text-[9px] font-bold text-slate-400">(opsional)</span>') + '</div>'
+    +   _qcBadge(it.status)
+    + '</div>'
+    + (thumbs ? '<div class="flex flex-wrap gap-2 mt-3">' + thumbs + '</div>' : '')
+    + rejectNote + approvedNote
+    + ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '')
+    + reviewCtrl
+    + '</div>';
+}
+
+// ── Aksi ──────────────────────────────────────────────────────────
+function _qcUpload(kode, input) {
+  var files = Array.prototype.slice.call(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  var MAX = 15 * 1024 * 1024;
+  for (var k = 0; k < files.length; k++) { if (files[k].size > MAX) return showNotification('Ukuran foto maksimal 15MB: ' + files[k].name, 'error'); }
+  var i = 0;
+  toggleLoader(true, 'Mengupload foto (0/' + files.length + ')...');
+  function next() {
+    if (i >= files.length) { toggleLoader(false); showNotification(files.length + ' foto terupload.'); _qcReloadDetail(); return; }
+    var f = files[i];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = ((e.target.result) || '').split(',')[1];
+      toggleLoader(true, 'Mengupload foto (' + (i + 1) + '/' + files.length + ')...');
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success === false) { toggleLoader(false); showNotification(res.message, 'error'); return; }
+        i++; next();
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); })
+        .uploadQCFoto({ noWO: _qcWO.noWO, kode: kode, base64Data: base64, fileName: f.name, mimeType: f.type, oleh: _qcUserNama() });
+    };
+    reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca file.', 'error'); };
+    reader.readAsDataURL(f);
+  }
+  next();
+}
+
+function _qcHapusFoto(kode, fileId) {
+  if (!confirm('Hapus foto ini?')) return;
+  toggleLoader(true, 'Menghapus foto...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+    .hapusQCFoto(_qcWO.noWO, kode, fileId);
+}
+
+function _qcToggleNA(kode, checked) {
+  toggleLoader(true, 'Menyimpan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .setQCItemNA(_qcWO.noWO, kode, checked, _qcUserNama());
+}
+
+function _qcReview(kode, keputusan) {
+  var ta = document.getElementById('qc-note-' + kode);
+  var catatan = ta ? ta.value.trim() : '';
+  if (keputusan === 'Rejected' && !catatan) return showNotification('Isi catatan revisi untuk menolak item.', 'error');
+  toggleLoader(true, 'Menyimpan review...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Tersimpan.');
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal review.', 'error'); })
+    .reviewQCItem(_qcWO.noWO, kode, keputusan, catatan, _qcUserNama());
+}
+</script>

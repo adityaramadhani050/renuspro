@@ -41,13 +41,15 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan'],
+  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
   sales:       ['dashboard','penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
   procurement: ['workorder','purchaseorder','supplier','pricelist'],
   warehouse:   ['workorder','inventory'],
-  owner:       ['dashboard','workorder']
+  siteengineer:['workorder','qc'],
+  spvengineer: ['workorder','qc'],
+  owner:       ['dashboard','workorder','qc']
 };
 const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',
@@ -56,9 +58,11 @@ const _ROLE_BADGE = {
   leadsales:   'bg-orange-100 text-orange-700',
   procurement: 'bg-amber-100 text-amber-700',
   warehouse:   'bg-cyan-100 text-cyan-700',
+  siteengineer:'bg-teal-100 text-teal-700',
+  spvengineer: 'bg-indigo-100 text-indigo-700',
   owner:       'bg-rose-100 text-rose-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', owner: 'OWNER' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', spvengineer: 'SPV ENGINEER', owner: 'OWNER' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
@@ -79,7 +83,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan']
+  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
@@ -90,6 +94,7 @@ function _renderUserSidebar(user) {
     'nav-group-penjualan':  ['penawaran','workorder','invoice','kwitansi','customer'],
     'nav-group-masterdata': ['produk','template','supplier'],
     'nav-group-pembelian':  ['purchaseorder','inventory'],
+    'nav-group-lapangan':   ['qc'],
     'nav-group-keuangan':   ['pengeluaran','laporanfinance','laporanprofitabilitas','laporankeuangan'],
     'nav-group-administrasi': ['users','settings']
   };

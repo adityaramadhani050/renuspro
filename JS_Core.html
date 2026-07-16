@@ -169,7 +169,8 @@
         if (listPO)   listPO.classList.remove('hidden');
         loadPurchaseOrder();
       }
-      if(pageId === 'inventory') {
+      if(pageId === 'qc') loadQC();
+  if(pageId === 'inventory') {
         var listInv = document.getElementById('inv-list-section');
         if (listInv) listInv.classList.remove('hidden');
         loadInventory();
