@@ -43,7 +43,15 @@
         <div id="qc-photo-viewer" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/90 px-4" onclick="_qcCloseFoto()">
           <button onclick="_qcCloseFoto()" class="absolute top-4 right-4 text-white/80 hover:text-white h-11 w-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl transition"><i class="fa-solid fa-xmark"></i></button>
           <div class="max-w-4xl max-h-[85vh] flex flex-col items-center gap-3" onclick="event.stopPropagation()">
-            <img id="qc-photo-viewer-img" src="" alt="Preview foto QC" class="max-w-full max-h-[75vh] rounded-xl shadow-2xl object-contain bg-slate-800">
+            <div class="relative flex items-center justify-center min-h-[120px] min-w-[120px]">
+              <div id="qc-photo-viewer-spinner" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/80">
+                <i class="fa-solid fa-spinner fa-spin text-3xl"></i>
+                <span class="text-xs font-bold">Memuat foto…</span>
+              </div>
+              <img id="qc-photo-viewer-img" src="" alt="Preview foto QC"
+                onload="_qcFotoLoaded()" onerror="_qcFotoError()"
+                class="max-w-full max-h-[75vh] rounded-xl shadow-2xl object-contain bg-slate-800 opacity-0 transition-opacity duration-200">
+            </div>
             <a id="qc-photo-viewer-link" href="#" target="_blank" class="text-xs font-bold text-white/70 hover:text-white"><i class="fa-solid fa-up-right-from-square mr-1"></i>Buka di Google Drive</a>
           </div>
         </div>

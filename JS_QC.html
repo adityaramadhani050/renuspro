@@ -285,9 +285,21 @@ function _qcHapusFoto(kode, fileId) {
 function _qcViewFoto(fileId, fileUrl) {
   var v = document.getElementById('qc-photo-viewer');
   if (!v) return;
-  document.getElementById('qc-photo-viewer-img').src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
+  var img = document.getElementById('qc-photo-viewer-img');
+  var sp = document.getElementById('qc-photo-viewer-spinner');
+  img.classList.add('opacity-0');            // sembunyikan gambar lama
+  if (sp) sp.classList.remove('hidden');     // tampilkan spinner
+  img.src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
   document.getElementById('qc-photo-viewer-link').href = fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
   v.classList.remove('hidden');
+}
+function _qcFotoLoaded() {
+  var sp = document.getElementById('qc-photo-viewer-spinner'); if (sp) sp.classList.add('hidden');
+  var img = document.getElementById('qc-photo-viewer-img'); if (img) img.classList.remove('opacity-0');
+}
+function _qcFotoError() {
+  var sp = document.getElementById('qc-photo-viewer-spinner');
+  if (sp) sp.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-2xl text-amber-400"></i><span class="text-xs font-bold">Gagal memuat foto</span>';
 }
 function _qcCloseFoto() {
   var v = document.getElementById('qc-photo-viewer');
