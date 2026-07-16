@@ -1239,7 +1239,8 @@ window.exportDashboardPDF = function() {
     // ── Analisa Win & Lost (section tersendiri di bagian akhir) ──
     var adaAnalisa = list.some(function(s){ return (s.penawaran||[]).some(function(p){ return (p.status==='Deal'&&p.kodeWin)||(p.status==='Fail'&&p.kodeLost); }); });
     if (adaAnalisa) {
-      doc.addPage(); y = 14;
+      y += 8;
+      if (y > 255) { doc.addPage(); y = 14; }   // lanjut di halaman yang sama, pindah hanya bila mepet bawah
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
       doc.text('ANALISA WIN & LOST', ML, y); y += 6;
       list.forEach(function(sales) {
