@@ -9,6 +9,7 @@ let _qcDash   = null;    // ringkasan dashboard
 let _qcWO     = null;    // WO yang sedang dibuka
 let _qcItems  = [];      // checklist item WO terbuka
 let _qcSiteEngineers = null; // cache daftar site engineer (untuk penugasan)
+let _qcSectionOpen = {};     // accordion: section terbuka di detail
 
 function _qcUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _qcRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -18,6 +19,7 @@ function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r ==
 function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function _qcThumb(fileId) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'; }
+function _qcJs(s) { return _qcEsc(JSON.stringify(s == null ? '' : s)); }  // aman utk arg string di dalam onclick="..."
 
 var _QC_STATUS = {
   'Approved':     { c: 'bg-emerald-100 text-emerald-700', t: 'Approved' },
@@ -33,7 +35,9 @@ window.loadQC = function() {
   var hint = document.getElementById('qc-role-hint');
   if (hint) hint.innerText = (_qcCanUpload() && _qcCanReview()) ? 'Admin' : (_qcCanReview() ? 'Lead Engineer' : (_qcCanUpload() ? 'Site Engineer' : 'Lihat'));
   document.getElementById('qc-detail').classList.add('hidden');
+  document.getElementById('qc-manage').classList.add('hidden');
   document.getElementById('qc-home').classList.remove('hidden');
+  var mbtn = document.getElementById('qc-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_qcCanAssign());
   document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
   if (typeof google === 'undefined') return;
   // Site engineer hanya melihat WO yang di-assign; admin/lead lihat semua.
@@ -98,6 +102,7 @@ function _qcRenderWOList() {
 
 // ── Detail per WO ─────────────────────────────────────────────────
 function bukaQCDetail(noWO) {
+  _qcSectionOpen = {};   // mulai dari accordion tertutup
   _qcWO = _qcWOList.filter(function(w) { return w.noWO === noWO; })[0] || { noWO: noWO, namaProject: '', namaKlien: '' };
   document.getElementById('qc-home').classList.add('hidden');
   document.getElementById('qc-detail').classList.remove('hidden');
@@ -107,6 +112,7 @@ function bukaQCDetail(noWO) {
 
 function kembaliQCHome() {
   document.getElementById('qc-detail').classList.add('hidden');
+  document.getElementById('qc-manage').classList.add('hidden');
   document.getElementById('qc-home').classList.remove('hidden');
   loadQC(); // refresh ringkasan
 }
@@ -151,7 +157,11 @@ function _qcRenderDetail(summary) {
     + assignedHtml + assignBtn + '</div>'
     + '<div id="qc-assign-panel" class="hidden"></div>';
 
-  // Group by section
+  _qcRenderDetailBody();
+}
+
+// Body checklist = accordion per section (Item QC). Klik header buka/tutup detail.
+function _qcRenderDetailBody() {
   var groups = [];
   var idx = {};
   _qcItems.forEach(function(it) {
@@ -159,11 +169,23 @@ function _qcRenderDetail(summary) {
     groups[idx[it.section]].items.push(it);
   });
   document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
+    var open = !!_qcSectionOpen[g.section];
+    var ap = 0, rej = 0, pen = 0;
+    g.items.forEach(function(it) { if (it.status === 'Approved') ap++; else if (it.status === 'Rejected') rej++; else if (it.status === 'Pending') pen++; });
+    var mini = '<span class="text-[10px] font-bold text-slate-400 ml-2">' + ap + '/' + g.items.length + '</span>'
+      + (rej ? '<span class="text-[10px] font-bold text-rose-600 ml-1"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>' : '')
+      + (pen ? '<span class="text-[10px] font-bold text-amber-600 ml-1"><i class="fa-solid fa-clock"></i> ' + pen + '</span>' : '');
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
-      + '<div class="px-5 py-3 bg-slate-50 border-b border-slate-150 font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</div>'
-      + '<div class="divide-y divide-slate-100">' + g.items.map(_qcItemHtml).join('') + '</div></div>';
+      + '<button onclick="_qcToggleSection(\'' + g.section + '\')" class="w-full flex items-center gap-1 px-5 py-3.5 hover:bg-slate-50 transition text-left">'
+      +   '<span class="font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</span>' + mini
+      +   '<i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + ' text-slate-400 ml-auto"></i>'
+      + '</button>'
+      + (open ? '<div class="divide-y divide-slate-100 border-t border-slate-100">' + g.items.map(_qcItemHtml).join('') + '</div>' : '')
+      + '</div>';
   }).join('');
 }
+
+function _qcToggleSection(sec) { _qcSectionOpen[sec] = !_qcSectionOpen[sec]; _qcRenderDetailBody(); }
 
 function _qcItemHtml(it) {
   var canUp = _qcCanUpload(), canRev = _qcCanReview();
@@ -314,5 +336,87 @@ function _qcSaveAssign() {
     _qcReloadDetail();
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan penugasan.', 'error'); })
     .setQCAssignment(_qcWO.noWO, ids, _qcUserNama());
+}
+
+// ── Kelola Checklist QC (Lead Engineer / Admin) ───────────────────
+function bukaQCManage() {
+  document.getElementById('qc-home').classList.add('hidden');
+  document.getElementById('qc-detail').classList.add('hidden');
+  document.getElementById('qc-manage').classList.remove('hidden');
+  _qcRenderManage();
+}
+
+function _qcRenderManage() {
+  var box = document.getElementById('qc-manage-body');
+  box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat checklist...</div>';
+  google.script.run.withSuccessHandler(function(res) {
+    var sections = (res && res.success) ? (res.sections || []) : [];
+    var items = (res && res.success) ? (res.list || []) : [];
+    var bySec = {};
+    items.forEach(function(it) { (bySec[it.section] = bySec[it.section] || []).push(it); });
+    if (!sections.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Belum ada item QC. Klik <b>Tambah Item QC</b>.</div>'; return; }
+    box.innerHTML = sections.map(function(s) {
+      var subs = (bySec[s.kode] || []).map(function(it) {
+        return '<div class="flex items-center gap-2 px-4 py-2 hover:bg-slate-50">'
+          + '<span class="font-mono text-[10px] font-bold text-slate-400 w-10 shrink-0">' + it.kode + '</span>'
+          + '<span class="flex-1 text-sm text-slate-700 min-w-0">' + _qcEsc(it.label) + '</span>'
+          + '<label class="flex items-center gap-1 text-[10px] font-semibold text-slate-400 cursor-pointer select-none whitespace-nowrap"><input type="checkbox" ' + (it.wajib ? 'checked' : '') + ' onchange="_qcToggleSubWajib(\'' + it.kode + '\', ' + _qcJs(it.label) + ', this.checked)" class="accent-orange-500"> Wajib</label>'
+          + '<button onclick="_qcEditSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ', ' + (it.wajib ? 'true' : 'false') + ')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit"><i class="fa-solid fa-pen-to-square text-xs"></i></button>'
+          + '<button onclick="_qcDelSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
+          + '</div>';
+      }).join('') || '<div class="px-4 py-2 text-[11px] text-slate-400 italic">Belum ada subitem.</div>';
+      return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
+        + '<div class="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-150">'
+        +   '<span class="font-extrabold text-sm text-slate-700 flex-1 min-w-0">' + _qcEsc(s.kode) + '. ' + _qcEsc(s.label) + '</span>'
+        +   '<button onclick="_qcAddSub(\'' + s.kode + '\')" class="text-[11px] font-bold text-orange-600 hover:text-orange-700"><i class="fa-solid fa-plus mr-1"></i>Subitem</button>'
+        +   '<button onclick="_qcEditSection(\'' + s.kode + '\', ' + _qcJs(s.label) + ')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit"><i class="fa-solid fa-pen-to-square text-xs"></i></button>'
+        +   '<button onclick="_qcDelSection(\'' + s.kode + '\', ' + _qcJs(s.label) + ')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
+        + '</div>'
+        + '<div class="divide-y divide-slate-100">' + subs + '</div></div>';
+    }).join('');
+  }).withFailureHandler(function() { box.innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat checklist.</div>'; }).getQCChecklist();
+}
+
+function _qcMgmtCall(fn, args, okMsg) {
+  toggleLoader(true, 'Menyimpan...');
+  var r = google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : okMsg);
+    _qcRenderManage();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); });
+  r[fn].apply(r, args);
+}
+
+function _qcAddSection() {
+  var label = prompt('Nama Item QC (mis. Sebelum Instalasi):', '');
+  if (label == null) return; label = label.trim(); if (!label) return;
+  _qcMgmtCall('tambahQCSection', [label], 'Item QC ditambahkan.');
+}
+function _qcEditSection(kode, cur) {
+  var label = prompt('Ubah nama Item QC:', cur || '');
+  if (label == null) return; label = label.trim(); if (!label) return;
+  _qcMgmtCall('updateQCSection', [kode, label], 'Item QC diperbarui.');
+}
+function _qcDelSection(kode, label) {
+  if (!confirm('Hapus item "' + kode + '. ' + label + '" beserta SEMUA subitemnya?')) return;
+  _qcMgmtCall('hapusQCSection', [kode], 'Item QC dihapus.');
+}
+function _qcAddSub(sectionKode) {
+  var label = prompt('Nama Subitem QC (mis. Foto - Depan bangunan):', '');
+  if (label == null) return; label = label.trim(); if (!label) return;
+  _qcMgmtCall('tambahQCSubItem', [sectionKode, label, true], 'Subitem ditambahkan.');
+}
+function _qcEditSub(kode, cur, wajib) {
+  var label = prompt('Ubah nama Subitem:', cur || '');
+  if (label == null) return; label = label.trim(); if (!label) return;
+  _qcMgmtCall('updateQCSubItem', [kode, label, wajib], 'Subitem diperbarui.');
+}
+function _qcToggleSubWajib(kode, label, checked) {
+  _qcMgmtCall('updateQCSubItem', [kode, label, checked], 'Subitem diperbarui.');
+}
+function _qcDelSub(kode, label) {
+  if (!confirm('Hapus subitem "' + kode + ' - ' + label + '"?')) return;
+  _qcMgmtCall('hapusQCSubItem', [kode], 'Subitem dihapus.');
 }
 </script>

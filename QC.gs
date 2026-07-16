@@ -77,22 +77,43 @@ var _QC_MASTER_SEED = [
   ['H3','H','Finish Instalasi','Foto - Form Commisioning', true]
 ];
 
-// ── Sheets ────────────────────────────────────────────────────────────────
-function _ensureQCChecklistMaster(ss) {
+// ── Sheets: master checklist dua sheet (Section + Item) ─────────────────────
+//  QC_Section   : Kode | Label | Urutan
+//  QC_Checklist : Kode | Section Kode | Label | Wajib | Urutan
+function _ensureQCMaster(ss) {
   ss = ss || getSpreadsheet();
-  var sheet = ss.getSheetByName('QC_Checklist_Master');
-  if (!sheet) {
-    sheet = ss.insertSheet('QC_Checklist_Master');
-    sheet.appendRow(['Kode', 'Section', 'Section Label', 'Label', 'Wajib', 'Urutan']);
-    sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
-  }
-  if (sheet.getLastRow() <= 1) {
-    var rows = _QC_MASTER_SEED.map(function (r, idx) {
-      return [r[0], r[1], r[2], r[3], r[4] ? 'Ya' : 'Tidak', idx + 1];
+  var sec = ss.getSheetByName('QC_Section');
+  if (!sec) { sec = ss.insertSheet('QC_Section'); sec.appendRow(['Kode', 'Label', 'Urutan']); sec.getRange(1, 1, 1, 3).setFontWeight('bold'); }
+  var item = ss.getSheetByName('QC_Checklist');
+  if (!item) { item = ss.insertSheet('QC_Checklist'); item.appendRow(['Kode', 'Section Kode', 'Label', 'Wajib', 'Urutan']); item.getRange(1, 1, 1, 5).setFontWeight('bold'); }
+
+  if (sec.getLastRow() <= 1) {
+    // Sumber seed: migrasi dari QC_Checklist_Master lama bila ada, else _QC_MASTER_SEED.
+    // srcRows: [kode, sectionCode, sectionLabel, label, wajib(bool), urutan]
+    var srcRows = null;
+    var oldSheet = ss.getSheetByName('QC_Checklist_Master');
+    if (oldSheet && oldSheet.getLastRow() > 1) {
+      var od = oldSheet.getDataRange().getValues();
+      srcRows = [];
+      for (var i = 1; i < od.length; i++) {
+        if (!od[i][0]) continue;
+        srcRows.push([od[i][0].toString(), (od[i][1] || '').toString(), (od[i][2] || '').toString(), (od[i][3] || '').toString(),
+          (od[i][4] != null && od[i][4].toString().trim().toLowerCase() === 'ya'), Number(od[i][5]) || i]);
+      }
+    } else {
+      srcRows = _QC_MASTER_SEED.map(function (r, idx) { return [r[0], r[1], r[2], r[3], !!r[4], idx + 1]; });
+    }
+    var secMap = {}, secOrder = [], items = [];
+    srcRows.forEach(function (r) {
+      var sc = r[1];
+      if (!secMap[sc]) { secMap[sc] = { label: r[2], urutan: secOrder.length + 1 }; secOrder.push(sc); }
+      items.push([r[0], sc, r[3], r[4] ? 'Ya' : 'Tidak', r[5]]);
     });
-    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    var secRows = secOrder.map(function (sc) { return [sc, secMap[sc].label, secMap[sc].urutan]; });
+    if (secRows.length) sec.getRange(2, 1, secRows.length, 3).setValues(secRows);
+    if (items.length) item.getRange(2, 1, items.length, 5).setValues(items);
   }
-  return sheet;
+  return { sec: sec, item: item };
 }
 
 function _ensureQCItemSheet(ss) {
@@ -118,29 +139,151 @@ function _getQCFolder(noWO) {
   return subIt.hasNext() ? subIt.next() : base.createFolder(noWO);
 }
 
-// ── Master ────────────────────────────────────────────────────────────────
+// ── Master (join Section × Checklist) ───────────────────────────────────────
 function getQCChecklist() {
   try {
-    var ss = getSpreadsheet();
-    var sheet = _ensureQCChecklistMaster(ss);
-    var data = sheet.getDataRange().getValues();
+    var m = _ensureQCMaster(getSpreadsheet());
+    var secData = m.sec.getDataRange().getValues();
+    var secMap = {}, sections = [];
+    for (var i = 1; i < secData.length; i++) {
+      if (!secData[i][0]) continue;
+      var sk = secData[i][0].toString();
+      secMap[sk] = { label: secData[i][1] ? secData[i][1].toString() : '', urutan: Number(secData[i][2]) || i };
+      sections.push({ kode: sk, label: secMap[sk].label, urutan: secMap[sk].urutan });
+    }
+    sections.sort(function (a, b) { return a.urutan - b.urutan; });
+    var itData = m.item.getDataRange().getValues();
     var list = [];
-    for (var i = 1; i < data.length; i++) {
-      if (!data[i][0]) continue;
+    for (var j = 1; j < itData.length; j++) {
+      if (!itData[j][0]) continue;
+      var sc = (itData[j][1] || '').toString();
+      var s = secMap[sc] || { label: '', urutan: 999 };
       list.push({
-        kode:         data[i][0].toString(),
-        section:      data[i][1] ? data[i][1].toString() : '',
-        sectionLabel: data[i][2] ? data[i][2].toString() : '',
-        label:        data[i][3] ? data[i][3].toString() : '',
-        wajib:        (data[i][4] != null && data[i][4].toString().trim().toLowerCase() === 'ya'),
-        urutan:       Number(data[i][5]) || (i)
+        kode:          itData[j][0].toString(),
+        section:       sc,
+        sectionLabel:  s.label,
+        label:         itData[j][2] ? itData[j][2].toString() : '',
+        wajib:         (itData[j][3] != null && itData[j][3].toString().trim().toLowerCase() === 'ya'),
+        sectionUrutan: s.urutan,
+        urutan:        Number(itData[j][4]) || j
       });
     }
-    list.sort(function (a, b) { return a.urutan - b.urutan; });
-    return { success: true, list: list };
+    list.sort(function (a, b) { return (a.sectionUrutan - b.sectionUrutan) || (a.urutan - b.urutan); });
+    return { success: true, list: list, sections: sections };
   } catch (e) {
-    return { success: false, list: [], message: e.toString() };
+    return { success: false, list: [], sections: [], message: e.toString() };
   }
+}
+
+// ── Kelola master checklist (Lead Engineer / Admin) ─────────────────────────
+function _qcNextSectionCode(secSheet) {
+  var data = secSheet.getDataRange().getValues();
+  var used = {};
+  for (var i = 1; i < data.length; i++) { if (data[i][0]) used[data[i][0].toString().trim().toUpperCase()] = true; }
+  for (var c = 65; c <= 90; c++) { var L = String.fromCharCode(c); if (!used[L]) return L; }
+  return 'S' + data.length;
+}
+
+function tambahQCSection(label) {
+  var lock = LockService.getScriptLock();
+  try {
+    label = (label || '').toString().trim();
+    if (!label) return { success: false, message: 'Nama item QC wajib diisi.' };
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var kode = _qcNextSectionCode(m.sec);
+    var maxU = 0, d = m.sec.getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) { maxU = Math.max(maxU, Number(d[i][2]) || 0); }
+    m.sec.appendRow([kode, label, maxU + 1]);
+    return { success: true, message: 'Item QC "' + kode + '. ' + label + '" ditambahkan.', kode: kode };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function updateQCSection(kode, label) {
+  var lock = LockService.getScriptLock();
+  try {
+    kode = (kode || '').toString().trim(); label = (label || '').toString().trim();
+    if (!label) return { success: false, message: 'Nama item QC wajib diisi.' };
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var d = m.sec.getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      if ((d[i][0] || '').toString().trim() === kode) { m.sec.getRange(i + 1, 2).setValue(label); return { success: true, message: 'Item QC diperbarui.' }; }
+    }
+    return { success: false, message: 'Item tidak ditemukan.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function hapusQCSection(kode) {
+  var lock = LockService.getScriptLock();
+  try {
+    kode = (kode || '').toString().trim();
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var d = m.sec.getDataRange().getValues();
+    for (var i = d.length - 1; i >= 1; i--) { if ((d[i][0] || '').toString().trim() === kode) m.sec.deleteRow(i + 1); }
+    var it = m.item.getDataRange().getValues();
+    for (var j = it.length - 1; j >= 1; j--) { if ((it[j][1] || '').toString().trim() === kode) m.item.deleteRow(j + 1); }
+    return { success: true, message: 'Item QC & subitemnya dihapus.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function tambahQCSubItem(sectionKode, label, wajib) {
+  var lock = LockService.getScriptLock();
+  try {
+    sectionKode = (sectionKode || '').toString().trim(); label = (label || '').toString().trim();
+    if (!sectionKode) return { success: false, message: 'Item QC induk wajib.' };
+    if (!label) return { success: false, message: 'Nama subitem wajib diisi.' };
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var d = m.item.getDataRange().getValues();
+    var maxNum = 0, maxU = 0;
+    for (var i = 1; i < d.length; i++) {
+      maxU = Math.max(maxU, Number(d[i][4]) || 0);
+      if ((d[i][1] || '').toString().trim() === sectionKode) {
+        var mm = (d[i][0] || '').toString().match(/(\d+)$/); if (mm) maxNum = Math.max(maxNum, parseInt(mm[1], 10));
+      }
+    }
+    var kode = sectionKode + (maxNum + 1);
+    m.item.appendRow([kode, sectionKode, label, wajib ? 'Ya' : 'Tidak', maxU + 1]);
+    return { success: true, message: 'Subitem "' + kode + '" ditambahkan.', kode: kode };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function updateQCSubItem(kode, label, wajib) {
+  var lock = LockService.getScriptLock();
+  try {
+    kode = (kode || '').toString().trim(); label = (label || '').toString().trim();
+    if (!label) return { success: false, message: 'Nama subitem wajib diisi.' };
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var d = m.item.getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      if ((d[i][0] || '').toString().trim() === kode) {
+        m.item.getRange(i + 1, 3, 1, 2).setValues([[label, wajib ? 'Ya' : 'Tidak']]);
+        return { success: true, message: 'Subitem diperbarui.' };
+      }
+    }
+    return { success: false, message: 'Subitem tidak ditemukan.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function hapusQCSubItem(kode) {
+  var lock = LockService.getScriptLock();
+  try {
+    kode = (kode || '').toString().trim();
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var d = m.item.getDataRange().getValues();
+    for (var i = d.length - 1; i >= 1; i--) { if ((d[i][0] || '').toString().trim() === kode) { m.item.deleteRow(i + 1); return { success: true, message: 'Subitem dihapus.' }; } }
+    return { success: false, message: 'Subitem tidak ditemukan.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────
