@@ -222,25 +222,140 @@ function _qcReloadDetail() {
   }).getQCByWO(_qcWO.noWO);
 }
 
-// ── Export PDF laporan QC per WO ──────────────────────────────────
+// ── Export PDF laporan QC per WO (desain konsisten dgn laporan lain) ──
 function _qcExportPDF() {
   if (!_qcWO) return;
+  if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
   toggleLoader(true, 'Menyiapkan PDF laporan QC (memuat foto)...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
     if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal membuat PDF.', 'error'); return; }
-    _qcDownloadBase64(res.pdfBase64, res.fileName || ('Laporan-QC-' + _qcWO.noWO + '.pdf'));
-    showNotification('Laporan QC berhasil diexport.');
+    try { _qcBuildPDF(res); showNotification('Laporan QC berhasil diunduh.'); }
+    catch (e) { showNotification('Gagal membuat PDF: ' + e.message, 'error'); }
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal membuat PDF.', 'error'); })
-    .exportQCReportPDF(_qcWO.noWO);
+    .getQCReportData(_qcWO.noWO);
 }
-function _qcDownloadBase64(b64, name) {
-  var bin = atob(b64 || ''), arr = new Uint8Array(bin.length);
-  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  var blob = new Blob([arr], { type: 'application/pdf' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+
+function _qcBuildPDF(d) {
+  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, PH = 297, ML = 14, MR = 14, CW = PW - ML - MR;
+  var DARK = [30,41,59], SLATE = [100,116,139], BLUE = [30,64,175], WHITE = [255,255,255];
+  var BOTTOM = 284;
+  function stColor(st) {
+    return ({ Approved:[5,150,105], Pending:[217,119,6], Rejected:[225,29,72], NA:[100,116,139], 'Belum Upload':[148,163,184] })[st] || [148,163,184];
+  }
+  function header() {
+    doc.setFillColor.apply(doc, DARK); doc.rect(0, 0, PW, 24, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor.apply(doc, WHITE);
+    doc.text('LAPORAN QUALITY CONTROL', ML, 11);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(190,200,220);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(170,195,255);
+    doc.text('No WO:', PW - MR, 9, { align:'right' });
+    doc.setFont('helvetica','normal'); doc.setTextColor.apply(doc, WHITE);
+    doc.text(d.noWO || '-', PW - MR, 14, { align:'right' });
+    doc.setFontSize(7); doc.setTextColor(190,200,220);
+    doc.text('Dicetak: ' + (d.tglExport || ''), PW - MR, 19, { align:'right' });
+  }
+  function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); header(); y = 30; } }
+
+  header();
+  var y = 30;
+  var s = d.summary || {};
+
+  // Info project
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor.apply(doc, DARK);
+  doc.text(d.namaProject || '-', ML, y); y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, SLATE);
+  doc.text('Klien: ' + (d.namaKlien || '-'), ML, y); y += 4;
+  var seLine = doc.splitTextToSize('Site Engineer: ' + (d.assigned && d.assigned.length ? d.assigned.join(', ') : '-'), CW);
+  doc.text(seLine, ML, y); y += seLine.length * 4 + 3;
+
+  // Ringkasan: progress bar + KPI boxes
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, BLUE);
+  doc.text('RINGKASAN', ML, y); y += 4;
+  var pct = s.pct || 0;
+  doc.setFillColor(226,232,240); doc.roundedRect(ML, y, CW - 30, 5, 1.2, 1.2, 'F');
+  var fillW = Math.max(0, Math.min(1, pct / 100)) * (CW - 30);
+  if (fillW > 0) { doc.setFillColor.apply(doc, pct >= 100 ? [5,150,105] : [249,115,22]); doc.roundedRect(ML, y, fillW, 5, 1.2, 1.2, 'F'); }
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, DARK);
+  doc.text(pct + '% Wajib Selesai', PW - MR, y + 4, { align:'right' });
+  y += 9;
+
+  var kpis = [
+    { label:'APPROVED', val: s.approved || 0, color:[5,150,105] },
+    { label:'PENDING',  val: s.pending  || 0, color:[217,119,6] },
+    { label:'REJECTED', val: s.rejected || 0, color:[225,29,72] },
+    { label:'BELUM',    val: s.belum    || 0, color:[100,116,139] },
+    { label:'N/A',      val: s.na       || 0, color:[100,116,139] }
+  ];
+  var kbW = (CW - 4 * 2.5) / 5, kbH = 15;
+  kpis.forEach(function(k, i) {
+    var bx = ML + i * (kbW + 2.5);
+    doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+    doc.roundedRect(bx, y, kbW, kbH, 2, 2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor.apply(doc, SLATE);
+    doc.text(k.label, bx + 2.5, y + 5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor.apply(doc, k.color);
+    doc.text(String(k.val), bx + 2.5, y + 12);
+  });
+  y += kbH + 8;
+
+  // Sections & items
+  (d.sections || []).forEach(function(sec) {
+    ensure(14);
+    doc.setFillColor(51,65,85); doc.roundedRect(ML, y, CW, 7, 1.5, 1.5, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, WHITE);
+    doc.text((sec.kode || '') + '. ' + (sec.label || ''), ML + 3, y + 4.8);
+    y += 10;
+
+    (sec.items || []).forEach(function(it) {
+      ensure(10);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, DARK);
+      var labelLines = doc.splitTextToSize(it.kode + ' — ' + it.label + (it.wajib ? '' : ' (opsional)'), CW - 32);
+      doc.text(labelLines, ML, y + 3);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor.apply(doc, stColor(it.status));
+      doc.text(it.statusLabel || '', PW - MR, y + 3, { align:'right' });
+      y += labelLines.length * 4 + 1;
+
+      if (it.catatanSPV) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(71,85,105);
+        var cat = doc.splitTextToSize('Catatan Lead: ' + it.catatanSPV, CW);
+        ensure(cat.length * 3.5 + 2);
+        doc.text(cat, ML, y + 2); y += cat.length * 3.5 + 1;
+      }
+
+      var foto = it.foto || [];
+      if (foto.length) {
+        var boxW = 30, gap = 2.5, px = ML, rowMaxH = 0;
+        foto.forEach(function(f) {
+          var iw = 4, ih = 3;
+          try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
+          var w = boxW, h = Math.min(26, w * (ih / iw));
+          if (px + w > ML + CW) { px = ML; y += rowMaxH + gap; rowMaxH = 0; }
+          if (y + h > BOTTOM) { doc.addPage(); header(); y = 30; px = ML; rowMaxH = 0; }
+          try { doc.addImage(f.dataUrl, px, y, w, h); } catch (e) {}
+          px += w + gap; if (h > rowMaxH) rowMaxH = h;
+        });
+        y += rowMaxH + 4;
+      } else if (it.status !== 'NA') {
+        doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(148,163,184);
+        doc.text('(Belum ada foto)', ML, y + 2); y += 5;
+      }
+      y += 3;
+    });
+  });
+
+  // Footer halaman
+  var totalPages = doc.internal.getNumberOfPages();
+  for (var p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc, SLATE);
+    doc.text('Halaman ' + p + ' / ' + totalPages, PW / 2, 292, { align:'center' });
+    doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
+  }
+
+  doc.save('Laporan-QC-' + (d.noWO || '') + '.pdf');
 }
 
 function _qcRenderDetail(summary) {
@@ -250,14 +365,17 @@ function _qcRenderDetail(summary) {
   // Tombol Atur Site Engineer diletakkan di baris atas, sejajar tombol Kembali
   var actions = document.getElementById('qc-detail-actions');
   if (actions) {
-    var exportBtn = '<button onclick="_qcExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Export PDF</button>';
-    var assignHtml = _qcCanAssign()
-      ? '<div class="relative">'
-        + '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
-        + '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
+    // Export PDF & Atur Site Engineer hanya untuk Lead Engineer / Admin.
+    var canManage = _qcCanAssign();
+    actions.innerHTML = canManage
+      ? '<div class="flex items-center gap-2">'
+        + '<button onclick="_qcExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Export PDF</button>'
+        + '<div class="relative">'
+        +   '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
+        +   '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
+        + '</div>'
         + '</div>'
       : '';
-    actions.innerHTML = '<div class="flex items-center gap-2">' + exportBtn + assignHtml + '</div>';
   }
   head.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-3">'
     + '<div><div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
