@@ -297,18 +297,14 @@ function _ssValidateStep(n) {
 
 // Upload foto pending milik step yang sedang ditinggalkan sebelum benar-benar
 // pindah (baik maju maupun mundur) — foto yg sudah terupload dilewati.
+// Pindah step TIDAK mengupload foto — semua foto tetap "pending" (preview
+// lokal) sampai user klik Submit Survey, baru diupload sekaligus di sana.
 function _ssStepNext() {
   var err = _ssValidateStep(_ssStep);
   if (err) { showNotification(err, 'error'); return; }
-  if (_ssStep >= 5) return;
-  var target = _ssStep + 1;
-  _ssUploadPendingInFields(_ssFieldsForStep(_ssStep), function(ok) { if (ok) _ssGotoStep(target); });
+  if (_ssStep < 5) _ssGotoStep(_ssStep + 1);
 }
-function _ssStepPrev() {
-  if (_ssStep <= 1) return;
-  var target = _ssStep - 1;
-  _ssUploadPendingInFields(_ssFieldsForStep(_ssStep), function(ok) { if (ok) _ssGotoStep(target); });
-}
+function _ssStepPrev() { if (_ssStep > 1) _ssGotoStep(_ssStep - 1); }
 
 // ── Peta (Leaflet + Geolocation + input manual) ─────────────────────
 var SS_DEFAULT_CENTER = [-2.5, 118]; // tengah Indonesia
@@ -420,9 +416,9 @@ function _ssFotoAnotMode(fieldKey) {
 
 // Setiap field foto menyimpan ARRAY foto (bisa lebih dari 1). Foto yang baru
 // dipilih disimpan sbg "pending" (preview lokal, belum diupload) — upload
-// sungguhan baru terjadi saat pindah step (lihat _ssUploadPendingInFields),
-// bukan seketika saat dipilih, agar memilih foto terasa instan. Setelah
-// terupload, entry berubah jadi {fileId, fileUrl, caption}.
+// sungguhan baru terjadi sekaligus saat Submit Survey (lihat
+// _ssUploadPendingInFields), bukan seketika saat dipilih, agar memilih foto
+// terasa instan. Setelah terupload, entry berubah jadi {fileId, fileUrl, caption}.
 function _ssRenderFotoSlot(fieldKey) {
   var box = document.getElementById('ss-foto-' + fieldKey);
   if (!box) return;
@@ -475,8 +471,9 @@ function _ssHandleFotoInput(fieldKey, inputEl) {
     return;
   }
   // Resize/kompres di browser lalu simpan sbg "pending" (preview lokal saja,
-  // TIDAK langsung upload) — upload sungguhan baru terjadi saat pindah step
-  // (lihat _ssUploadPendingInFields), supaya memilih foto terasa instan.
+  // TIDAK langsung upload) — upload sungguhan baru terjadi sekaligus saat
+  // Submit Survey (lihat _ssUploadPendingInFields), supaya memilih foto
+  // terasa instan di sepanjang pengisian form.
   files.forEach(function(file) {
     _ssResizeImage(file, function(dataUrl) {
       if (!dataUrl) { showNotification('Gagal memproses foto: ' + file.name, 'error'); return; }
@@ -508,14 +505,8 @@ function _ssHapusFotoSlot(fieldKey, key) {
   if (!f.pending && f.fileId) google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
 }
 
-// ── Upload foto pending — dipicu saat pindah step / submit, BUKAN saat
-// foto dipilih. Hanya entry berstatus pending yg diupload; yg sudah punya
-// fileId dilewati (mencegah upload ganda saat bolak-balik antar step). ──
-function _ssFieldsForStep(n) {
-  var cfg = _SS_STEP_REQUIRED[n];
-  return cfg ? cfg.fotos.map(function(f) { return f.key; }) : [];
-}
-
+// ── Upload foto pending — dipicu SEKALIGUS saat Submit Survey, bukan saat
+// foto dipilih atau pindah step. Hanya entry berstatus pending yg diupload.
 function _ssUploadPendingInFields(fieldKeys, onDone) {
   var pending = [];
   fieldKeys.forEach(function(key) {
@@ -660,8 +651,8 @@ function _ssAnotSave() {
 // ── Submit final ─────────────────────────────────────────────────
 function _ssSubmit() {
   if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
-  // Jaring pengaman: sapu SEMUA field foto (bukan cuma step terakhir) kalau2
-  // ada yg masih pending — normalnya sudah terupload lewat step Selanjutnya.
+  // Upload SEMUA foto (dari semua step) sekaligus di sini, baru submit data
+  // teks — pindah step sebelumnya tidak mengupload apa pun.
   _ssUploadPendingInFields(_SS_FOTO_FIELDS, function(ok) {
     if (ok) _ssDoSubmit();
   });
