@@ -222,18 +222,43 @@ function _qcReloadDetail() {
   }).getQCByWO(_qcWO.noWO);
 }
 
+// ── Export PDF laporan QC per WO ──────────────────────────────────
+function _qcExportPDF() {
+  if (!_qcWO) return;
+  toggleLoader(true, 'Menyiapkan PDF laporan QC (memuat foto)...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal membuat PDF.', 'error'); return; }
+    _qcDownloadBase64(res.pdfBase64, res.fileName || ('Laporan-QC-' + _qcWO.noWO + '.pdf'));
+    showNotification('Laporan QC berhasil diexport.');
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal membuat PDF.', 'error'); })
+    .exportQCReportPDF(_qcWO.noWO);
+}
+function _qcDownloadBase64(b64, name) {
+  var bin = atob(b64 || ''), arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  var blob = new Blob([arr], { type: 'application/pdf' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
 function _qcRenderDetail(summary) {
   summary = summary || {};
   var head = document.getElementById('qc-detail-head');
   var pct = summary.pct || 0;
   // Tombol Atur Site Engineer diletakkan di baris atas, sejajar tombol Kembali
   var actions = document.getElementById('qc-detail-actions');
-  if (actions) actions.innerHTML = _qcCanAssign()
-    ? '<div class="relative">'
-      + '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
-      + '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
-      + '</div>'
-    : '';
+  if (actions) {
+    var exportBtn = '<button onclick="_qcExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Export PDF</button>';
+    var assignHtml = _qcCanAssign()
+      ? '<div class="relative">'
+        + '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
+        + '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
+        + '</div>'
+      : '';
+    actions.innerHTML = '<div class="flex items-center gap-2">' + exportBtn + assignHtml + '</div>';
+  }
   head.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-3">'
     + '<div><div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
     +   '<div class="font-bold text-slate-800">' + _qcEsc(_qcWO.namaProject || '-') + '</div>'
