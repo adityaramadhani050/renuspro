@@ -184,9 +184,11 @@ function _qcRenderWOList() {
       +   '<div class="text-[11px] text-slate-400 truncate">' + _qcEsc(w.namaKlien || '') + '</div>'
       + '</div>'
       + '<div class="flex items-center gap-3 w-full sm:w-auto">'
-      +   '<div class="flex flex-wrap gap-1 flex-1 min-w-0">' + seBadges + '</div>'
-      +   '<div class="w-28 shrink-0"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
-      +     '<div class="text-[10px] text-slate-400 mt-1 text-right">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +   '<div class="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5 flex-1 sm:flex-none w-full sm:w-auto">'
+      +     '<div class="flex flex-wrap gap-1 flex-1 min-w-0 sm:flex-none sm:justify-end">' + seBadges + '</div>'
+      +     '<div class="w-28 shrink-0"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
+      +       '<div class="text-[10px] text-slate-400 mt-1 text-right">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +   '</div>'
       +   removeBtn
       + '</div></div>';
   }).join('');
@@ -381,9 +383,9 @@ function _qcRenderDetail(summary) {
     +   '<div class="font-bold text-slate-800">' + _qcEsc(_qcWO.namaProject || '-') + '</div>'
     +   '<div class="text-xs text-slate-400">' + _qcEsc(_qcWO.namaKlien || '') + '</div>'
     + '</div>'
-    + '<div class="flex items-center gap-3 mt-3">'
-    +   '<div class="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400') + '" style="width:' + pct + '%"></div></div>'
-    +   '<span class="text-lg font-extrabold text-slate-800 shrink-0">' + pct + '%</span>'
+    + '<div class="flex items-center gap-2 mt-3">'
+    +   '<div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-2.5 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400') + '" style="width:' + pct + '%"></div></div>'
+    +   '<span class="text-base font-extrabold text-slate-800 shrink-0 w-12 text-right">' + pct + '%</span>'
     + '</div>'
     + '<div class="flex flex-wrap gap-3 mt-3 text-[11px] font-bold">'
     +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (summary.approved || 0) + ' Approved</span>'
