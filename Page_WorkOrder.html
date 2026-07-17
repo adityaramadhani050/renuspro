@@ -50,26 +50,14 @@
             </div>
           </div>
 
-          <!-- ── Tabel Work Order ── -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse rp-table">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <th class="p-4">No WO / Penawaran</th>
-                    <th class="p-4">Klien / Project</th>
-                    <th class="p-4 text-right">Nilai Kontrak</th>
-                    <th class="p-4" style="min-width:180px">Progress Pembayaran</th>
-                    <th class="p-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="table-workorder" class="text-sm">
-                  <tr><td colspan="5" class="p-8 text-center text-slate-500">
-                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...
-                  </td></tr>
-                </tbody>
-              </table>
+          <!-- ── Daftar Work Order (card, klik utk buka detail) ── -->
+          <div id="table-workorder" class="space-y-2.5">
+            <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-500">
+              <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...
             </div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-150 overflow-hidden mt-3">
+            <div id="pg-bar-workorder" class="pg-wrap"></div>
           </div>
         </div>
 
@@ -166,16 +154,10 @@
             </div>
           </div>
 
-          <!-- Body 2 kolom: kiri = Invoice, kanan = Realisasi HPP & Margin -->
+          <!-- Body 2 kolom: kiri = Realisasi HPP & Margin, kanan = Invoice -->
           <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
 
-            <!-- Kolom kiri: Daftar Invoice -->
-            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-150 p-5">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Daftar Invoice</p>
-              <div id="wo-invoice-list" class="space-y-2"></div>
-            </div>
-
-            <!-- Kolom kanan: Realisasi HPP & Margin -->
+            <!-- Kolom kiri: Realisasi HPP & Margin -->
             <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-150 p-5">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -306,6 +288,12 @@
                   </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Kolom kanan: Daftar Invoice -->
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-150 p-5">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Daftar Invoice</p>
+              <div id="wo-invoice-list" class="space-y-2"></div>
             </div>
           </div>
         </div>
