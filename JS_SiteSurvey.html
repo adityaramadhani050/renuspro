@@ -92,6 +92,7 @@ function bukaFormSiteSurvey() {
   document.getElementById('ss-detail-view').classList.add('hidden');
   document.getElementById('ss-form-view').classList.remove('hidden');
   _ssGotoStep(1);
+  _ssInitMap(); // panggil setelah kontainer #ss-map terlihat (bukan display:none)
   toggleLoader(true, 'Menyiapkan form survey...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
@@ -108,15 +109,14 @@ var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', '
   'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
   'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi', 'ss-bosCaption',
   'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapLuas', 'ss-atapMounting',
-  'ss-panjangPV', 'ss-panjangAC'];
+  'ss-panjangPV', 'ss-panjangAC', 'ss-koor-search', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
 
 function _ssResetForm() {
   _ssCurrentId = null; _ssStep = 1; _ssPhotos = {}; _ssLatLng = null;
   _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
-  var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat';
-  var mapEl = document.getElementById('ss-map'); if (mapEl) mapEl.classList.add('hidden');
+  var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
   if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
 }
 
@@ -161,51 +161,159 @@ function _ssGotoStep(n) {
   if (host) host.scrollIntoView({ block: 'start' });
 }
 
-function _ssStepNext() {
-  if (_ssStep === 1 && !(document.getElementById('ss-namaSite').value || '').trim()) {
-    showNotification('Nama Site wajib diisi.', 'error');
-    return;
+// Semua field per-langkah wajib diisi sebelum lanjut/submit.
+var _SS_STEP_REQUIRED = {
+  1: {
+    fields: [
+      { id: 'ss-namaSite', label: 'Nama Site' },
+      { id: 'ss-namaPIC', label: 'Nama PIC Site' },
+      { id: 'ss-telepon', label: 'No. Telepon' },
+      { id: 'ss-alamat', label: 'Alamat' },
+      { id: 'ss-arahBangunan', label: 'Arah Hadap Bangunan' },
+      { id: 'ss-tinggiBangunan', label: 'Tinggi Bangunan' }
+    ],
+    coords: true,
+    fotos: [{ key: 'fotoBangunan', label: 'Foto Bangunan Tampak Depan' }]
+  },
+  2: {
+    fields: [
+      { id: 'ss-idPelangganPLN', label: 'ID Pelanggan PLN' },
+      { id: 'ss-dayaPLN', label: 'Daya PLN' },
+      { id: 'ss-phase', label: 'Phase Listrik' },
+      { id: 'ss-ratingBreaker', label: 'Rating Breaker Utama' }
+    ],
+    fotos: [{ key: 'fotoKwh', label: 'Foto kWh Meter' }, { key: 'fotoPHB', label: 'Foto Panel Hubung Bagi (PHB)' }]
+  },
+  3: {
+    fields: [
+      { id: 'ss-bosLokasi', label: 'Lokasi Penempatan BoS' },
+      { id: 'ss-bosPanjang', label: 'Panjang Area BoS' },
+      { id: 'ss-bosLebar', label: 'Lebar Area BoS' },
+      { id: 'ss-bosJenisTembok', label: 'Jenis Tembok' },
+      { id: 'ss-bosJarakInterkoneksi', label: 'Jarak BoS ke Titik Interkoneksi' },
+      { id: 'ss-bosCaption', label: 'Caption Foto BoS' }
+    ],
+    fotos: [{ key: 'bosFoto', label: 'Foto Area BoS' }]
+  },
+  4: {
+    fields: [
+      { id: 'ss-atapJenis', label: 'Jenis Atap' },
+      { id: 'ss-atapArah', label: 'Arah Hadap Atap' },
+      { id: 'ss-atapRangka', label: 'Rangka Atap' },
+      { id: 'ss-atapLuas', label: 'Luasan Atap' },
+      { id: 'ss-atapMounting', label: 'Jenis Mounting' }
+    ],
+    fotos: [{ key: 'fotoAtap', label: 'Foto Atap' }, { key: 'fotoRangka', label: 'Foto Rangka Atap' }, { key: 'fotoAkses', label: 'Foto Akses ke Atap' }]
+  },
+  5: {
+    fields: [
+      { id: 'ss-panjangPV', label: 'Panjang Kabel PV' },
+      { id: 'ss-panjangAC', label: 'Panjang Kabel AC' }
+    ],
+    fotos: [{ key: 'fotoPV', label: 'Foto Jalur Kabel PV' }, { key: 'fotoAC', label: 'Foto Jalur Kabel AC' }]
   }
+};
+
+// Return pesan error field pertama yang kosong, atau null bila step n sudah lengkap.
+function _ssValidateStep(n) {
+  var cfg = _SS_STEP_REQUIRED[n];
+  if (!cfg) return null;
+  for (var i = 0; i < cfg.fields.length; i++) {
+    var el = document.getElementById(cfg.fields[i].id);
+    if (!el || !(el.value || '').trim()) return cfg.fields[i].label + ' wajib diisi.';
+  }
+  if (cfg.coords && !_ssLatLng) return 'Titik Koordinat wajib diisi (ambil lokasi, cari alamat, klik di peta, atau isi manual).';
+  for (var j = 0; j < cfg.fotos.length; j++) {
+    if (!_ssPhotos[cfg.fotos[j].key]) return cfg.fotos[j].label + ' wajib diupload.';
+  }
+  return null;
+}
+
+function _ssStepNext() {
+  var err = _ssValidateStep(_ssStep);
+  if (err) { showNotification(err, 'error'); return; }
   if (_ssStep < 5) _ssGotoStep(_ssStep + 1);
 }
 function _ssStepPrev() { if (_ssStep > 1) _ssGotoStep(_ssStep - 1); }
 
-// ── Peta (Leaflet + Geolocation) ────────────────────────────────────
+// ── Peta (Leaflet + Geolocation + pencarian alamat + input manual) ──
+var SS_DEFAULT_CENTER = [-2.5, 118]; // tengah Indonesia
+var SS_DEFAULT_ZOOM = 5;
+
+function _ssInitMap() {
+  if (_ssMap || typeof L === 'undefined') return;
+  _ssMap = L.map('ss-map').setView(SS_DEFAULT_CENTER, SS_DEFAULT_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(_ssMap);
+  // Klik langsung di peta = salah satu cara memilih titik koordinat.
+  _ssMap.on('click', function(e) { _ssSetLatLng(e.latlng.lat, e.latlng.lng, { recenter: false }); });
+  setTimeout(function() { if (_ssMap) _ssMap.invalidateSize(); }, 200);
+}
+
 function _ssAmbilLokasi() {
   if (!navigator.geolocation) { showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
   toggleLoader(true, 'Mengambil lokasi...');
   navigator.geolocation.getCurrentPosition(function(pos) {
     toggleLoader(false);
-    _ssSetLatLng(pos.coords.latitude, pos.coords.longitude);
+    _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 18 });
   }, function(err) {
     toggleLoader(false);
     showNotification('Gagal mengambil lokasi: ' + err.message, 'error');
   }, { enableHighAccuracy: true, timeout: 15000 });
 }
 
-function _ssSetLatLng(lat, lng) {
+// Cari alamat via Nominatim (OpenStreetMap) lalu pindahkan peta+pin ke sana;
+// user tetap bisa geser pin/klik ulang utk presisi.
+function _ssCariAlamat() {
+  var q = (document.getElementById('ss-koor-search').value || '').trim();
+  if (!q) { showNotification('Isi alamat yang ingin dicari.', 'error'); return; }
+  toggleLoader(true, 'Mencari alamat...');
+  fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=id&q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      toggleLoader(false);
+      if (!results || !results.length) { showNotification('Alamat tidak ditemukan. Coba kata kunci lain, atau pilih titik langsung di peta.', 'error'); return; }
+      _ssSetLatLng(parseFloat(results[0].lat), parseFloat(results[0].lon), { zoom: 17 });
+    })
+    .catch(function() {
+      toggleLoader(false);
+      showNotification('Gagal mencari alamat. Periksa koneksi internet, atau pilih titik langsung di peta.', 'error');
+    });
+}
+
+// Input manual Latitude/Longitude — memindahkan pin juga.
+function _ssLatLngManualChange() {
+  var lat = parseFloat((document.getElementById('ss-latitude').value || '').trim());
+  var lng = parseFloat((document.getElementById('ss-longitude').value || '').trim());
+  if (isNaN(lat) || isNaN(lng)) return;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) { showNotification('Koordinat tidak valid.', 'error'); return; }
+  _ssSetLatLng(lat, lng, { recenter: true });
+}
+
+// opts.recenter (default true) = geser tampilan peta ke titik ini; false dipakai
+// saat klik peta/drag pin agar tampilan tak melompat dari yg sudah dipilih user.
+function _ssSetLatLng(lat, lng, opts) {
+  opts = opts || {};
   _ssLatLng = { lat: lat, lng: lng };
   document.getElementById('ss-koor-text').innerText = lat.toFixed(6) + ', ' + lng.toFixed(6);
-  var mapBox = document.getElementById('ss-map');
-  mapBox.classList.remove('hidden');
-  if (typeof L === 'undefined') { showNotification('Modul peta belum siap, muat ulang halaman.', 'error'); return; }
-  if (!_ssMap) {
-    _ssMap = L.map('ss-map').setView([lat, lng], 18);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20, attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(_ssMap);
+  var latEl = document.getElementById('ss-latitude'), lngEl = document.getElementById('ss-longitude');
+  if (latEl) latEl.value = lat.toFixed(6);
+  if (lngEl) lngEl.value = lng.toFixed(6);
+
+  if (!_ssMap) _ssInitMap();
+  if (!_ssMap) { showNotification('Modul peta belum siap, muat ulang halaman.', 'error'); return; }
+
+  if (opts.recenter !== false) _ssMap.setView([lat, lng], opts.zoom || Math.max(_ssMap.getZoom(), 16));
+  if (!_ssMarker) {
     _ssMarker = L.marker([lat, lng], { draggable: true }).addTo(_ssMap);
     _ssMarker.on('dragend', function() {
       var p = _ssMarker.getLatLng();
-      _ssLatLng = { lat: p.lat, lng: p.lng };
-      document.getElementById('ss-koor-text').innerText = p.lat.toFixed(6) + ', ' + p.lng.toFixed(6);
+      _ssSetLatLng(p.lat, p.lng, { recenter: false });
     });
   } else {
-    _ssMap.setView([lat, lng], 18);
     _ssMarker.setLatLng([lat, lng]);
   }
-  // Kontainer peta baru saja muncul dari hidden -> perlu invalidateSize agar Leaflet render benar.
-  setTimeout(function() { if (_ssMap) _ssMap.invalidateSize(); }, 200);
 }
 
 // ── Slot foto (Kamera/Galeri, atau buka editor anotasi) ─────────────
@@ -377,8 +485,10 @@ function _ssAnotSave() {
 // ── Submit final ─────────────────────────────────────────────────
 function _ssSubmit() {
   if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
-  var namaSite = (document.getElementById('ss-namaSite').value || '').trim();
-  if (!namaSite) { showNotification('Nama Site wajib diisi.', 'error'); _ssGotoStep(1); return; }
+  for (var n = 1; n <= 5; n++) {
+    var err = _ssValidateStep(n);
+    if (err) { _ssGotoStep(n); showNotification(err, 'error'); return; }
+  }
 
   var g = function(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
   var gn = function(id) { var v = g(id); return v === '' ? 0 : Number(v); };
@@ -387,7 +497,7 @@ function _ssSubmit() {
     id: _ssCurrentId,
     dibuatOleh: _ssUserNama(),
     tanggalSurvey: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    namaSite: namaSite,
+    namaSite: g('ss-namaSite'),
     namaPIC: g('ss-namaPIC'),
     telepon: g('ss-telepon'),
     alamat: g('ss-alamat'),
