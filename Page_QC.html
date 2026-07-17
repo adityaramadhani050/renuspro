@@ -58,7 +58,33 @@
                 onload="_qcFotoLoaded()"
                 class="max-w-full max-h-[75vh] rounded-xl shadow-2xl object-contain bg-slate-800 opacity-0 transition-opacity duration-200">
             </div>
-            <a id="qc-photo-viewer-link" href="#" target="_blank" class="text-xs font-bold text-white/70 hover:text-white"><i class="fa-solid fa-up-right-from-square mr-1"></i>Buka di Google Drive</a>
+            <div class="flex items-center gap-4">
+              <button id="qc-photo-edit-btn" onclick="event.stopPropagation();_qcEditFromViewer()" class="hidden inline-flex items-center gap-1.5 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-pen"></i> Coret / Edit</button>
+              <a id="qc-photo-viewer-link" href="#" target="_blank" class="text-xs font-bold text-white/70 hover:text-white"><i class="fa-solid fa-up-right-from-square mr-1"></i>Buka di Google Drive</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- EDITOR: coret/anotasi foto QC (Lead Engineer) -->
+        <div id="modal-qc-anotasi" class="hidden fixed inset-0 z-[330] flex flex-col bg-slate-900/95 px-2 sm:px-3 py-3">
+          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button data-color="#ef4444" onclick="_qcAnotSetColor('#ef4444')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-white" style="background:#ef4444" title="Merah"></button>
+              <button data-color="#eab308" onclick="_qcAnotSetColor('#eab308')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#eab308" title="Kuning"></button>
+              <button data-color="#22c55e" onclick="_qcAnotSetColor('#22c55e')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#22c55e" title="Hijau"></button>
+              <button data-color="#111827" onclick="_qcAnotSetColor('#111827')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#111827" title="Hitam"></button>
+              <button data-color="#ffffff" onclick="_qcAnotSetColor('#ffffff')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent border border-white/40" style="background:#ffffff" title="Putih"></button>
+              <input type="range" id="qc-anot-size" min="2" max="28" value="6" oninput="_qcAnotSetSize(this.value)" class="w-20 sm:w-28 ml-1 accent-orange-500">
+              <button onclick="_qcAnotUndo()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Undo</button>
+              <button onclick="_qcAnotClear()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-eraser mr-1"></i>Hapus</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="_qcAnotClose()" class="text-white/80 hover:text-white text-xs font-bold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Batal</button>
+              <button onclick="_qcAnotSave()" class="text-white text-xs font-bold px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 shadow"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>
+            </div>
+          </div>
+          <div class="flex-1 flex items-center justify-center overflow-auto">
+            <canvas id="qc-anot-canvas" class="max-w-full max-h-full rounded-lg bg-slate-800 touch-none" style="touch-action:none"></canvas>
           </div>
         </div>
 

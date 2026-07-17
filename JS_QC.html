@@ -468,9 +468,10 @@ function _qcItemHtml(it) {
   var foto = it.foto || [];
   var thumbs = foto.map(function(f) {
     var del = (canUp && it.status !== 'NA' && it.status !== 'Approved') ? '<button onclick="event.stopPropagation();_qcHapusFoto(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>' : '';
+    var editedMark = f.editedBy ? '<span class="absolute bottom-0.5 left-0.5 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded" title="Diberi coretan oleh ' + _qcEsc(f.editedBy) + '"><i class="fa-solid fa-pen"></i></span>' : '';
     return '<div class="relative">'
-      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
-      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + del + '</div>';
+      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ', \'' + it.kode + '\')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
+      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + editedMark + del + '</div>';
   }).join('');
 
   var rejectNote = (it.status === 'Rejected' && it.catatanSPV)
@@ -577,7 +578,9 @@ function _qcHapusFoto(kode, fileId) {
 }
 
 // Preview foto in-app (lightbox) — tanpa membuka Google Drive.
-function _qcViewFoto(fileId, fileUrl) {
+// kode diisi utk foto item QC (agar Lead bisa "Coret/Edit"); kosong utk foto contoh.
+var _qcViewerCtx = null;
+function _qcViewFoto(fileId, fileUrl, kode) {
   var v = document.getElementById('qc-photo-viewer');
   if (!v) return;
   var img = document.getElementById('qc-photo-viewer-img');
@@ -586,7 +589,16 @@ function _qcViewFoto(fileId, fileUrl) {
   if (sp) sp.classList.remove('hidden');     // tampilkan spinner
   img.src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
   document.getElementById('qc-photo-viewer-link').href = fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
+  _qcViewerCtx = { fileId: fileId, kode: kode || '' };
+  var eb = document.getElementById('qc-photo-edit-btn');
+  if (eb) eb.classList.toggle('hidden', !(kode && _qcCanReview()));
   v.classList.remove('hidden');
+}
+function _qcEditFromViewer() {
+  if (!_qcViewerCtx || !_qcViewerCtx.kode || !_qcWO) return;
+  var fileId = _qcViewerCtx.fileId, kode = _qcViewerCtx.kode;
+  _qcCloseFoto();
+  _qcAnotOpen(fileId, _qcWO.noWO, kode);
 }
 function _qcFotoLoaded() {
   var sp = document.getElementById('qc-photo-viewer-spinner'); if (sp) sp.classList.add('hidden');
@@ -597,6 +609,113 @@ function _qcCloseFoto() {
   if (!v) return;
   v.classList.add('hidden');
   document.getElementById('qc-photo-viewer-img').src = '';
+}
+
+// ── Editor coret/anotasi foto (Lead Engineer) ─────────────────────
+var _qcAnot = null;
+function _qcAnotOpen(fileId, noWO, kode) {
+  toggleLoader(true, 'Memuat gambar untuk diedit...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false || !res.dataUrl) { showNotification((res && res.message) || 'Gagal memuat gambar.', 'error'); return; }
+    _qcAnotInit(res.dataUrl, fileId, noWO, kode);
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal memuat gambar.', 'error'); })
+    .getQCFotoBesar(fileId);
+}
+function _qcAnotInit(dataUrl, fileId, noWO, kode) {
+  var canvas = document.getElementById('qc-anot-canvas');
+  var img = new Image();
+  img.onload = function() {
+    var maxDim = 1600, w = img.naturalWidth || 800, h = img.naturalHeight || 600;
+    var sc = Math.min(1, maxDim / Math.max(w, h));
+    canvas.width = Math.round(w * sc); canvas.height = Math.round(h * sc);
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    _qcAnot = { fileId: fileId, noWO: noWO, kode: kode, img: img, canvas: canvas, ctx: ctx, color: '#ef4444', size: 6, strokes: [], drawing: false, cur: null };
+    _qcAnotSetColor('#ef4444');
+    var sz = document.getElementById('qc-anot-size'); if (sz) { sz.value = 6; }
+    canvas.onpointerdown = _qcAnotDown;
+    canvas.onpointermove = _qcAnotMove;
+    canvas.onpointerup = _qcAnotUp;
+    canvas.onpointerleave = _qcAnotUp;
+    canvas.onpointercancel = _qcAnotUp;
+    document.getElementById('modal-qc-anotasi').classList.remove('hidden');
+  };
+  img.onerror = function() { showNotification('Gagal memuat gambar untuk diedit.', 'error'); };
+  img.src = dataUrl;
+}
+function _qcAnotSetColor(c) {
+  if (_qcAnot) _qcAnot.color = c;
+  Array.prototype.forEach.call(document.querySelectorAll('.qc-anot-color'), function(b) {
+    var on = b.getAttribute('data-color') === c;
+    b.classList.toggle('ring-white', on);
+    b.classList.toggle('ring-transparent', !on);
+  });
+}
+function _qcAnotSetSize(v) { if (_qcAnot) _qcAnot.size = parseInt(v, 10) || 6; }
+function _qcAnotPos(e) {
+  var r = _qcAnot.canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (_qcAnot.canvas.width / r.width), y: (e.clientY - r.top) * (_qcAnot.canvas.height / r.height) };
+}
+function _qcAnotDown(e) {
+  if (!_qcAnot) return; e.preventDefault();
+  _qcAnot.drawing = true;
+  _qcAnot.cur = { color: _qcAnot.color, size: _qcAnot.size, pts: [_qcAnotPos(e)] };
+}
+function _qcAnotMove(e) {
+  if (!_qcAnot || !_qcAnot.drawing) return; e.preventDefault();
+  _qcAnot.cur.pts.push(_qcAnotPos(e));
+  var pts = _qcAnot.cur.pts, n = pts.length;
+  if (n < 2) return;
+  var ctx = _qcAnot.ctx;
+  ctx.strokeStyle = _qcAnot.cur.color; ctx.lineWidth = _qcAnot.cur.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(pts[n - 2].x, pts[n - 2].y); ctx.lineTo(pts[n - 1].x, pts[n - 1].y); ctx.stroke();
+}
+function _qcAnotUp() {
+  if (!_qcAnot || !_qcAnot.drawing) return;
+  _qcAnot.drawing = false;
+  if (_qcAnot.cur && _qcAnot.cur.pts.length) {
+    if (_qcAnot.cur.pts.length === 1) { // titik tunggal → dot
+      var p = _qcAnot.cur.pts[0], ctx = _qcAnot.ctx;
+      ctx.fillStyle = _qcAnot.cur.color; ctx.beginPath(); ctx.arc(p.x, p.y, _qcAnot.cur.size / 2, 0, Math.PI * 2); ctx.fill();
+    }
+    _qcAnot.strokes.push(_qcAnot.cur);
+  }
+  _qcAnot.cur = null;
+}
+function _qcAnotRedraw() {
+  if (!_qcAnot) return;
+  var ctx = _qcAnot.ctx, c = _qcAnot.canvas;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.drawImage(_qcAnot.img, 0, 0, c.width, c.height);
+  _qcAnot.strokes.forEach(function(s) {
+    var pts = s.pts; if (!pts.length) return;
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    if (pts.length === 1) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, s.size / 2, 0, Math.PI * 2); ctx.fill(); }
+  });
+}
+function _qcAnotUndo() { if (_qcAnot && _qcAnot.strokes.length) { _qcAnot.strokes.pop(); _qcAnotRedraw(); } }
+function _qcAnotClear() { if (_qcAnot) { _qcAnot.strokes = []; _qcAnotRedraw(); } }
+function _qcAnotClose() { document.getElementById('modal-qc-anotasi').classList.add('hidden'); _qcAnot = null; }
+function _qcAnotSave() {
+  if (!_qcAnot) return;
+  if (!_qcAnot.strokes.length) { showNotification('Belum ada coretan. Tambahkan dulu atau tekan Batal.', 'error'); return; }
+  var base64;
+  try { base64 = _qcAnot.canvas.toDataURL('image/jpeg', 0.9).split(',')[1]; }
+  catch (e) { showNotification('Gagal memproses gambar.', 'error'); return; }
+  var payload = { noWO: _qcAnot.noWO, kode: _qcAnot.kode, fileId: _qcAnot.fileId, base64Data: base64, mimeType: 'image/jpeg', oleh: _qcUserNama() };
+  _qcAnotClose();
+  toggleLoader(true, 'Menyimpan gambar...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menyimpan.', 'error'); return; }
+    showNotification(res.message || 'Gambar tersimpan dengan coretan.');
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan.', 'error'); })
+    .simpanQCFotoAnotasi(payload);
 }
 
 function _qcToggleNA(kode, checked) {

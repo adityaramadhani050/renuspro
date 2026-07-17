@@ -535,6 +535,78 @@ function hapusQCFoto(noWO, kode, fileId) {
   }
 }
 
+// ── Anotasi foto (coret-coret oleh Lead Engineer) ───────────────────────────
+// Kirim gambar resolusi tinggi sbg data URL utk diedit di kanvas (hindari taint
+// canvas oleh Drive cross-origin).
+function getQCFotoBesar(fileId) {
+  try {
+    fileId = (fileId || '').toString().trim();
+    if (!fileId) return { success: false, message: 'fileId wajib.' };
+    var dataUrl = '';
+    try {
+      var resp = UrlFetchApp.fetch('https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600',
+        { muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } });
+      if (resp.getResponseCode() === 200) {
+        var b = resp.getBlob();
+        if (b && b.getBytes().length > 200) dataUrl = 'data:' + (b.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(b.getBytes());
+      }
+    } catch (e) {}
+    if (!dataUrl) {
+      var blob = DriveApp.getFileById(fileId).getBlob();
+      dataUrl = 'data:' + (blob.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    }
+    return { success: true, dataUrl: dataUrl };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// Simpan gambar hasil coretan → menimpa slot foto (file baru, file lama di-trash).
+function simpanQCFotoAnotasi(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var noWO = (payload.noWO || '').toString().trim();
+    var kode = (payload.kode || '').toString().trim();
+    var oldFileId = (payload.fileId || '').toString().trim();
+    var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    var mimeType = payload.mimeType ? payload.mimeType.toString() : 'image/jpeg';
+    if (!noWO || !kode || !oldFileId) return { success: false, message: 'Data tidak lengkap.' };
+    if (!base64Data) return { success: false, message: 'Gambar kosong.' };
+    var ext = (mimeType.split('/')[1] || 'jpg').toLowerCase(); if (ext === 'jpeg') ext = 'jpg';
+
+    lock.waitLock(20000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureQCItemSheet(ss);
+    var found = _qcFindItemRow(sheet, noWO, kode);
+    if (!found) return { success: false, message: 'Item tidak ditemukan.' };
+    var arr = _qcParseFoto(found.row[3]);
+    var idx = -1;
+    for (var i = 0; i < arr.length; i++) { if (arr[i].fileId === oldFileId) { idx = i; break; } }
+    if (idx === -1) return { success: false, message: 'Foto tidak ditemukan.' };
+
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    var fileName = kode + '-edit-' + (idx + 1) + '.' + ext;
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(bytes, mimeType, fileName);
+    var file = _getQCFolder(noWO).createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {}
+
+    var old = arr[idx] || {};
+    arr[idx] = { fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName,
+                 by: old.by || '', at: old.at || when,
+                 editedBy: (payload.oleh || '').toString(), editedAt: when };
+    sheet.getRange(found.rowIdx, 4).setValue(JSON.stringify(arr));
+    return { success: true, message: 'Gambar tersimpan dengan coretan.', foto_list: arr };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── Review SPV (Approved/Rejected + catatan) ────────────────────────────────
 function reviewQCItem(noWO, kode, keputusan, catatan, reviewer) {
   var lock = LockService.getScriptLock();
