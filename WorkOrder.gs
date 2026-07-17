@@ -112,6 +112,10 @@ function _ensureWorkOrderSheet(ss) {
   sheet = ss.insertSheet('Work_Order');
   sheet.appendRow(_WO_HEADERS);
   sheet.getRange(1, 1, 1, _WO_HEADERS.length).setFontWeight('bold');
+  // Kolom tanggal (4, 5, 20) sbg TEXT agar tak di-auto-parse Sheets jadi Date.
+  var maxR = sheet.getMaxRows();
+  sheet.getRange(2, 4, maxR - 1, 2).setNumberFormat('@');
+  sheet.getRange(2, 20, maxR - 1, 1).setNumberFormat('@');
   _backfillWorkOrderSheet(ss, sheet);   // migrasi sekali dari penawaran existing
   return sheet;
 }
@@ -203,8 +207,8 @@ function getWorkOrderList() {
         noWO:           noWO,
         id:             (r[1] || '').toString(),
         rev:            (r[2] != null ? r[2] : '').toString(),
-        tanggal:        (r[3] || '').toString(),
-        validUntil:     (r[4] || '').toString(),
+        tanggal:        _fmtTgl(r[3]),   // normalisasi (sheet bisa auto-ubah string → Date/ISO)
+        validUntil:     _fmtTgl(r[4]),
         namaProject:    (r[5] || '').toString(),
         klienId:        (r[6] || '').toString(),
         namaKlien:      (r[7] || '').toString(),
