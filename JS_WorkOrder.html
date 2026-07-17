@@ -630,13 +630,6 @@
         }).join('');
       }
 
-      // Tombol tambah (finance/admin)
-      var addBtns = el('wo-hpp-add-btns');
-      if (addBtns) {
-        if (typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()) addBtns.classList.remove('hidden');
-        else addBtns.classList.add('hidden');
-      }
-
       // PO Terkait
       var poCont = el('wo-hpp-po-content');
       if (!res.poTerkait || res.poTerkait.length === 0) {
@@ -665,16 +658,6 @@
 
     function _escWO(s) {
       return (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    function _tambahPengeluaranDariWO() {
-      if (!_woDetailCurrent) return;
-      var noWO = _woDetailCurrent.noWO;
-      tutupModalDetailWO();
-      navigate('pengeluaran');
-      setTimeout(function() {
-        if (typeof bukaFormPengeluaranLangsung === 'function') bukaFormPengeluaranLangsung(noWO);
-      }, 400);
     }
 
     // ── Export Laporan Pengeluaran per WO (Fase 4) ─────────────────
