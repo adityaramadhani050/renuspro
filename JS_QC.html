@@ -637,11 +637,15 @@ function _qcAnotInit(dataUrl, fileId, noWO, kode) {
     _qcAnot = { fileId: fileId, noWO: noWO, kode: kode, img: img, canvas: canvas, ctx: ctx, color: '#ef4444', size: 6, strokes: [], drawing: false, cur: null };
     _qcAnotSetColor('#ef4444');
     var sz = document.getElementById('qc-anot-size'); if (sz) { sz.value = 6; }
-    canvas.onpointerdown = _qcAnotDown;
-    canvas.onpointermove = _qcAnotMove;
-    canvas.onpointerup = _qcAnotUp;
-    canvas.onpointerleave = _qcAnotUp;
-    canvas.onpointercancel = _qcAnotUp;
+    // Mouse + touch (lebih andal daripada pointer event di iframe GAS)
+    canvas.onmousedown = _qcAnotDown;
+    canvas.onmousemove = _qcAnotMove;
+    canvas.onmouseup = _qcAnotUp;
+    canvas.onmouseleave = _qcAnotUp;
+    canvas.addEventListener('touchstart', _qcAnotDown, { passive: false });
+    canvas.addEventListener('touchmove', _qcAnotMove, { passive: false });
+    canvas.addEventListener('touchend', _qcAnotUp, { passive: false });
+    canvas.addEventListener('touchcancel', _qcAnotUp, { passive: false });
     document.getElementById('modal-qc-anotasi').classList.remove('hidden');
   };
   img.onerror = function() { showNotification('Gagal memuat gambar untuk diedit.', 'error'); };
@@ -658,7 +662,11 @@ function _qcAnotSetColor(c) {
 function _qcAnotSetSize(v) { if (_qcAnot) _qcAnot.size = parseInt(v, 10) || 6; }
 function _qcAnotPos(e) {
   var r = _qcAnot.canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * (_qcAnot.canvas.width / r.width), y: (e.clientY - r.top) * (_qcAnot.canvas.height / r.height) };
+  var cx, cy;
+  if (e.touches && e.touches.length) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+  else if (e.changedTouches && e.changedTouches.length) { cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY; }
+  else { cx = e.clientX; cy = e.clientY; }
+  return { x: (cx - r.left) * (_qcAnot.canvas.width / r.width), y: (cy - r.top) * (_qcAnot.canvas.height / r.height) };
 }
 function _qcAnotDown(e) {
   if (!_qcAnot) return; e.preventDefault();
