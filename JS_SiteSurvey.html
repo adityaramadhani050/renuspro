@@ -367,13 +367,13 @@ function _ssRenderFotoSlot(fieldKey) {
   var anotMode = box.getAttribute('data-anot');
 
   var thumbsHtml = arr.map(function(f) {
-    return '<div class="inline-block align-top">'
+    return '<div class="inline-block align-top w-32">'
       + '<div class="relative inline-block">'
       +   '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
       +     '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
       +   '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\', \'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
       + '</div>'
-      + '<input type="text" value="' + _ssEsc(f.caption || '') + '" placeholder="Keterangan foto..." onchange="_ssFotoCaptionChange(\'' + fieldKey + '\', \'' + f.fileId + '\', this.value)" class="mt-1 w-24 px-1.5 py-1 text-[10px] border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400">'
+      + '<input type="text" value="' + _ssEsc(f.caption || '') + '" placeholder="Keterangan foto..." onchange="_ssFotoCaptionChange(\'' + fieldKey + '\', \'' + f.fileId + '\', this.value)" class="mt-1.5 w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">'
       + '</div>';
   }).join('');
 
@@ -674,6 +674,13 @@ function _ssRenderDetail() {
       + '<div class="flex flex-wrap gap-3">' + arr.map(fotoThumb).join('') + '</div>'
       + '</div>';
   }
+  // Susun beberapa fotoGroup() berdampingan (horizontal, wrap di layar sempit)
+  // bukan menumpuk ke bawah — dipakai saat 1 bagian punya >1 field foto.
+  function fotoGroups() {
+    var parts = Array.prototype.slice.call(arguments).filter(Boolean);
+    if (!parts.length) return '';
+    return '<div class="flex flex-wrap gap-6">' + parts.join('') + '</div>';
+  }
   function row(label, val) {
     var has = val || val === 0;
     return '<div><p class="text-[10px] text-slate-400 uppercase font-semibold">' + label + '</p><p class="text-sm font-semibold text-slate-700">' + (has ? _ssEsc(val) : '-') + '</p></div>';
@@ -699,8 +706,7 @@ function _ssRenderDetail() {
     +   row('Phase', kel.phase)
     +   row('Rating Breaker', kel.ratingBreaker ? kel.ratingBreaker + ' A' : '')
     + '</div>'
-    + fotoGroup('Foto kWh Meter', kel.fotoKwh)
-    + fotoGroup('Foto Panel Hubung Bagi (PHB)', kel.fotoPHB));
+    + fotoGroups(fotoGroup('Foto kWh Meter', kel.fotoKwh), fotoGroup('Foto Panel Hubung Bagi (PHB)', kel.fotoPHB)));
 
   body += section('C. Balance of System (BoS)', 'fa-server',
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
@@ -719,17 +725,14 @@ function _ssRenderDetail() {
     +   row('Jenis Mounting', atap.mounting)
     +   row('Ukuran Atap', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '')
     + '</div>'
-    + fotoGroup('Foto Atap', atap.fotoAtap)
-    + fotoGroup('Foto Rangka Atap', atap.fotoRangka)
-    + fotoGroup('Foto Akses ke Atap', atap.fotoAkses));
+    + fotoGroups(fotoGroup('Foto Atap', atap.fotoAtap), fotoGroup('Foto Rangka Atap', atap.fotoRangka), fotoGroup('Foto Akses ke Atap', atap.fotoAkses)));
 
   body += section('E. Jalur Kabel', 'fa-timeline',
       '<div class="grid grid-cols-2 gap-3">'
     +   row('Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : '')
     +   row('Panjang Kabel AC', jk.panjangAC ? jk.panjangAC + ' m' : '')
     + '</div>'
-    + fotoGroup('Foto Jalur Kabel PV', jk.fotoPV)
-    + fotoGroup('Foto Jalur Kabel AC', jk.fotoAC));
+    + fotoGroups(fotoGroup('Foto Jalur Kabel PV', jk.fotoPV), fotoGroup('Foto Jalur Kabel AC', jk.fotoAC)));
 
   document.getElementById('ss-detail-body').innerHTML = body;
 }
