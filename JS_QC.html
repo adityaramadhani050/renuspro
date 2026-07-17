@@ -10,6 +10,7 @@ let _qcWO     = null;    // WO yang sedang dibuka
 let _qcItems  = [];      // checklist item WO terbuka
 let _qcSiteEngineers = null; // cache daftar site engineer (untuk penugasan)
 let _qcSectionOpen = {};     // accordion: section terbuka di detail
+let _qcGroups = {};          // cache grup item per section (untuk lazy render)
 
 function _qcUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _qcRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -18,7 +19,7 @@ function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r ==
 function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
-function _qcThumb(fileId) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'; }
+function _qcThumb(fileId, sz) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=' + (sz || 'w200'); }  // default kecil sesuai ukuran tampil
 function _qcJs(s) { return _qcEsc(JSON.stringify(s == null ? '' : s)); }  // aman utk arg string di dalam onclick="..."
 
 var _QC_STATUS = {
@@ -416,8 +417,9 @@ function _qcRenderDetailBody() {
     if (idx[it.section] == null) { idx[it.section] = groups.length; groups.push({ section: it.section, label: it.sectionLabel, items: [] }); }
     groups[idx[it.section]].items.push(it);
   });
+  _qcGroups = {};
+  groups.forEach(function(g) { _qcGroups[g.section] = g; });
   document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
-    var open = !!_qcSectionOpen[g.section];
     var ap = 0, rej = 0, pen = 0;
     g.items.forEach(function(it) { if (it.status === 'Approved') ap++; else if (it.status === 'Rejected') rej++; else if (it.status === 'Pending') pen++; });
     var mini = '<span class="text-[10px] font-bold text-slate-400 ml-2">' + ap + '/' + g.items.length + '</span>'
@@ -426,14 +428,40 @@ function _qcRenderDetailBody() {
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<button onclick="_qcToggleSection(\'' + g.section + '\')" class="w-full flex items-center gap-1 px-5 py-3.5 hover:bg-slate-50 transition text-left">'
       +   '<span class="font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</span>' + mini
-      +   '<i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + ' text-slate-400 ml-auto"></i>'
+      +   '<i id="qc-chev-' + g.section + '" class="fa-solid fa-chevron-down text-slate-400 ml-auto"></i>'
       + '</button>'
-      + (open ? '<div class="divide-y divide-slate-100 border-t border-slate-100">' + g.items.map(_qcItemHtml).join('') + '</div>' : '')
+      + '<div id="qc-sec-body-' + g.section + '" class="hidden divide-y divide-slate-100 border-t border-slate-100"></div>'
       + '</div>';
   }).join('');
+  // Buka kembali section yang sebelumnya terbuka (render ulang isinya).
+  Object.keys(_qcSectionOpen).forEach(function(sec) { if (_qcSectionOpen[sec]) _qcOpenSection(sec); });
 }
 
-function _qcToggleSection(sec) { _qcSectionOpen[sec] = !_qcSectionOpen[sec]; _qcRenderDetailBody(); }
+// Lazy: isi & foto section hanya dirender saat pertama dibuka; toggle section
+// lain tidak menyentuh (tidak fetch ulang) section yang sudah terbuka.
+function _qcToggleSection(sec) {
+  if (_qcSectionOpen[sec]) _qcCloseSection(sec); else _qcOpenSection(sec);
+}
+function _qcOpenSection(sec) {
+  var body = document.getElementById('qc-sec-body-' + sec);
+  if (!body) return;
+  if (!body.getAttribute('data-rendered')) {
+    var g = _qcGroups[sec];
+    if (g) body.innerHTML = g.items.map(_qcItemHtml).join('');
+    body.setAttribute('data-rendered', '1');
+  }
+  body.classList.remove('hidden');
+  var ch = document.getElementById('qc-chev-' + sec);
+  if (ch) { ch.classList.remove('fa-chevron-down'); ch.classList.add('fa-chevron-up'); }
+  _qcSectionOpen[sec] = true;
+}
+function _qcCloseSection(sec) {
+  var body = document.getElementById('qc-sec-body-' + sec);
+  if (body) body.classList.add('hidden');
+  var ch = document.getElementById('qc-chev-' + sec);
+  if (ch) { ch.classList.remove('fa-chevron-up'); ch.classList.add('fa-chevron-down'); }
+  _qcSectionOpen[sec] = false;
+}
 
 function _qcItemHtml(it) {
   var canUp = _qcCanUpload(), canRev = _qcCanReview();
