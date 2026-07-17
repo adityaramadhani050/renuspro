@@ -46,6 +46,7 @@ window.loadQC = function() {
     _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _qcWOList = _qcDash.perWO || [];
     _qcRenderCards();
+    _qcPopulateFilter();
     _qcRenderWOList();
   }).withFailureHandler(function() {
     document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-rose-400">Gagal memuat data QC.</div>';
@@ -66,16 +67,40 @@ function _qcRenderCards() {
     + _qcCard('Rejected', g.rejected || 0, 'text-rose-500', 'fa-circle-xmark');
 }
 
+// Filter site engineer (hanya utk Lead/Admin yg melihat banyak WO).
+function _qcPopulateFilter() {
+  var sel = document.getElementById('qc-filter-se');
+  if (!sel) return;
+  if (!_qcCanAssign()) { sel.classList.add('hidden'); return; }
+  sel.classList.remove('hidden');
+  var seen = {}, opts = [];
+  _qcWOList.forEach(function(w) { (w.assigned || []).forEach(function(a) { if (!seen[a.id]) { seen[a.id] = 1; opts.push(a); } }); });
+  opts.sort(function(a, b) { return (a.nama || '').localeCompare(b.nama || ''); });
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">Semua Site Engineer</option>'
+    + '<option value="__none__">Belum Ditugaskan</option>'
+    + opts.map(function(a) { return '<option value="' + _qcEsc(a.id) + '">' + _qcEsc(a.nama) + '</option>'; }).join('');
+  sel.value = prev;                    // pertahankan pilihan bila masih ada
+  if (sel.value !== prev) sel.value = '';
+}
+
 function _qcRenderWOList() {
   var box = document.getElementById('qc-wo-list');
   if (!box) return;
   var q = ((document.getElementById('qc-search') || {}).value || '').toLowerCase().trim();
+  var fsel = document.getElementById('qc-filter-se');
+  var fval = fsel ? fsel.value : '';
   var list = _qcWOList.filter(function(w) {
-    if (!q) return true;
-    return ((w.noWO || '') + (w.namaProject || '') + (w.namaKlien || '')).toLowerCase().indexOf(q) !== -1;
+    if (q && ((w.noWO || '') + (w.namaProject || '') + (w.namaKlien || '')).toLowerCase().indexOf(q) === -1) return false;
+    if (fval) {
+      var asg = w.assigned || [];
+      if (fval === '__none__') { if (asg.length) return false; }
+      else if (!asg.some(function(a) { return a.id === fval; })) return false;
+    }
+    return true;
   });
   if (!list.length) {
-    var emptyMsg = q ? 'Tidak ada WO cocok.'
+    var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
       : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada Work Order.');
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
@@ -84,17 +109,23 @@ function _qcRenderWOList() {
     var badge = (w.pending + w.rejected) === 0 && w.pct === 100 ? 'bg-emerald-100 text-emerald-700'
       : (w.rejected ? 'bg-rose-100 text-rose-700' : (w.pending ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'));
     var barCls = w.pct >= 100 ? 'bg-emerald-500' : (w.pct > 0 ? 'bg-orange-400' : 'bg-slate-200');
+    var asg = w.assigned || [];
+    var seBadges = asg.length
+      ? asg.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">' + _qcEsc(a.nama) + '</span>'; }).join('')
+      : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400">Belum ditugaskan</span>';
     return '<button onclick="bukaQCDetail(\'' + _qcEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3">'
       + '<div class="flex-1 min-w-0">'
       +   '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700">' + _qcEsc(w.noWO) + '</span>'
       +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span></div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _qcEsc(w.namaProject || '-') + '</div>'
       +   '<div class="text-[11px] text-slate-400 truncate">' + _qcEsc(w.namaKlien || '') + '</div>'
-      +   ((w.assigned && w.assigned.length) ? '<div class="text-[10px] text-indigo-500 mt-0.5 truncate"><i class="fa-solid fa-user-helmet-safety mr-1"></i>' + _qcEsc(w.assigned.map(function(a){return a.nama;}).join(', ')) + '</div>' : '')
       + '</div>'
       + '<div class="flex items-center gap-3">'
-      +   '<div class="w-28"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
-      +     '<div class="text-[10px] text-slate-400 mt-1">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +   '<div class="flex flex-col items-start sm:items-end gap-1.5">'
+      +     '<div class="flex flex-wrap gap-1 sm:justify-end">' + seBadges + '</div>'
+      +     '<div class="w-28"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
+      +       '<div class="text-[10px] text-slate-400 mt-1 sm:text-right">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +   '</div>'
       +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
       + '</div></button>';
   }).join('');
