@@ -21,7 +21,7 @@
     function _pgRenderWorkOrder(data) {
       const tbody = document.getElementById('table-workorder');
       if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">
+        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">
           <i class="fas fa-clipboard-list mr-2"></i>Belum ada Work Order. WO terbit otomatis saat penawaran berstatus <b>Deal</b>.
         </td></tr>`;
         return;
@@ -36,6 +36,9 @@
         const maxAging = (i.invoices || []).filter(inv => inv.statusBayar !== 'Lunas')
           .reduce((m, inv) => { const d = typeof _agingDays === 'function' ? _agingDays(inv.tanggal) : null; return d !== null && d > m ? d : m; }, -1);
         const agingBadgeWO = maxAging > 0 && typeof _agingBadge === 'function' ? _agingBadge(maxAging) : '';
+        // Indikator (bukan tombol) — ada catatan customer utk WO ini
+        const catatanDot = i.catatanCustomer
+          ? '<i class="fa-solid fa-comment-dots text-amber-400 text-[10px]" title="Ada catatan customer"></i>' : '';
 
         return `<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-sm cursor-pointer"
                     onclick='bukaDetailWO(${itemJson})'>
@@ -46,7 +49,7 @@
           </td>
           <td class="p-4 max-w-[200px]" data-label="Klien / Project">
             <p class="text-[11px] text-slate-400 truncate">${i.namaKlien}</p>
-            <p class="font-semibold text-slate-700 truncate">${i.namaProject}</p>
+            <p class="font-semibold text-slate-700 truncate flex items-center gap-1.5">${i.namaProject} ${catatanDot}</p>
             <p class="text-[10px] text-slate-400 mt-0.5">${i.dibuatOleh || ''}</p>
           </td>
           <td class="p-4 text-right whitespace-nowrap" data-label="Nilai Kontrak">
@@ -68,23 +71,6 @@
             <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${_woBadge(i.paymentStatus)}">${i.paymentStatus}</span>
             ${agingBadgeWO ? `<div class="mt-1">${agingBadgeWO}</div>` : ''}
           </td>
-          <td class="p-4 text-center rp-actions" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-center gap-1">
-              <button onclick='bukaDetailWO(${itemJson})'
-                class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail & Invoice">
-                <i class="fa-solid fa-eye text-sm"></i>
-              </button>
-              <button onclick='bukaModalCatatanWO(${itemJson})'
-                class="relative ${i.catatanCustomer ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="Catatan Customer">
-                <i class="fa-solid fa-comment-dots"></i>
-                ${i.catatanCustomer ? '<span class="absolute top-0.5 right-0.5 w-2 h-2 bg-amber-500 rounded-full"></span>' : ''}
-              </button>
-              <button onclick='exportWorkOrderPDF(${itemJson})'
-                class="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition" title="Export PDF WO Internal">
-                <i class="fa-solid fa-file-arrow-down"></i>
-              </button>
-            </div>
-          </td>
         </tr>`;
       }).join('');
     }
@@ -104,6 +90,11 @@
 
     // ── Load ──
     window.loadWorkOrder = function() {
+      // Selalu mulai dari daftar (bila sebelumnya user tinggalkan di halaman detail).
+      var detailView = document.getElementById('wo-detail-view');
+      var listView = document.getElementById('wo-list-view');
+      if (detailView) detailView.classList.add('hidden');
+      if (listView) listView.classList.remove('hidden');
       const tbody = document.getElementById('table-workorder');
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...</td></tr>`;
       if (typeof google !== 'undefined') {
@@ -229,14 +220,21 @@
         else btnExportLap.classList.add('hidden');
       }
 
-      el('modal-detail-wo').classList.remove('hidden');
+      document.getElementById('wo-list-view').classList.add('hidden');
+      document.getElementById('wo-detail-view').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      var scrollHost = document.getElementById('wo-detail-view').closest('.overflow-y-auto');
+      if (scrollHost) scrollHost.scrollTop = 0;
       _loadRealisasiHPP(item.noWO);
     };
 
-    window.tutupModalDetailWO = function() {
-      document.getElementById('modal-detail-wo').classList.add('hidden');
+    // Kembali dari detail WO (halaman penuh) ke daftar.
+    window.kembaliListWO = function() {
+      document.getElementById('wo-detail-view').classList.add('hidden');
+      document.getElementById('wo-list-view').classList.remove('hidden');
       _woDetailCurrent = null;
     };
+    window.tutupModalDetailWO = window.kembaliListWO; // alias kompatibilitas
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;
