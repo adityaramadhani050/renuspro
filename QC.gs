@@ -85,7 +85,8 @@ function _ensureQCMaster(ss) {
   var sec = ss.getSheetByName('QC_Section');
   if (!sec) { sec = ss.insertSheet('QC_Section'); sec.appendRow(['Kode', 'Label', 'Urutan']); sec.getRange(1, 1, 1, 3).setFontWeight('bold'); }
   var item = ss.getSheetByName('QC_Checklist');
-  if (!item) { item = ss.insertSheet('QC_Checklist'); item.appendRow(['Kode', 'Section Kode', 'Label', 'Wajib', 'Urutan']); item.getRange(1, 1, 1, 5).setFontWeight('bold'); }
+  if (!item) { item = ss.insertSheet('QC_Checklist'); item.appendRow(['Kode', 'Section Kode', 'Label', 'Wajib', 'Urutan', 'Instruksi', 'Contoh Foto']); item.getRange(1, 1, 1, 7).setFontWeight('bold'); }
+  else if (item.getLastColumn() < 7) { item.getRange(1, 6, 1, 2).setValues([['Instruksi', 'Contoh Foto']]).setFontWeight('bold'); }
 
   if (sec.getLastRow() <= 1) {
     // Sumber seed: migrasi dari QC_Checklist_Master lama bila ada, else _QC_MASTER_SEED.
@@ -165,7 +166,9 @@ function getQCChecklist() {
         label:         itData[j][2] ? itData[j][2].toString() : '',
         wajib:         (itData[j][3] != null && itData[j][3].toString().trim().toLowerCase() === 'ya'),
         sectionUrutan: s.urutan,
-        urutan:        Number(itData[j][4]) || j
+        urutan:        Number(itData[j][4]) || j,
+        instruksi:     itData[j][5] ? itData[j][5].toString() : '',
+        contohFoto:    _qcParseFoto(itData[j][6])
       });
     }
     list.sort(function (a, b) { return (a.sectionUrutan - b.sectionUrutan) || (a.urutan - b.urutan); });
@@ -231,7 +234,7 @@ function hapusQCSection(kode) {
   finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
-function tambahQCSubItem(sectionKode, label, wajib) {
+function tambahQCSubItem(sectionKode, label, wajib, instruksi) {
   var lock = LockService.getScriptLock();
   try {
     sectionKode = (sectionKode || '').toString().trim(); label = (label || '').toString().trim();
@@ -248,29 +251,98 @@ function tambahQCSubItem(sectionKode, label, wajib) {
       }
     }
     var kode = sectionKode + (maxNum + 1);
-    m.item.appendRow([kode, sectionKode, label, wajib ? 'Ya' : 'Tidak', maxU + 1]);
+    m.item.appendRow([kode, sectionKode, label, wajib ? 'Ya' : 'Tidak', maxU + 1, (instruksi || '').toString(), '']);
     return { success: true, message: 'Subitem "' + kode + '" ditambahkan.', kode: kode };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
-function updateQCSubItem(kode, label, wajib) {
+function updateQCSubItem(kode, label, wajib, instruksi) {
   var lock = LockService.getScriptLock();
   try {
     kode = (kode || '').toString().trim(); label = (label || '').toString().trim();
     if (!label) return { success: false, message: 'Nama subitem wajib diisi.' };
+    var setInstr = (instruksi != null);   // hanya ditulis bila argumen dikirim
     lock.waitLock(15000);
     var m = _ensureQCMaster(getSpreadsheet());
     var d = m.item.getDataRange().getValues();
     for (var i = 1; i < d.length; i++) {
       if ((d[i][0] || '').toString().trim() === kode) {
         m.item.getRange(i + 1, 3, 1, 2).setValues([[label, wajib ? 'Ya' : 'Tidak']]);
+        if (setInstr) m.item.getRange(i + 1, 6).setValue(instruksi.toString());
         return { success: true, message: 'Subitem diperbarui.' };
       }
     }
     return { success: false, message: 'Subitem tidak ditemukan.' };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+// Cari baris QC_Checklist utk kode subitem. Return {rowIdx, row} | null.
+function _qcFindChecklistRow(itemSheet, kode) {
+  var d = itemSheet.getDataRange().getValues();
+  kode = (kode || '').toString().trim();
+  for (var i = 1; i < d.length; i++) {
+    if ((d[i][0] || '').toString().trim() === kode) return { rowIdx: i + 1, row: d[i] };
+  }
+  return null;
+}
+
+// Upload foto contoh untuk subitem checklist (base64 → Drive/_Contoh Checklist).
+function uploadQCContohFoto(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var kode = (payload.kode || '').toString().trim();
+    var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
+    var mimeType = payload.mimeType ? payload.mimeType.toString() : 'image/jpeg';
+    if (!kode) return { success: false, message: 'Kode subitem wajib.' };
+    if (!base64Data) return { success: false, message: 'File tidak boleh kosong.' };
+    var origName = payload.fileName ? payload.fileName.toString() : '';
+    var ext = (origName.indexOf('.') !== -1) ? origName.split('.').pop().toLowerCase() : '';
+    if (!ext) ext = (mimeType.split('/')[1] || 'jpg').toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+
+    lock.waitLock(20000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var found = _qcFindChecklistRow(m.item, kode);
+    if (!found) return { success: false, message: 'Subitem tidak ditemukan.' };
+    var existing = _qcParseFoto(found.row[6]);
+    var fileName = kode + '-contoh-' + (existing.length + 1) + '.' + ext;
+
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(bytes, mimeType, fileName);
+    var file = _getQCFolder('_Contoh Checklist').createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    existing.push({ fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName });
+    m.item.getRange(found.rowIdx, 7).setValue(JSON.stringify(existing));
+    return { success: true, message: 'Foto contoh tersimpan.', contohFoto: existing };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// Hapus 1 foto contoh dari subitem.
+function hapusQCContohFoto(kode, fileId) {
+  var lock = LockService.getScriptLock();
+  try {
+    kode = (kode || '').toString().trim();
+    fileId = (fileId || '').toString().trim();
+    lock.waitLock(15000);
+    var m = _ensureQCMaster(getSpreadsheet());
+    var found = _qcFindChecklistRow(m.item, kode);
+    if (!found) return { success: false, message: 'Subitem tidak ditemukan.' };
+    var arr = _qcParseFoto(found.row[6]).filter(function (f) { return f.fileId !== fileId; });
+    m.item.getRange(found.rowIdx, 7).setValue(JSON.stringify(arr));
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+    return { success: true, message: 'Foto contoh dihapus.', contohFoto: arr };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
 }
 
 function hapusQCSubItem(kode) {
@@ -327,6 +399,8 @@ function _qcMergeItem(master, itemRow) {
     label:        master.label,
     wajib:        master.wajib,
     urutan:       master.urutan,
+    instruksi:    master.instruksi || '',
+    contohFoto:   master.contohFoto || [],
     foto:         foto,
     status:       status,
     catatanSPV:   itemRow && itemRow[5] ? itemRow[5].toString() : '',
