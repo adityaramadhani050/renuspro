@@ -276,11 +276,12 @@ function _qcBuildPDF(d) {
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, BLUE);
   doc.text('RINGKASAN', ML, y); y += 4;
   var pct = s.pct || 0;
-  doc.setFillColor(226,232,240); doc.roundedRect(ML, y, CW - 30, 5, 1.2, 1.2, 'F');
-  var fillW = Math.max(0, Math.min(1, pct / 100)) * (CW - 30);
+  var barW = CW - 14;   // sisakan ~14mm untuk teks persentase tepat di samping bar
+  doc.setFillColor(226,232,240); doc.roundedRect(ML, y, barW, 5, 1.2, 1.2, 'F');
+  var fillW = Math.max(0, Math.min(1, pct / 100)) * barW;
   if (fillW > 0) { doc.setFillColor.apply(doc, pct >= 100 ? [5,150,105] : [249,115,22]); doc.roundedRect(ML, y, fillW, 5, 1.2, 1.2, 'F'); }
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc, DARK);
-  doc.text(pct + '%', PW - MR, y + 4, { align:'right' });
+  doc.text(pct + '%', ML + barW + 2, y + 4);
   y += 9;
 
   var kpis = [
