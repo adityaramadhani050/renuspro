@@ -139,7 +139,7 @@ function bukaFormSiteSurvey() {
 
 var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', 'ss-arahBangunan', 'ss-tinggiBangunan',
   'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
-  'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi', 'ss-bosCaption',
+  'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi',
   'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapPanjang', 'ss-atapLebar', 'ss-atapMounting',
   'ss-panjangPV', 'ss-panjangAC', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
@@ -222,8 +222,7 @@ var _SS_STEP_REQUIRED = {
       { id: 'ss-bosPanjang', label: 'Panjang Area BoS' },
       { id: 'ss-bosLebar', label: 'Lebar Area BoS' },
       { id: 'ss-bosJenisTembok', label: 'Jenis Tembok' },
-      { id: 'ss-bosJarakInterkoneksi', label: 'Jarak BoS ke Titik Interkoneksi' },
-      { id: 'ss-bosCaption', label: 'Caption Foto BoS' }
+      { id: 'ss-bosJarakInterkoneksi', label: 'Jarak BoS ke Titik Interkoneksi' }
     ],
     fotos: [{ key: 'bosFoto', label: 'Foto Area BoS' }]
   },
@@ -255,9 +254,10 @@ function _ssValidateStep(n) {
     var el = document.getElementById(cfg.fields[i].id);
     if (!el || !(el.value || '').trim()) return cfg.fields[i].label + ' wajib diisi.';
   }
-  if (cfg.coords && !_ssLatLng) return 'Titik Koordinat wajib diisi (ambil lokasi, cari alamat, klik di peta, atau isi manual).';
+  if (cfg.coords && !_ssLatLng) return 'Titik Koordinat wajib diisi (ambil lokasi, klik di peta, atau isi manual).';
   for (var j = 0; j < cfg.fotos.length; j++) {
-    if (!_ssPhotos[cfg.fotos[j].key]) return cfg.fotos[j].label + ' wajib diupload.';
+    var arr = _ssPhotos[cfg.fotos[j].key];
+    if (!arr || !arr.length) return cfg.fotos[j].label + ' wajib diupload.';
   }
   return null;
 }
@@ -357,59 +357,96 @@ function _ssFotoAnotMode(fieldKey) {
   return box ? (box.getAttribute('data-anot') || null) : null;
 }
 
+// Setiap field foto menyimpan ARRAY foto (bisa lebih dari 1), masing-masing
+// {fileId, fileUrl, caption}. Tombol Kamera/Galeri tetap tampil setelah upload
+// agar bisa terus menambah foto.
 function _ssRenderFotoSlot(fieldKey) {
   var box = document.getElementById('ss-foto-' + fieldKey);
   if (!box) return;
-  var f = _ssPhotos[fieldKey];
-  if (f) {
-    box.innerHTML = '<div class="relative inline-block">'
-      + '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
-      +   '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
-      + '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
+  var arr = _ssPhotos[fieldKey] || [];
+  var anotMode = box.getAttribute('data-anot');
+
+  var thumbsHtml = arr.map(function(f) {
+    return '<div class="inline-block align-top">'
+      + '<div class="relative inline-block">'
+      +   '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
+      +     '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
+      +   '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\', \'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
+      + '</div>'
+      + '<input type="text" value="' + _ssEsc(f.caption || '') + '" placeholder="Keterangan foto..." onchange="_ssFotoCaptionChange(\'' + fieldKey + '\', \'' + f.fileId + '\', this.value)" class="mt-1 w-24 px-1.5 py-1 text-[10px] border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400">'
       + '</div>';
-    return;
-  }
-  box.innerHTML = '<div class="flex items-center gap-2">'
+  }).join('');
+
+  var uploadBtns = '<div class="flex items-center gap-2 mt-2">'
     + '<label class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
     +   '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_ssHandleFotoInput(\'' + fieldKey + '\', this)"></label>'
     + '<label class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-regular fa-images"></i> Galeri'
-    +   '<input type="file" accept="image/*" class="hidden" onchange="_ssHandleFotoInput(\'' + fieldKey + '\', this)"></label>'
+    +   '<input type="file" accept="image/*"' + (anotMode ? '' : ' multiple') + ' class="hidden" onchange="_ssHandleFotoInput(\'' + fieldKey + '\', this)"></label>'
     + '</div>';
+
+  box.innerHTML = (thumbsHtml ? '<div class="flex flex-wrap gap-3">' + thumbsHtml + '</div>' : '') + uploadBtns;
 }
 
+// Field beranotasi (kotak/garis) hanya proses 1 foto per pilih (perlu digambar
+// manual); field biasa boleh pilih banyak foto sekaligus, diupload berurutan.
 function _ssHandleFotoInput(fieldKey, inputEl) {
-  var file = inputEl.files && inputEl.files[0];
+  var files = Array.prototype.slice.call(inputEl.files || []);
   inputEl.value = '';
-  if (!file) return;
-  if (file.size > 15 * 1024 * 1024) { showNotification('Ukuran foto maksimal 15MB.', 'error'); return; }
+  if (!files.length) return;
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].size > 15 * 1024 * 1024) { showNotification('Ukuran foto maksimal 15MB: ' + files[i].name, 'error'); return; }
+  }
   var anotMode = _ssFotoAnotMode(fieldKey);
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    if (anotMode) _ssAnotOpen(anotMode, fieldKey, e.target.result, file.type);
-    else _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type);
-  };
-  reader.onerror = function() { showNotification('Gagal membaca file.', 'error'); };
-  reader.readAsDataURL(file);
+  if (anotMode) {
+    var reader1 = new FileReader();
+    reader1.onload = function(e) { _ssAnotOpen(anotMode, fieldKey, e.target.result, files[0].type); };
+    reader1.onerror = function() { showNotification('Gagal membaca file.', 'error'); };
+    reader1.readAsDataURL(files[0]);
+    return;
+  }
+  var idx = 0;
+  function next() {
+    if (idx >= files.length) return;
+    var file = files[idx];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type, function() { idx++; next(); });
+    };
+    reader.onerror = function() { showNotification('Gagal membaca file.', 'error'); idx++; next(); };
+    reader.readAsDataURL(file);
+  }
+  next();
 }
 
-function _ssUploadFoto(fieldKey, base64, fileName, mimeType) {
+function _ssUploadFoto(fieldKey, base64, fileName, mimeType, onDone) {
   if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
   toggleLoader(true, 'Mengupload foto...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
-    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); return; }
-    _ssPhotos[fieldKey] = res.foto;
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); if (onDone) onDone(); return; }
+    if (!_ssPhotos[fieldKey]) _ssPhotos[fieldKey] = [];
+    res.foto.caption = '';
+    _ssPhotos[fieldKey].push(res.foto);
     _ssRenderFotoSlot(fieldKey);
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); })
+    if (onDone) onDone();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); if (onDone) onDone(); })
     .uploadSiteSurveyFoto({ surveyId: _ssCurrentId, fieldKey: fieldKey, base64Data: base64, fileName: fileName, mimeType: mimeType });
 }
 
-function _ssHapusFotoSlot(fieldKey) {
-  var f = _ssPhotos[fieldKey];
-  if (!f) return;
-  delete _ssPhotos[fieldKey];
+function _ssFotoCaptionChange(fieldKey, fileId, value) {
+  var arr = _ssPhotos[fieldKey] || [];
+  var f = arr.filter(function(x) { return x.fileId === fileId; })[0];
+  if (f) f.caption = value;
+}
+
+function _ssHapusFotoSlot(fieldKey, fileId) {
+  var arr = _ssPhotos[fieldKey] || [];
+  var idx = -1;
+  for (var i = 0; i < arr.length; i++) { if (arr[i].fileId === fileId) { idx = i; break; } }
+  if (idx === -1) return;
+  arr.splice(idx, 1);
   _ssRenderFotoSlot(fieldKey);
-  google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
+  google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(fileId);
 }
 
 // ── Editor anotasi foto (kotak utk BoS, garis utk jalur kabel) ──────
@@ -540,24 +577,24 @@ function _ssSubmit() {
     longitude: _ssLatLng ? _ssLatLng.lng : null,
     arahBangunan: g('ss-arahBangunan'),
     tinggiBangunan: gn('ss-tinggiBangunan'),
-    fotoBangunan: _ssPhotos.fotoBangunan || null,
+    fotoBangunan: _ssPhotos.fotoBangunan || [],
     kelistrikan: {
       idPelangganPLN: g('ss-idPelangganPLN'), dayaPLN: gn('ss-dayaPLN'), phase: g('ss-phase'),
-      ratingBreaker: gn('ss-ratingBreaker'), fotoKwh: _ssPhotos.fotoKwh || null, fotoPHB: _ssPhotos.fotoPHB || null
+      ratingBreaker: gn('ss-ratingBreaker'), fotoKwh: _ssPhotos.fotoKwh || [], fotoPHB: _ssPhotos.fotoPHB || []
     },
     bos: {
       lokasi: g('ss-bosLokasi'), panjang: gn('ss-bosPanjang'), lebar: gn('ss-bosLebar'),
       jenisTembok: g('ss-bosJenisTembok'), jarakInterkoneksi: gn('ss-bosJarakInterkoneksi'),
-      foto: _ssPhotos.bosFoto ? { fileId: _ssPhotos.bosFoto.fileId, fileUrl: _ssPhotos.bosFoto.fileUrl, caption: g('ss-bosCaption') } : null
+      foto: _ssPhotos.bosFoto || []
     },
     atap: {
       jenis: g('ss-atapJenis'), arah: g('ss-atapArah'), rangka: g('ss-atapRangka'),
       panjang: gn('ss-atapPanjang'), lebar: gn('ss-atapLebar'),
-      mounting: g('ss-atapMounting'), fotoAtap: _ssPhotos.fotoAtap || null, fotoRangka: _ssPhotos.fotoRangka || null, fotoAkses: _ssPhotos.fotoAkses || null
+      mounting: g('ss-atapMounting'), fotoAtap: _ssPhotos.fotoAtap || [], fotoRangka: _ssPhotos.fotoRangka || [], fotoAkses: _ssPhotos.fotoAkses || []
     },
     jalurKabel: {
       panjangPV: gn('ss-panjangPV'), panjangAC: gn('ss-panjangAC'),
-      fotoPV: _ssPhotos.fotoPV || null, fotoAC: _ssPhotos.fotoAC || null
+      fotoPV: _ssPhotos.fotoPV || [], fotoAC: _ssPhotos.fotoAC || []
     }
   };
 
@@ -613,7 +650,7 @@ function _ssRenderDetail() {
     + '</div>'
     + '<p class="text-xs text-slate-500 mt-2"><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>' + _ssEsc(d.alamat || '-') + '</p>'
     + (d.latitude != null && d.longitude != null
-        ? '<a href="https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude + '" target="_blank" class="text-[11px] text-blue-600 hover:text-blue-700 font-bold mt-1 inline-block"><i class="fa-solid fa-map-location-dot mr-1"></i>' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) + ' — Buka di Google Maps</a>'
+        ? '<a href="https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude + '" target="_blank" class="inline-flex items-center gap-1.5 mt-2 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-map-location-dot"></i>' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) + ' — Buka di Google Maps</a>'
         : '');
 
   var kel = d.kelistrikan || {}, bos = d.bos || {}, atap = d.atap || {}, jk = d.jalurKabel || {};
@@ -622,7 +659,20 @@ function _ssRenderDetail() {
     if (!f || !f.fileId) return '';
     // data-* + event delegation (bukan onclick inline) agar tak rawan bug
     // escaping kutip pada URL Drive yang panjang/kompleks.
-    return '<button type="button" class="ss-foto-view block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+    var img = '<button type="button" class="ss-foto-view block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+    return '<div class="w-20">' + img + (f.caption ? '<p class="text-[10px] text-slate-500 mt-1 break-words">' + _ssEsc(f.caption) + '</p>' : '') + '</div>';
+  }
+  // Label per field ditampilkan di atas kelompok foto-nya agar jelas foto
+  // mana untuk field mana (mis. "Foto kWh Meter" vs "Foto PHB"). Setiap foto
+  // punya keterangan (caption) masing-masing bila diisi saat upload.
+  function fotoGroup(label, arr) {
+    arr = Array.isArray(arr) ? arr : (arr ? [arr] : []);
+    arr = arr.filter(function(f) { return f && f.fileId; });
+    if (!arr.length) return '';
+    return '<div>'
+      + '<p class="text-[10px] text-slate-400 uppercase font-semibold mb-1.5">' + _ssEsc(label) + '</p>'
+      + '<div class="flex flex-wrap gap-3">' + arr.map(fotoThumb).join('') + '</div>'
+      + '</div>';
   }
   function row(label, val) {
     var has = val || val === 0;
@@ -640,7 +690,7 @@ function _ssRenderDetail() {
     +   row('Arah Hadap Bangunan', d.arahBangunan)
     +   row('Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '')
     + '</div>'
-    + (fotoThumb(d.fotoBangunan) ? '<div class="flex flex-wrap gap-2">' + fotoThumb(d.fotoBangunan) + '</div>' : ''));
+    + fotoGroup('Foto Bangunan Tampak Depan', d.fotoBangunan));
 
   body += section('B. Informasi Kelistrikan', 'fa-bolt',
       '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">'
@@ -649,7 +699,8 @@ function _ssRenderDetail() {
     +   row('Phase', kel.phase)
     +   row('Rating Breaker', kel.ratingBreaker ? kel.ratingBreaker + ' A' : '')
     + '</div>'
-    + '<div class="flex flex-wrap gap-2">' + fotoThumb(kel.fotoKwh) + fotoThumb(kel.fotoPHB) + '</div>');
+    + fotoGroup('Foto kWh Meter', kel.fotoKwh)
+    + fotoGroup('Foto Panel Hubung Bagi (PHB)', kel.fotoPHB));
 
   body += section('C. Balance of System (BoS)', 'fa-server',
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
@@ -658,8 +709,7 @@ function _ssRenderDetail() {
     +   row('Jenis Tembok', bos.jenisTembok)
     +   row('Jarak ke Interkoneksi', bos.jarakInterkoneksi ? bos.jarakInterkoneksi + ' m' : '')
     + '</div>'
-    + (fotoThumb(bos.foto) ? '<div class="flex flex-wrap gap-2">' + fotoThumb(bos.foto) + '</div>' : '')
-    + (bos.foto && bos.foto.caption ? '<p class="text-xs text-slate-500 italic">"' + _ssEsc(bos.foto.caption) + '"</p>' : ''));
+    + fotoGroup('Foto Area BoS & Titik Interkoneksi', bos.foto));
 
   body += section('D. Informasi Atap', 'fa-house-chimney',
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
@@ -669,14 +719,17 @@ function _ssRenderDetail() {
     +   row('Jenis Mounting', atap.mounting)
     +   row('Ukuran Atap', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '')
     + '</div>'
-    + '<div class="flex flex-wrap gap-2">' + fotoThumb(atap.fotoAtap) + fotoThumb(atap.fotoRangka) + fotoThumb(atap.fotoAkses) + '</div>');
+    + fotoGroup('Foto Atap', atap.fotoAtap)
+    + fotoGroup('Foto Rangka Atap', atap.fotoRangka)
+    + fotoGroup('Foto Akses ke Atap', atap.fotoAkses));
 
   body += section('E. Jalur Kabel', 'fa-timeline',
       '<div class="grid grid-cols-2 gap-3">'
     +   row('Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : '')
     +   row('Panjang Kabel AC', jk.panjangAC ? jk.panjangAC + ' m' : '')
     + '</div>'
-    + '<div class="flex flex-wrap gap-2">' + fotoThumb(jk.fotoPV) + fotoThumb(jk.fotoAC) + '</div>');
+    + fotoGroup('Foto Jalur Kabel PV', jk.fotoPV)
+    + fotoGroup('Foto Jalur Kabel AC', jk.fotoAC));
 
   document.getElementById('ss-detail-body').innerHTML = body;
 }

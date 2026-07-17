@@ -9,16 +9,18 @@
  *   ID | Tanggal Survey | Dibuat Oleh | Nama Site | Nama PIC | No Telepon |
  *   Alamat | Latitude | Longitude | Data (JSON) | Dibuat Pada
  *
- * Kolom "Data" (JSON) menampung field per-bagian selain info umum di atas:
- *   { arahBangunan, tinggiBangunan, fotoBangunan:{fileId,fileUrl},
+ * Kolom "Data" (JSON) menampung field per-bagian selain info umum di atas.
+ * Setiap field foto adalah ARRAY (boleh lebih dari 1 foto), tiap item
+ * {fileId, fileUrl, caption}:
+ *   { arahBangunan, tinggiBangunan, fotoBangunan:[{fileId,fileUrl,caption}],
  *     kelistrikan:{idPelangganPLN,dayaPLN,phase,ratingBreaker,
- *                  fotoKwh:{fileId,fileUrl}, fotoPHB:{fileId,fileUrl}},
+ *                  fotoKwh:[...], fotoPHB:[...]},
  *     bos:{lokasi,panjang,lebar,jenisTembok,jarakInterkoneksi,
- *          foto:{fileId,fileUrl,caption}},
- *     atap:{jenis,arah,rangka,luas,mounting,
- *           fotoAtap:{fileId,fileUrl}, fotoRangka:{fileId,fileUrl}, fotoAkses:{fileId,fileUrl}},
+ *          foto:[{fileId,fileUrl,caption}]},
+ *     atap:{jenis,arah,rangka,panjang,lebar,mounting,
+ *           fotoAtap:[...], fotoRangka:[...], fotoAkses:[...]},
  *     jalurKabel:{panjangPV,panjangAC,
- *                 fotoPV:{fileId,fileUrl}, fotoAC:{fileId,fileUrl}} }
+ *                 fotoPV:[...], fotoAC:[...]} }
  * File foto: Drive folder "RenusPro - Site Survey" / <ID Survey>.
  */
 
