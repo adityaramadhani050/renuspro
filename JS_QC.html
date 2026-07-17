@@ -257,7 +257,9 @@ function _qcBuildPDF(d) {
     doc.setFontSize(7); doc.setTextColor(190,200,220);
     doc.text('Dicetak: ' + (d.tglExport || ''), PW - MR, 19, { align:'right' });
   }
-  function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); header(); y = 30; } }
+  // Kop gelap hanya di halaman pertama; halaman berikutnya mulai dari margin atas.
+  function newPage() { doc.addPage(); y = 16; }
+  function ensure(h) { if (y + h > BOTTOM) { newPage(); } }
 
   header();
   var y = 30;
@@ -333,7 +335,7 @@ function _qcBuildPDF(d) {
           try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
           var w = boxW, h = Math.min(26, w * (ih / iw));
           if (px + w > ML + CW) { px = ML; y += rowMaxH + gap; rowMaxH = 0; }
-          if (y + h > BOTTOM) { doc.addPage(); header(); y = 30; px = ML; rowMaxH = 0; }
+          if (y + h > BOTTOM) { newPage(); px = ML; rowMaxH = 0; }
           try { doc.addImage(f.dataUrl, px, y, w, h); } catch (e) {}
           px += w + gap; if (h > rowMaxH) rowMaxH = h;
         });
