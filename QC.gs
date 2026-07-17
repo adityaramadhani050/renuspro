@@ -141,8 +141,15 @@ function _getQCFolder(noWO) {
 }
 
 // ── Master (join Section × Checklist) ───────────────────────────────────────
+function _qcInvalidateChecklistCache() {
+  try { CacheService.getScriptCache().remove('cache_qc_checklist'); } catch (e) {}
+}
+
 function getQCChecklist() {
   try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get('cache_qc_checklist');
+    if (cached) { try { return JSON.parse(cached); } catch (e) {} }
     var m = _ensureQCMaster(getSpreadsheet());
     var secData = m.sec.getDataRange().getValues();
     var secMap = {}, sections = [];
@@ -172,7 +179,9 @@ function getQCChecklist() {
       });
     }
     list.sort(function (a, b) { return (a.sectionUrutan - b.sectionUrutan) || (a.urutan - b.urutan); });
-    return { success: true, list: list, sections: sections };
+    var out = { success: true, list: list, sections: sections };
+    try { var j = JSON.stringify(out); if (j.length < 95000) cache.put('cache_qc_checklist', j, CACHE_TTL); } catch (e) {}
+    return out;
   } catch (e) {
     return { success: false, list: [], sections: [], message: e.toString() };
   }
@@ -198,6 +207,7 @@ function tambahQCSection(label) {
     var maxU = 0, d = m.sec.getDataRange().getValues();
     for (var i = 1; i < d.length; i++) { maxU = Math.max(maxU, Number(d[i][2]) || 0); }
     m.sec.appendRow([kode, label, maxU + 1]);
+    _qcInvalidateChecklistCache();
     return { success: true, message: 'Item QC "' + kode + '. ' + label + '" ditambahkan.', kode: kode };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
@@ -212,7 +222,7 @@ function updateQCSection(kode, label) {
     var m = _ensureQCMaster(getSpreadsheet());
     var d = m.sec.getDataRange().getValues();
     for (var i = 1; i < d.length; i++) {
-      if ((d[i][0] || '').toString().trim() === kode) { m.sec.getRange(i + 1, 2).setValue(label); return { success: true, message: 'Item QC diperbarui.' }; }
+      if ((d[i][0] || '').toString().trim() === kode) { m.sec.getRange(i + 1, 2).setValue(label); _qcInvalidateChecklistCache(); return { success: true, message: 'Item QC diperbarui.' }; }
     }
     return { success: false, message: 'Item tidak ditemukan.' };
   } catch (e) { return { success: false, message: e.toString() }; }
@@ -229,6 +239,7 @@ function hapusQCSection(kode) {
     for (var i = d.length - 1; i >= 1; i--) { if ((d[i][0] || '').toString().trim() === kode) m.sec.deleteRow(i + 1); }
     var it = m.item.getDataRange().getValues();
     for (var j = it.length - 1; j >= 1; j--) { if ((it[j][1] || '').toString().trim() === kode) m.item.deleteRow(j + 1); }
+    _qcInvalidateChecklistCache();
     return { success: true, message: 'Item QC & subitemnya dihapus.' };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
@@ -252,6 +263,7 @@ function tambahQCSubItem(sectionKode, label, wajib, instruksi) {
     }
     var kode = sectionKode + (maxNum + 1);
     m.item.appendRow([kode, sectionKode, label, wajib ? 'Ya' : 'Tidak', maxU + 1, (instruksi || '').toString(), '']);
+    _qcInvalidateChecklistCache();
     return { success: true, message: 'Subitem "' + kode + '" ditambahkan.', kode: kode };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
@@ -270,6 +282,7 @@ function updateQCSubItem(kode, label, wajib, instruksi) {
       if ((d[i][0] || '').toString().trim() === kode) {
         m.item.getRange(i + 1, 3, 1, 2).setValues([[label, wajib ? 'Ya' : 'Tidak']]);
         if (setInstr) m.item.getRange(i + 1, 6).setValue(instruksi.toString());
+        _qcInvalidateChecklistCache();
         return { success: true, message: 'Subitem diperbarui.' };
       }
     }
@@ -316,6 +329,7 @@ function uploadQCContohFoto(payload) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     existing.push({ fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName });
     m.item.getRange(found.rowIdx, 7).setValue(JSON.stringify(existing));
+    _qcInvalidateChecklistCache();
     return { success: true, message: 'Foto contoh tersimpan.', contohFoto: existing };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -337,6 +351,7 @@ function hapusQCContohFoto(kode, fileId) {
     var arr = _qcParseFoto(found.row[6]).filter(function (f) { return f.fileId !== fileId; });
     m.item.getRange(found.rowIdx, 7).setValue(JSON.stringify(arr));
     try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+    _qcInvalidateChecklistCache();
     return { success: true, message: 'Foto contoh dihapus.', contohFoto: arr };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -352,7 +367,7 @@ function hapusQCSubItem(kode) {
     lock.waitLock(15000);
     var m = _ensureQCMaster(getSpreadsheet());
     var d = m.item.getDataRange().getValues();
-    for (var i = d.length - 1; i >= 1; i--) { if ((d[i][0] || '').toString().trim() === kode) { m.item.deleteRow(i + 1); return { success: true, message: 'Subitem dihapus.' }; } }
+    for (var i = d.length - 1; i >= 1; i--) { if ((d[i][0] || '').toString().trim() === kode) { m.item.deleteRow(i + 1); _qcInvalidateChecklistCache(); return { success: true, message: 'Subitem dihapus.' }; } }
     return { success: false, message: 'Subitem tidak ditemukan.' };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
@@ -765,13 +780,10 @@ function getQCDashboard(opts) {
     }
     var assignedMap = _qcAssignedMap();
     var siteUserId = (opts && opts.siteUserId) ? opts.siteUserId.toString().trim() : '';
-    // Hanya WO yang terdaftar di QC (bukan seluruh WO). Nama project/klien
-    // di-refresh dari master WO bila masih ada, jika tidak pakai snapshot.
-    var woMap = {};
-    try { (getWorkOrderList() || []).forEach(function (wo) { woMap[wo.noWO] = wo; }); } catch (e) {}
+    // Hanya WO yang terdaftar di QC (bukan seluruh WO). Nama project/klien pakai
+    // snapshot registry — hindari getWorkOrderList() yang berat di jalur panas.
     var woList = _qcRegisteredWOs().map(function (r) {
-      var wo = woMap[r.noWO] || {};
-      return { noWO: r.noWO, namaProject: wo.namaProject || r.namaProject, namaKlien: wo.namaKlien || r.namaKlien, status: wo.status || '' };
+      return { noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien, status: '' };
     });
     if (siteUserId) {
       woList = woList.filter(function (wo) {
