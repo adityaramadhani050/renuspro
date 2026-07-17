@@ -48,6 +48,17 @@ if (typeof L !== 'undefined') {
   });
 }
 
+// Delegasi klik thumbnail foto (form-view & modal detail) ke lightbox QC.
+// Dipasang sekali di document — tak perlu re-attach tiap kali innerHTML
+// dirender ulang, dan menghindari onclick inline yg rawan bug escaping kutip.
+document.addEventListener('click', function(ev) {
+  var btn = ev.target.closest ? ev.target.closest('.ss-foto-view') : null;
+  if (!btn) return;
+  var fileId = btn.getAttribute('data-fileid');
+  var fileUrl = btn.getAttribute('data-fileurl');
+  if (fileId && typeof _qcViewFoto === 'function') _qcViewFoto(fileId, fileUrl);
+});
+
 // ── Load daftar (tabel + pagination) ────────────────────────────────
 window.loadSiteSurvey = function() {
   document.getElementById('ss-form-view').classList.add('hidden');
@@ -352,7 +363,7 @@ function _ssRenderFotoSlot(fieldKey) {
   var f = _ssPhotos[fieldKey];
   if (f) {
     box.innerHTML = '<div class="relative inline-block">'
-      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
+      + '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
       +   '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
       + '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
       + '</div>';
@@ -609,7 +620,9 @@ function _ssRenderDetail() {
 
   function fotoThumb(f) {
     if (!f || !f.fileId) return '';
-    return '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+    // data-* + event delegation (bukan onclick inline) agar tak rawan bug
+    // escaping kutip pada URL Drive yang panjang/kompleks.
+    return '<button type="button" class="ss-foto-view block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
   }
   function row(label, val) {
     var has = val || val === 0;
