@@ -38,71 +38,193 @@ function generateNextWONumber(sheet) {
   return yy + nextSeq; // "26012"
 }
 
-// ── Daftar Work Order: semua penawaran Deal yang sudah punya No WO ───────────
-function getWorkOrderList() {
+// ════════════════════════════════════════════════════════════════════════════
+//  SHEET WORK ORDER TERSENDIRI (proyeksi dari Penawaran_Main).
+//  Alasan: memindai seluruh Penawaran_Main tiap baca WO makin berat seiring
+//  data penawaran bertambah. Work_Order menyimpan HANYA WO (Deal/Closed +
+//  No WO), disinkron dari satu titik `_syncWorkOrder(noPenawaran)` di setiap
+//  jalur tulis penawaran. Sumber kebenaran tetap Penawaran; sheet ini salinan
+//  cepat yang di-cache.
+//  Kolom: No WO | No Penawaran | Rev | Tanggal | Valid Until | Nama Project |
+//         Klien ID | Nama Klien | Dibuat Oleh | Subtotal | Diskon | Pajak |
+//         Grand Total | HPP | Profit | Margin% | Term Conditions | Items |
+//         Status | Tanggal Deal
+// ════════════════════════════════════════════════════════════════════════════
+var _WO_HEADERS = ['No WO', 'No Penawaran', 'Rev', 'Tanggal', 'Valid Until', 'Nama Project',
+  'Klien ID', 'Nama Klien', 'Dibuat Oleh', 'Subtotal', 'Diskon', 'Pajak', 'Grand Total',
+  'HPP', 'Profit', 'Margin %', 'Term Conditions', 'Items', 'Status', 'Tanggal Deal'];
+
+function _woKlienMap(ss) {
+  var m = {};
+  var kd = _cachedKlien();
+  for (var i = 1; i < kd.length; i++) { if (kd[i][0]) m[kd[i][0].toString()] = kd[i][1].toString(); }
+  return m;
+}
+
+// Bangun 1 baris Work_Order dari baris Penawaran_Main (rev tertinggi).
+function _woRecordFromPenRow(row, rev, klienMap) {
+  var klienId = (row[5] != null ? row[5] : '').toString();
+  var noWO = (row[17] !== '' && row[17] != null) ? row[17].toString() : '';
+  return [
+    noWO,
+    (row[0] != null ? row[0] : '').toString(),
+    (rev != null ? rev : (parseInt(row[1]) || 0)).toString(),
+    _fmtTgl(row[2]), _fmtTgl(row[3]),
+    (row[4] != null ? row[4] : '').toString(),
+    klienId, klienMap[klienId] || klienId,
+    (row[6] != null ? row[6] : '').toString(),
+    parseFloat(row[7]) || 0, parseFloat(row[8]) || 0, parseFloat(row[9]) || 0, parseFloat(row[10]) || 0,
+    parseFloat(row[11]) || 0, parseFloat(row[12]) || 0, parseFloat(row[13]) || 0,
+    row[14] ? row[14].toString() : '{}',
+    row[15] ? row[15].toString() : '[]',
+    (row[16] != null ? row[16] : '').toString(),
+    _fmtTgl(row[18])
+  ];
+}
+
+function _backfillWorkOrderSheet(ss, sheet) {
+  var pen = ss.getSheetByName('Penawaran_Main');
+  if (!pen || pen.getLastRow() < 2) return;
+  var data = pen.getDataRange().getValues();
+  var klienMap = _woKlienMap(ss);
+  var latest = {};
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    var noPen = data[i][0].toString().trim();
+    var rev = parseInt(data[i][1]) || 0;
+    if (!latest[noPen] || rev > latest[noPen].rev) latest[noPen] = { rev: rev, row: data[i] };
+  }
+  var rows = [];
+  for (var k in latest) {
+    var r = latest[k].row;
+    var status = r[16] ? r[16].toString() : '';
+    var noWO = (r[17] !== '' && r[17] != null) ? r[17].toString() : '';
+    if ((status !== 'Deal' && status !== 'Closed') || !noWO) continue;
+    rows.push(_woRecordFromPenRow(r, latest[k].rev, klienMap));
+  }
+  if (rows.length) sheet.getRange(2, 1, rows.length, _WO_HEADERS.length).setValues(rows);
+}
+
+function _ensureWorkOrderSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Work_Order');
+  if (sheet) return sheet;
+  sheet = ss.insertSheet('Work_Order');
+  sheet.appendRow(_WO_HEADERS);
+  sheet.getRange(1, 1, 1, _WO_HEADERS.length).setFontWeight('bold');
+  _backfillWorkOrderSheet(ss, sheet);   // migrasi sekali dari penawaran existing
+  return sheet;
+}
+
+function _cachedWorkOrder() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('cache_workorder');
+  if (c) { try { return JSON.parse(c); } catch (e) {} }
+  var ss = getSpreadsheet();
+  var sheet = _ensureWorkOrderSheet(ss);
+  var data = sheet.getDataRange().getValues().map(function (row) {
+    return row.map(function (cell) { return cell instanceof Date ? cell.toISOString() : cell; });
+  });
+  try { var j = JSON.stringify(data); if (j.length < 95000) cache.put('cache_workorder', j, CACHE_TTL); } catch (e) {}
+  return data;
+}
+
+function invalidateWorkOrderCache() { try { CacheService.getScriptCache().remove('cache_workorder'); } catch (e) {} }
+
+// Titik sinkron tunggal: hitung ulang snapshot WO utk 1 penawaran (rev tertinggi).
+// Dipanggil dari setiap jalur tulis penawaran (deal, edit, restore, hapus, close).
+function _syncWorkOrder(noPenawaran) {
   try {
-    const klienMap = {};
-    const kd = _cachedKlien();
-    for (let i = 1; i < kd.length; i++) {
-      if (kd[i][0]) klienMap[kd[i][0].toString()] = kd[i][1].toString();
+    noPenawaran = (noPenawaran || '').toString().trim();
+    if (!noPenawaran) return;
+    var ss = getSpreadsheet();
+    var pen = ss.getSheetByName('Penawaran_Main');
+    if (!pen) return;
+    var pdata = pen.getDataRange().getValues();
+    var best = null, bestRev = -1;
+    for (var i = 1; i < pdata.length; i++) {
+      if (!pdata[i][0] || pdata[i][0].toString().trim() !== noPenawaran) continue;
+      var rev = parseInt(pdata[i][1]) || 0;
+      if (rev > bestRev) { bestRev = rev; best = pdata[i]; }
     }
-
-    const data = _cachedPenawaran();
-    if (!data || data.length === 0) return [];
-    const list = [];
-
-    // Deduplikasi: ambil revisi tertinggi per noPenawaran
-    const latestRevMap = {};
-    for (let i = 1; i < data.length; i++) {
-      if (!data[i][0]) continue;
-      const noPen = data[i][0].toString().trim();
-      const rev   = parseInt(data[i][1]) || 0;
-      if (!latestRevMap[noPen] || rev > latestRevMap[noPen].rev) {
-        latestRevMap[noPen] = { rev, rowIdx: i };
+    var qualifies = false, record = null;
+    if (best) {
+      var status = best[16] ? best[16].toString() : '';
+      var noWO = (best[17] !== '' && best[17] != null) ? best[17].toString() : '';
+      if ((status === 'Deal' || status === 'Closed') && noWO) {
+        qualifies = true;
+        record = _woRecordFromPenRow(best, bestRev, _woKlienMap(ss));
       }
     }
+    var woSheet = _ensureWorkOrderSheet(ss);
+    var wdata = woSheet.getDataRange().getValues();
+    var foundRow = -1;
+    for (var j = 1; j < wdata.length; j++) {
+      if ((wdata[j][1] || '').toString().trim() === noPenawaran) { foundRow = j + 1; break; }
+    }
+    if (qualifies) {
+      if (foundRow > 0) woSheet.getRange(foundRow, 1, 1, _WO_HEADERS.length).setValues([record]);
+      else woSheet.appendRow(record);
+    } else if (foundRow > 0) {
+      woSheet.deleteRow(foundRow);
+    }
+    invalidateWorkOrderCache();
+  } catch (e) { Logger.log('_syncWorkOrder error: ' + e); }
+}
 
-    for (const noPen in latestRevMap) {
-      const i      = latestRevMap[noPen].rowIdx;
-      const status = data[i][16] ? data[i][16].toString() : '';
-      const noWO   = (data[i][17] !== '' && data[i][17] != null) ? data[i][17].toString() : '';
-      if ((status !== 'Deal' && status !== 'Closed') || !noWO) continue;
+// Bangun ulang seluruh sheet Work_Order dari penawaran (perbaikan manual).
+function rebuildWorkOrderSheet() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    var ss = getSpreadsheet();
+    var old = ss.getSheetByName('Work_Order');
+    if (old) ss.deleteSheet(old);
+    _ensureWorkOrderSheet(ss);   // buat ulang + backfill
+    invalidateWorkOrderCache();
+    return { success: true, message: 'Sheet Work_Order dibangun ulang.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally { try { lock.releaseLock(); } catch (e) {} }
+}
 
-      const tglStr   = _fmtTgl(data[i][2]);
-      const validStr = _fmtTgl(data[i][3]);
-      const klienId = data[i][5].toString();
-
+// ── Daftar Work Order: baca dari sheet Work_Order (cepat & di-cache) ─────────
+function getWorkOrderList() {
+  try {
+    var data = _cachedWorkOrder();
+    if (!data || data.length < 2) return [];
+    var catatanMap = _getCatatanWOMap();
+    var list = [];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      var noWO = (r[0] !== '' && r[0] != null) ? r[0].toString() : '';
+      if (!noWO) continue;
       list.push({
         noWO:           noWO,
-        id:             noPen,
-        rev:            latestRevMap[noPen].rev.toString(),
-        tanggal:        tglStr,
-        validUntil:     validStr,
-        namaProject:    data[i][4].toString(),
-        klienId:        klienId,
-        namaKlien:      klienMap[klienId] || klienId,
-        dibuatOleh:     data[i][6].toString(),
-        subtotal:       parseFloat(data[i][7])  || 0,
-        diskon:         parseFloat(data[i][8])  || 0,
-        pajak:          parseFloat(data[i][9])  || 0,
-        grandTotal:     parseFloat(data[i][10]) || 0,
-        hpp:            parseFloat(data[i][11]) || 0,
-        profit:         parseFloat(data[i][12]) || 0,
-        marginPersen:   parseFloat(data[i][13]) || 0,
-        termConditions: data[i][14] ? data[i][14].toString() : '{}',
-        items:          data[i][15] ? data[i][15].toString() : '[]',
-        status:         status
+        id:             (r[1] || '').toString(),
+        rev:            (r[2] != null ? r[2] : '').toString(),
+        tanggal:        (r[3] || '').toString(),
+        validUntil:     (r[4] || '').toString(),
+        namaProject:    (r[5] || '').toString(),
+        klienId:        (r[6] || '').toString(),
+        namaKlien:      (r[7] || '').toString(),
+        dibuatOleh:     (r[8] || '').toString(),
+        subtotal:       parseFloat(r[9])  || 0,
+        diskon:         parseFloat(r[10]) || 0,
+        pajak:          parseFloat(r[11]) || 0,
+        grandTotal:     parseFloat(r[12]) || 0,
+        hpp:            parseFloat(r[13]) || 0,
+        profit:         parseFloat(r[14]) || 0,
+        marginPersen:   parseFloat(r[15]) || 0,
+        termConditions: (r[16] || '{}').toString(),
+        items:          (r[17] || '[]').toString(),
+        status:         (r[18] || '').toString(),
+        catatanCustomer: catatanMap[noWO] || ''
       });
     }
-
-    // Sisipkan catatan customer per No WO
-    const catatanMap = _getCatatanWOMap();
-    list.forEach(wo => { wo.catatanCustomer = catatanMap[wo.noWO] || ''; });
-
-    // Urutkan No WO terbaru di atas (numeric-aware)
-    list.sort((a, b) => b.noWO.localeCompare(a.noWO, undefined, { numeric: true }));
+    list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
     return list;
-  } catch(e) {
+  } catch (e) {
     Logger.log('getWorkOrderList error: ' + e);
     return [];
   }
@@ -294,6 +416,7 @@ function closeWorkOrder(noWO, namaUser) {
     const noWOStr = String(noWO);
     let   found   = false;
 
+    let syncNoPen = '';
     for (let i = 1; i < data.length; i++) {
       const rowNoWO = data[i][17] !== '' && data[i][17] != null ? data[i][17].toString() : '';
       if (rowNoWO !== noWOStr) continue;
@@ -302,12 +425,14 @@ function closeWorkOrder(noWO, namaUser) {
       if (status !== 'Deal' && status !== 'On-Progress')
         return { success: false, message: 'Hanya WO berstatus Deal atau On-Progress yang bisa ditutup.' };
       sheet.getRange(i + 1, 17).setValue('Closed');
+      if (data[i][0]) syncNoPen = data[i][0].toString();
       found = true;
     }
 
     if (!found) return { success: false, message: 'Work Order tidak ditemukan.' };
     SpreadsheetApp.flush();
     invalidatePenawaranCache();
+    if (syncNoPen) _syncWorkOrder(syncNoPen);   // sinkron status Closed ke Work_Order
     return { success: true, message: 'Work Order ' + noWO + ' berhasil ditutup.' };
   } catch(e) {
     return { success: false, message: e.toString() };

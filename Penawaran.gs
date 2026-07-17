@@ -414,6 +414,7 @@ function updateStatusPenawaran(noPenawaran, rev, statusBaru, catatanFail, extra)
         SpreadsheetApp.flush();
 
         invalidatePenawaranCache();
+        _syncWorkOrder(noPenawaran);   // sinkron ke sheet Work_Order
         return { success: true, message: "Status diperbarui menjadi: " + statusBaru, noWO: noWO };
       }
     }
@@ -465,9 +466,11 @@ function hapusPenawaran(noPenawaran, rev) {
     // Hapus dari baris terbawah agar index tidak bergeser
     rowsToDelete.reverse().forEach(rowNum => sheet.deleteRow(rowNum));
 
-    return { 
-      success: true, 
-      message: `Penawaran ${noPenawaran} beserta ${rowsToDelete.length} revisi berhasil dihapus.` 
+    invalidatePenawaranCache();
+    _syncWorkOrder(noPenawaran);   // sinkron ke sheet Work_Order (hapus WO bila perlu)
+    return {
+      success: true,
+      message: `Penawaran ${noPenawaran} beserta ${rowsToDelete.length} revisi berhasil dihapus.`
     };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
@@ -529,6 +532,7 @@ function editPenawaran(payload) {
     ]);
 
     invalidatePenawaranCache();
+    _syncWorkOrder(payload.noPenawaran);   // sinkron snapshot WO bila penawaran Deal direvisi
     const nextNo = generateNextQuotationNumber(ss);
     return { success: true, message: `${payload.noPenawaran} berhasil direvisi → Rev${newRev}!`, nextNo: nextNo };
   } catch(e) {
@@ -585,6 +589,7 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
     ]);
 
     invalidatePenawaranCache();
+    _syncWorkOrder(noPenawaran);   // sinkron snapshot WO bila penawaran Deal di-restore
     return { success: true, message: `Rev${rev} berhasil dipulihkan sebagai revisi terbaru → Rev${newRev}!`, newRev: newRev };
   } catch(e) {
     return { success: false, message: "Gagal: " + e.toString() };
