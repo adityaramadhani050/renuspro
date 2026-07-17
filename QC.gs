@@ -580,6 +580,7 @@ function simpanQCFotoAnotasi(payload) {
     var sheet = _ensureQCItemSheet(ss);
     var found = _qcFindItemRow(sheet, noWO, kode);
     if (!found) return { success: false, message: 'Item tidak ditemukan.' };
+    if ((found.row[4] || '').toString() === 'Approved') return { success: false, message: 'Item sudah Approved — foto tidak bisa ditandai.' };
     var arr = _qcParseFoto(found.row[3]);
     var idx = -1;
     for (var i = 0; i < arr.length; i++) { if (arr[i].fileId === oldFileId) { idx = i; break; } }

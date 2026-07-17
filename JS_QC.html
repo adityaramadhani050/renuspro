@@ -590,8 +590,11 @@ function _qcViewFoto(fileId, fileUrl, kode) {
   img.src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
   document.getElementById('qc-photo-viewer-link').href = fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
   _qcViewerCtx = { fileId: fileId, kode: kode || '' };
+  // Foto pada item yang sudah Approved tidak boleh ditandai.
+  var it = (_qcItems || []).filter(function(x) { return x.kode === kode; })[0];
+  var canEdit = kode && _qcCanReview() && it && it.status !== 'Approved';
   var eb = document.getElementById('qc-photo-edit-btn');
-  if (eb) eb.classList.toggle('hidden', !(kode && _qcCanReview()));
+  if (eb) eb.classList.toggle('hidden', !canEdit);
   v.classList.remove('hidden');
 }
 function _qcEditFromViewer() {
