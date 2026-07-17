@@ -130,7 +130,7 @@ var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', '
   'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
   'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi', 'ss-bosCaption',
   'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapPanjang', 'ss-atapLebar', 'ss-atapMounting',
-  'ss-panjangPV', 'ss-panjangAC', 'ss-koor-search', 'ss-latitude', 'ss-longitude'];
+  'ss-panjangPV', 'ss-panjangAC', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
 
 function _ssResetForm() {
@@ -258,7 +258,7 @@ function _ssStepNext() {
 }
 function _ssStepPrev() { if (_ssStep > 1) _ssGotoStep(_ssStep - 1); }
 
-// ── Peta (Leaflet + Geolocation + pencarian alamat + input manual) ──
+// ── Peta (Leaflet + Geolocation + input manual) ─────────────────────
 var SS_DEFAULT_CENTER = [-2.5, 118]; // tengah Indonesia
 var SS_DEFAULT_ZOOM = 5;
 
@@ -273,6 +273,16 @@ function _ssInitMap() {
   setTimeout(function() { if (_ssMap) _ssMap.invalidateSize(); }, 200);
 }
 
+function _ssGeoErrMsg(err) {
+  if (err.code === err.PERMISSION_DENIED) return 'Izin lokasi ditolak — aktifkan izin lokasi untuk browser/perangkat ini.';
+  if (err.code === err.POSITION_UNAVAILABLE) return 'Lokasi tidak tersedia (sinyal GPS/jaringan lemah).';
+  if (err.code === err.TIMEOUT) return 'Waktu tunggu habis.';
+  return err.message || 'Kesalahan tidak diketahui.';
+}
+
+// GPS presisi tinggi bisa lambat/timeout (sinyal lemah, dalam ruangan). Coba
+// dulu dgn presisi tinggi; kalau timeout/tidak tersedia, coba ulang dgn
+// presisi lebih longgar (lebih cepat & toleran) sebelum benar-benar gagal.
 function _ssAmbilLokasi() {
   if (!navigator.geolocation) { showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
   toggleLoader(true, 'Mengambil lokasi...');
@@ -280,28 +290,20 @@ function _ssAmbilLokasi() {
     toggleLoader(false);
     _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 18 });
   }, function(err) {
-    toggleLoader(false);
-    showNotification('Gagal mengambil lokasi: ' + err.message, 'error');
-  }, { enableHighAccuracy: true, timeout: 15000 });
-}
-
-// Cari alamat via Nominatim (OpenStreetMap) lalu pindahkan peta+pin ke sana;
-// user tetap bisa geser pin/klik ulang utk presisi.
-function _ssCariAlamat() {
-  var q = (document.getElementById('ss-koor-search').value || '').trim();
-  if (!q) { showNotification('Isi alamat yang ingin dicari.', 'error'); return; }
-  toggleLoader(true, 'Mencari alamat...');
-  fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=id&q=' + encodeURIComponent(q))
-    .then(function(r) { return r.json(); })
-    .then(function(results) {
+    if (err.code !== err.TIMEOUT && err.code !== err.POSITION_UNAVAILABLE) {
       toggleLoader(false);
-      if (!results || !results.length) { showNotification('Alamat tidak ditemukan. Coba kata kunci lain, atau pilih titik langsung di peta.', 'error'); return; }
-      _ssSetLatLng(parseFloat(results[0].lat), parseFloat(results[0].lon), { zoom: 17 });
-    })
-    .catch(function() {
+      showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err), 'error');
+      return;
+    }
+    toggleLoader(true, 'Mencoba lagi dengan akurasi lebih longgar...');
+    navigator.geolocation.getCurrentPosition(function(pos) {
       toggleLoader(false);
-      showNotification('Gagal mencari alamat. Periksa koneksi internet, atau pilih titik langsung di peta.', 'error');
-    });
+      _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 16 });
+    }, function(err2) {
+      toggleLoader(false);
+      showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err2) + '. Coba lagi, atau pilih titik langsung di peta / input manual.', 'error');
+    }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 }
 
 // Input manual Latitude/Longitude — memindahkan pin juga.

@@ -71,22 +71,14 @@
               <textarea id="ss-alamat" rows="2" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none" placeholder="Alamat lengkap lokasi survey"></textarea>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Titik Koordinat *</label>
-              <p class="text-[11px] text-slate-400 mb-2">Pilih salah satu: ambil lokasi otomatis, cari alamat lalu geser pin, klik langsung di peta, atau input manual di bawah.</p>
-              <div class="flex flex-col sm:flex-row gap-2 mb-2">
-                <button type="button" onclick="_ssAmbilLokasi()" class="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition flex items-center justify-center gap-1.5">
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Titik Koordinat *</label>
+                <button type="button" onclick="_ssAmbilLokasi()" class="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
                   <i class="fa-solid fa-location-crosshairs"></i> Lokasi Saat Ini
                 </button>
-                <div class="flex-1 flex gap-2">
-                  <input type="text" id="ss-koor-search" placeholder="Cari alamat di peta..."
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();_ssCariAlamat();}"
-                    class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                  <button type="button" onclick="_ssCariAlamat()" class="shrink-0 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                  </button>
-                </div>
               </div>
-              <div id="ss-map" class="rounded-xl overflow-hidden border border-slate-200" style="height:260px"></div>
+              <p class="text-[11px] text-slate-400 mb-2">Klik tombol Lokasi Saat Ini, klik langsung di peta, atau isi manual di bawah.</p>
+              <div id="ss-map" class="relative z-0 rounded-xl overflow-hidden border border-slate-200" style="height:260px"></div>
               <p id="ss-koor-text" class="text-[11px] text-slate-400 mt-2">Belum ada koordinat — klik di peta atau isi manual di bawah.</p>
               <div class="grid grid-cols-2 gap-3 mt-2">
                 <div>
