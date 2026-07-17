@@ -89,7 +89,7 @@ function _qcOpenAddProject() {
     var rows = (_qcSiteEngineers || []).map(function(u) {
       return '<label class="flex items-center gap-2 py-1.5 px-1 cursor-pointer">'
         + '<input type="checkbox" value="' + u.id + '" class="accent-orange-500 qc-project-se-cb">'
-        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + ' <span class="text-[10px] text-slate-400">@' + _qcEsc(u.username) + '</span></span></label>';
+        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + '</span></label>';
     }).join('') || '<div class="text-xs text-slate-400 italic py-1 px-1">Belum ada user Site Engineer.</div>';
     seBox.innerHTML = rows;
   };
@@ -780,7 +780,7 @@ function _qcToggleAssign(e) {
     var rows = (_qcSiteEngineers || []).map(function(u) {
       return '<label class="flex items-center gap-2 py-1.5 cursor-pointer">'
         + '<input type="checkbox" value="' + u.id + '" ' + (assignedIds.indexOf(u.id) !== -1 ? 'checked' : '') + ' class="accent-orange-500 qc-assign-cb">'
-        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + ' <span class="text-[10px] text-slate-400">@' + _qcEsc(u.username) + '</span></span></label>';
+        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + '</span></label>';
     }).join('') || '<div class="text-xs text-slate-400 italic py-1">Belum ada user Site Engineer. Buat di menu Users.</div>';
     panel.innerHTML = '<p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tugaskan Site Engineer</p>'
       + '<div class="max-h-56 overflow-y-auto -mx-1 px-1">' + rows + '</div>'
