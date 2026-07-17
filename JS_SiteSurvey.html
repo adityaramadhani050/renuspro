@@ -140,7 +140,7 @@ function bukaFormSiteSurvey() {
 
 var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', 'ss-arahBangunan', 'ss-tinggiBangunan',
   'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
-  'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi',
+  'ss-bosLokasi', 'ss-bosLebar', 'ss-bosTinggi', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi',
   'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapPanjang', 'ss-atapLebar', 'ss-atapMounting',
   'ss-panjangPV', 'ss-panjangAC', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
@@ -220,8 +220,8 @@ var _SS_STEP_REQUIRED = {
   3: {
     fields: [
       { id: 'ss-bosLokasi', label: 'Lokasi Penempatan BoS' },
-      { id: 'ss-bosPanjang', label: 'Panjang Area BoS' },
       { id: 'ss-bosLebar', label: 'Lebar Area BoS' },
+      { id: 'ss-bosTinggi', label: 'Tinggi Area BoS' },
       { id: 'ss-bosJenisTembok', label: 'Jenis Tembok' },
       { id: 'ss-bosJarakInterkoneksi', label: 'Jarak BoS ke Titik Interkoneksi' }
     ],
@@ -613,7 +613,7 @@ function _ssSubmit() {
       ratingBreaker: gn('ss-ratingBreaker'), fotoKwh: _ssPhotos.fotoKwh || [], fotoPHB: _ssPhotos.fotoPHB || []
     },
     bos: {
-      lokasi: g('ss-bosLokasi'), panjang: gn('ss-bosPanjang'), lebar: gn('ss-bosLebar'),
+      lokasi: g('ss-bosLokasi'), lebar: gn('ss-bosLebar'), tinggi: gn('ss-bosTinggi'),
       jenisTembok: g('ss-bosJenisTembok'), jarakInterkoneksi: gn('ss-bosJarakInterkoneksi'),
       foto: _ssPhotos.bosFoto || []
     },
@@ -748,7 +748,7 @@ function _ssRenderDetail() {
   body += section('C. Balance of System (BoS)', 'fa-server',
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
     +   row('Lokasi Penempatan', bos.lokasi)
-    +   row('Luasan Area', (bos.panjang || bos.lebar) ? (bos.panjang || 0) + ' x ' + (bos.lebar || 0) + ' m' : '')
+    +   row('Ukuran Area (Lebar x Tinggi)', (bos.lebar || bos.tinggi) ? (bos.lebar || 0) + ' x ' + (bos.tinggi || 0) + ' m' : '')
     +   row('Jenis Tembok', bos.jenisTembok)
     +   row('Jarak ke Interkoneksi', bos.jarakInterkoneksi ? bos.jarakInterkoneksi + ' m' : '')
     + '</div>'
