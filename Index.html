@@ -12,6 +12,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <?!= include('Styles'); ?>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
@@ -32,6 +34,9 @@
         </button>
 
         <p id="nav-group-penjualan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penjualan</p>
+        <button onclick="navigate('sitesurvey')" id="nav-sitesurvey" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-map-location-dot w-6"></i> Site Survey
+        </button>
         <button onclick="navigate('penawaran')" id="nav-penawaran" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-file-invoice-dollar w-6"></i> Penawaran
         </button>
@@ -169,6 +174,7 @@
 
 
       <?!= include('Page_Dashboard'); ?>
+      <?!= include('Page_SiteSurvey'); ?>
       <?!= include('Page_Penawaran'); ?>
       <?!= include('Page_WorkOrder'); ?>
       <?!= include('Page_Invoice'); ?>
@@ -198,6 +204,7 @@
   <?!= include('JS_Backdrop'); ?>
   <?!= include('JS_Core'); ?>
   <?!= include('JS_Dashboard'); ?>
+  <?!= include('JS_SiteSurvey'); ?>
   <?!= include('JS_Penawaran_List'); ?>
   <?!= include('JS_WorkOrder'); ?>
   <?!= include('JS_Invoice'); ?>

@@ -41,10 +41,10 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc'],
+  admin:       ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
-  sales:       ['dashboard','penawaran','workorder','produk','template','customer'],
-  leadsales:   ['dashboard','penawaran','workorder','produk','template','customer'],
+  sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer'],
+  leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer'],
   procurement: ['workorder','purchaseorder','supplier','pricelist'],
   warehouse:   ['workorder','inventory'],
   siteengineer:['qc'],
@@ -83,7 +83,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc']
+  ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
@@ -91,7 +91,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan title grup menu yang seluruh itemnya tidak relevan dengan role user
   const navGroups = {
-    'nav-group-penjualan':  ['penawaran','workorder','invoice','kwitansi','customer'],
+    'nav-group-penjualan':  ['sitesurvey','penawaran','workorder','invoice','kwitansi','customer'],
     'nav-group-masterdata': ['produk','template','supplier'],
     'nav-group-pembelian':  ['purchaseorder','inventory'],
     'nav-group-lapangan':   ['qc'],

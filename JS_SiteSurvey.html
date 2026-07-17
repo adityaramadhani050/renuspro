@@ -1,0 +1,548 @@
+<script>
+// ================================================================
+//  SITE SURVEY — form lapangan Tim Sales (5 bagian, multi-step).
+//  Standalone (tanpa tautan ke Customer/Penawaran/WO), submit = final.
+//  Peta pakai Leaflet+OSM; anotasi foto (kotak/garis) pakai canvas vanilla.
+//  Lightbox foto pakai ulang modal QC (_qcViewFoto / _qcJs sudah global).
+// ================================================================
+
+let _ssCurrentId  = null;   // ID survey yang sedang diisi (dipesan saat form dibuka)
+let _ssStep       = 1;
+let _ssPhotos     = {};     // fieldKey -> {fileId, fileUrl}
+let _ssLatLng     = null;   // {lat, lng}
+let _ssMap        = null;   // instance Leaflet
+let _ssMarker     = null;
+let _ssListData   = [];
+let _ssDetailCurrent = null;
+
+var _SS_STEP_DEFS = [
+  { n: 1, label: 'Umum' },
+  { n: 2, label: 'Kelistrikan' },
+  { n: 3, label: 'BoS' },
+  { n: 4, label: 'Atap' },
+  { n: 5, label: 'Jalur Kabel' }
+];
+
+function _ssUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _ssRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _ssCanDelete(){ var r = _ssRole(); return r === 'admin' || r === 'leadsales'; }
+function _ssEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+// Marker icon default Leaflet via CDN unpkg butuh URL eksplisit (dikenal broken
+// bila tak di-set manual saat memakai CDN langsung, bukan bundler).
+if (typeof L !== 'undefined') {
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+  });
+}
+
+// ── Load daftar ──────────────────────────────────────────────────
+window.loadSiteSurvey = function() {
+  document.getElementById('ss-form-view').classList.add('hidden');
+  document.getElementById('ss-detail-view').classList.add('hidden');
+  document.getElementById('ss-list-view').classList.remove('hidden');
+  document.getElementById('ss-list-box').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data survey...</div>';
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res) {
+    _ssListData = (res && res.success) ? (res.list || []) : [];
+    _ssRenderList();
+  }).withFailureHandler(function() {
+    document.getElementById('ss-list-box').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-rose-400">Gagal memuat data survey.</div>';
+  }).getSiteSurveyList();
+};
+
+function _ssRenderList() {
+  var box = document.getElementById('ss-list-box');
+  if (!box) return;
+  var q = ((document.getElementById('ss-search') || {}).value || '').toLowerCase().trim();
+  var list = _ssListData.filter(function(s) {
+    if (!q) return true;
+    return ((s.namaSite || '') + (s.namaPIC || '') + (s.alamat || '')).toLowerCase().indexOf(q) !== -1;
+  });
+  if (!list.length) {
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-map-location-dot mr-2"></i>'
+      + (q ? 'Tidak ada survey cocok.' : 'Belum ada Site Survey. Klik <b>Tambah Survey</b> untuk memulai.') + '</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(s) {
+    return '<div onclick="bukaDetailSiteSurvey(\'' + s.id + '\')" class="bg-white rounded-2xl border border-slate-150 hover:border-blue-300 hover:shadow-md transition p-4 sm:p-5 cursor-pointer">'
+      + '<div class="flex items-center gap-3">'
+      +   '<div class="flex-1 min-w-0">'
+      +     '<div class="flex items-center gap-2"><span class="font-mono text-[11px] font-bold text-slate-400">' + s.id + '</span><span class="text-[10px] text-slate-400">' + _ssEsc(s.tanggalSurvey || '') + '</span></div>'
+      +     '<p class="font-bold text-slate-800 truncate">' + _ssEsc(s.namaSite || '-') + '</p>'
+      +     '<p class="text-xs text-slate-400 truncate">' + _ssEsc(s.namaPIC || '-') + (s.telepon ? ' · ' + _ssEsc(s.telepon) : '') + '</p>'
+      +     '<p class="text-[11px] text-slate-400 truncate mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>' + _ssEsc(s.alamat || '-') + '</p>'
+      +   '</div>'
+      +   '<div class="text-right shrink-0 hidden sm:block">'
+      +     '<p class="text-[10px] text-slate-400">Sales</p>'
+      +     '<p class="text-xs font-bold text-slate-600">' + _ssEsc(s.dibuatOleh || '-') + '</p>'
+      +   '</div>'
+      +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Form: buka / batal / reset ─────────────────────────────────────
+function bukaFormSiteSurvey() {
+  _ssResetForm();
+  document.getElementById('ss-list-view').classList.add('hidden');
+  document.getElementById('ss-detail-view').classList.add('hidden');
+  document.getElementById('ss-form-view').classList.remove('hidden');
+  _ssGotoStep(1);
+  toggleLoader(true, 'Menyiapkan form survey...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menyiapkan ID survey.', 'error'); _ssDoBatalForm(); return; }
+    _ssCurrentId = res.id;
+  }).withFailureHandler(function(err) {
+    toggleLoader(false);
+    showNotification((err && err.message) || 'Gagal menyiapkan form.', 'error');
+    _ssDoBatalForm();
+  }).getNextSiteSurveyId();
+}
+
+var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', 'ss-arahBangunan', 'ss-tinggiBangunan',
+  'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
+  'ss-bosLokasi', 'ss-bosPanjang', 'ss-bosLebar', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi', 'ss-bosCaption',
+  'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapLuas', 'ss-atapMounting',
+  'ss-panjangPV', 'ss-panjangAC'];
+var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
+
+function _ssResetForm() {
+  _ssCurrentId = null; _ssStep = 1; _ssPhotos = {}; _ssLatLng = null;
+  _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
+  var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat';
+  var mapEl = document.getElementById('ss-map'); if (mapEl) mapEl.classList.add('hidden');
+  if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
+}
+
+function _ssBatalForm() {
+  var hasData = (document.getElementById('ss-namaSite').value || '').trim() || Object.keys(_ssPhotos).length;
+  if (hasData) {
+    showConfirm({ title: 'Batalkan Survey', message: 'Keluar dari form? Data yang sudah diisi akan hilang.', confirmText: 'Ya, Keluar', onConfirm: _ssDoBatalForm });
+  } else {
+    _ssDoBatalForm();
+  }
+}
+function _ssDoBatalForm() {
+  document.getElementById('ss-form-view').classList.add('hidden');
+  document.getElementById('ss-list-view').classList.remove('hidden');
+  loadSiteSurvey();
+}
+
+// ── Navigasi step ────────────────────────────────────────────────
+function _ssRenderSteps() {
+  var box = document.getElementById('ss-steps');
+  if (!box) return;
+  box.innerHTML = _SS_STEP_DEFS.map(function(s) {
+    var active = s.n === _ssStep;
+    var done = s.n < _ssStep;
+    var circleCls = active ? 'bg-blue-600 text-white' : (done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400');
+    return '<div class="flex items-center gap-1.5 shrink-0">'
+      + '<div class="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ' + circleCls + '">' + (done ? '<i class="fa-solid fa-check text-[10px]"></i>' : s.n) + '</div>'
+      + '<span class="text-[11px] font-bold ' + (active ? 'text-slate-700' : 'text-slate-400') + ' hidden sm:inline">' + s.label + '</span>'
+      + (s.n < 5 ? '<div class="w-4 sm:w-8 h-0.5 ' + (done ? 'bg-emerald-400' : 'bg-slate-200') + ' mx-1"></div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function _ssGotoStep(n) {
+  _ssStep = n;
+  document.querySelectorAll('.ss-step').forEach(function(el, i) { el.classList.toggle('hidden', (i + 1) !== n); });
+  document.getElementById('ss-btn-prev').classList.toggle('hidden', n === 1);
+  document.getElementById('ss-btn-next').classList.toggle('hidden', n === 5);
+  document.getElementById('ss-btn-submit').classList.toggle('hidden', n !== 5);
+  _ssRenderSteps();
+  var host = document.getElementById('ss-form-view');
+  if (host) host.scrollIntoView({ block: 'start' });
+}
+
+function _ssStepNext() {
+  if (_ssStep === 1 && !(document.getElementById('ss-namaSite').value || '').trim()) {
+    showNotification('Nama Site wajib diisi.', 'error');
+    return;
+  }
+  if (_ssStep < 5) _ssGotoStep(_ssStep + 1);
+}
+function _ssStepPrev() { if (_ssStep > 1) _ssGotoStep(_ssStep - 1); }
+
+// ── Peta (Leaflet + Geolocation) ────────────────────────────────────
+function _ssAmbilLokasi() {
+  if (!navigator.geolocation) { showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
+  toggleLoader(true, 'Mengambil lokasi...');
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    toggleLoader(false);
+    _ssSetLatLng(pos.coords.latitude, pos.coords.longitude);
+  }, function(err) {
+    toggleLoader(false);
+    showNotification('Gagal mengambil lokasi: ' + err.message, 'error');
+  }, { enableHighAccuracy: true, timeout: 15000 });
+}
+
+function _ssSetLatLng(lat, lng) {
+  _ssLatLng = { lat: lat, lng: lng };
+  document.getElementById('ss-koor-text').innerText = lat.toFixed(6) + ', ' + lng.toFixed(6);
+  var mapBox = document.getElementById('ss-map');
+  mapBox.classList.remove('hidden');
+  if (typeof L === 'undefined') { showNotification('Modul peta belum siap, muat ulang halaman.', 'error'); return; }
+  if (!_ssMap) {
+    _ssMap = L.map('ss-map').setView([lat, lng], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(_ssMap);
+    _ssMarker = L.marker([lat, lng], { draggable: true }).addTo(_ssMap);
+    _ssMarker.on('dragend', function() {
+      var p = _ssMarker.getLatLng();
+      _ssLatLng = { lat: p.lat, lng: p.lng };
+      document.getElementById('ss-koor-text').innerText = p.lat.toFixed(6) + ', ' + p.lng.toFixed(6);
+    });
+  } else {
+    _ssMap.setView([lat, lng], 18);
+    _ssMarker.setLatLng([lat, lng]);
+  }
+  // Kontainer peta baru saja muncul dari hidden -> perlu invalidateSize agar Leaflet render benar.
+  setTimeout(function() { if (_ssMap) _ssMap.invalidateSize(); }, 200);
+}
+
+// ── Slot foto (Kamera/Galeri, atau buka editor anotasi) ─────────────
+function _ssFotoAnotMode(fieldKey) {
+  var box = document.getElementById('ss-foto-' + fieldKey);
+  return box ? (box.getAttribute('data-anot') || null) : null;
+}
+
+function _ssRenderFotoSlot(fieldKey) {
+  var box = document.getElementById('ss-foto-' + fieldKey);
+  if (!box) return;
+  var f = _ssPhotos[fieldKey];
+  if (f) {
+    box.innerHTML = '<div class="relative inline-block">'
+      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
+      +   '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
+      + '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
+      + '</div>';
+    return;
+  }
+  box.innerHTML = '<div class="flex items-center gap-2">'
+    + '<label class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
+    +   '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_ssHandleFotoInput(\'' + fieldKey + '\', this)"></label>'
+    + '<label class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-regular fa-images"></i> Galeri'
+    +   '<input type="file" accept="image/*" class="hidden" onchange="_ssHandleFotoInput(\'' + fieldKey + '\', this)"></label>'
+    + '</div>';
+}
+
+function _ssHandleFotoInput(fieldKey, inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  inputEl.value = '';
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { showNotification('Ukuran foto maksimal 15MB.', 'error'); return; }
+  var anotMode = _ssFotoAnotMode(fieldKey);
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    if (anotMode) _ssAnotOpen(anotMode, fieldKey, e.target.result, file.type);
+    else _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type);
+  };
+  reader.onerror = function() { showNotification('Gagal membaca file.', 'error'); };
+  reader.readAsDataURL(file);
+}
+
+function _ssUploadFoto(fieldKey, base64, fileName, mimeType) {
+  if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
+  toggleLoader(true, 'Mengupload foto...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); return; }
+    _ssPhotos[fieldKey] = res.foto;
+    _ssRenderFotoSlot(fieldKey);
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); })
+    .uploadSiteSurveyFoto({ surveyId: _ssCurrentId, fieldKey: fieldKey, base64Data: base64, fileName: fileName, mimeType: mimeType });
+}
+
+function _ssHapusFotoSlot(fieldKey) {
+  var f = _ssPhotos[fieldKey];
+  if (!f) return;
+  delete _ssPhotos[fieldKey];
+  _ssRenderFotoSlot(fieldKey);
+  google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
+}
+
+// ── Editor anotasi foto (kotak utk BoS, garis utk jalur kabel) ──────
+var _ssAnot = null; // { mode, fieldKey, img, canvas, ctx, color, size, shapes:[], drawing, start }
+
+function _ssAnotOpen(mode, fieldKey, dataUrl, mimeType) {
+  var canvas = document.getElementById('ss-anot-canvas');
+  var img = new Image();
+  img.onload = function() {
+    var maxDim = 1600, w = img.naturalWidth || 800, h = img.naturalHeight || 600;
+    var sc = Math.min(1, maxDim / Math.max(w, h));
+    canvas.width = Math.round(w * sc); canvas.height = Math.round(h * sc);
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    _ssAnot = { mode: mode, fieldKey: fieldKey, img: img, canvas: canvas, ctx: ctx, color: '#ef4444', size: 4, shapes: [], drawing: false, start: null, mimeType: mimeType || 'image/jpeg' };
+    _ssAnotSetColor('#ef4444');
+    var sz = document.getElementById('ss-anot-size'); if (sz) sz.value = 4;
+    var lbl = document.getElementById('ss-anot-mode-label');
+    if (lbl) lbl.innerText = mode === 'rect' ? 'Tandai Area (kotak)' : 'Tandai Jalur (garis)';
+
+    canvas.onmousedown = _ssAnotDown; canvas.onmousemove = _ssAnotMove;
+    canvas.onmouseup = _ssAnotUp; canvas.onmouseleave = _ssAnotUp;
+    canvas.addEventListener('touchstart', _ssAnotDown, { passive: false });
+    canvas.addEventListener('touchmove', _ssAnotMove, { passive: false });
+    canvas.addEventListener('touchend', _ssAnotUp, { passive: false });
+    canvas.addEventListener('touchcancel', _ssAnotUp, { passive: false });
+
+    document.getElementById('modal-ss-anotasi').classList.remove('hidden');
+  };
+  img.onerror = function() { showNotification('Gagal memuat foto.', 'error'); };
+  img.src = dataUrl;
+}
+
+function _ssAnotPos(e) {
+  var r = _ssAnot.canvas.getBoundingClientRect();
+  var cx, cy;
+  if (e.touches && e.touches.length) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+  else if (e.changedTouches && e.changedTouches.length) { cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY; }
+  else { cx = e.clientX; cy = e.clientY; }
+  return { x: (cx - r.left) * (_ssAnot.canvas.width / r.width), y: (cy - r.top) * (_ssAnot.canvas.height / r.height) };
+}
+
+function _ssAnotDrawShape(ctx, s) {
+  ctx.strokeStyle = s.color; ctx.lineWidth = s.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (s.type === 'rect') {
+    ctx.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+  } else {
+    ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+  }
+}
+
+function _ssAnotRedraw() {
+  if (!_ssAnot) return;
+  var ctx = _ssAnot.ctx, c = _ssAnot.canvas;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.drawImage(_ssAnot.img, 0, 0, c.width, c.height);
+  _ssAnot.shapes.forEach(function(s) { _ssAnotDrawShape(ctx, s); });
+}
+
+function _ssAnotDown(e) {
+  if (!_ssAnot) return; e.preventDefault();
+  _ssAnot.drawing = true;
+  _ssAnot.start = _ssAnotPos(e);
+}
+function _ssAnotMove(e) {
+  if (!_ssAnot || !_ssAnot.drawing) return; e.preventDefault();
+  var p = _ssAnotPos(e);
+  _ssAnotRedraw();
+  _ssAnotDrawShape(_ssAnot.ctx, { type: _ssAnot.mode, x1: _ssAnot.start.x, y1: _ssAnot.start.y, x2: p.x, y2: p.y, color: _ssAnot.color, size: _ssAnot.size });
+}
+function _ssAnotUp(e) {
+  if (!_ssAnot || !_ssAnot.drawing) return;
+  _ssAnot.drawing = false;
+  if (e && e.type === 'touchcancel') { _ssAnot.start = null; _ssAnotRedraw(); return; }
+  var p = _ssAnotPos(e);
+  var dx = p.x - _ssAnot.start.x, dy = p.y - _ssAnot.start.y;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+    _ssAnot.shapes.push({ type: _ssAnot.mode, x1: _ssAnot.start.x, y1: _ssAnot.start.y, x2: p.x, y2: p.y, color: _ssAnot.color, size: _ssAnot.size });
+  }
+  _ssAnot.start = null;
+  _ssAnotRedraw();
+}
+
+function _ssAnotSetColor(c) {
+  if (_ssAnot) _ssAnot.color = c;
+  Array.prototype.forEach.call(document.querySelectorAll('.ss-anot-color'), function(b) {
+    var on = b.getAttribute('data-color') === c;
+    b.classList.toggle('ring-white', on);
+    b.classList.toggle('ring-transparent', !on);
+  });
+}
+function _ssAnotSetSize(v) { if (_ssAnot) _ssAnot.size = parseInt(v, 10) || 4; }
+function _ssAnotUndo() { if (_ssAnot && _ssAnot.shapes.length) { _ssAnot.shapes.pop(); _ssAnotRedraw(); } }
+function _ssAnotClear() { if (_ssAnot) { _ssAnot.shapes = []; _ssAnotRedraw(); } }
+function _ssAnotCancel() { document.getElementById('modal-ss-anotasi').classList.add('hidden'); _ssAnot = null; }
+
+function _ssAnotSave() {
+  if (!_ssAnot) return;
+  var base64;
+  try { base64 = _ssAnot.canvas.toDataURL('image/jpeg', 0.9).split(',')[1]; }
+  catch (e) { showNotification('Gagal memproses gambar.', 'error'); return; }
+  var fieldKey = _ssAnot.fieldKey;
+  document.getElementById('modal-ss-anotasi').classList.add('hidden');
+  _ssAnot = null;
+  _ssUploadFoto(fieldKey, base64, fieldKey + '.jpg', 'image/jpeg');
+}
+
+// ── Submit final ─────────────────────────────────────────────────
+function _ssSubmit() {
+  if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
+  var namaSite = (document.getElementById('ss-namaSite').value || '').trim();
+  if (!namaSite) { showNotification('Nama Site wajib diisi.', 'error'); _ssGotoStep(1); return; }
+
+  var g = function(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
+  var gn = function(id) { var v = g(id); return v === '' ? 0 : Number(v); };
+
+  var payload = {
+    id: _ssCurrentId,
+    dibuatOleh: _ssUserNama(),
+    tanggalSurvey: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    namaSite: namaSite,
+    namaPIC: g('ss-namaPIC'),
+    telepon: g('ss-telepon'),
+    alamat: g('ss-alamat'),
+    latitude: _ssLatLng ? _ssLatLng.lat : null,
+    longitude: _ssLatLng ? _ssLatLng.lng : null,
+    arahBangunan: g('ss-arahBangunan'),
+    tinggiBangunan: gn('ss-tinggiBangunan'),
+    fotoBangunan: _ssPhotos.fotoBangunan || null,
+    kelistrikan: {
+      idPelangganPLN: g('ss-idPelangganPLN'), dayaPLN: gn('ss-dayaPLN'), phase: g('ss-phase'),
+      ratingBreaker: gn('ss-ratingBreaker'), fotoKwh: _ssPhotos.fotoKwh || null, fotoPHB: _ssPhotos.fotoPHB || null
+    },
+    bos: {
+      lokasi: g('ss-bosLokasi'), panjang: gn('ss-bosPanjang'), lebar: gn('ss-bosLebar'),
+      jenisTembok: g('ss-bosJenisTembok'), jarakInterkoneksi: gn('ss-bosJarakInterkoneksi'),
+      foto: _ssPhotos.bosFoto ? { fileId: _ssPhotos.bosFoto.fileId, fileUrl: _ssPhotos.bosFoto.fileUrl, caption: g('ss-bosCaption') } : null
+    },
+    atap: {
+      jenis: g('ss-atapJenis'), arah: g('ss-atapArah'), rangka: g('ss-atapRangka'), luas: gn('ss-atapLuas'),
+      mounting: g('ss-atapMounting'), fotoAtap: _ssPhotos.fotoAtap || null, fotoRangka: _ssPhotos.fotoRangka || null, fotoAkses: _ssPhotos.fotoAkses || null
+    },
+    jalurKabel: {
+      panjangPV: gn('ss-panjangPV'), panjangAC: gn('ss-panjangAC'),
+      fotoPV: _ssPhotos.fotoPV || null, fotoAC: _ssPhotos.fotoAC || null
+    }
+  };
+
+  toggleLoader(true, 'Menyimpan survey...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menyimpan survey.', 'error'); return; }
+    showNotification(res.message || 'Survey tersimpan.');
+    document.getElementById('ss-form-view').classList.add('hidden');
+    document.getElementById('ss-list-view').classList.remove('hidden');
+    loadSiteSurvey();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan survey.', 'error'); })
+    .submitSiteSurvey(payload);
+}
+
+// ── Detail (read-only, per section) ─────────────────────────────────
+window.bukaDetailSiteSurvey = function(id) {
+  document.getElementById('ss-list-view').classList.add('hidden');
+  document.getElementById('ss-form-view').classList.add('hidden');
+  document.getElementById('ss-detail-view').classList.remove('hidden');
+  document.getElementById('ss-detail-head').innerHTML = '<div class="text-center text-slate-400 py-6"><i class="fas fa-spinner fa-spin mr-2"></i>Memuat detail...</div>';
+  document.getElementById('ss-detail-body').innerHTML = '';
+  google.script.run.withSuccessHandler(function(res) {
+    if (!res || res.success === false) { document.getElementById('ss-detail-head').innerHTML = '<div class="text-center text-rose-400 py-6">Gagal memuat detail.</div>'; return; }
+    _ssDetailCurrent = res.survey;
+    _ssRenderDetail();
+  }).withFailureHandler(function() {
+    document.getElementById('ss-detail-head').innerHTML = '<div class="text-center text-rose-400 py-6">Gagal memuat detail.</div>';
+  }).getSiteSurveyDetail(id);
+};
+
+function _ssKembaliList() {
+  document.getElementById('ss-detail-view').classList.add('hidden');
+  document.getElementById('ss-list-view').classList.remove('hidden');
+  loadSiteSurvey();
+}
+
+function _ssRenderDetail() {
+  var d = _ssDetailCurrent; if (!d) return;
+
+  var actions = document.getElementById('ss-detail-actions');
+  if (actions) actions.innerHTML = _ssCanDelete()
+    ? '<button onclick="_ssHapusSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition"><i class="fa-regular fa-trash-can"></i> Hapus</button>'
+    : '';
+
+  document.getElementById('ss-detail-head').innerHTML =
+      '<div class="flex flex-wrap items-start justify-between gap-3">'
+    +   '<div><span class="font-mono text-xs font-bold text-slate-400">' + d.id + '</span>'
+    +     '<h3 class="text-lg font-extrabold text-slate-800">' + _ssEsc(d.namaSite || '-') + '</h3>'
+    +     '<p class="text-xs text-slate-400">' + _ssEsc(d.namaPIC || '-') + (d.telepon ? ' · ' + _ssEsc(d.telepon) : '') + '</p>'
+    +   '</div>'
+    +   '<div class="text-right text-xs text-slate-400"><p>' + _ssEsc(d.tanggalSurvey || '') + '</p><p class="font-bold text-slate-600">' + _ssEsc(d.dibuatOleh || '-') + '</p></div>'
+    + '</div>'
+    + '<p class="text-xs text-slate-500 mt-3"><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>' + _ssEsc(d.alamat || '-') + '</p>'
+    + (d.latitude != null && d.longitude != null
+        ? '<a href="https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude + '" target="_blank" class="text-[11px] text-blue-600 hover:text-blue-700 font-bold mt-1 inline-block"><i class="fa-solid fa-map-location-dot mr-1"></i>' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) + ' — Buka di Google Maps</a>'
+        : '');
+
+  var kel = d.kelistrikan || {}, bos = d.bos || {}, atap = d.atap || {}, jk = d.jalurKabel || {};
+
+  function fotoThumb(f) {
+    if (!f || !f.fileId) return '';
+    return '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+  }
+  function row(label, val) {
+    var has = val || val === 0;
+    return '<div><p class="text-[10px] text-slate-400 uppercase font-semibold">' + label + '</p><p class="text-sm font-semibold text-slate-700">' + (has ? _ssEsc(val) : '-') + '</p></div>';
+  }
+  function section(title, icon, bodyHtml) {
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
+      + '<div class="px-5 py-3 bg-slate-50 border-b border-slate-100 font-extrabold text-sm text-slate-700 flex items-center gap-2"><i class="fa-solid ' + icon + ' text-blue-500"></i>' + title + '</div>'
+      + '<div class="p-5 space-y-4">' + bodyHtml + '</div></div>';
+  }
+
+  var body = '';
+  body += section('A. Informasi Umum', 'fa-house',
+      '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
+    +   row('Arah Hadap Bangunan', d.arahBangunan)
+    +   row('Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '')
+    + '</div>'
+    + (fotoThumb(d.fotoBangunan) ? '<div class="flex flex-wrap gap-2">' + fotoThumb(d.fotoBangunan) + '</div>' : ''));
+
+  body += section('B. Informasi Kelistrikan', 'fa-bolt',
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">'
+    +   row('ID Pelanggan PLN', kel.idPelangganPLN)
+    +   row('Daya PLN', kel.dayaPLN ? kel.dayaPLN + ' VA' : '')
+    +   row('Phase', kel.phase)
+    +   row('Rating Breaker', kel.ratingBreaker ? kel.ratingBreaker + ' A' : '')
+    + '</div>'
+    + '<div class="flex flex-wrap gap-2">' + fotoThumb(kel.fotoKwh) + fotoThumb(kel.fotoPHB) + '</div>');
+
+  body += section('C. Balance of System (BoS)', 'fa-server',
+      '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
+    +   row('Lokasi Penempatan', bos.lokasi)
+    +   row('Luasan Area', (bos.panjang || bos.lebar) ? (bos.panjang || 0) + ' x ' + (bos.lebar || 0) + ' m' : '')
+    +   row('Jenis Tembok', bos.jenisTembok)
+    +   row('Jarak ke Interkoneksi', bos.jarakInterkoneksi ? bos.jarakInterkoneksi + ' m' : '')
+    + '</div>'
+    + (fotoThumb(bos.foto) ? '<div class="flex flex-wrap gap-2">' + fotoThumb(bos.foto) + '</div>' : '')
+    + (bos.foto && bos.foto.caption ? '<p class="text-xs text-slate-500 italic">"' + _ssEsc(bos.foto.caption) + '"</p>' : ''));
+
+  body += section('D. Informasi Atap', 'fa-house-chimney',
+      '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
+    +   row('Jenis Atap', atap.jenis)
+    +   row('Arah Hadap Atap', atap.arah)
+    +   row('Rangka Atap', atap.rangka)
+    +   row('Luasan Atap', atap.luas ? atap.luas + ' m²' : '')
+    +   row('Jenis Mounting', atap.mounting)
+    + '</div>'
+    + '<div class="flex flex-wrap gap-2">' + fotoThumb(atap.fotoAtap) + fotoThumb(atap.fotoRangka) + fotoThumb(atap.fotoAkses) + '</div>');
+
+  body += section('E. Jalur Kabel', 'fa-timeline',
+      '<div class="grid grid-cols-2 gap-3">'
+    +   row('Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : '')
+    +   row('Panjang Kabel AC', jk.panjangAC ? jk.panjangAC + ' m' : '')
+    + '</div>'
+    + '<div class="flex flex-wrap gap-2">' + fotoThumb(jk.fotoPV) + fotoThumb(jk.fotoAC) + '</div>');
+
+  document.getElementById('ss-detail-body').innerHTML = body;
+}
+
+function _ssHapusSurvey(id) {
+  showConfirm({ title: 'Hapus Site Survey', message: 'Hapus survey ' + id + '? Foto terkait juga akan dihapus.', confirmText: 'Ya, Hapus', onConfirm: function() {
+    toggleLoader(true, 'Menghapus...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menghapus.', 'error'); return; }
+      showNotification(res.message || 'Survey dihapus.');
+      _ssKembaliList();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .hapusSiteSurvey(id);
+  } });
+}
+</script>
