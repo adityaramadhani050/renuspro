@@ -318,14 +318,10 @@
 
       var canEdit = _canEditCatatanWO();
       var saveBtn = document.getElementById('catatan-wo-save-btn');
-      var descEl  = document.getElementById('catatan-wo-desc');
       textEl.readOnly = !canEdit;
       textEl.classList.toggle('bg-slate-50', !canEdit);
       textEl.classList.toggle('text-slate-500', !canEdit);
       if (saveBtn) saveBtn.classList.toggle('hidden', !canEdit);
-      if (descEl) descEl.innerText = canEdit
-        ? 'Catatan / request / komunikasi dari customer untuk tim project.'
-        : 'Mode lihat saja — hanya Sales/Lead Sales/Admin yang dapat menambah/mengubah catatan.';
 
       document.getElementById('modal-catatan-wo').classList.remove('hidden');
       if (canEdit) setTimeout(() => textEl.focus(), 50);
