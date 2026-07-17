@@ -32,6 +32,11 @@ function _ensureSiteSurveySheet(ss) {
   sheet = ss.insertSheet('SiteSurvey_Main');
   sheet.appendRow(_SS_HEADERS);
   sheet.getRange(1, 1, 1, _SS_HEADERS.length).setFontWeight('bold');
+  // Kolom tanggal (2, 11) sbg TEXT agar tak di-auto-parse Sheets jadi Date
+  // (mis. "17/07/2026" -> Date -> ISO saat dibaca ulang).
+  var maxR = sheet.getMaxRows();
+  sheet.getRange(2, 2, maxR - 1, 1).setNumberFormat('@');
+  sheet.getRange(2, 11, maxR - 1, 1).setNumberFormat('@');
   return sheet;
 }
 
@@ -171,7 +176,7 @@ function getSiteSurveyList() {
       if (!r[0]) continue;
       list.push({
         id: r[0].toString(),
-        tanggalSurvey: r[1] ? r[1].toString() : '',
+        tanggalSurvey: _fmtTgl(r[1]),
         dibuatOleh: r[2] ? r[2].toString() : '',
         namaSite: r[3] ? r[3].toString() : '',
         namaPIC: r[4] ? r[4].toString() : '',
@@ -205,7 +210,7 @@ function getSiteSurveyDetail(id) {
         success: true,
         survey: {
           id: r[0].toString(),
-          tanggalSurvey: r[1] ? r[1].toString() : '',
+          tanggalSurvey: _fmtTgl(r[1]),
           dibuatOleh: r[2] ? r[2].toString() : '',
           namaSite: r[3] ? r[3].toString() : '',
           namaPIC: r[4] ? r[4].toString() : '',

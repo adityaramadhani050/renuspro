@@ -13,6 +13,7 @@ const _pgState = {
   purchaseorder: { page: 1, perPage: 10, data: [] },
   stok:          { page: 1, perPage: 20, data: [] },
   mutasi:        { page: 1, perPage: 20, data: [] },
+  sitesurvey:    { page: 1, perPage: 10, data: [] },
 };
 
 // ── Style injeksi sekali ──────────────────────────────────────────
@@ -215,6 +216,7 @@ function _pgRender(tipe) {
   if (tipe === 'purchaseorder') _pgRenderPurchaseOrder(sliced);
   if (tipe === 'stok')          _pgRenderStok(sliced);
   if (tipe === 'mutasi')        _pgRenderMutasi(sliced);
+  if (tipe === 'sitesurvey')    _pgRenderSiteSurvey(sliced);
 
   _renderPaginationBar(tipe);
 }
