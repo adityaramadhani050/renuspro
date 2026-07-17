@@ -204,21 +204,6 @@
         }).join('');
       }
 
-      // Tombol Buat Invoice — hanya untuk finance/admin
-      const btnInv = el('wo-btn-invoice');
-      const canCreateInvoice = typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin();
-      if (!canCreateInvoice) {
-        btnInv.classList.add('hidden');
-      } else if (item.sisaDpp > 0) {
-        btnInv.classList.remove('hidden', 'opacity-50', 'cursor-not-allowed');
-        btnInv.disabled = false;
-      } else {
-        btnInv.classList.remove('hidden');
-        btnInv.classList.add('opacity-50', 'cursor-not-allowed');
-        btnInv.disabled = true;
-        btnInv.title = 'Seluruh nilai kontrak sudah ditagih';
-      }
-
       // HPP panel: reset and trigger async load
       var hppLoading = el('wo-hpp-loading');
       var hppContent = el('wo-hpp-content');
@@ -259,18 +244,6 @@
     function _pdfDariDetailWO() {
       if (!_woDetailCurrent) return;
       exportWorkOrderPDF(_woDetailCurrent);
-    }
-
-    function _buatInvoiceDariWO() {
-      if (!_woDetailCurrent) return;
-      const noWO = _woDetailCurrent.noWO;
-      tutupModalDetailWO();
-      navigate('invoice');
-      setTimeout(function() {
-        if (typeof bukaModalBuatInvoice === 'function') {
-          bukaModalBuatInvoice(noWO);
-        }
-      }, 300);
     }
 
     function _exportKwDariWODetail(kwitansiId) {
@@ -329,13 +302,33 @@
     // ================================================================
     // CATATAN CUSTOMER PER WORK ORDER
     // ================================================================
+    // Hanya admin/lead sales/sales yang boleh menambah/mengubah catatan;
+    // role lain (finance, procurement, warehouse, engineer, dst) read-only.
+    function _canEditCatatanWO() {
+      var role = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : '';
+      return role === 'admin' || role === 'leadsales' || role === 'sales';
+    }
+
     window.bukaModalCatatanWO = function(item) {
       document.getElementById('catatan-wo-id').value       = item.noWO;
       document.getElementById('catatan-wo-nomor').innerText = 'WO ' + item.noWO;
       document.getElementById('catatan-wo-project').innerText = '  ·  ' + (item.namaProject || '');
-      document.getElementById('catatan-wo-text').value     = item.catatanCustomer || '';
+      var textEl = document.getElementById('catatan-wo-text');
+      textEl.value = item.catatanCustomer || '';
+
+      var canEdit = _canEditCatatanWO();
+      var saveBtn = document.getElementById('catatan-wo-save-btn');
+      var descEl  = document.getElementById('catatan-wo-desc');
+      textEl.readOnly = !canEdit;
+      textEl.classList.toggle('bg-slate-50', !canEdit);
+      textEl.classList.toggle('text-slate-500', !canEdit);
+      if (saveBtn) saveBtn.classList.toggle('hidden', !canEdit);
+      if (descEl) descEl.innerText = canEdit
+        ? 'Catatan / request / komunikasi dari customer untuk tim project.'
+        : 'Mode lihat saja — hanya Sales/Lead Sales/Admin yang dapat menambah/mengubah catatan.';
+
       document.getElementById('modal-catatan-wo').classList.remove('hidden');
-      setTimeout(() => document.getElementById('catatan-wo-text').focus(), 50);
+      if (canEdit) setTimeout(() => textEl.focus(), 50);
     };
 
     window.tutupModalCatatanWO = function() {
