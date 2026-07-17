@@ -342,8 +342,8 @@ function _qcItemHtml(it) {
   var panduan = (it.instruksi || contoh.length)
     ? '<div class="mt-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2.5">'
       + '<div class="text-[11px] font-extrabold text-sky-700 uppercase tracking-wider"><i class="fa-solid fa-circle-info mr-1"></i>Panduan Foto</div>'
-      + (it.instruksi ? '<div class="text-[12px] text-sky-800 mt-1">' + _qcEsc(it.instruksi) + '</div>' : '')
       + (contoh.length ? '<div class="flex flex-wrap gap-2 mt-2">' + contohThumbs + '</div>' : '')
+      + (it.instruksi ? '<div class="text-[12px] text-sky-800 mt-2 whitespace-pre-line">' + _qcEsc(it.instruksi) + '</div>' : '')
       + '</div>'
     : '';
 
@@ -535,7 +535,7 @@ function _qcRenderManage() {
           +   '<button onclick="_qcEditSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ', ' + (it.wajib ? 'true' : 'false') + ', ' + _qcJs(it.instruksi) + ')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit nama/instruksi"><i class="fa-solid fa-pen-to-square text-xs"></i></button>'
           +   '<button onclick="_qcDelSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
           + '</div>'
-          + (it.instruksi ? '<div class="text-[11px] text-slate-500 mt-1 ml-12"><i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>' + _qcEsc(it.instruksi) + '</div>' : '')
+          + (it.instruksi ? '<div class="text-[11px] text-slate-500 mt-1 ml-12 whitespace-pre-line"><i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>' + _qcEsc(it.instruksi) + '</div>' : '')
           + '<div class="flex flex-wrap items-center gap-2 mt-2 ml-12">'
           +   thumbs
           +   '<label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-600 border border-dashed border-sky-300 hover:bg-sky-50 rounded-lg px-2.5 py-1.5 cursor-pointer transition"><i class="fa-solid fa-image"></i> Foto Contoh<input type="file" accept="image/*" multiple class="hidden" onchange="_qcUploadContoh(\'' + it.kode + '\', this)"></label>'
