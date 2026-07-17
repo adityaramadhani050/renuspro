@@ -125,6 +125,7 @@ function bukaFormSiteSurvey() {
   document.getElementById('ss-form-view').classList.remove('hidden');
   _ssGotoStep(1);
   _ssInitMap(); // panggil setelah kontainer #ss-map terlihat (bukan display:none)
+  _ssCheckGeoPermission();
   toggleLoader(true, 'Menyiapkan form survey...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
@@ -294,18 +295,21 @@ function _ssGeoErrMsg(err) {
 // GPS presisi tinggi bisa lambat/timeout (sinyal lemah, dalam ruangan). Coba
 // dulu dgn presisi tinggi; kalau timeout/tidak tersedia, coba ulang dgn
 // presisi lebih longgar (lebih cepat & toleran) sebelum benar-benar gagal.
-function _ssAmbilLokasi() {
-  if (!navigator.geolocation) { showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
-  toggleLoader(true, 'Mengambil lokasi...');
+// opts.silent = true: dipanggil otomatis di background (cek izin saat form
+// dibuka) — tak menampilkan loader/notifikasi error, cukup diam2 gagal.
+function _ssAmbilLokasi(opts) {
+  opts = opts || {};
+  if (!navigator.geolocation) { if (!opts.silent) showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
+  if (!opts.silent) toggleLoader(true, 'Mengambil lokasi...');
   navigator.geolocation.getCurrentPosition(function(pos) {
-    toggleLoader(false);
+    if (!opts.silent) toggleLoader(false);
     _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 18 });
   }, function(err) {
     if (err.code !== err.TIMEOUT && err.code !== err.POSITION_UNAVAILABLE) {
-      toggleLoader(false);
-      showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err), 'error');
+      if (!opts.silent) { toggleLoader(false); showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err), 'error'); }
       return;
     }
+    if (opts.silent) return; // jangan retry berulang di background — cukup coba sekali
     toggleLoader(true, 'Mencoba lagi dengan akurasi lebih longgar...');
     navigator.geolocation.getCurrentPosition(function(pos) {
       toggleLoader(false);
@@ -315,6 +319,23 @@ function _ssAmbilLokasi() {
       showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err2) + '. Coba lagi, atau pilih titik langsung di peta / input manual.', 'error');
     }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
   }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+
+// Cek status izin lokasi tiap kali form dibuka. Kalau belum pernah
+// ditentukan ("prompt") atau sudah diizinkan ("granted"), otomatis picu
+// permintaan lokasi (native browser akan memunculkan dialog izin bila
+// perlu) — user tak perlu klik tombol dulu. Kalau ditolak ("denied"), tak
+// dipicu otomatis (hindari notifikasi error tiap buka form); user tetap
+// bisa coba manual via tombol "Lokasi Saat Ini" setelah mengaktifkan izin.
+function _ssCheckGeoPermission() {
+  if (!navigator.geolocation) return;
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(function(status) {
+      if (status.state === 'granted' || status.state === 'prompt') _ssAmbilLokasi({ silent: true });
+    }).catch(function() { _ssAmbilLokasi({ silent: true }); });
+  } else {
+    _ssAmbilLokasi({ silent: true });
+  }
 }
 
 // Input manual Latitude/Longitude — memindahkan pin juga.
@@ -404,32 +425,41 @@ function _ssHandleFotoInput(fieldKey, inputEl) {
     reader1.readAsDataURL(files[0]);
     return;
   }
+  // Indikator jumlah foto (n/total), pola sama seperti upload foto di QC.
   var idx = 0;
+  toggleLoader(true, 'Mengupload foto (0/' + files.length + ')...');
   function next() {
-    if (idx >= files.length) return;
+    if (idx >= files.length) { toggleLoader(false); showNotification(files.length + ' foto terupload.'); return; }
     var file = files[idx];
     var reader = new FileReader();
     reader.onload = function(e) {
-      _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type, function() { idx++; next(); });
+      toggleLoader(true, 'Mengupload foto (' + (idx + 1) + '/' + files.length + ')...');
+      _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type, { silent: true, onDone: function(ok) {
+        if (!ok) { toggleLoader(false); return; }
+        idx++; next();
+      } });
     };
-    reader.onerror = function() { showNotification('Gagal membaca file.', 'error'); idx++; next(); };
+    reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca file.', 'error'); };
     reader.readAsDataURL(file);
   }
   next();
 }
 
-function _ssUploadFoto(fieldKey, base64, fileName, mimeType, onDone) {
+// opts.silent: lewati toggleLoader sendiri (dipakai saat dipanggil dari loop
+// batch yg sudah menampilkan progres "(n/total)" sendiri). opts.onDone(ok).
+function _ssUploadFoto(fieldKey, base64, fileName, mimeType, opts) {
+  opts = opts || {};
   if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
-  toggleLoader(true, 'Mengupload foto...');
+  if (!opts.silent) toggleLoader(true, 'Mengupload foto...');
   google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); if (onDone) onDone(); return; }
+    if (!opts.silent) toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); if (opts.onDone) opts.onDone(false); return; }
     if (!_ssPhotos[fieldKey]) _ssPhotos[fieldKey] = [];
     res.foto.caption = '';
     _ssPhotos[fieldKey].push(res.foto);
     _ssRenderFotoSlot(fieldKey);
-    if (onDone) onDone();
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); if (onDone) onDone(); })
+    if (opts.onDone) opts.onDone(true);
+  }).withFailureHandler(function(err) { if (!opts.silent) toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); if (opts.onDone) opts.onDone(false); })
     .uploadSiteSurveyFoto({ surveyId: _ssCurrentId, fieldKey: fieldKey, base64Data: base64, fileName: fileName, mimeType: mimeType });
 }
 
