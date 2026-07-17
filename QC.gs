@@ -575,6 +575,100 @@ function setQCAssignment(noWO, userIds, assignedBy) {
   }
 }
 
+// ── Daftar Project QC ───────────────────────────────────────────────────────
+// Tidak semua WO perlu QC lapangan. Lead Engineer mendaftarkan WO ke QC lewat
+// sheet QC_Project; hanya WO terdaftar yang muncul di modul QC.
+function _qcProjectSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('QC_Project');
+  if (sheet) return sheet;
+  sheet = ss.insertSheet('QC_Project');
+  sheet.appendRow(['No WO', 'Nama Project', 'Nama Klien', 'Ditambahkan Oleh', 'Ditambahkan Pada']);
+  sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+  return sheet;
+}
+
+// Array WO yang terdaftar di QC: [{noWO, namaProject, namaKlien}] (snapshot).
+function _qcRegisteredWOs() {
+  var out = [];
+  try {
+    var sheet = _qcProjectSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var w = (data[i][0] || '').toString().trim();
+      if (!w) continue;
+      out.push({ noWO: w, namaProject: (data[i][1] || '').toString(), namaKlien: (data[i][2] || '').toString() });
+    }
+  } catch (e) {}
+  return out;
+}
+
+// WO yang BELUM terdaftar di QC (untuk dropdown "Tambah Project").
+function getAvailableWOForQC() {
+  try {
+    var reg = {};
+    _qcRegisteredWOs().forEach(function (w) { reg[w.noWO] = true; });
+    var woList = [];
+    try { woList = getWorkOrderList() || []; } catch (e) {}
+    var list = woList.filter(function (wo) { return !reg[wo.noWO]; })
+      .map(function (wo) { return { noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status }; });
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
+  }
+}
+
+// Daftarkan 1 WO ke QC (opsional sekaligus assign site engineer).
+function addQCProject(noWO, userIds, addedBy) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'Pilih Work Order dulu.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _qcProjectSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === noWO) return { success: false, message: 'Work Order sudah ada di daftar QC.' };
+    }
+    var proj = '', klien = '';
+    try {
+      var wo = (getWorkOrderList() || []).filter(function (w) { return w.noWO === noWO; })[0];
+      if (wo) { proj = wo.namaProject || ''; klien = wo.namaKlien || ''; }
+    } catch (e) {}
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.appendRow([noWO, proj, klien, (addedBy || '').toString(), when]);
+    try { lock.releaseLock(); } catch (e) {}
+    if (userIds && userIds.length) setQCAssignment(noWO, userIds, addedBy);
+    return { success: true, message: 'Work Order ditambahkan ke QC.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// Keluarkan 1 WO dari daftar QC (foto & penugasan tidak dihapus).
+function removeQCProject(noWO) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+    lock.waitLock(15000);
+    var sheet = _qcProjectSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    var removed = false;
+    for (var i = data.length - 1; i >= 1; i--) {
+      if ((data[i][0] || '').toString().trim() === noWO) { sheet.deleteRow(i + 1); removed = true; }
+    }
+    return { success: removed, message: removed ? 'Work Order dikeluarkan dari QC.' : 'Work Order tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── Dashboard: ringkasan WO (opsional filter utk site engineer) ─────────────
 // opts.siteUserId → hanya WO yang di-assign ke user itu.
 function getQCDashboard(opts) {
@@ -597,8 +691,14 @@ function getQCDashboard(opts) {
     }
     var assignedMap = _qcAssignedMap();
     var siteUserId = (opts && opts.siteUserId) ? opts.siteUserId.toString().trim() : '';
-    var woList = [];
-    try { woList = getWorkOrderList() || []; } catch (e) {}
+    // Hanya WO yang terdaftar di QC (bukan seluruh WO). Nama project/klien
+    // di-refresh dari master WO bila masih ada, jika tidak pakai snapshot.
+    var woMap = {};
+    try { (getWorkOrderList() || []).forEach(function (wo) { woMap[wo.noWO] = wo; }); } catch (e) {}
+    var woList = _qcRegisteredWOs().map(function (r) {
+      var wo = woMap[r.noWO] || {};
+      return { noWO: r.noWO, namaProject: wo.namaProject || r.namaProject, namaKlien: wo.namaKlien || r.namaKlien, status: wo.status || '' };
+    });
     if (siteUserId) {
       woList = woList.filter(function (wo) {
         return (assignedMap[wo.noWO] || []).some(function (a) { return a.id === siteUserId; });

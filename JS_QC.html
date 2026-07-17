@@ -38,6 +38,7 @@ window.loadQC = function() {
   document.getElementById('qc-manage').classList.add('hidden');
   document.getElementById('qc-home').classList.remove('hidden');
   var mbtn = document.getElementById('qc-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_qcCanAssign());
+  var abtn = document.getElementById('qc-add-project-btn'); if (abtn) abtn.classList.toggle('hidden', !_qcCanAssign());
   document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
   if (typeof google === 'undefined') return;
   // Site engineer hanya melihat WO yang di-assign; admin/lead lihat semua.
@@ -65,6 +66,65 @@ function _qcRenderCards() {
     + _qcCard('Approved', g.approved || 0, 'text-emerald-500', 'fa-circle-check')
     + _qcCard('Pending', g.pending || 0, 'text-amber-500', 'fa-clock')
     + _qcCard('Rejected', g.rejected || 0, 'text-rose-500', 'fa-circle-xmark');
+}
+
+// ── Tambah Project ke QC (Lead Engineer / Admin) ──────────────────────────
+function _qcOpenAddProject() {
+  document.getElementById('modal-qc-project').classList.remove('hidden');
+  var woSel = document.getElementById('qc-project-wo');
+  var seBox = document.getElementById('qc-project-se');
+  woSel.innerHTML = '<option value="">Memuat...</option>';
+  seBox.innerHTML = '<div class="text-xs text-slate-400 py-1 px-1"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat site engineer...</div>';
+  // WO yang belum terdaftar di QC
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    if (!list.length) { woSel.innerHTML = '<option value="">Semua WO sudah terdaftar / tidak ada WO</option>'; return; }
+    woSel.innerHTML = '<option value="">-- Pilih Work Order --</option>' + list.map(function(w) {
+      return '<option value="' + _qcEsc(w.noWO) + '">' + _qcEsc(w.noWO) + ' — ' + _qcEsc(w.namaProject || '-') + (w.namaKlien ? ' (' + _qcEsc(w.namaKlien) + ')' : '') + '</option>';
+    }).join('');
+  }).withFailureHandler(function() { woSel.innerHTML = '<option value="">Gagal memuat WO</option>'; }).getAvailableWOForQC();
+  // Daftar site engineer (checkbox, opsional)
+  var renderSE = function() {
+    var rows = (_qcSiteEngineers || []).map(function(u) {
+      return '<label class="flex items-center gap-2 py-1.5 px-1 cursor-pointer">'
+        + '<input type="checkbox" value="' + u.id + '" class="accent-orange-500 qc-project-se-cb">'
+        + '<span class="text-sm text-slate-700">' + _qcEsc(u.nama) + ' <span class="text-[10px] text-slate-400">@' + _qcEsc(u.username) + '</span></span></label>';
+    }).join('') || '<div class="text-xs text-slate-400 italic py-1 px-1">Belum ada user Site Engineer.</div>';
+    seBox.innerHTML = rows;
+  };
+  if (_qcSiteEngineers) { renderSE(); return; }
+  google.script.run.withSuccessHandler(function(res) { _qcSiteEngineers = (res && res.success) ? (res.list || []) : []; renderSE(); })
+    .withFailureHandler(function() { _qcSiteEngineers = []; renderSE(); }).getSiteEngineerList();
+}
+function _qcCloseAddProject() { document.getElementById('modal-qc-project').classList.add('hidden'); }
+function _qcSaveAddProject() {
+  var noWO = (document.getElementById('qc-project-wo').value || '').trim();
+  if (!noWO) return showNotification('Pilih Work Order dulu.', 'error');
+  var ids = [];
+  Array.prototype.forEach.call(document.querySelectorAll('.qc-project-se-cb'), function(cb) { if (cb.checked) ids.push(cb.value); });
+  toggleLoader(true, 'Menambahkan project...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Project ditambahkan.');
+    _qcCloseAddProject();
+    loadQC();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menambahkan project.', 'error'); })
+    .addQCProject(noWO, ids, _qcUserNama());
+}
+
+// Keluarkan project dari daftar QC.
+function _qcRemoveProject(noWO) {
+  showConfirm({ title: 'Keluarkan dari QC', message: 'Keluarkan WO ' + noWO + ' dari daftar QC? Foto & penugasan tetap tersimpan.', confirmText: 'Ya, Keluarkan', onConfirm: function() {
+    toggleLoader(true, 'Memproses...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      showNotification(res && res.message ? res.message : 'Dikeluarkan dari QC.');
+      kembaliQCHome();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .removeQCProject(noWO);
+  } });
 }
 
 // Filter site engineer (hanya utk Lead/Admin yg melihat banyak WO).
@@ -101,7 +161,7 @@ function _qcRenderWOList() {
   });
   if (!list.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
-      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada Work Order.');
+      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.');
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
@@ -165,9 +225,12 @@ function _qcRenderDetail(summary) {
   // Tombol Atur Site Engineer diletakkan di baris atas, sejajar tombol Kembali
   var actions = document.getElementById('qc-detail-actions');
   if (actions) actions.innerHTML = _qcCanAssign()
-    ? '<div class="relative">'
-      + '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
-      + '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
+    ? '<div class="flex items-center gap-2">'
+      + '<button onclick="_qcRemoveProject(\'' + _qcEsc(_qcWO.noWO) + '\')" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-trash-can"></i> Keluarkan</button>'
+      + '<div class="relative">'
+      +   '<button onclick="_qcToggleAssign(event)" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i> Atur Site Engineer <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
+      +   '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'
+      + '</div>'
       + '</div>'
     : '';
   head.innerHTML = '<div class="flex flex-wrap items-start justify-between gap-3">'
