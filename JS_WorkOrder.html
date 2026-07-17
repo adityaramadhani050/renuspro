@@ -36,9 +36,6 @@
         const maxAging = (i.invoices || []).filter(inv => inv.statusBayar !== 'Lunas')
           .reduce((m, inv) => { const d = typeof _agingDays === 'function' ? _agingDays(inv.tanggal) : null; return d !== null && d > m ? d : m; }, -1);
         const agingBadgeWO = maxAging > 0 && typeof _agingBadge === 'function' ? _agingBadge(maxAging) : '';
-        // Indikator (bukan tombol) — ada catatan customer utk WO ini
-        const catatanDot = i.catatanCustomer
-          ? '<i class="fa-solid fa-comment-dots text-amber-400 text-[10px]" title="Ada catatan customer"></i>' : '';
 
         // Card, bukan baris tabel — border+hover+chevron menandakan bisa diklik.
         return `<div onclick='bukaDetailWO(${itemJson})'
@@ -51,7 +48,7 @@
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-[11px] text-slate-400 truncate">${i.namaKlien}</p>
-              <p class="font-bold text-slate-800 truncate flex items-center gap-1.5">${i.namaProject} ${catatanDot}</p>
+              <p class="font-bold text-slate-800 truncate">${i.namaProject}</p>
               <p class="text-[10px] text-slate-400 truncate mt-0.5">${i.dibuatOleh || ''}</p>
             </div>
             <div class="sm:w-36 sm:text-right shrink-0">
