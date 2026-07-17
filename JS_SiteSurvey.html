@@ -37,6 +37,38 @@ function _ssTodayDDMMYYYY() {
   return dd + '/' + mm + '/' + d.getFullYear();
 }
 
+// Kompres/resize foto di browser sebelum diupload — foto kamera HP modern
+// bisa 3-8MB; dipangkas ke maks 1600px sisi terpanjang + JPEG ~80% supaya
+// upload jauh lebih cepat tanpa terlihat bedanya di thumbnail/laporan.
+function _ssResizeImage(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxDim = 1600;
+      var w = img.naturalWidth || 800, h = img.naturalHeight || 600;
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var dataUrl;
+      try { dataUrl = canvas.toDataURL('image/jpeg', 0.8); }
+      catch (err) { cb(null); return; }
+      cb(dataUrl);
+    };
+    img.onerror = function() { cb(null); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() { cb(null); };
+  reader.readAsDataURL(file);
+}
+
+var _ssLocalIdSeq = 0;
+function _ssNextLocalId() { return 'L' + (++_ssLocalIdSeq); }
+function _ssFotoKey(f) { return f.fileId || f._localId; }
+
 // Marker icon default Leaflet via CDN unpkg butuh URL eksplisit (dikenal broken
 // bila tak di-set manual saat memakai CDN langsung, bukan bundler).
 if (typeof L !== 'undefined') {
@@ -263,12 +295,20 @@ function _ssValidateStep(n) {
   return null;
 }
 
+// Upload foto pending milik step yang sedang ditinggalkan sebelum benar-benar
+// pindah (baik maju maupun mundur) — foto yg sudah terupload dilewati.
 function _ssStepNext() {
   var err = _ssValidateStep(_ssStep);
   if (err) { showNotification(err, 'error'); return; }
-  if (_ssStep < 5) _ssGotoStep(_ssStep + 1);
+  if (_ssStep >= 5) return;
+  var target = _ssStep + 1;
+  _ssUploadPendingInFields(_ssFieldsForStep(_ssStep), function(ok) { if (ok) _ssGotoStep(target); });
 }
-function _ssStepPrev() { if (_ssStep > 1) _ssGotoStep(_ssStep - 1); }
+function _ssStepPrev() {
+  if (_ssStep <= 1) return;
+  var target = _ssStep - 1;
+  _ssUploadPendingInFields(_ssFieldsForStep(_ssStep), function(ok) { if (ok) _ssGotoStep(target); });
+}
 
 // ── Peta (Leaflet + Geolocation + input manual) ─────────────────────
 var SS_DEFAULT_CENTER = [-2.5, 118]; // tengah Indonesia
@@ -378,9 +418,11 @@ function _ssFotoAnotMode(fieldKey) {
   return box ? (box.getAttribute('data-anot') || null) : null;
 }
 
-// Setiap field foto menyimpan ARRAY foto (bisa lebih dari 1), masing-masing
-// {fileId, fileUrl, caption}. Tombol Kamera/Galeri tetap tampil setelah upload
-// agar bisa terus menambah foto.
+// Setiap field foto menyimpan ARRAY foto (bisa lebih dari 1). Foto yang baru
+// dipilih disimpan sbg "pending" (preview lokal, belum diupload) — upload
+// sungguhan baru terjadi saat pindah step (lihat _ssUploadPendingInFields),
+// bukan seketika saat dipilih, agar memilih foto terasa instan. Setelah
+// terupload, entry berubah jadi {fileId, fileUrl, caption}.
 function _ssRenderFotoSlot(fieldKey) {
   var box = document.getElementById('ss-foto-' + fieldKey);
   if (!box) return;
@@ -388,13 +430,20 @@ function _ssRenderFotoSlot(fieldKey) {
   var anotMode = box.getAttribute('data-anot');
 
   var thumbsHtml = arr.map(function(f) {
+    var key = _ssFotoKey(f);
+    var thumbInner = f.pending
+      ? '<div class="relative h-24 w-24 rounded-lg overflow-hidden border border-amber-300 bg-slate-50">'
+        + '<img src="' + f.localPreview + '" class="h-full w-full object-cover">'
+        + '<span class="absolute bottom-0 inset-x-0 bg-amber-500/90 text-white text-[9px] font-bold text-center py-0.5">Menunggu upload</span>'
+        + '</div>'
+      : '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
+        +   '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
     return '<div class="inline-block align-top w-32">'
       + '<div class="relative inline-block">'
-      +   '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
-      +     '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>'
-      +   '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\', \'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
+      +   thumbInner
+      +   '<button type="button" onclick="_ssHapusFotoSlot(\'' + fieldKey + '\', \'' + key + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
       + '</div>'
-      + '<input type="text" value="' + _ssEsc(f.caption || '') + '" placeholder="Keterangan foto..." onchange="_ssFotoCaptionChange(\'' + fieldKey + '\', \'' + f.fileId + '\', this.value)" class="mt-1.5 w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">'
+      + '<input type="text" value="' + _ssEsc(f.caption || '') + '" placeholder="Keterangan foto..." onchange="_ssFotoCaptionChange(\'' + fieldKey + '\', \'' + key + '\', this.value)" class="mt-1.5 w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">'
       + '</div>';
   }).join('');
 
@@ -425,58 +474,75 @@ function _ssHandleFotoInput(fieldKey, inputEl) {
     reader1.readAsDataURL(files[0]);
     return;
   }
-  // Indikator jumlah foto (n/total), pola sama seperti upload foto di QC.
-  var idx = 0;
-  toggleLoader(true, 'Mengupload foto (0/' + files.length + ')...');
-  function next() {
-    if (idx >= files.length) { toggleLoader(false); showNotification(files.length + ' foto terupload.'); return; }
-    var file = files[idx];
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      toggleLoader(true, 'Mengupload foto (' + (idx + 1) + '/' + files.length + ')...');
-      _ssUploadFoto(fieldKey, e.target.result.split(',')[1], file.name, file.type, { silent: true, onDone: function(ok) {
-        if (!ok) { toggleLoader(false); return; }
-        idx++; next();
-      } });
-    };
-    reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca file.', 'error'); };
-    reader.readAsDataURL(file);
-  }
-  next();
+  // Resize/kompres di browser lalu simpan sbg "pending" (preview lokal saja,
+  // TIDAK langsung upload) — upload sungguhan baru terjadi saat pindah step
+  // (lihat _ssUploadPendingInFields), supaya memilih foto terasa instan.
+  files.forEach(function(file) {
+    _ssResizeImage(file, function(dataUrl) {
+      if (!dataUrl) { showNotification('Gagal memproses foto: ' + file.name, 'error'); return; }
+      if (!_ssPhotos[fieldKey]) _ssPhotos[fieldKey] = [];
+      _ssPhotos[fieldKey].push({
+        _localId: _ssNextLocalId(), pending: true, localPreview: dataUrl,
+        base64: dataUrl.split(',')[1], fileName: (file.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg',
+        mimeType: 'image/jpeg', caption: ''
+      });
+      _ssRenderFotoSlot(fieldKey);
+    });
+  });
 }
 
-// opts.silent: lewati toggleLoader sendiri (dipakai saat dipanggil dari loop
-// batch yg sudah menampilkan progres "(n/total)" sendiri). opts.onDone(ok).
-function _ssUploadFoto(fieldKey, base64, fileName, mimeType, opts) {
-  opts = opts || {};
-  if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
-  if (!opts.silent) toggleLoader(true, 'Mengupload foto...');
-  google.script.run.withSuccessHandler(function(res) {
-    if (!opts.silent) toggleLoader(false);
-    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload foto.', 'error'); if (opts.onDone) opts.onDone(false); return; }
-    if (!_ssPhotos[fieldKey]) _ssPhotos[fieldKey] = [];
-    res.foto.caption = '';
-    _ssPhotos[fieldKey].push(res.foto);
-    _ssRenderFotoSlot(fieldKey);
-    if (opts.onDone) opts.onDone(true);
-  }).withFailureHandler(function(err) { if (!opts.silent) toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); if (opts.onDone) opts.onDone(false); })
-    .uploadSiteSurveyFoto({ surveyId: _ssCurrentId, fieldKey: fieldKey, base64Data: base64, fileName: fileName, mimeType: mimeType });
-}
-
-function _ssFotoCaptionChange(fieldKey, fileId, value) {
+function _ssFotoCaptionChange(fieldKey, key, value) {
   var arr = _ssPhotos[fieldKey] || [];
-  var f = arr.filter(function(x) { return x.fileId === fileId; })[0];
+  var f = arr.filter(function(x) { return _ssFotoKey(x) === key; })[0];
   if (f) f.caption = value;
 }
 
-function _ssHapusFotoSlot(fieldKey, fileId) {
+function _ssHapusFotoSlot(fieldKey, key) {
   var arr = _ssPhotos[fieldKey] || [];
   var idx = -1;
-  for (var i = 0; i < arr.length; i++) { if (arr[i].fileId === fileId) { idx = i; break; } }
+  for (var i = 0; i < arr.length; i++) { if (_ssFotoKey(arr[i]) === key) { idx = i; break; } }
   if (idx === -1) return;
+  var f = arr[idx];
   arr.splice(idx, 1);
   _ssRenderFotoSlot(fieldKey);
-  google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(fileId);
+  if (!f.pending && f.fileId) google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
+}
+
+// ── Upload foto pending — dipicu saat pindah step / submit, BUKAN saat
+// foto dipilih. Hanya entry berstatus pending yg diupload; yg sudah punya
+// fileId dilewati (mencegah upload ganda saat bolak-balik antar step). ──
+function _ssFieldsForStep(n) {
+  var cfg = _SS_STEP_REQUIRED[n];
+  return cfg ? cfg.fotos.map(function(f) { return f.key; }) : [];
+}
+
+function _ssUploadPendingInFields(fieldKeys, onDone) {
+  var pending = [];
+  fieldKeys.forEach(function(key) {
+    (_ssPhotos[key] || []).forEach(function(f) { if (f.pending) pending.push({ fieldKey: key, foto: f }); });
+  });
+  if (!pending.length) { onDone(true); return; }
+  if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); onDone(false); return; }
+  var idx = 0;
+  toggleLoader(true, 'Mengupload foto (0/' + pending.length + ')...');
+  function next() {
+    if (idx >= pending.length) { toggleLoader(false); onDone(true); return; }
+    toggleLoader(true, 'Mengupload foto (' + (idx + 1) + '/' + pending.length + ')...');
+    var item = pending[idx];
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || res.success === false) { toggleLoader(false); showNotification((res && res.message) || 'Gagal upload foto.', 'error'); onDone(false); return; }
+      item.foto.fileId = res.foto.fileId;
+      item.foto.fileUrl = res.foto.fileUrl;
+      delete item.foto.pending;
+      delete item.foto.base64;
+      delete item.foto.localPreview;
+      _ssRenderFotoSlot(item.fieldKey);
+      idx++; next();
+    }).withFailureHandler(function(err) {
+      toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); onDone(false);
+    }).uploadSiteSurveyFoto({ surveyId: _ssCurrentId, fieldKey: item.fieldKey, base64Data: item.foto.base64, fileName: item.foto.fileName, mimeType: item.foto.mimeType });
+  }
+  next();
 }
 
 // ── Editor anotasi foto (kotak utk BoS, garis utk jalur kabel) ──────
@@ -575,18 +641,33 @@ function _ssAnotCancel() { document.getElementById('modal-ss-anotasi').classList
 
 function _ssAnotSave() {
   if (!_ssAnot) return;
-  var base64;
-  try { base64 = _ssAnot.canvas.toDataURL('image/jpeg', 0.9).split(',')[1]; }
+  var dataUrl;
+  try { dataUrl = _ssAnot.canvas.toDataURL('image/jpeg', 0.9); }
   catch (e) { showNotification('Gagal memproses gambar.', 'error'); return; }
   var fieldKey = _ssAnot.fieldKey;
   document.getElementById('modal-ss-anotasi').classList.add('hidden');
   _ssAnot = null;
-  _ssUploadFoto(fieldKey, base64, fieldKey + '.jpg', 'image/jpeg');
+  // Simpan sbg pending (blm upload) — sama seperti foto biasa, terupload
+  // sungguhan saat pindah step.
+  if (!_ssPhotos[fieldKey]) _ssPhotos[fieldKey] = [];
+  _ssPhotos[fieldKey].push({
+    _localId: _ssNextLocalId(), pending: true, localPreview: dataUrl,
+    base64: dataUrl.split(',')[1], fileName: fieldKey + '.jpg', mimeType: 'image/jpeg', caption: ''
+  });
+  _ssRenderFotoSlot(fieldKey);
 }
 
 // ── Submit final ─────────────────────────────────────────────────
 function _ssSubmit() {
   if (!_ssCurrentId) { showNotification('Sesi form belum siap, coba buka ulang form.', 'error'); return; }
+  // Jaring pengaman: sapu SEMUA field foto (bukan cuma step terakhir) kalau2
+  // ada yg masih pending — normalnya sudah terupload lewat step Selanjutnya.
+  _ssUploadPendingInFields(_SS_FOTO_FIELDS, function(ok) {
+    if (ok) _ssDoSubmit();
+  });
+}
+
+function _ssDoSubmit() {
   for (var n = 1; n <= 5; n++) {
     var err = _ssValidateStep(n);
     if (err) { _ssGotoStep(n); showNotification(err, 'error'); return; }
