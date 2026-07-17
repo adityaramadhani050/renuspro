@@ -140,7 +140,7 @@
       const el = id => document.getElementById(id);
 
       el('wo-detail-nowo').innerText    = 'WO ' + item.noWO;
-      el('wo-detail-subtitle').innerText = item.namaProject + '  ·  ' + item.namaKlien;
+      el('wo-detail-subtitle').innerText = item.namaProject;
       el('wo-detail-id').innerText      = item.id + ' (Rev' + item.rev + ')';
       el('wo-detail-klien').innerText   = item.namaKlien;
       el('wo-detail-sales').innerText   = item.dibuatOleh || '-';
