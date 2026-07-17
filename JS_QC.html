@@ -102,12 +102,12 @@ function _qcSaveAddProject() {
   if (!noWO) return showNotification('Pilih Work Order dulu.', 'error');
   var ids = [];
   Array.prototype.forEach.call(document.querySelectorAll('.qc-project-se-cb'), function(cb) { if (cb.checked) ids.push(cb.value); });
+  _qcCloseAddProject();              // tutup modal dulu agar tak menutupi loader
   toggleLoader(true, 'Menambahkan project...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
     if (res && res.success === false) { showNotification(res.message, 'error'); return; }
     showNotification(res && res.message ? res.message : 'Project ditambahkan.');
-    _qcCloseAddProject();
     loadQC();
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menambahkan project.', 'error'); })
     .addQCProject(noWO, ids, _qcUserNama());
