@@ -928,6 +928,7 @@ function _ssBuildPDF(d) {
       var w = boxW, h = w * (ih / iw);
       if (h > 100) h = 100;
       var capLines = f.caption ? doc.splitTextToSize(f.caption, boxW) : [];
+      if (capLines.length > 6) { capLines = capLines.slice(0, 6); capLines[5] = capLines[5].replace(/.{0,3}$/, '...'); }
       var blockH = h + (capLines.length ? capLines.length * 3.2 + 1.5 : 0);
       if (px + w > ML + CW + 0.5) { px = ML; y += rowMaxH + 6; rowMaxH = 0; }
       if (y + blockH > BOTTOM) { newPage(); px = ML; rowMaxH = 0; }
