@@ -1124,6 +1124,7 @@ function _ssBuildPDF(d) {
   header();
   y = 30;
 
+  sectionBar('A. INFORMASI UMUM');
   doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor.apply(doc, DARK);
   doc.text(d.namaSite || '-', ML, y); y += 5;
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, SLATE);
@@ -1138,7 +1139,6 @@ function _ssBuildPDF(d) {
   }
   y += 4;
 
-  sectionBar('A. INFORMASI UMUM');
   fieldRow([
     ['Arah Hadap Bangunan', d.arahBangunan],
     ['Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '']
