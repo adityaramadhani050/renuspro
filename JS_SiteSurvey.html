@@ -1147,6 +1147,7 @@ function _ssBuildPDF(d) {
   y += 2;
 
   var kel = d.kelistrikan || {};
+  newPage();
   sectionBar('B. INFORMASI KELISTRIKAN');
   fieldRow([
     ['ID Pelanggan PLN', kel.idPelangganPLN],
@@ -1159,6 +1160,7 @@ function _ssBuildPDF(d) {
   y += 2;
 
   var bos = d.bos || {};
+  newPage();
   sectionBar('C. BALANCE OF SYSTEM (BOS)');
   fieldRow([
     ['Lokasi Penempatan', bos.lokasi],
@@ -1170,6 +1172,7 @@ function _ssBuildPDF(d) {
   y += 2;
 
   var atap = d.atap || {};
+  newPage();
   sectionBar('D. INFORMASI ATAP');
   fieldRow([
     ['Jenis Atap', atap.jenis],
@@ -1184,6 +1187,7 @@ function _ssBuildPDF(d) {
   y += 2;
 
   var jk = d.jalurKabel || {};
+  newPage();
   sectionBar('E. JALUR KABEL');
   fieldRow([
     ['Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : ''],
