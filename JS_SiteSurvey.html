@@ -833,7 +833,8 @@ function _ssRenderDetail() {
   }
 
   var petaBtn = (d.latitude != null && d.longitude != null)
-    ? '<a href="https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude + '" target="_blank" class="inline-flex items-center gap-1.5 mt-2 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-map-location-dot"></i>' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) + ' — Buka di Google Maps</a>'
+    ? '<p class="text-[11px] font-semibold text-slate-500 mt-2">' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) + '</p>'
+      + '<a href="https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude + '" target="_blank" class="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-map-location-dot"></i>Buka di Google Maps</a>'
     : '';
   // Kolom kanan (Dibuat Oleh + tombol Maps) disusun agar tombol Maps sejajar
   // baris dgn Alamat di kolom kiri (Tanggal+Alamat kiri, Dibuat Oleh+Maps kanan).
