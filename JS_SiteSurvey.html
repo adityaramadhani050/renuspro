@@ -177,9 +177,41 @@ var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', '
   'ss-panjangPV', 'ss-panjangAC', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
 
+// Tabel standar Daya PLN → Rate Ampere MCB (PLN, sesuai jenis phase).
+var _SS_PLN_TABLE = {
+  '1 Phase': [
+    { va: 450, a: 2 }, { va: 900, a: 4 }, { va: 1300, a: 6 }, { va: 2200, a: 10 },
+    { va: 3500, a: 16 }, { va: 4400, a: 20 }, { va: 5500, a: 25 }, { va: 7700, a: 35 }, { va: 11000, a: 50 }
+  ],
+  '3 Phase': [
+    { va: 6600, a: 10 }, { va: 10600, a: 16 }, { va: 13200, a: 20 }, { va: 16500, a: 25 },
+    { va: 23000, a: 35 }, { va: 33000, a: 50 }, { va: 41500, a: 63 }, { va: 53000, a: 80 }
+  ]
+};
+
+// Daya PLN mengikuti Phase yang dipilih; Rating Breaker otomatis mengikuti
+// Daya PLN (nilai baku PLN, bukan input bebas) agar kombinasinya selalu valid.
+function _ssOnPhaseChange() {
+  var phase = document.getElementById('ss-phase').value;
+  var sel = document.getElementById('ss-dayaPLN');
+  var opts = _SS_PLN_TABLE[phase] || [];
+  sel.innerHTML = (opts.length ? '<option value="">-- Pilih --</option>' : '<option value="">-- Pilih Phase Listrik dahulu --</option>')
+    + opts.map(function (o) { return '<option value="' + o.va + '">' + o.va + ' VA</option>'; }).join('');
+  sel.disabled = !opts.length;
+  document.getElementById('ss-ratingBreaker').value = '';
+}
+function _ssOnDayaChange() {
+  var phase = document.getElementById('ss-phase').value;
+  var va = Number(document.getElementById('ss-dayaPLN').value || 0);
+  var match = (_SS_PLN_TABLE[phase] || []).filter(function (o) { return o.va === va; })[0];
+  document.getElementById('ss-ratingBreaker').value = match ? match.a : '';
+}
+
 function _ssResetForm() {
   _ssCurrentId = null; _ssStep = 1; _ssPhotos = {}; _ssLatLng = null;
   _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('ss-dayaPLN').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
+  document.getElementById('ss-dayaPLN').disabled = true;
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
   var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
   if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
