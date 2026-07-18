@@ -1137,12 +1137,24 @@ function _ssBuildPDF(d) {
   y = 30;
 
   sectionBar('A. INFORMASI UMUM');
+  // Semua info survey dibungkus panel abu muda agar tampak sbg satu blok yg
+  // rapi (mirip kartu detail di layar). Tinggi panel dihitung dulu dgn formula
+  // yg sama spt fieldRow/fullField supaya kotak latarnya bisa digambar lebih
+  // dahulu, lalu field-nya di atasnya. Field pendek di grid 3-kolom di atas,
+  // Alamat (panjang) full-width di bawah agar ritme grid tak terputus.
+  var aPadX = 4, aPadTop = 5, aPadBot = 3;
+  var aAlamatLines = doc.splitTextToSize(String(d.alamat || '-'), CW);
+  var aContentH = 10 + 10 + 10 + (4.5 + (aAlamatLines.length - 1) * 4 + 4);
+  var aPanelH = aPadTop + aContentH + aPadBot;
+  var aTop = y;
+  doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+  doc.roundedRect(ML - aPadX, aTop, CW + 2 * aPadX, aPanelH, 2.5, 2.5, 'FD');
+  y = aTop + aPadTop;
   fieldRow([
     ['Nama Site', d.namaSite],
     ['Nama PIC', d.namaPIC],
     ['No. Telepon', d.telepon]
   ]);
-  fullField('Alamat', d.alamat);
   fieldRow([
     ['Tanggal Survey', d.tanggalSurvey],
     ['Surveyor', d.dibuatOleh],
@@ -1152,6 +1164,8 @@ function _ssBuildPDF(d) {
     ['Arah Hadap Bangunan', d.arahBangunan],
     ['Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '']
   ]);
+  fullField('Alamat', d.alamat);
+  y = aTop + aPanelH + 5;
   photoGroup('Foto Bangunan Tampak Depan', d.fotoBangunan);
   y += 2;
 
