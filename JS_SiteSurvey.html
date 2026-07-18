@@ -146,6 +146,10 @@ function _pgRenderSiteSurvey(data) {
     return;
   }
   tbody.innerHTML = data.map(function(s) {
+    var editBtn = _ssCanEditRecord(s)
+      ? '<button onclick="event.stopPropagation();bukaEditSiteSurvey(\'' + s.id + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>'
+      : '';
+    var pdfBtn = '<button onclick="event.stopPropagation();_ssExportPDFById(\'' + s.id + '\')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>';
     var delBtn = _ssCanDelete()
       ? '<button onclick="event.stopPropagation();_ssHapusSurvey(\'' + s.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
@@ -159,6 +163,8 @@ function _pgRenderSiteSurvey(data) {
       + '<td class="p-4 text-center rp-actions" onclick="event.stopPropagation()" data-label="Aksi">'
       +   '<div class="flex items-center justify-center gap-1">'
       +     '<button onclick="bukaDetailSiteSurvey(\'' + s.id + '\')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Lihat Detail"><i class="fa-solid fa-eye text-sm"></i></button>'
+      +     editBtn
+      +     pdfBtn
       +     delBtn
       +   '</div>'
       + '</td>'
@@ -942,14 +948,26 @@ function _ssRenderDetail() {
 }
 
 // ── Edit survey lama (isi ulang form dari data yang sudah ada) ─────────────
-// Dipakai data yang sudah dimuat di modal detail (_ssDetailCurrent) — tak
-// perlu fetch ulang. Foto lama diperlakukan sbg sudah terupload (bukan
-// pending); foto baru yang ditambahkan tetap lewat alur pending->upload saat
-// Simpan Perubahan. Tanggal Survey asli dipertahankan (lihat _ssDoSubmit).
+// Selalu fetch detail terbaru dari server (bukan pakai _ssDetailCurrent yg
+// belum tentu ada — dipanggil baik dari modal detail maupun langsung dari
+// tombol Edit di tabel list). Foto lama diperlakukan sbg sudah terupload
+// (bukan pending); foto baru yang ditambahkan tetap lewat alur
+// pending->upload saat Simpan Perubahan. Tanggal Survey asli dipertahankan
+// (lihat _ssDoSubmit).
 window.bukaEditSiteSurvey = function(id) {
-  var d = _ssDetailCurrent;
-  if (!d || d.id !== id) return;
-  _ssTutupDetail();
+  toggleLoader(true, 'Memuat data survey...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal memuat survey.', 'error'); return; }
+    _ssTutupDetail();
+    _ssFillEditForm(res.survey);
+  }).withFailureHandler(function(err) {
+    toggleLoader(false);
+    showNotification((err && err.message) || 'Gagal memuat survey.', 'error');
+  }).getSiteSurveyDetail(id);
+};
+
+function _ssFillEditForm(d) {
   _ssResetForm();
   _ssEditMode = true;
   _ssCurrentId = d.id;
@@ -1019,11 +1037,16 @@ window.bukaEditSiteSurvey = function(id) {
   var submitBtn = document.getElementById('ss-btn-submit');
   if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Simpan Perubahan';
   showNotification('Mode edit — ' + d.id, 'info');
-};
+}
 
 // ── Export PDF laporan Site Survey (desain konsisten dgn laporan lain) ─────
+// Dipakai baik dari modal detail (_ssExportPDF) maupun langsung dari tombol
+// PDF di tabel list (_ssExportPDFById) — tak bergantung modal detail terbuka.
 function _ssExportPDF() {
   var d = _ssDetailCurrent; if (!d) return;
+  _ssExportPDFById(d.id);
+}
+function _ssExportPDFById(id) {
   if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
   toggleLoader(true, 'Menyiapkan PDF laporan Site Survey (memuat foto)...');
   google.script.run.withSuccessHandler(function(res) {
@@ -1032,7 +1055,7 @@ function _ssExportPDF() {
     try { _ssBuildPDF(res.survey); showNotification('Laporan Site Survey berhasil diunduh.'); }
     catch (e) { showNotification('Gagal membuat PDF: ' + e.message, 'error'); }
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal membuat PDF.', 'error'); })
-    .getSiteSurveyReportData(d.id);
+    .getSiteSurveyReportData(id);
 }
 
 function _ssBuildPDF(d) {

@@ -233,10 +233,13 @@ function getSiteSurveyList() {
     for (var i = 1; i < data.length; i++) {
       var r = data[i];
       if (!r[0]) continue;
+      var parsedList = {};
+      try { parsedList = JSON.parse(r[9] || '{}'); } catch (e) {}
       list.push({
         id: r[0].toString(),
         tanggalSurvey: _fmtTgl(r[1]),
         dibuatOleh: r[2] ? r[2].toString() : '',
+        dibuatOlehId: parsedList.dibuatOlehId || '',
         namaSite: r[3] ? r[3].toString() : '',
         namaPIC: r[4] ? r[4].toString() : '',
         telepon: r[5] ? r[5].toString() : '',
