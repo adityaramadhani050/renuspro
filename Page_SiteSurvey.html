@@ -280,32 +280,6 @@
           </div>
         </div>
 
-        <!-- ═══════════════ MODAL DETAIL (read-only, per section) ═══════════════ -->
-        <div id="modal-ss-detail" class="hidden fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/50 px-4 py-6">
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
-            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
-              <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
-                <i class="fa-solid fa-map-location-dot"></i>
-              </span>
-              <div class="flex-1 min-w-0">
-                <h3 id="ss-detail-title" class="text-base font-extrabold text-slate-800"></h3>
-                <p id="ss-detail-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
-              </div>
-              <button onclick="_ssTutupDetail()" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
-                <i class="fa-solid fa-xmark text-lg"></i>
-              </button>
-            </div>
-            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-3">
-              <div id="ss-detail-head" class="bg-slate-50 rounded-2xl border border-slate-100 p-4"></div>
-              <div id="ss-detail-body" class="space-y-3"></div>
-            </div>
-            <div class="flex justify-between items-center gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
-              <div id="ss-detail-actions"></div>
-              <button onclick="_ssTutupDetail()" class="px-5 py-2.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">Tutup</button>
-            </div>
-          </div>
-        </div>
-
         <!-- ═══════════════ EDITOR: anotasi foto (kotak / garis) ═══════════════ -->
         <div id="modal-ss-anotasi" class="hidden fixed inset-0 z-[330] flex flex-col bg-slate-900/95 px-2 sm:px-3 py-3">
           <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
@@ -332,3 +306,30 @@
 
         <!-- LIGHTBOX preview dipakai bersama modul QC (_qcViewFoto / #qc-photo-viewer) -->
       </section>
+
+      <!-- MODAL DETAIL Site Survey — DILUAR <section> agar bisa dibuka dari
+           halaman lain (mis. detail Work Order) meski page-sitesurvey display:none. -->
+      <div id="modal-ss-detail" class="hidden fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
+          <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+              <i class="fa-solid fa-map-location-dot"></i>
+            </span>
+            <div class="flex-1 min-w-0">
+              <h3 id="ss-detail-title" class="text-base font-extrabold text-slate-800"></h3>
+              <p id="ss-detail-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+            </div>
+            <button onclick="_ssTutupDetail()" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+          </div>
+          <div class="overflow-y-auto flex-1 px-6 py-5 space-y-3">
+            <div id="ss-detail-head" class="bg-slate-50 rounded-2xl border border-slate-100 p-4"></div>
+            <div id="ss-detail-body" class="space-y-3"></div>
+          </div>
+          <div class="flex justify-between items-center gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl">
+            <div id="ss-detail-actions"></div>
+            <button onclick="_ssTutupDetail()" class="px-5 py-2.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">Tutup</button>
+          </div>
+        </div>
+      </div>

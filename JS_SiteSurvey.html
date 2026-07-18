@@ -18,6 +18,7 @@ let _ssEditMode   = false;  // true = form sedang mengedit survey lama, bukan bu
 let _ssEditOriginalTanggal = ''; // Tanggal Survey asli dipertahankan saat edit (bukan tanggal hari ini)
 let _ssEditOriginalDibuatOlehId = ''; // id pembuat asli dipertahankan saat edit (bukan id user yg sedang edit)
 let _ssPendingFotoDeletes = []; // fileId foto lama yg dihapus user saat edit — ditrash setelah Simpan berhasil
+let _ssDetailReadOnly = false;  // true = modal detail dibuka murni utk dilihat (mis. dari detail WO), tanpa tombol aksi
 
 var _SS_STEP_DEFS = [
   { n: 1, label: 'Umum' },
@@ -790,7 +791,10 @@ function _ssDoSubmit() {
 }
 
 // ── Detail (modal, read-only per section) ───────────────────────────
-window.bukaDetailSiteSurvey = function(id) {
+// opts.readOnly = true → sembunyikan tombol aksi (Edit/Export/Hapus); dipakai
+// saat dibuka dari luar modul Site Survey (mis. panel di detail Work Order).
+window.bukaDetailSiteSurvey = function(id, opts) {
+  _ssDetailReadOnly = !!(opts && opts.readOnly);
   document.getElementById('ss-detail-title').innerText = 'Memuat...';
   document.getElementById('ss-detail-subtitle').innerText = '';
   document.getElementById('ss-detail-actions').innerHTML = '';
@@ -809,6 +813,7 @@ window.bukaDetailSiteSurvey = function(id) {
 function _ssTutupDetail() {
   document.getElementById('modal-ss-detail').classList.add('hidden');
   _ssDetailCurrent = null;
+  _ssDetailReadOnly = false;
 }
 
 function _ssRenderDetail() {
@@ -818,7 +823,9 @@ function _ssRenderDetail() {
   document.getElementById('ss-detail-subtitle').innerText = d.id + (d.dibuatOleh ? ' · ' + d.dibuatOleh : '') + (d.tanggalSurvey ? ' · ' + d.tanggalSurvey : '');
 
   var actions = document.getElementById('ss-detail-actions');
-  if (actions) {
+  if (actions && _ssDetailReadOnly) {
+    actions.innerHTML = '';
+  } else if (actions) {
     var editBtn = _ssCanEditRecord(d)
       ? '<button onclick="bukaEditSiteSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold px-3.5 py-2.5 rounded-xl transition"><i class="fa-solid fa-pen-to-square"></i> Edit</button>'
       : '';

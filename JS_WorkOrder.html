@@ -5,6 +5,8 @@
 
     let _cachedWorkOrderData = [];
     let _woDetailCurrent     = null;
+    let _woSurveys           = [];   // survey tertaut ke WO yg sedang dibuka
+    let _woAllSurveys        = [];   // semua survey (utk modal picker tautkan)
 
     // ── Status badge helper ──
     function _woBadge(status) {
@@ -223,6 +225,7 @@
       var scrollHost = document.getElementById('wo-detail-view').closest('.overflow-y-auto');
       if (scrollHost) scrollHost.scrollTop = 0;
       _loadRealisasiHPP(item.noWO);
+      _woLoadSurveys(item.noWO);
     };
 
     // Kembali dari detail WO (halaman penuh) ke daftar.
@@ -232,6 +235,133 @@
       _woDetailCurrent = null;
     };
     window.tutupModalDetailWO = window.kembaliListWO; // alias kompatibilitas
+
+    // ================================================================
+    // SITE SURVEY TERKAIT (panel read-only di detail WO)
+    // ================================================================
+    // Menautkan/melepas survey: admin/lead sales/sales (reuse _canEditCatatanWO).
+    // Tampil survey milik semua divisi yg buka WO — tapi hanya lihat (modal
+    // detail Site Survey dibuka dgn readOnly, tanpa tombol Export/Edit/Hapus).
+    function _woEsc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+    function _woLoadSurveys(noWO) {
+      var cont = document.getElementById('wo-survey-list');
+      var linkBtn = document.getElementById('wo-survey-link-btn');
+      if (linkBtn) linkBtn.classList.toggle('hidden', !_canEditCatatanWO());
+      if (cont) cont.innerHTML = '<div class="text-center py-3 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      google.script.run.withSuccessHandler(function(res) {
+        _woSurveys = (res && res.success) ? (res.list || []) : [];
+        _woRenderSurveyList();
+      }).withFailureHandler(function() {
+        if (cont) cont.innerHTML = '<div class="text-center py-3 text-rose-400 text-xs">Gagal memuat survey.</div>';
+      }).getSiteSurveysByWO(noWO);
+    }
+
+    function _woRenderSurveyList() {
+      var cont = document.getElementById('wo-survey-list');
+      if (!cont) return;
+      var canManage = _canEditCatatanWO();
+      if (!_woSurveys.length) {
+        cont.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl">'
+          + '<i class="fa-solid fa-map-location-dot text-2xl mb-2 opacity-30 block"></i>'
+          + 'Belum ada Site Survey tertaut.' + (canManage ? '<br>Klik <b>Tautkan</b> untuk menautkan.' : '') + '</div>';
+        return;
+      }
+      cont.innerHTML = _woSurveys.map(function(s) {
+        var lepasBtn = canManage
+          ? '<button onclick="_woLepasTautanSurvey(\'' + s.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Lepas tautan"><i class="fa-solid fa-link-slash text-xs"></i></button>'
+          : '';
+        return '<div class="bg-slate-50 rounded-xl border border-slate-100 p-3 text-xs">'
+          + '<div class="flex items-start justify-between gap-2">'
+          +   '<div class="min-w-0">'
+          +     '<p class="font-bold text-slate-800 truncate">' + _woEsc(s.namaSite || '-') + '</p>'
+          +     '<p class="text-slate-400 mt-0.5 truncate">' + _woEsc(s.id) + (s.namaPIC ? ' · ' + _woEsc(s.namaPIC) : '') + (s.telepon ? ' · ' + _woEsc(s.telepon) : '') + '</p>'
+          +     '<p class="text-slate-400 mt-0.5">' + _woEsc(s.tanggalSurvey || '') + (s.dibuatOleh ? ' · ' + _woEsc(s.dibuatOleh) : '') + '</p>'
+          +   '</div>'
+          +   '<div class="flex items-center gap-1 shrink-0">'
+          +     '<button onclick="bukaDetailSiteSurvey(\'' + s.id + '\', {readOnly:true})" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Lihat Detail"><i class="fa-solid fa-eye text-xs"></i></button>'
+          +     lepasBtn
+          +   '</div>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    window._woBukaLinkSurvey = function() {
+      if (!_woDetailCurrent) return;
+      if (!_canEditCatatanWO()) { showNotification('Anda tidak berhak menautkan survey.', 'error'); return; }
+      document.getElementById('wo-link-survey-nowo').innerText = 'WO ' + _woDetailCurrent.noWO;
+      var search = document.getElementById('wo-link-survey-search'); if (search) search.value = '';
+      document.getElementById('wo-link-survey-list').innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat daftar survey...</div>';
+      document.getElementById('modal-wo-link-survey').classList.remove('hidden');
+      google.script.run.withSuccessHandler(function(res) {
+        _woAllSurveys = (res && res.success) ? (res.list || []) : [];
+        _woRenderLinkSurveyList();
+      }).withFailureHandler(function() {
+        document.getElementById('wo-link-survey-list').innerHTML = '<div class="text-center py-4 text-rose-400 text-xs">Gagal memuat daftar survey.</div>';
+      }).getSiteSurveyList();
+    };
+
+    window._woTutupLinkSurvey = function() {
+      document.getElementById('modal-wo-link-survey').classList.add('hidden');
+    };
+
+    window._woRenderLinkSurveyList = function() {
+      var box = document.getElementById('wo-link-survey-list');
+      if (!box || !_woDetailCurrent) return;
+      var noWO = _woDetailCurrent.noWO;
+      var q = ((document.getElementById('wo-link-survey-search') || {}).value || '').toLowerCase().trim();
+      // Sembunyikan survey yg sudah tertaut ke WO ini; sisanya bisa ditautkan.
+      var rows = _woAllSurveys.filter(function(s) {
+        if ((s.noWO || '') === noWO) return false;
+        if (!q) return true;
+        return ((s.namaSite || '') + (s.namaPIC || '') + (s.alamat || '') + (s.id || '')).toLowerCase().indexOf(q) !== -1;
+      });
+      if (!rows.length) {
+        box.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs">' + (q ? 'Tidak ada survey cocok.' : 'Tidak ada survey lain untuk ditautkan.') + '</div>';
+        return;
+      }
+      box.innerHTML = rows.map(function(s) {
+        var linkedNote = (s.noWO && s.noWO !== noWO)
+          ? '<span class="inline-block mt-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Tertaut: ' + _woEsc(s.noWO) + '</span>'
+          : '';
+        return '<div class="flex items-center justify-between gap-2 bg-slate-50 rounded-xl border border-slate-100 p-3">'
+          + '<div class="min-w-0 text-xs">'
+          +   '<p class="font-bold text-slate-800 truncate">' + _woEsc(s.namaSite || '-') + '</p>'
+          +   '<p class="text-slate-400 mt-0.5 truncate">' + _woEsc(s.id) + (s.namaPIC ? ' · ' + _woEsc(s.namaPIC) : '') + '</p>'
+          +   linkedNote
+          + '</div>'
+          + '<button onclick="_woTautkanSurvey(\'' + s.id + '\')" class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-link text-[10px]"></i> Tautkan</button>'
+          + '</div>';
+      }).join('');
+    };
+
+    window._woTautkanSurvey = function(surveyId) {
+      if (!_woDetailCurrent) return;
+      toggleLoader(true, 'Menautkan survey...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menautkan.', 'error'); return; }
+        showNotification(res.message || 'Survey ditautkan.');
+        _woTutupLinkSurvey();
+        _woLoadSurveys(_woDetailCurrent.noWO);
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menautkan.', 'error'); })
+        .linkSiteSurveyToWO(surveyId, _woDetailCurrent.noWO);
+    };
+
+    window._woLepasTautanSurvey = function(surveyId) {
+      if (!_woDetailCurrent) return;
+      showConfirm({ title: 'Lepas Tautan Survey', message: 'Lepas tautan survey ' + surveyId + ' dari WO ini? Survey tidak dihapus, hanya tautannya dilepas.', confirmText: 'Ya, Lepas', onConfirm: function() {
+        toggleLoader(true, 'Melepas tautan...');
+        google.script.run.withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal melepas tautan.', 'error'); return; }
+          showNotification(res.message || 'Tautan dilepas.');
+          _woLoadSurveys(_woDetailCurrent.noWO);
+        }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal melepas tautan.', 'error'); })
+          .unlinkSiteSurveyFromWO(surveyId);
+      } });
+    };
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;
