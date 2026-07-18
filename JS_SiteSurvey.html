@@ -1074,15 +1074,18 @@ function _ssBuildPDF(d) {
     doc.text(title, ML + 3, y + 4.8);
     y += 11;
   }
-  function fieldRow(pairs) {
+  // x0/w0 opsional (default ML/CW) — dipakai saat field digambar di dalam
+  // kartu (dataCard) yg butuh padding kiri/kanan.
+  function fieldRow(pairs, x0, w0) {
+    x0 = x0 == null ? ML : x0; w0 = w0 == null ? CW : w0;
     pairs = pairs.filter(function (p) { return p[1]; });
     if (!pairs.length) return;
-    var cols = 3, colW = CW / cols, rowH = 8;
+    var cols = 3, colW = w0 / cols, rowH = 8;
     var rows = Math.ceil(pairs.length / cols);
     ensure(rows * rowH + 2);
     pairs.forEach(function (p, i) {
       var col = i % cols, rowI = Math.floor(i / cols);
-      var bx = ML + col * colW, by = y + rowI * rowH;
+      var bx = x0 + col * colW, by = y + rowI * rowH;
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor.apply(doc, SLATE);
       doc.text(String(p[0]).toUpperCase(), bx, by);
       doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, DARK);
@@ -1092,15 +1095,48 @@ function _ssBuildPDF(d) {
   }
   // Field lebar penuh (label + nilai yg bisa membungkus banyak baris) — dipakai
   // utk nilai panjang spt Alamat yg tak muat di kolom sempit fieldRow.
-  function fullField(label, value) {
+  function fullField(label, value, x0, w0) {
+    x0 = x0 == null ? ML : x0; w0 = w0 == null ? CW : w0;
     if (!value && value !== 0) return;
-    var lines = doc.splitTextToSize(String(value), CW);
+    var lines = doc.splitTextToSize(String(value), w0);
     ensure(4.5 + lines.length * 4 + 2);
     doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor.apply(doc, SLATE);
-    doc.text(String(label).toUpperCase(), ML, y);
+    doc.text(String(label).toUpperCase(), x0, y);
     doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, DARK);
-    doc.text(lines, ML, y + 4.5);
+    doc.text(lines, x0, y + 4.5);
     y += 4.5 + (lines.length - 1) * 4 + 4;
+  }
+  // Bungkus sekelompok field dlm kartu latar abu muda selebar section bar
+  // (ML..ML+CW, sama persis dgn bar judul di atasnya). Tinggi dihitung dulu —
+  // pakai formula yg sama dgn fieldRow/fullField — agar kotak latar bisa
+  // digambar lebih dahulu, baru field-nya di atasnya dgn padding dalam.
+  // blocks: [{type:'row', pairs:[[label,val],...]} | {type:'full', label, value}]
+  function dataCard(blocks) {
+    var padX = 5, padTop = 5, padBot = 3;
+    var innerL = ML + padX, innerW = CW - 2 * padX;
+    var contentH = 0;
+    blocks.forEach(function (b) {
+      if (b.type === 'full') {
+        if (b.value || b.value === 0) {
+          var lines = doc.splitTextToSize(String(b.value), innerW);
+          contentH += 4.5 + (lines.length - 1) * 4 + 4;
+        }
+      } else {
+        var n = b.pairs.filter(function (p) { return p[1]; }).length;
+        contentH += n ? Math.ceil(n / 3) * 8 + 2 : 0;
+      }
+    });
+    var panelH = padTop + contentH + padBot;
+    ensure(panelH);
+    var top = y;
+    doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+    doc.roundedRect(ML, top, CW, panelH, 2.5, 2.5, 'FD');
+    y = top + padTop;
+    blocks.forEach(function (b) {
+      if (b.type === 'full') fullField(b.label, b.value, innerL, innerW);
+      else fieldRow(b.pairs, innerL, innerW);
+    });
+    y = top + panelH + 5;
   }
   // Foto laporan ini sengaja dibuat besar (boxW 85mm, 2 kolom) agar mudah
   // dilihat — berbeda dari laporan QC yang memakai foto kecil (30mm).
@@ -1137,46 +1173,38 @@ function _ssBuildPDF(d) {
   y = 30;
 
   sectionBar('A. INFORMASI UMUM');
-  // Semua info survey dibungkus panel abu muda agar tampak sbg satu blok yg
-  // rapi (mirip kartu detail di layar). Tinggi panel dihitung dulu dgn formula
-  // yg sama spt fieldRow/fullField supaya kotak latarnya bisa digambar lebih
-  // dahulu, lalu field-nya di atasnya. Field pendek di grid 3-kolom di atas,
-  // Alamat (panjang) full-width di bawah agar ritme grid tak terputus.
-  var aPadX = 4, aPadTop = 5, aPadBot = 3;
-  var aAlamatLines = doc.splitTextToSize(String(d.alamat || '-'), CW);
-  var aContentH = 10 + 10 + 10 + (4.5 + (aAlamatLines.length - 1) * 4 + 4);
-  var aPanelH = aPadTop + aContentH + aPadBot;
-  var aTop = y;
-  doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
-  doc.roundedRect(ML - aPadX, aTop, CW + 2 * aPadX, aPanelH, 2.5, 2.5, 'FD');
-  y = aTop + aPadTop;
-  fieldRow([
-    ['Nama Site', d.namaSite],
-    ['Nama PIC', d.namaPIC],
-    ['No. Telepon', d.telepon]
+  // Field pendek di grid 3-kolom di atas, Alamat (panjang) full-width di bawah
+  // agar ritme grid tak terputus. Semua dibungkus kartu latar abu muda.
+  dataCard([
+    { type: 'row', pairs: [
+      ['Nama Site', d.namaSite],
+      ['Nama PIC', d.namaPIC],
+      ['No. Telepon', d.telepon]
+    ] },
+    { type: 'row', pairs: [
+      ['Tanggal Survey', d.tanggalSurvey],
+      ['Surveyor', d.dibuatOleh],
+      ['Koordinat', (d.latitude != null && d.longitude != null) ? d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) : '']
+    ] },
+    { type: 'row', pairs: [
+      ['Arah Hadap Bangunan', d.arahBangunan],
+      ['Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '']
+    ] },
+    { type: 'full', label: 'Alamat', value: d.alamat }
   ]);
-  fieldRow([
-    ['Tanggal Survey', d.tanggalSurvey],
-    ['Surveyor', d.dibuatOleh],
-    ['Koordinat', (d.latitude != null && d.longitude != null) ? d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) : '']
-  ]);
-  fieldRow([
-    ['Arah Hadap Bangunan', d.arahBangunan],
-    ['Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '']
-  ]);
-  fullField('Alamat', d.alamat);
-  y = aTop + aPanelH + 5;
   photoGroup('Foto Bangunan Tampak Depan', d.fotoBangunan);
   y += 2;
 
   var kel = d.kelistrikan || {};
   newPage();
   sectionBar('B. INFORMASI KELISTRIKAN');
-  fieldRow([
-    ['ID Pelanggan PLN', kel.idPelangganPLN],
-    ['Daya PLN', kel.dayaPLN ? kel.dayaPLN + ' VA' : ''],
-    ['Phase', kel.phase],
-    ['Rating Breaker', kel.ratingBreaker ? kel.ratingBreaker + ' A' : '']
+  dataCard([
+    { type: 'row', pairs: [
+      ['ID Pelanggan PLN', kel.idPelangganPLN],
+      ['Daya PLN', kel.dayaPLN ? kel.dayaPLN + ' VA' : ''],
+      ['Phase', kel.phase],
+      ['Rating Breaker', kel.ratingBreaker ? kel.ratingBreaker + ' A' : '']
+    ] }
   ]);
   photoGroup('Foto kWh Meter', kel.fotoKwh);
   photoGroup('Foto Panel Hubung Bagi (PHB)', kel.fotoPHB);
@@ -1185,11 +1213,13 @@ function _ssBuildPDF(d) {
   var bos = d.bos || {};
   newPage();
   sectionBar('C. BALANCE OF SYSTEM (BOS)');
-  fieldRow([
-    ['Lokasi Penempatan', bos.lokasi],
-    ['Ukuran Area (Lebar x Tinggi)', (bos.lebar || bos.tinggi) ? (bos.lebar || 0) + ' x ' + (bos.tinggi || 0) + ' m' : ''],
-    ['Jenis Tembok', bos.jenisTembok],
-    ['Jarak ke Interkoneksi', bos.jarakInterkoneksi ? bos.jarakInterkoneksi + ' m' : '']
+  dataCard([
+    { type: 'row', pairs: [
+      ['Lokasi Penempatan', bos.lokasi],
+      ['Ukuran Area (Lebar x Tinggi)', (bos.lebar || bos.tinggi) ? (bos.lebar || 0) + ' x ' + (bos.tinggi || 0) + ' m' : ''],
+      ['Jenis Tembok', bos.jenisTembok],
+      ['Jarak ke Interkoneksi', bos.jarakInterkoneksi ? bos.jarakInterkoneksi + ' m' : '']
+    ] }
   ]);
   photoGroup('Foto Area BoS & Titik Interkoneksi', bos.foto);
   y += 2;
@@ -1197,12 +1227,14 @@ function _ssBuildPDF(d) {
   var atap = d.atap || {};
   newPage();
   sectionBar('D. INFORMASI ATAP');
-  fieldRow([
-    ['Jenis Atap', atap.jenis],
-    ['Arah Hadap Atap', atap.arah],
-    ['Rangka Atap', atap.rangka],
-    ['Jenis Mounting', atap.mounting],
-    ['Ukuran Atap (P x L)', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '']
+  dataCard([
+    { type: 'row', pairs: [
+      ['Jenis Atap', atap.jenis],
+      ['Arah Hadap Atap', atap.arah],
+      ['Rangka Atap', atap.rangka],
+      ['Jenis Mounting', atap.mounting],
+      ['Ukuran Atap (P x L)', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '']
+    ] }
   ]);
   photoGroup('Foto Atap', atap.fotoAtap);
   photoGroup('Foto Rangka Atap', atap.fotoRangka);
@@ -1212,9 +1244,11 @@ function _ssBuildPDF(d) {
   var jk = d.jalurKabel || {};
   newPage();
   sectionBar('E. JALUR KABEL');
-  fieldRow([
-    ['Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : ''],
-    ['Panjang Kabel AC', jk.panjangAC ? jk.panjangAC + ' m' : '']
+  dataCard([
+    { type: 'row', pairs: [
+      ['Panjang Kabel PV', jk.panjangPV ? jk.panjangPV + ' m' : ''],
+      ['Panjang Kabel AC', jk.panjangAC ? jk.panjangAC + ' m' : '']
+    ] }
   ]);
   photoGroup('Foto Jalur Kabel PV', jk.fotoPV);
   photoGroup('Foto Jalur Kabel AC', jk.fotoAC);
