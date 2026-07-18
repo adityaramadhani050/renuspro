@@ -226,6 +226,7 @@
       if (scrollHost) scrollHost.scrollTop = 0;
       _loadRealisasiHPP(item.noWO);
       _woLoadSurveys(item.noWO);
+      _woLoadQC(item.noWO);
     };
 
     // Kembali dari detail WO (halaman penuh) ke daftar.
@@ -362,6 +363,50 @@
           .unlinkSiteSurveyFromWO(surveyId);
       } });
     };
+
+    // ================================================================
+    // RINGKASAN QC LAPANGAN (read-only) + engineer ditugaskan di header WO
+    // ================================================================
+    function _woLoadQC(noWO) {
+      var engEl = document.getElementById('wo-detail-engineer');
+      var sumEl = document.getElementById('wo-qc-summary');
+      if (engEl) engEl.innerText = '…';
+      if (sumEl) sumEl.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      google.script.run.withSuccessHandler(function(res) {
+        var assigned = (res && res.success) ? (res.assigned || []) : [];
+        if (engEl) engEl.innerText = assigned.length ? assigned.map(function(a) { return a.nama; }).join(', ') : 'Belum ditugaskan';
+        _woRenderQCSummary((res && res.success) ? res.summary : null);
+      }).withFailureHandler(function() {
+        if (engEl) engEl.innerText = '-';
+        if (sumEl) sumEl.innerHTML = '<div class="text-center py-3 text-rose-400 text-xs">Gagal memuat QC.</div>';
+      }).getQCSummaryByWO(noWO);
+    }
+
+    function _woRenderQCSummary(s) {
+      var el = document.getElementById('wo-qc-summary');
+      if (!el) return;
+      // "Belum ada aktivitas" bila belum ada item yg diproses (semua masih Belum).
+      var activity = s ? ((s.approved||0) + (s.pending||0) + (s.rejected||0) + (s.na||0)) : 0;
+      if (!s || !activity) {
+        el.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl">'
+          + '<i class="fa-solid fa-clipboard-check text-2xl mb-2 opacity-30 block"></i>Belum ada aktivitas QC.</div>';
+        return;
+      }
+      var pct = s.pct || 0;
+      var barColor = pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400';
+      el.innerHTML =
+          '<div class="flex items-center gap-2 mb-2">'
+        +   '<div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-2.5 ' + barColor + '" style="width:' + pct + '%"></div></div>'
+        +   '<span class="text-sm font-extrabold text-slate-800 shrink-0">' + pct + '%</span>'
+        + '</div>'
+        + '<div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold">'
+        +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (s.approved||0) + ' Approved</span>'
+        +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (s.pending||0) + ' Pending</span>'
+        +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (s.rejected||0) + ' Rejected</span>'
+        +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (s.belum||0) + ' Belum</span>'
+        +   '<span class="text-slate-400">N/A ' + (s.na||0) + '</span>'
+        + '</div>';
+    }
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;

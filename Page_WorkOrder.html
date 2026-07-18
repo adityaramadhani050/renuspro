@@ -93,7 +93,7 @@
                 </div>
                 <p id="wo-detail-subtitle" class="text-sm text-slate-500 mt-0.5"></p>
               </div>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <div class="bg-slate-50 rounded-xl p-3">
                   <p class="text-slate-400 mb-0.5">No Penawaran</p>
                   <p id="wo-detail-id" class="font-bold text-blue-700"></p>
@@ -103,8 +103,12 @@
                   <p id="wo-detail-klien" class="font-bold text-slate-700"></p>
                 </div>
                 <div class="bg-slate-50 rounded-xl p-3">
-                  <p class="text-slate-400 mb-0.5">Sales / PIC</p>
+                  <p class="text-slate-400 mb-0.5">Sales</p>
                   <p id="wo-detail-sales" class="font-bold text-slate-700"></p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                  <p class="text-slate-400 mb-0.5"><i class="fa-solid fa-user-helmet-safety text-slate-300 mr-0.5"></i> Engineer</p>
+                  <p id="wo-detail-engineer" class="font-bold text-slate-700">-</p>
                 </div>
               </div>
             </div>
@@ -299,6 +303,71 @@
                   </button>
                 </div>
                 <div id="wo-survey-list" class="space-y-2"></div>
+              </div>
+
+              <!-- Ringkasan QC Lapangan (read-only utk lintas divisi) -->
+              <div class="bg-white rounded-2xl border border-slate-150 p-5">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <i class="fa-solid fa-clipboard-check text-emerald-400 text-[11px]"></i> Ringkasan QC Lapangan
+                </p>
+                <div id="wo-qc-summary">
+                  <div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Baris placeholder: Dokumen Project & Timeline Project -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+
+            <!-- Dokumen Project (placeholder — fitur menyusul) -->
+            <div class="bg-white rounded-2xl border border-slate-150 p-5">
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <i class="fa-solid fa-folder-open text-amber-400 text-[11px]"></i> Dokumen Project
+                </p>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Segera Hadir</span>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-3">
+                  <span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-300"></i> Kontrak</span>
+                  <span class="text-[11px] font-semibold text-slate-300">Belum tersedia</span>
+                </div>
+                <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-3">
+                  <span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-signature text-slate-300"></i> BAST</span>
+                  <span class="text-[11px] font-semibold text-slate-300">Belum tersedia</span>
+                </div>
+                <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-3">
+                  <span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-plug-circle-check text-slate-300"></i> Commissioning</span>
+                  <span class="text-[11px] font-semibold text-slate-300">Belum tersedia</span>
+                </div>
+                <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-3">
+                  <span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-slate-300"></i> Surat Garansi</span>
+                  <span class="text-[11px] font-semibold text-slate-300">Belum tersedia</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline Project (placeholder — fitur menyusul) -->
+            <div class="bg-white rounded-2xl border border-slate-150 p-5">
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <i class="fa-solid fa-timeline text-indigo-400 text-[11px]"></i> Timeline Project
+                </p>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Segera Hadir</span>
+              </div>
+              <div class="relative pl-5">
+                <div class="absolute left-[7px] top-1 bottom-1 w-0.5 bg-slate-100"></div>
+                <div class="space-y-4">
+                  <div class="relative"><span class="absolute -left-5 top-0.5 h-3.5 w-3.5 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-200"></span>
+                    <p class="text-sm font-semibold text-slate-500">Site Survey</p><p class="text-[11px] text-slate-300">Belum tersedia</p></div>
+                  <div class="relative"><span class="absolute -left-5 top-0.5 h-3.5 w-3.5 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-200"></span>
+                    <p class="text-sm font-semibold text-slate-500">Instalasi</p><p class="text-[11px] text-slate-300">Belum tersedia</p></div>
+                  <div class="relative"><span class="absolute -left-5 top-0.5 h-3.5 w-3.5 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-200"></span>
+                    <p class="text-sm font-semibold text-slate-500">QC Lapangan</p><p class="text-[11px] text-slate-300">Belum tersedia</p></div>
+                  <div class="relative"><span class="absolute -left-5 top-0.5 h-3.5 w-3.5 rounded-full bg-slate-200 border-2 border-white ring-1 ring-slate-200"></span>
+                    <p class="text-sm font-semibold text-slate-500">Serah Terima</p><p class="text-[11px] text-slate-300">Belum tersedia</p></div>
+                </div>
               </div>
             </div>
           </div>

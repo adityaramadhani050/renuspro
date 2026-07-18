@@ -705,6 +705,24 @@ function getQCAssignment(noWO) {
   } catch (e) { return { success: false, list: [], message: e.toString() }; }
 }
 
+// Ringkasan QC + engineer yg ditugaskan, utk ditampilkan di detail Work Order
+// (read-only, lintas divisi). Payload ringan: hanya summary + assigned, TANPA
+// list 55 item checklist.
+function getQCSummaryByWO(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: true, summary: null, assigned: [] };
+    var byWO = getQCByWO(noWO);
+    return {
+      success: true,
+      summary: (byWO && byWO.success) ? byWO.summary : null,
+      assigned: _qcAssignedMap()[noWO] || []
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
 // Tulis ulang penugasan 1 WO. userIds = ['U001', ...].
 function setQCAssignment(noWO, userIds, assignedBy) {
   var lock = LockService.getScriptLock();
