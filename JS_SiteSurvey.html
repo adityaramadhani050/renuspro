@@ -1046,7 +1046,7 @@ function _ssExportPDFById(id) {
 function _ssBuildPDF(d) {
   var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   var PW = 210, PH = 297, ML = 14, MR = 14, CW = PW - ML - MR;
-  var DARK = [30,41,59], SLATE = [100,116,139], BLUE = [30,64,175], WHITE = [255,255,255];
+  var DARK = [30,41,59], SLATE = [100,116,139], WHITE = [255,255,255];
   var BOTTOM = 284;
   var y;
 
@@ -1090,6 +1090,18 @@ function _ssBuildPDF(d) {
     });
     y += rows * rowH + 2;
   }
+  // Field lebar penuh (label + nilai yg bisa membungkus banyak baris) — dipakai
+  // utk nilai panjang spt Alamat yg tak muat di kolom sempit fieldRow.
+  function fullField(label, value) {
+    if (!value && value !== 0) return;
+    var lines = doc.splitTextToSize(String(value), CW);
+    ensure(4.5 + lines.length * 4 + 2);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor.apply(doc, SLATE);
+    doc.text(String(label).toUpperCase(), ML, y);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, DARK);
+    doc.text(lines, ML, y + 4.5);
+    y += 4.5 + (lines.length - 1) * 4 + 4;
+  }
   // Foto laporan ini sengaja dibuat besar (boxW 85mm, 2 kolom) agar mudah
   // dilihat — berbeda dari laporan QC yang memakai foto kecil (30mm).
   function photoGroup(label, arr) {
@@ -1125,20 +1137,17 @@ function _ssBuildPDF(d) {
   y = 30;
 
   sectionBar('A. INFORMASI UMUM');
-  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor.apply(doc, DARK);
-  doc.text(d.namaSite || '-', ML, y); y += 5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, SLATE);
-  doc.text('PIC: ' + (d.namaPIC || '-') + (d.telepon ? ' · ' + d.telepon : ''), ML, y); y += 4;
-  var alamatLines = doc.splitTextToSize('Alamat: ' + (d.alamat || '-'), CW);
-  doc.text(alamatLines, ML, y); y += alamatLines.length * 4;
-  doc.text('Tanggal Survey: ' + (d.tanggalSurvey || '-') + '   ·   Surveyor: ' + (d.dibuatOleh || '-'), ML, y); y += 4;
-  if (d.latitude != null && d.longitude != null) {
-    doc.setTextColor.apply(doc, BLUE);
-    doc.text('Koordinat: ' + d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6), ML, y); y += 4;
-    doc.setTextColor.apply(doc, SLATE);
-  }
-  y += 4;
-
+  fieldRow([
+    ['Nama Site', d.namaSite],
+    ['Nama PIC', d.namaPIC],
+    ['No. Telepon', d.telepon]
+  ]);
+  fullField('Alamat', d.alamat);
+  fieldRow([
+    ['Tanggal Survey', d.tanggalSurvey],
+    ['Surveyor', d.dibuatOleh],
+    ['Koordinat', (d.latitude != null && d.longitude != null) ? d.latitude.toFixed(6) + ', ' + d.longitude.toFixed(6) : '']
+  ]);
   fieldRow([
     ['Arah Hadap Bangunan', d.arahBangunan],
     ['Tinggi Bangunan', d.tinggiBangunan ? d.tinggiBangunan + ' m' : '']
