@@ -189,22 +189,31 @@ var _SS_PLN_TABLE = {
   ]
 };
 
-// Daya PLN mengikuti Phase yang dipilih; Rating Breaker otomatis mengikuti
-// Daya PLN (nilai baku PLN, bukan input bebas) agar kombinasinya selalu valid.
+// Daya PLN & Rating Breaker/MCB Ampere sama-sama mengikuti Phase yang dipilih,
+// dan saling auto-fill satu sama lain (nilai baku PLN, bukan input bebas)
+// agar kombinasi Daya-Phase-Breaker selalu valid dari sisi mana pun diisi.
+function _ssFillSelectOptions(sel, opts, valueKey, unitLabel, placeholderEmpty) {
+  sel.innerHTML = (opts.length ? '<option value="">-- Pilih --</option>' : '<option value="">' + placeholderEmpty + '</option>')
+    + opts.map(function (o) { return '<option value="' + o[valueKey] + '">' + o[valueKey] + ' ' + unitLabel + '</option>'; }).join('');
+  sel.disabled = !opts.length;
+}
 function _ssOnPhaseChange() {
   var phase = document.getElementById('ss-phase').value;
-  var sel = document.getElementById('ss-dayaPLN');
   var opts = _SS_PLN_TABLE[phase] || [];
-  sel.innerHTML = (opts.length ? '<option value="">-- Pilih --</option>' : '<option value="">-- Pilih Phase Listrik dahulu --</option>')
-    + opts.map(function (o) { return '<option value="' + o.va + '">' + o.va + ' VA</option>'; }).join('');
-  sel.disabled = !opts.length;
-  document.getElementById('ss-ratingBreaker').value = '';
+  _ssFillSelectOptions(document.getElementById('ss-dayaPLN'), opts, 'va', 'VA', '-- Pilih Phase Listrik dahulu --');
+  _ssFillSelectOptions(document.getElementById('ss-ratingBreaker'), opts, 'a', 'A', '-- Pilih Phase Listrik dahulu --');
 }
 function _ssOnDayaChange() {
   var phase = document.getElementById('ss-phase').value;
   var va = Number(document.getElementById('ss-dayaPLN').value || 0);
   var match = (_SS_PLN_TABLE[phase] || []).filter(function (o) { return o.va === va; })[0];
-  document.getElementById('ss-ratingBreaker').value = match ? match.a : '';
+  document.getElementById('ss-ratingBreaker').value = match ? String(match.a) : '';
+}
+function _ssOnBreakerChange() {
+  var phase = document.getElementById('ss-phase').value;
+  var a = Number(document.getElementById('ss-ratingBreaker').value || 0);
+  var match = (_SS_PLN_TABLE[phase] || []).filter(function (o) { return o.a === a; })[0];
+  document.getElementById('ss-dayaPLN').value = match ? String(match.va) : '';
 }
 
 function _ssResetForm() {
@@ -212,6 +221,8 @@ function _ssResetForm() {
   _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('ss-dayaPLN').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
   document.getElementById('ss-dayaPLN').disabled = true;
+  document.getElementById('ss-ratingBreaker').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
+  document.getElementById('ss-ratingBreaker').disabled = true;
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
   var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
   if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
