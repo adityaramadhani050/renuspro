@@ -31,7 +31,12 @@ var _SS_STEP_DEFS = [
 function _ssUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _ssUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _ssRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
-function _ssCanDelete(){ var r = _ssRole(); return r === 'admin' || r === 'leadsales'; }
+// Hapus: Admin, Lead Sales, atau sales pembuat record itu sendiri.
+function _ssCanDelete(survey){
+  var r = _ssRole();
+  if (r === 'admin' || r === 'leadsales') return true;
+  return _ssCanEditRecord(survey); // sales pembuat (via id/nama) boleh hapus miliknya
+}
 // Hanya Admin atau sales yang membuat record itu sendiri yang boleh mengedit.
 // Dibandingkan via id user (stabil) bukan nama (bisa berubah kalau admin
 // mengganti nama akun) — fallback ke nama utk record lama sblm dibuatOlehId ada.
@@ -151,7 +156,7 @@ function _pgRenderSiteSurvey(data) {
       ? '<button onclick="event.stopPropagation();bukaEditSiteSurvey(\'' + s.id + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>'
       : '';
     var pdfBtn = '<button onclick="event.stopPropagation();_ssExportPDFById(\'' + s.id + '\')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>';
-    var delBtn = _ssCanDelete()
+    var delBtn = _ssCanDelete(s)
       ? '<button onclick="event.stopPropagation();_ssHapusSurvey(\'' + s.id + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition cursor-pointer" onclick="bukaDetailSiteSurvey(\'' + s.id + '\')">'
@@ -829,7 +834,7 @@ function _ssRenderDetail() {
     var editBtn = _ssCanEditRecord(d)
       ? '<button onclick="bukaEditSiteSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold px-3.5 py-2.5 rounded-xl transition"><i class="fa-solid fa-pen-to-square"></i> Edit</button>'
       : '';
-    var hapusBtn = _ssCanDelete()
+    var hapusBtn = _ssCanDelete(d)
       ? '<button onclick="_ssHapusSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition"><i class="fa-regular fa-trash-can"></i> Hapus</button>'
       : '';
     actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap">'
