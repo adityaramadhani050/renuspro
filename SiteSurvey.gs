@@ -204,7 +204,10 @@ function updateSiteSurvey(payload) {
       jalurKabel: payload.jalurKabel || {},
       // Id pembuat asli dipertahankan (bukan id pengedit) agar hak edit tetap
       // melekat ke pembuat aslinya; fallback ke data lama bila payload kosong.
-      dibuatOlehId: (payload.dibuatOlehId || existingParsed.dibuatOlehId || '').toString()
+      dibuatOlehId: (payload.dibuatOlehId || existingParsed.dibuatOlehId || '').toString(),
+      // Tautan ke Work Order dipertahankan saat edit (edit form tak mengirim
+      // noWO) — tautan hanya diubah lewat linkSiteSurveyToWO/unlink.
+      noWO: (existingParsed.noWO || '').toString()
     };
 
     sheet.getRange(rowIdx, 2).setValue(tglSurvey); // Tanggal Survey
@@ -240,6 +243,7 @@ function getSiteSurveyList() {
         tanggalSurvey: _fmtTgl(r[1]),
         dibuatOleh: r[2] ? r[2].toString() : '',
         dibuatOlehId: parsedList.dibuatOlehId || '',
+        noWO: parsedList.noWO || '',
         namaSite: r[3] ? r[3].toString() : '',
         namaPIC: r[4] ? r[4].toString() : '',
         telepon: r[5] ? r[5].toString() : '',
@@ -275,6 +279,7 @@ function getSiteSurveyDetail(id) {
           tanggalSurvey: _fmtTgl(r[1]),
           dibuatOleh: r[2] ? r[2].toString() : '',
           dibuatOlehId: parsed.dibuatOlehId || '',
+          noWO: parsed.noWO || '',
           namaSite: r[3] ? r[3].toString() : '',
           namaPIC: r[4] ? r[4].toString() : '',
           telepon: r[5] ? r[5].toString() : '',
@@ -327,5 +332,74 @@ function hapusSiteSurvey(id) {
     return { success: false, message: e.toString() };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// ── Tautan Site Survey ↔ Work Order ────────────────────────────────────────
+// Tautan disimpan sbg field noWO di dalam JSON Data survey (kolom 10), BUKAN di
+// sheet Work_Order yg bersifat turunan (dibangun ulang otomatis dari penawaran).
+// Satu survey milik <=1 WO; satu WO bisa punya banyak survey. Kontrol akses
+// (Admin/Lead Sales/Sales) diatur di sisi client. Dipanggil dari detail WO.
+function _ssSetNoWO(surveyId, noWO) {
+  var lock = LockService.getScriptLock();
+  try {
+    surveyId = (surveyId || '').toString().trim();
+    if (!surveyId) return { success: false, message: 'ID survey wajib.' };
+    lock.waitLock(15000);
+    var sheet = _ensureSiteSurveySheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() !== surveyId) continue;
+      var parsed = {};
+      try { parsed = JSON.parse(data[i][9] || '{}'); } catch (e) {}
+      parsed.noWO = noWO;
+      sheet.getRange(i + 1, 10).setValue(JSON.stringify(parsed));
+      return { success: true, noWO: noWO,
+        message: noWO ? ('Survey ' + surveyId + ' ditautkan ke ' + noWO + '.') : ('Tautan survey ' + surveyId + ' dilepas.') };
+    }
+    return { success: false, message: 'Survey tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+function linkSiteSurveyToWO(surveyId, noWO) {
+  noWO = (noWO || '').toString().trim();
+  if (!noWO) return { success: false, message: 'No WO wajib.' };
+  return _ssSetNoWO(surveyId, noWO);
+}
+function unlinkSiteSurveyFromWO(surveyId) {
+  return _ssSetNoWO(surveyId, '');
+}
+
+// Daftar ringkas survey yang tertaut ke sebuah No WO (utk panel di detail WO).
+function getSiteSurveysByWO(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: true, list: [] };
+    var sheet = _ensureSiteSurveySheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      if (!r[0]) continue;
+      var parsed = {};
+      try { parsed = JSON.parse(r[9] || '{}'); } catch (e) {}
+      if ((parsed.noWO || '').toString().trim() !== noWO) continue;
+      list.push({
+        id: r[0].toString(),
+        tanggalSurvey: _fmtTgl(r[1]),
+        dibuatOleh: r[2] ? r[2].toString() : '',
+        namaSite: r[3] ? r[3].toString() : '',
+        namaPIC: r[4] ? r[4].toString() : '',
+        telepon: r[5] ? r[5].toString() : '',
+        alamat: r[6] ? r[6].toString() : ''
+      });
+    }
+    list.sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
   }
 }
