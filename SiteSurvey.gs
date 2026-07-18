@@ -148,7 +148,10 @@ function submitSiteSurvey(payload) {
       kelistrikan: payload.kelistrikan || {},
       bos: payload.bos || {},
       atap: payload.atap || {},
-      jalurKabel: payload.jalurKabel || {}
+      jalurKabel: payload.jalurKabel || {},
+      // Id user pembuat (stabil, tak berubah bila nama akun diganti admin) —
+      // dipakai utk cek hak edit, terpisah dari "Dibuat Oleh" (nama tampilan).
+      dibuatOlehId: (payload.dibuatOlehId || '').toString()
     };
 
     sheet.appendRow([
@@ -189,6 +192,8 @@ function updateSiteSurvey(payload) {
     if (rowIdx === -1) return { success: false, message: 'Survey tidak ditemukan.' };
 
     var tglSurvey = payload.tanggalSurvey ? payload.tanggalSurvey.toString() : _fmtTgl(data[rowIdx - 1][1]);
+    var existingParsed = {};
+    try { existingParsed = JSON.parse(data[rowIdx - 1][9] || '{}'); } catch (e) {}
     var dataObj = {
       arahBangunan: payload.arahBangunan || '',
       tinggiBangunan: Number(payload.tinggiBangunan) || 0,
@@ -196,7 +201,10 @@ function updateSiteSurvey(payload) {
       kelistrikan: payload.kelistrikan || {},
       bos: payload.bos || {},
       atap: payload.atap || {},
-      jalurKabel: payload.jalurKabel || {}
+      jalurKabel: payload.jalurKabel || {},
+      // Id pembuat asli dipertahankan (bukan id pengedit) agar hak edit tetap
+      // melekat ke pembuat aslinya; fallback ke data lama bila payload kosong.
+      dibuatOlehId: (payload.dibuatOlehId || existingParsed.dibuatOlehId || '').toString()
     };
 
     sheet.getRange(rowIdx, 2).setValue(tglSurvey); // Tanggal Survey
@@ -263,6 +271,7 @@ function getSiteSurveyDetail(id) {
           id: r[0].toString(),
           tanggalSurvey: _fmtTgl(r[1]),
           dibuatOleh: r[2] ? r[2].toString() : '',
+          dibuatOlehId: parsed.dibuatOlehId || '',
           namaSite: r[3] ? r[3].toString() : '',
           namaPIC: r[4] ? r[4].toString() : '',
           telepon: r[5] ? r[5].toString() : '',

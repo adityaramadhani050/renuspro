@@ -16,6 +16,7 @@ let _ssListData   = [];
 let _ssDetailCurrent = null;
 let _ssEditMode   = false;  // true = form sedang mengedit survey lama, bukan buat baru
 let _ssEditOriginalTanggal = ''; // Tanggal Survey asli dipertahankan saat edit (bukan tanggal hari ini)
+let _ssEditOriginalDibuatOlehId = ''; // id pembuat asli dipertahankan saat edit (bukan id user yg sedang edit)
 let _ssPendingFotoDeletes = []; // fileId foto lama yg dihapus user saat edit — ditrash setelah Simpan berhasil
 
 var _SS_STEP_DEFS = [
@@ -27,12 +28,17 @@ var _SS_STEP_DEFS = [
 ];
 
 function _ssUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _ssUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _ssRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _ssCanDelete(){ var r = _ssRole(); return r === 'admin' || r === 'leadsales'; }
 // Hanya Admin atau sales yang membuat record itu sendiri yang boleh mengedit.
+// Dibandingkan via id user (stabil) bukan nama (bisa berubah kalau admin
+// mengganti nama akun) — fallback ke nama utk record lama sblm dibuatOlehId ada.
 function _ssCanEditRecord(survey) {
   if (!survey) return false;
   if (_ssRole() === 'admin') return true;
+  var uid = _ssUserId();
+  if (uid && survey.dibuatOlehId) return uid === survey.dibuatOlehId;
   var nama = _ssUserNama();
   return !!(nama && survey.dibuatOleh && nama === survey.dibuatOleh);
 }
@@ -228,7 +234,7 @@ function _ssOnBreakerChange() {
 
 function _ssResetForm() {
   _ssCurrentId = null; _ssStep = 1; _ssPhotos = {}; _ssLatLng = null;
-  _ssEditMode = false; _ssEditOriginalTanggal = ''; _ssPendingFotoDeletes = [];
+  _ssEditMode = false; _ssEditOriginalTanggal = ''; _ssEditOriginalDibuatOlehId = ''; _ssPendingFotoDeletes = [];
   _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('ss-dayaPLN').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
   document.getElementById('ss-dayaPLN').disabled = true;
@@ -732,6 +738,9 @@ function _ssDoSubmit() {
   var payload = {
     id: _ssCurrentId,
     dibuatOleh: _ssUserNama(),
+    // Edit mempertahankan id pembuat asli (bukan id user yg sedang edit) agar
+    // hak edit tetap melekat ke pembuat aslinya, bukan berpindah ke pengedit.
+    dibuatOlehId: _ssEditMode ? _ssEditOriginalDibuatOlehId : _ssUserId(),
     // Edit mempertahankan Tanggal Survey asli (bukan tanggal hari ini) —
     // hanya submit baru yg memakai tanggal saat itu disurvei/diinput.
     tanggalSurvey: _ssEditMode ? _ssEditOriginalTanggal : _ssTodayDDMMYYYY(),
@@ -945,6 +954,7 @@ window.bukaEditSiteSurvey = function(id) {
   _ssEditMode = true;
   _ssCurrentId = d.id;
   _ssEditOriginalTanggal = d.tanggalSurvey || _ssTodayDDMMYYYY();
+  _ssEditOriginalDibuatOlehId = d.dibuatOlehId || '';
 
   document.getElementById('ss-list-view').classList.add('hidden');
   document.getElementById('ss-form-view').classList.remove('hidden');
@@ -961,10 +971,11 @@ window.bukaEditSiteSurvey = function(id) {
   set('ss-arahBangunan', d.arahBangunan);
   set('ss-tinggiBangunan', d.tinggiBangunan);
   _ssPhotos.fotoBangunan = (d.fotoBangunan || []).slice();
-  if (d.latitude != null && d.longitude != null) {
-    var lat = d.latitude, lng = d.longitude;
-    setTimeout(function() { _ssSetLatLng(lat, lng, { zoom: 16 }); }, 250);
-  }
+  // Dipanggil langsung (bukan ditunda) — _ssLatLng harus terisi seketika
+  // supaya validasi "Titik Koordinat wajib diisi" tak gagal semu kalau user
+  // langsung klik Selanjutnya. Marker peta tetap benar meski container masih
+  // 0px saat ini — _ssInitMap() sudah menjadwalkan invalidateSize() sendiri.
+  if (d.latitude != null && d.longitude != null) _ssSetLatLng(d.latitude, d.longitude, { zoom: 16 });
 
   // B. Informasi Kelistrikan
   var kel = d.kelistrikan || {};
