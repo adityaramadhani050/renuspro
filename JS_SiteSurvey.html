@@ -14,6 +14,9 @@ let _ssMap        = null;   // instance Leaflet
 let _ssMarker     = null;
 let _ssListData   = [];
 let _ssDetailCurrent = null;
+let _ssEditMode   = false;  // true = form sedang mengedit survey lama, bukan buat baru
+let _ssEditOriginalTanggal = ''; // Tanggal Survey asli dipertahankan saat edit (bukan tanggal hari ini)
+let _ssPendingFotoDeletes = []; // fileId foto lama yg dihapus user saat edit — ditrash setelah Simpan berhasil
 
 var _SS_STEP_DEFS = [
   { n: 1, label: 'Umum' },
@@ -26,6 +29,13 @@ var _SS_STEP_DEFS = [
 function _ssUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _ssRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _ssCanDelete(){ var r = _ssRole(); return r === 'admin' || r === 'leadsales'; }
+// Hanya Admin atau sales yang membuat record itu sendiri yang boleh mengedit.
+function _ssCanEditRecord(survey) {
+  if (!survey) return false;
+  if (_ssRole() === 'admin') return true;
+  var nama = _ssUserNama();
+  return !!(nama && survey.dibuatOleh && nama === survey.dibuatOleh);
+}
 function _ssEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
 // Format tanggal manual (bukan toLocaleDateString) agar separator "/" konsisten
@@ -218,6 +228,7 @@ function _ssOnBreakerChange() {
 
 function _ssResetForm() {
   _ssCurrentId = null; _ssStep = 1; _ssPhotos = {}; _ssLatLng = null;
+  _ssEditMode = false; _ssEditOriginalTanggal = ''; _ssPendingFotoDeletes = [];
   _SS_TEXT_FIELDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('ss-dayaPLN').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
   document.getElementById('ss-dayaPLN').disabled = true;
@@ -226,6 +237,8 @@ function _ssResetForm() {
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
   var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
   if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
+  var submitBtn = document.getElementById('ss-btn-submit');
+  if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit Survey';
 }
 
 function _ssBatalForm() {
@@ -545,7 +558,13 @@ function _ssHapusFotoSlot(fieldKey, key) {
   var f = arr[idx];
   arr.splice(idx, 1);
   _ssRenderFotoSlot(fieldKey);
-  if (!f.pending && f.fileId) google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
+  if (!f.pending && f.fileId) {
+    // Mode edit: baris sheet masih menunjuk ke foto ini sampai "Simpan
+    // Perubahan" berhasil — jangan trash filenya sekarang, cukup antre.
+    // Kalau edit dibatalkan, file lama tetap utuh (tak ada perubahan nyata).
+    if (_ssEditMode) _ssPendingFotoDeletes.push(f.fileId);
+    else google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(f.fileId);
+  }
 }
 
 // ── Upload foto pending — dipicu SEKALIGUS saat Submit Survey, bukan saat
@@ -713,7 +732,9 @@ function _ssDoSubmit() {
   var payload = {
     id: _ssCurrentId,
     dibuatOleh: _ssUserNama(),
-    tanggalSurvey: _ssTodayDDMMYYYY(),
+    // Edit mempertahankan Tanggal Survey asli (bukan tanggal hari ini) —
+    // hanya submit baru yg memakai tanggal saat itu disurvei/diinput.
+    tanggalSurvey: _ssEditMode ? _ssEditOriginalTanggal : _ssTodayDDMMYYYY(),
     namaSite: g('ss-namaSite'),
     namaPIC: g('ss-namaPIC'),
     telepon: g('ss-telepon'),
@@ -743,16 +764,28 @@ function _ssDoSubmit() {
     }
   };
 
-  toggleLoader(true, 'Menyimpan survey...');
-  google.script.run.withSuccessHandler(function(res) {
+  toggleLoader(true, _ssEditMode ? 'Menyimpan perubahan...' : 'Menyimpan survey...');
+  var handler = function(res) {
     toggleLoader(false);
     if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menyimpan survey.', 'error'); return; }
     showNotification(res.message || 'Survey tersimpan.');
+    // Baris sheet sudah ditimpa & tak lagi menunjuk foto yang dihapus saat
+    // edit — baru sekarang aman men-trash file-file tsb dari Drive.
+    if (_ssEditMode && _ssPendingFotoDeletes.length) {
+      _ssPendingFotoDeletes.forEach(function(fileId) {
+        google.script.run.withFailureHandler(function() {}).hapusSiteSurveyFoto(fileId);
+      });
+    }
     document.getElementById('ss-form-view').classList.add('hidden');
     document.getElementById('ss-list-view').classList.remove('hidden');
     loadSiteSurvey();
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan survey.', 'error'); })
-    .submitSiteSurvey(payload);
+  };
+  var failHandler = function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan survey.', 'error'); };
+  if (_ssEditMode) {
+    google.script.run.withSuccessHandler(handler).withFailureHandler(failHandler).updateSiteSurvey(payload);
+  } else {
+    google.script.run.withSuccessHandler(handler).withFailureHandler(failHandler).submitSiteSurvey(payload);
+  }
 }
 
 // ── Detail (modal, read-only per section) ───────────────────────────
@@ -785,11 +818,15 @@ function _ssRenderDetail() {
 
   var actions = document.getElementById('ss-detail-actions');
   if (actions) {
+    var editBtn = _ssCanEditRecord(d)
+      ? '<button onclick="bukaEditSiteSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold px-3.5 py-2.5 rounded-xl transition"><i class="fa-solid fa-pen-to-square"></i> Edit</button>'
+      : '';
     var hapusBtn = _ssCanDelete()
       ? '<button onclick="_ssHapusSurvey(\'' + d.id + '\')" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition"><i class="fa-regular fa-trash-can"></i> Hapus</button>'
       : '';
-    actions.innerHTML = '<div class="flex items-center gap-2">'
-      + '<button onclick="_ssExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition"><i class="fa-solid fa-file-pdf text-rose-500"></i> Export PDF</button>'
+    actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap">'
+      + editBtn
+      + '<button onclick="_ssExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-3.5 py-2.5 rounded-xl shadow-md transition"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>'
       + hapusBtn
       + '</div>';
   }
@@ -894,6 +931,84 @@ function _ssRenderDetail() {
 
   document.getElementById('ss-detail-body').innerHTML = body;
 }
+
+// ── Edit survey lama (isi ulang form dari data yang sudah ada) ─────────────
+// Dipakai data yang sudah dimuat di modal detail (_ssDetailCurrent) — tak
+// perlu fetch ulang. Foto lama diperlakukan sbg sudah terupload (bukan
+// pending); foto baru yang ditambahkan tetap lewat alur pending->upload saat
+// Simpan Perubahan. Tanggal Survey asli dipertahankan (lihat _ssDoSubmit).
+window.bukaEditSiteSurvey = function(id) {
+  var d = _ssDetailCurrent;
+  if (!d || d.id !== id) return;
+  _ssTutupDetail();
+  _ssResetForm();
+  _ssEditMode = true;
+  _ssCurrentId = d.id;
+  _ssEditOriginalTanggal = d.tanggalSurvey || _ssTodayDDMMYYYY();
+
+  document.getElementById('ss-list-view').classList.add('hidden');
+  document.getElementById('ss-form-view').classList.remove('hidden');
+  _ssGotoStep(1);
+  _ssInitMap();
+
+  var set = function(id, val) { var el = document.getElementById(id); if (el) el.value = (val == null ? '' : val); };
+
+  // A. Informasi Umum
+  set('ss-namaSite', d.namaSite);
+  set('ss-namaPIC', d.namaPIC);
+  set('ss-telepon', d.telepon);
+  set('ss-alamat', d.alamat);
+  set('ss-arahBangunan', d.arahBangunan);
+  set('ss-tinggiBangunan', d.tinggiBangunan);
+  _ssPhotos.fotoBangunan = (d.fotoBangunan || []).slice();
+  if (d.latitude != null && d.longitude != null) {
+    var lat = d.latitude, lng = d.longitude;
+    setTimeout(function() { _ssSetLatLng(lat, lng, { zoom: 16 }); }, 250);
+  }
+
+  // B. Informasi Kelistrikan
+  var kel = d.kelistrikan || {};
+  set('ss-idPelangganPLN', kel.idPelangganPLN);
+  set('ss-phase', kel.phase);
+  _ssOnPhaseChange();
+  set('ss-dayaPLN', kel.dayaPLN ? String(kel.dayaPLN) : '');
+  set('ss-ratingBreaker', kel.ratingBreaker ? String(kel.ratingBreaker) : '');
+  _ssPhotos.fotoKwh = (kel.fotoKwh || []).slice();
+  _ssPhotos.fotoPHB = (kel.fotoPHB || []).slice();
+
+  // C. Balance of System (BoS)
+  var bos = d.bos || {};
+  set('ss-bosLokasi', bos.lokasi);
+  set('ss-bosLebar', bos.lebar);
+  set('ss-bosTinggi', bos.tinggi);
+  set('ss-bosJenisTembok', bos.jenisTembok);
+  set('ss-bosJarakInterkoneksi', bos.jarakInterkoneksi);
+  _ssPhotos.bosFoto = (bos.foto || []).slice();
+
+  // D. Informasi Atap
+  var atap = d.atap || {};
+  set('ss-atapJenis', atap.jenis);
+  set('ss-atapArah', atap.arah);
+  set('ss-atapRangka', atap.rangka);
+  set('ss-atapMounting', atap.mounting);
+  set('ss-atapPanjang', atap.panjang);
+  set('ss-atapLebar', atap.lebar);
+  _ssPhotos.fotoAtap = (atap.fotoAtap || []).slice();
+  _ssPhotos.fotoRangka = (atap.fotoRangka || []).slice();
+  _ssPhotos.fotoAkses = (atap.fotoAkses || []).slice();
+
+  // E. Jalur Kabel
+  var jk = d.jalurKabel || {};
+  set('ss-panjangPV', jk.panjangPV);
+  set('ss-panjangAC', jk.panjangAC);
+  _ssPhotos.fotoPV = (jk.fotoPV || []).slice();
+  _ssPhotos.fotoAC = (jk.fotoAC || []).slice();
+
+  _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
+  var submitBtn = document.getElementById('ss-btn-submit');
+  if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Simpan Perubahan';
+  showNotification('Mode edit — ' + d.id, 'info');
+};
 
 // ── Export PDF laporan Site Survey (desain konsisten dgn laporan lain) ─────
 function _ssExportPDF() {

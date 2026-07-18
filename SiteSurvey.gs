@@ -167,6 +167,55 @@ function submitSiteSurvey(payload) {
   }
 }
 
+// ── Update survey yang sudah ada (Edit) — timpa data di baris yang sama,
+// "Dibuat Oleh" & "Dibuat Pada" (info pembuatan awal) tidak diubah. Akses
+// diatur di sisi client (_ssCanEditRecord: Admin atau sales pembuatnya).
+function updateSiteSurvey(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var id = (payload.id || '').toString().trim();
+    var namaSite = (payload.namaSite || '').toString().trim();
+    if (!id) return { success: false, message: 'ID survey wajib.' };
+    if (!namaSite) return { success: false, message: 'Nama Site wajib diisi.' };
+
+    lock.waitLock(20000);
+    var sheet = _ensureSiteSurveySheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    var rowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === id) { rowIdx = i + 1; break; }
+    }
+    if (rowIdx === -1) return { success: false, message: 'Survey tidak ditemukan.' };
+
+    var tglSurvey = payload.tanggalSurvey ? payload.tanggalSurvey.toString() : _fmtTgl(data[rowIdx - 1][1]);
+    var dataObj = {
+      arahBangunan: payload.arahBangunan || '',
+      tinggiBangunan: Number(payload.tinggiBangunan) || 0,
+      fotoBangunan: payload.fotoBangunan || null,
+      kelistrikan: payload.kelistrikan || {},
+      bos: payload.bos || {},
+      atap: payload.atap || {},
+      jalurKabel: payload.jalurKabel || {}
+    };
+
+    sheet.getRange(rowIdx, 2).setValue(tglSurvey); // Tanggal Survey
+    sheet.getRange(rowIdx, 4, 1, 6).setValues([[
+      namaSite, (payload.namaPIC || '').toString(), (payload.telepon || '').toString(),
+      (payload.alamat || '').toString(),
+      payload.latitude != null ? Number(payload.latitude) : '',
+      payload.longitude != null ? Number(payload.longitude) : ''
+    ]]); // Nama Site..Longitude
+    sheet.getRange(rowIdx, 10).setValue(JSON.stringify(dataObj)); // Data (JSON)
+
+    return { success: true, message: 'Site Survey ' + id + ' berhasil diperbarui.', id: id };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── Daftar survey (ringkas, utk list) ───────────────────────────────────────
 function getSiteSurveyList() {
   try {
