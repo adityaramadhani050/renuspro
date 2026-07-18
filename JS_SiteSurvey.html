@@ -943,27 +943,27 @@ function _ssBuildPDF(d) {
   function fieldRow(pairs) {
     pairs = pairs.filter(function (p) { return p[1]; });
     if (!pairs.length) return;
-    var cols = 3, colW = CW / cols;
+    var cols = 3, colW = CW / cols, rowH = 8;
     var rows = Math.ceil(pairs.length / cols);
-    ensure(rows * 10 + 4);
+    ensure(rows * rowH + 2);
     pairs.forEach(function (p, i) {
       var col = i % cols, rowI = Math.floor(i / cols);
-      var bx = ML + col * colW, by = y + rowI * 10;
+      var bx = ML + col * colW, by = y + rowI * rowH;
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor.apply(doc, SLATE);
       doc.text(String(p[0]).toUpperCase(), bx, by);
       doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, DARK);
       doc.text(String(p[1]), bx, by + 4.5);
     });
-    y += rows * 10 + 4;
+    y += rows * rowH + 2;
   }
   // Foto laporan ini sengaja dibuat besar (boxW 85mm, 2 kolom) agar mudah
   // dilihat — berbeda dari laporan QC yang memakai foto kecil (30mm).
   function photoGroup(label, arr) {
     arr = arr || [];
     if (!arr.length) return;
-    ensure(10);
+    ensure(8);
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor.apply(doc, SLATE);
-    doc.text(label.toUpperCase(), ML, y + 3); y += 5;
+    doc.text(label.toUpperCase(), ML, y + 2.5); y += 4.5;
     var boxW = 85, gap = 12, px = ML, rowMaxH = 0;
     arr.forEach(function (f) {
       var iw = 4, ih = 3;
