@@ -1201,7 +1201,7 @@ function _ssBuildPDF(d) {
     doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
   }
 
-  doc.save('Laporan-SiteSurvey-' + (d.id || '') + '.pdf');
+  doc.save('Laporan-SiteSurvey-' + (d.namaSite || d.id || '').toString().replace(/[\\/\s:*?"<>|]/g, '-') + '.pdf');
 }
 
 function _ssHapusSurvey(id) {
