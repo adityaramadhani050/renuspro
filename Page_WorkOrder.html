@@ -334,45 +334,15 @@
                 <div id="wo-survey-list" class="space-y-2"></div>
               </div>
 
-              <!-- Dokumen Project (placeholder — fitur menyusul) -->
+              <!-- Dokumen Project -->
               <div class="bg-white rounded-2xl border border-slate-150 p-5">
-                <div class="flex items-center justify-between gap-2 mb-3">
-                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-folder-open text-amber-400 text-[11px]"></i> Dokumen Project
-                  </p>
-                  <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Segera Hadir</span>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <i class="fa-solid fa-folder-open text-amber-400 text-[11px]"></i> Dokumen Project
+                </p>
+                <div id="wo-doc-content">
+                  <div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>
                 </div>
-
-                <!-- Dibuat manual: Kontrak (generate dari template + upload bertandatangan) -->
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Dibuat &amp; Ditandatangani</p>
-                <div class="bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-3 mb-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-300"></i> Kontrak</span>
-                    <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Belum tersedia</span>
-                  </div>
-                  <p class="text-[11px] text-slate-400 mt-1">Generate dari template lalu upload versi bertandatangan.</p>
-                  <div class="flex items-center gap-2 mt-2">
-                    <button disabled class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-not-allowed opacity-70"><i class="fa-solid fa-file-arrow-down"></i> Generate</button>
-                    <button disabled class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-not-allowed opacity-70"><i class="fa-solid fa-file-arrow-up"></i> Upload Bertandatangan</button>
-                  </div>
-                </div>
-
-                <!-- Otomatis dari QC: BAST, Surat Garansi, Hasil Commissioning -->
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Otomatis dari QC <span class="normal-case font-semibold text-slate-300">(saat item disetujui)</span></p>
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-2.5">
-                    <span class="text-sm font-semibold text-slate-500 flex items-center gap-2 min-w-0"><i class="fa-solid fa-file-signature text-slate-300 shrink-0"></i><span class="truncate">BAST</span></span>
-                    <span class="text-[10px] font-bold text-slate-400 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0"><i class="fa-solid fa-link text-[9px] mr-0.5"></i>Dari QC</span>
-                  </div>
-                  <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-2.5">
-                    <span class="text-sm font-semibold text-slate-500 flex items-center gap-2 min-w-0"><i class="fa-solid fa-shield-halved text-slate-300 shrink-0"></i><span class="truncate">Surat Garansi</span></span>
-                    <span class="text-[10px] font-bold text-slate-400 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0"><i class="fa-solid fa-link text-[9px] mr-0.5"></i>Dari QC</span>
-                  </div>
-                  <div class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 px-3.5 py-2.5">
-                    <span class="text-sm font-semibold text-slate-500 flex items-center gap-2 min-w-0"><i class="fa-solid fa-plug-circle-check text-slate-300 shrink-0"></i><span class="truncate">Hasil Commissioning</span></span>
-                    <span class="text-[10px] font-bold text-slate-400 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0"><i class="fa-solid fa-link text-[9px] mr-0.5"></i>Dari QC</span>
-                  </div>
-                </div>
+                <input type="file" id="wo-kontrak-input" accept="application/pdf,.pdf" class="hidden" onchange="_woUploadKontrak(this)">
               </div>
 
               <!-- Ringkasan QC Lapangan (read-only utk lintas divisi) -->

@@ -227,6 +227,7 @@
       _loadRealisasiHPP(item.noWO);
       _woLoadSurveys(item.noWO);
       _woLoadQC(item.noWO);
+      _woLoadDokumen(item.noWO);
     };
 
     // Kembali dari detail WO (halaman penuh) ke daftar.
@@ -407,6 +408,145 @@
         +   '<span class="text-slate-400">N/A ' + (s.na||0) + '</span>'
         + '</div>';
     }
+
+    // ================================================================
+    // DOKUMEN PROJECT (Kontrak manual + BAST/Garansi/Commissioning dari QC)
+    // ================================================================
+    // Kontrak: generate (menyusul) + upload versi bertandatangan. Boleh
+    // upload/hapus: admin/lead sales/sales (reuse _canEditCatatanWO).
+    // BAST/Garansi/Commissioning: read-only, ditarik dari item QC H1/H2/H3.
+    let _woDok = null;
+    var _WO_QC_DOC_ICONS = { bast: 'fa-file-signature', garansi: 'fa-shield-halved', commissioning: 'fa-plug-circle-check' };
+    var _WO_QC_DOC_ORDER = ['bast', 'garansi', 'commissioning'];
+
+    function _woLoadDokumen(noWO) {
+      var cont = document.getElementById('wo-doc-content');
+      if (cont) cont.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      google.script.run.withSuccessHandler(function(res) {
+        _woDok = (res && res.success) ? res : { kontrak: null, qc: {} };
+        _woRenderDokumen();
+      }).withFailureHandler(function() {
+        if (cont) cont.innerHTML = '<div class="text-center py-3 text-rose-400 text-xs">Gagal memuat dokumen.</div>';
+      }).getWODokumen(noWO);
+    }
+
+    function _woQCStatusBadge(st) {
+      var m = ({
+        'Approved':     { c: 'bg-emerald-100 text-emerald-700', t: 'Approved' },
+        'Pending':      { c: 'bg-amber-100 text-amber-700', t: 'Pending' },
+        'Rejected':     { c: 'bg-rose-100 text-rose-700', t: 'Rejected' },
+        'NA':           { c: 'bg-slate-100 text-slate-500', t: 'N/A' },
+        'Belum Upload': { c: 'bg-slate-100 text-slate-400', t: 'Belum ada' }
+      })[st] || { c: 'bg-slate-100 text-slate-400', t: 'Belum ada' };
+      return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ' + m.c + '">' + m.t + '</span>';
+    }
+
+    // Kartu file PDF kecil (ikon PDF + nama/keterangan + tombol Buka). aksiHtml
+    // = tombol tambahan (ganti/hapus) opsional.
+    function _woDocFileCard(fileUrl, meta, aksiHtml) {
+      return '<div class="flex items-center gap-2 mt-2">'
+        + '<a href="' + _woEsc(fileUrl) + '" target="_blank" class="flex items-center justify-center h-10 w-10 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition shrink-0" title="Buka dokumen"><i class="fa-solid fa-file-pdf text-rose-500 text-lg"></i></a>'
+        + '<div class="min-w-0 flex-1 text-[10px] text-slate-400 leading-tight">' + _woEsc(meta || '') + '</div>'
+        + (aksiHtml || '')
+        + '</div>';
+    }
+
+    function _woRenderDokumen() {
+      var cont = document.getElementById('wo-doc-content');
+      if (!cont || !_woDok) return;
+      var canManage = _canEditCatatanWO();
+      var k = _woDok.kontrak;
+
+      // ── Kontrak (manual) ──
+      var kontrakBody;
+      if (k && k.fileId) {
+        var aksi = canManage
+          ? '<button onclick="document.getElementById(\'wo-kontrak-input\').click()" class="text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition shrink-0" title="Ganti"><i class="fa-solid fa-arrows-rotate"></i></button>'
+            + '<button onclick="_woHapusKontrak()" class="text-[11px] font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg transition shrink-0" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>'
+          : '';
+        kontrakBody = '<div class="flex items-center justify-between gap-2">'
+          + '<span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-400"></i> Kontrak</span>'
+          + '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Tersimpan</span>'
+          + '</div>'
+          + _woDocFileCard(k.fileUrl, (k.by ? k.by + ' · ' : '') + (k.at || ''), aksi);
+      } else {
+        kontrakBody = '<div class="flex items-center justify-between gap-2">'
+          + '<span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-300"></i> Kontrak</span>'
+          + '<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">Belum ada</span>'
+          + '</div>'
+          + '<p class="text-[11px] text-slate-400 mt-1">Generate dari template lalu upload versi bertandatangan.</p>'
+          + '<div class="flex items-center gap-2 mt-2">'
+          +   '<button disabled title="Segera hadir" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-not-allowed opacity-70"><i class="fa-solid fa-file-arrow-down"></i> Generate</button>'
+          +   (canManage
+                ? '<button onclick="document.getElementById(\'wo-kontrak-input\').click()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-orange-500 hover:bg-orange-600 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-up"></i> Upload Bertandatangan</button>'
+                : '<span class="text-[11px] text-slate-300 italic self-center">Belum diupload</span>')
+          + '</div>';
+      }
+
+      // ── Dari QC (BAST / Garansi / Commissioning) ──
+      var qc = _woDok.qc || {};
+      var qcRows = _WO_QC_DOC_ORDER.map(function(key) {
+        var d = qc[key]; if (!d) return '';
+        var icon = _WO_QC_DOC_ICONS[key] || 'fa-file';
+        var body = '<div class="flex items-center justify-between gap-3">'
+          + '<span class="text-sm font-semibold text-slate-600 flex items-center gap-2 min-w-0"><i class="fa-solid ' + icon + ' text-slate-300 shrink-0"></i><span class="truncate">' + _woEsc(d.label) + '</span></span>'
+          + _woQCStatusBadge(d.status)
+          + '</div>';
+        if (d.file && d.file.fileId) {
+          body += _woDocFileCard(d.file.fileUrl, (d.by ? d.by + ' · ' : '') + (d.at || '') + (d.status === 'Approved' ? '' : ' · (belum disetujui)'), '');
+        } else {
+          body += '<p class="text-[11px] text-slate-300 italic mt-1">Belum ada dokumen di QC (' + _woEsc(d.kode) + ').</p>';
+        }
+        return '<div class="bg-slate-50 rounded-xl border border-slate-100 px-3.5 py-2.5">' + body + '</div>';
+      }).join('');
+
+      cont.innerHTML =
+          '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Dibuat &amp; Ditandatangani</p>'
+        + '<div class="bg-slate-50 rounded-xl border border-slate-100 px-3.5 py-3 mb-3">' + kontrakBody + '</div>'
+        + '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Otomatis dari QC <span class="normal-case font-semibold text-slate-300">(item H1/H2/H3)</span></p>'
+        + '<div class="space-y-2">' + qcRows + '</div>';
+    }
+
+    window._woUploadKontrak = function(input) {
+      var f = (input.files || [])[0];
+      input.value = '';
+      if (!f) return;
+      if (!_woDetailCurrent) return;
+      if (!_canEditCatatanWO()) { showNotification('Anda tidak berhak mengupload dokumen.', 'error'); return; }
+      var isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+      if (!isPdf) { showNotification('Hanya file PDF yang diperbolehkan.', 'error'); return; }
+      if (f.size > 15 * 1024 * 1024) { showNotification('Ukuran dokumen maksimal 15MB.', 'error'); return; }
+      toggleLoader(true, 'Mengupload kontrak...');
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var dataUrl = e.target.result || '';
+        var base64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : '';
+        if (!base64) { toggleLoader(false); showNotification('Gagal membaca file.', 'error'); return; }
+        google.script.run.withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal upload.', 'error'); return; }
+          showNotification('Kontrak tersimpan.');
+          _woLoadDokumen(_woDetailCurrent.noWO);
+        }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
+          .uploadWODokumen({ noWO: _woDetailCurrent.noWO, jenis: 'kontrak', base64Data: base64, fileName: f.name || 'kontrak.pdf', mimeType: 'application/pdf', oleh: (typeof _currentUser !== 'undefined' && _currentUser ? _currentUser.nama : '') });
+      };
+      reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca file.', 'error'); };
+      reader.readAsDataURL(f);
+    };
+
+    window._woHapusKontrak = function() {
+      if (!_woDetailCurrent) return;
+      showConfirm({ title: 'Hapus Kontrak', message: 'Hapus dokumen kontrak dari WO ini?', confirmText: 'Ya, Hapus', onConfirm: function() {
+        toggleLoader(true, 'Menghapus...');
+        google.script.run.withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menghapus.', 'error'); return; }
+          showNotification('Kontrak dihapus.');
+          _woLoadDokumen(_woDetailCurrent.noWO);
+        }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+          .hapusWODokumen(_woDetailCurrent.noWO, 'kontrak');
+      } });
+    };
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;
