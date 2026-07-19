@@ -512,16 +512,30 @@ function _qcCloseSection(sec) {
 function _qcItemHtml(it) {
   var canUp = _qcCanUpload(), canRev = _qcCanReview();
   var isAdmin = _qcRole() === 'admin';
+  var isFile = it.tipeUpload === 'file';   // item minta upload dokumen (PDF), bukan foto
   var foto = it.foto || [];
   var thumbs = foto.map(function(f) {
     // Item Approved biasanya terkunci (tak bisa hapus foto), KECUALI admin —
     // admin tetap boleh hapus (mis. utk membersihkan data percobaan).
     var del = (canUp && it.status !== 'NA' && (it.status !== 'Approved' || isAdmin)) ? '<button onclick="event.stopPropagation();_qcHapusFoto(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>' : '';
     var editedMark = f.editedBy ? '<span class="absolute bottom-0.5 left-0.5 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded" title="Diberi coretan oleh ' + _qcEsc(f.editedBy) + '"><i class="fa-solid fa-pen"></i></span>' : '';
-    // Info singkat tiap foto: pengupload + tanggal (format sama spt di sheet).
+    // Info singkat tiap file/foto: pengupload + tanggal (format sama spt di sheet).
     var cap = (f.by || f.at)
       ? '<p class="text-[9px] text-slate-400 mt-0.5 leading-tight break-words">' + (f.by ? '<span class="font-semibold text-slate-500">' + _qcEsc(f.by) + '</span>' : '') + (f.by && f.at ? ' · ' : '') + (f.at ? _qcEsc(f.at) : '') + '</p>'
       : '';
+    if (isFile) {
+      // Dokumen (PDF): tampil pratinjau halaman pertama (thumbnail Drive),
+      // fallback ikon PDF bila belum siap; klik = buka file PDF di tab baru.
+      return '<div class="w-20">'
+        + '<div class="relative">'
+        +   '<a href="' + _qcEsc(f.fileUrl) + '" target="_blank" class="flex items-center justify-center h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 relative">'
+        +     '<i class="fa-solid fa-file-pdf text-rose-300 text-2xl"></i>'
+        +     '<img src="' + _qcThumb(f.fileId) + '" alt="dokumen" loading="lazy" class="absolute inset-0 h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;">'
+        +   '</a>'
+        +   '<span class="absolute bottom-0.5 left-0.5 bg-rose-600 text-white text-[8px] font-bold px-1 py-0.5 rounded">PDF</span>' + del
+        + '</div>' + cap
+        + '</div>';
+    }
     return '<div class="w-20">'
       + '<div class="relative">'
       +   '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ', \'' + it.kode + '\')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
@@ -540,11 +554,17 @@ function _qcItemHtml(it) {
   var uploadCtrl = '';
   var locked = (it.status === 'Approved');
   if (canUp && it.status !== 'NA' && !locked) {
-    // Tombol Kamera (capture) membuka kamera langsung di Android; Galeri untuk pilih file.
-    uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
-      + '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>'
-      + '<label class="inline-flex items-center gap-2 ml-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-regular fa-images"></i> Galeri'
-      + '<input type="file" accept="image/*" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>';
+    if (isFile) {
+      // Dokumen: hanya PDF, tanpa kamera & tanpa kompresi gambar.
+      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-file-arrow-up"></i> Upload Dokumen (PDF)'
+        + '<input type="file" accept="application/pdf,.pdf" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this, true)"></label>';
+    } else {
+      // Tombol Kamera (capture) membuka kamera langsung di Android; Galeri untuk pilih file.
+      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
+        + '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>'
+        + '<label class="inline-flex items-center gap-2 ml-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-regular fa-images"></i> Galeri'
+        + '<input type="file" accept="image/*" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>';
+    }
   }
   if (canUp && !it.wajib && !locked) {
     var naOn = it.status === 'NA';
@@ -625,28 +645,55 @@ function _qcActivityHtml(it) {
 }
 
 // ── Aksi ──────────────────────────────────────────────────────────
-function _qcUpload(kode, input) {
+// isFile=true → item bertipe Dokumen: hanya PDF, dikirim apa adanya (tanpa
+// resize/kompresi gambar). isFile=false → foto: di-resize dulu spt biasa.
+function _qcUpload(kode, input, isFile) {
   var files = Array.prototype.slice.call(input.files || []);
   input.value = '';
   if (!files.length) return;
+  var noun = isFile ? 'dokumen' : 'foto';
   var MAX = 15 * 1024 * 1024;
-  for (var k = 0; k < files.length; k++) { if (files[k].size > MAX) return showNotification('Ukuran foto maksimal 15MB: ' + files[k].name, 'error'); }
+  for (var k = 0; k < files.length; k++) {
+    if (files[k].size > MAX) return showNotification('Ukuran ' + noun + ' maksimal 15MB: ' + files[k].name, 'error');
+    if (isFile) {
+      var isPdf = files[k].type === 'application/pdf' || /\.pdf$/i.test(files[k].name || '');
+      if (!isPdf) return showNotification('Hanya file PDF yang diperbolehkan: ' + files[k].name, 'error');
+    }
+  }
   var i = 0;
-  toggleLoader(true, 'Mengupload foto (0/' + files.length + ')...');
+  toggleLoader(true, 'Mengupload ' + noun + ' (0/' + files.length + ')...');
+  function done() { toggleLoader(false); showNotification(files.length + ' ' + noun + ' terupload.'); _qcReloadDetail(); }
+  function send(base64, fileName, mimeType) {
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success === false) { toggleLoader(false); showNotification(res.message, 'error'); return; }
+      i++; next();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload ' + noun + '.', 'error'); })
+      .uploadQCFoto({ noWO: _qcWO.noWO, kode: kode, base64Data: base64, fileName: fileName, mimeType: mimeType, oleh: _qcUserNama() });
+  }
   function next() {
-    if (i >= files.length) { toggleLoader(false); showNotification(files.length + ' foto terupload.'); _qcReloadDetail(); return; }
+    if (i >= files.length) { done(); return; }
     var f = files[i];
-    toggleLoader(true, 'Mengupload foto (' + (i + 1) + '/' + files.length + ')...');
-    _qcResizeImage(f, function(dataUrl) {
-      if (!dataUrl) { toggleLoader(false); showNotification('Gagal memproses foto: ' + f.name, 'error'); return; }
-      var base64 = dataUrl.split(',')[1];
-      var fileName = (f.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg';
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success === false) { toggleLoader(false); showNotification(res.message, 'error'); return; }
-        i++; next();
-      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload foto.', 'error'); })
-        .uploadQCFoto({ noWO: _qcWO.noWO, kode: kode, base64Data: base64, fileName: fileName, mimeType: 'image/jpeg', oleh: _qcUserNama() });
-    });
+    toggleLoader(true, 'Mengupload ' + noun + ' (' + (i + 1) + '/' + files.length + ')...');
+    if (isFile) {
+      // PDF: baca apa adanya (jangan di-resize — akan merusak file).
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var dataUrl = e.target.result || '';
+        var base64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : '';
+        if (!base64) { toggleLoader(false); showNotification('Gagal membaca dokumen: ' + f.name, 'error'); return; }
+        var fileName = (f.name || 'dokumen').replace(/\.[a-zA-Z0-9]+$/, '') + '.pdf';
+        send(base64, fileName, 'application/pdf');
+      };
+      reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca dokumen: ' + f.name, 'error'); };
+      reader.readAsDataURL(f);
+    } else {
+      _qcResizeImage(f, function(dataUrl) {
+        if (!dataUrl) { toggleLoader(false); showNotification('Gagal memproses foto: ' + f.name, 'error'); return; }
+        var base64 = dataUrl.split(',')[1];
+        var fileName = (f.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg';
+        send(base64, fileName, 'image/jpeg');
+      });
+    }
   }
   next();
 }
@@ -921,9 +968,10 @@ function _qcRenderManage() {
         return '<div class="px-4 py-2.5 hover:bg-slate-50">'
           + '<div class="flex items-center gap-2">'
           +   '<span class="font-mono text-[10px] font-bold text-slate-400 w-10 shrink-0">' + it.kode + '</span>'
-          +   '<span class="flex-1 text-sm text-slate-700 min-w-0">' + _qcEsc(it.label) + '</span>'
+          +   '<span class="flex-1 text-sm text-slate-700 min-w-0">' + _qcEsc(it.label)
+          +     (it.tipeUpload === 'file' ? ' <span class="ml-1 text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded align-middle"><i class="fa-solid fa-file-pdf"></i> PDF</span>' : '') + '</span>'
           +   '<label class="flex items-center gap-1 text-[10px] font-semibold text-slate-400 cursor-pointer select-none whitespace-nowrap"><input type="checkbox" ' + (it.wajib ? 'checked' : '') + ' onchange="_qcToggleSubWajib(\'' + it.kode + '\', ' + _qcJs(it.label) + ', this.checked)" class="accent-orange-500"> Wajib</label>'
-          +   '<button onclick="_qcEditSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ', ' + (it.wajib ? 'true' : 'false') + ', ' + _qcJs(it.instruksi) + ')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit nama/instruksi"><i class="fa-solid fa-pen-to-square text-xs"></i></button>'
+          +   '<button onclick="_qcEditSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ', ' + (it.wajib ? 'true' : 'false') + ', ' + _qcJs(it.instruksi) + ', ' + _qcJs(it.tipeUpload || 'foto') + ')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Edit nama/instruksi"><i class="fa-solid fa-pen-to-square text-xs"></i></button>'
           +   '<button onclick="_qcDelSub(\'' + it.kode + '\', ' + _qcJs(it.label) + ')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
           + '</div>'
           + (it.instruksi ? '<div class="text-[11px] text-slate-500 mt-1 ml-12 whitespace-pre-line"><i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>' + _qcEsc(it.instruksi) + '</div>' : '')
@@ -1006,6 +1054,8 @@ function _qcOpenItemModal(cfg) {
   input.placeholder = isSub ? 'mis. Foto - Depan bangunan' : 'mis. Sebelum Instalasi';
   document.getElementById('qc-item-modal-wajib-wrap').classList.toggle('hidden', !isSub);
   document.getElementById('qc-item-modal-wajib').checked = isSub ? (cfg.wajib !== false) : false;
+  document.getElementById('qc-item-modal-tipe-wrap').classList.toggle('hidden', !isSub);
+  document.getElementById('qc-item-modal-tipe').value = (isSub && cfg.tipeUpload === 'file') ? 'file' : 'foto';
   document.getElementById('qc-item-modal-instr-wrap').classList.toggle('hidden', !isSub);
   document.getElementById('qc-item-modal-instr').value = isSub ? (cfg.instruksi || '') : '';
   document.getElementById('modal-qc-item').classList.remove('hidden');
@@ -1019,11 +1069,12 @@ function _qcSaveItemModal(e) {
   if (!label) return showNotification('Nama tidak boleh kosong.', 'error');
   var wajib = document.getElementById('qc-item-modal-wajib').checked;
   var instruksi = (document.getElementById('qc-item-modal-instr').value || '').trim();
+  var tipe = document.getElementById('qc-item-modal-tipe').value === 'file' ? 'file' : 'foto';
   _qcCloseItemModal();
   if (m.mode === 'add-section') _qcMgmtCall('tambahQCSection', [label], 'Item QC ditambahkan.');
   else if (m.mode === 'edit-section') _qcMgmtCall('updateQCSection', [m.kode, label], 'Item QC diperbarui.');
-  else if (m.mode === 'add-sub') _qcMgmtCall('tambahQCSubItem', [m.sectionKode, label, wajib, instruksi], 'Subitem ditambahkan.');
-  else if (m.mode === 'edit-sub') _qcMgmtCall('updateQCSubItem', [m.kode, label, wajib, instruksi], 'Subitem diperbarui.');
+  else if (m.mode === 'add-sub') _qcMgmtCall('tambahQCSubItem', [m.sectionKode, label, wajib, instruksi, tipe], 'Subitem ditambahkan.');
+  else if (m.mode === 'edit-sub') _qcMgmtCall('updateQCSubItem', [m.kode, label, wajib, instruksi, tipe], 'Subitem diperbarui.');
 }
 
 function _qcAddSection() { _qcOpenItemModal({ mode: 'add-section', title: 'Tambah Item QC' }); }
@@ -1032,8 +1083,8 @@ function _qcDelSection(kode, label) {
   showConfirm({ title: 'Hapus Item QC', message: 'Hapus item "' + kode + '. ' + label + '" beserta SEMUA subitemnya?', confirmText: 'Ya, Hapus',
     onConfirm: function() { _qcMgmtCall('hapusQCSection', [kode], 'Item QC dihapus.'); } });
 }
-function _qcAddSub(sectionKode) { _qcOpenItemModal({ mode: 'add-sub', sectionKode: sectionKode, wajib: true, title: 'Tambah Subitem QC' }); }
-function _qcEditSub(kode, cur, wajib, instruksi) { _qcOpenItemModal({ mode: 'edit-sub', kode: kode, value: cur, wajib: wajib, instruksi: instruksi, title: 'Ubah Subitem QC' }); }
+function _qcAddSub(sectionKode) { _qcOpenItemModal({ mode: 'add-sub', sectionKode: sectionKode, wajib: true, tipeUpload: 'foto', title: 'Tambah Subitem QC' }); }
+function _qcEditSub(kode, cur, wajib, instruksi, tipeUpload) { _qcOpenItemModal({ mode: 'edit-sub', kode: kode, value: cur, wajib: wajib, instruksi: instruksi, tipeUpload: tipeUpload, title: 'Ubah Subitem QC' }); }
 function _qcToggleSubWajib(kode, label, checked) {
   _qcMgmtCall('updateQCSubItem', [kode, label, checked], 'Subitem diperbarui.');
 }

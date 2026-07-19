@@ -105,6 +105,13 @@
               <label id="qc-item-modal-wajib-wrap" class="hidden mt-3 flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer select-none">
                 <input type="checkbox" id="qc-item-modal-wajib" class="accent-orange-500"> Wajib diisi
               </label>
+              <div id="qc-item-modal-tipe-wrap" class="hidden mt-3">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipe Upload</label>
+                <select id="qc-item-modal-tipe" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                  <option value="foto">Foto (gambar)</option>
+                  <option value="file">Dokumen (PDF) — mis. BAST, Surat Garansi, Commissioning</option>
+                </select>
+              </div>
               <div id="qc-item-modal-instr-wrap" class="hidden mt-3">
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Instruksi untuk Site Engineer <span class="text-slate-300 normal-case font-semibold">(opsional)</span></label>
                 <textarea id="qc-item-modal-instr" rows="3" placeholder="mis. Ambil foto tampak depan bangunan dari jarak ±5m, pastikan seluruh atap terlihat" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none"></textarea>
