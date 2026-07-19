@@ -201,7 +201,7 @@ function bukaFormSiteSurvey() {
 var _SS_TEXT_FIELDS = ['ss-namaSite', 'ss-namaPIC', 'ss-telepon', 'ss-alamat', 'ss-arahBangunan', 'ss-tinggiBangunan',
   'ss-idPelangganPLN', 'ss-dayaPLN', 'ss-phase', 'ss-ratingBreaker',
   'ss-bosLokasi', 'ss-bosLebar', 'ss-bosTinggi', 'ss-bosJenisTembok', 'ss-bosJarakInterkoneksi',
-  'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapPanjang', 'ss-atapLebar', 'ss-atapMounting',
+  'ss-atapJenis', 'ss-atapArah', 'ss-atapRangka', 'ss-atapMounting',
   'ss-panjangPV', 'ss-panjangAC', 'ss-latitude', 'ss-longitude'];
 var _SS_FOTO_FIELDS = ['fotoBangunan', 'fotoKwh', 'fotoPHB', 'bosFoto', 'fotoAtap', 'fotoRangka', 'fotoAkses', 'fotoPV', 'fotoAC'];
 
@@ -238,6 +238,8 @@ function _ssResetForm() {
   document.getElementById('ss-dayaPLN').disabled = true;
   document.getElementById('ss-ratingBreaker').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
   document.getElementById('ss-ratingBreaker').disabled = true;
+  var jEl = document.getElementById('ss-atapJumlah'); if (jEl) jEl.value = '1';
+  _ssRenderAtapUkuran([]);
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
   var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
   if (_ssMap) { _ssMap.remove(); _ssMap = null; _ssMarker = null; }
@@ -324,10 +326,20 @@ var _SS_STEP_REQUIRED = {
       { id: 'ss-atapJenis', label: 'Jenis Atap' },
       { id: 'ss-atapArah', label: 'Arah Hadap Atap' },
       { id: 'ss-atapRangka', label: 'Rangka Atap' },
-      { id: 'ss-atapMounting', label: 'Jenis Mounting' },
-      { id: 'ss-atapPanjang', label: 'Ukuran Atap (Panjang)' },
-      { id: 'ss-atapLebar', label: 'Ukuran Atap (Lebar)' }
+      { id: 'ss-atapMounting', label: 'Jenis Mounting' }
     ],
+    custom: function() {
+      var jEl = document.getElementById('ss-atapJumlah');
+      var n = jEl ? parseInt(jEl.value, 10) : 0;
+      if (!n || n < 1) return 'Jumlah Atap wajib dipilih.';
+      for (var i = 0; i < n; i++) {
+        var p = document.getElementById('ss-atapP-' + i);
+        var l = document.getElementById('ss-atapL-' + i);
+        if (!p || !(p.value || '').trim()) return 'Ukuran Atap ' + (i + 1) + ' — Panjang wajib diisi.';
+        if (!l || !(l.value || '').trim()) return 'Ukuran Atap ' + (i + 1) + ' — Lebar wajib diisi.';
+      }
+      return null;
+    },
     fotos: [{ key: 'fotoAtap', label: 'Foto Atap' }, { key: 'fotoRangka', label: 'Foto Rangka Atap' }, { key: 'fotoAkses', label: 'Foto Akses ke Atap' }]
   },
   5: {
@@ -348,11 +360,60 @@ function _ssValidateStep(n) {
     if (!el || !(el.value || '').trim()) return cfg.fields[i].label + ' wajib diisi.';
   }
   if (cfg.coords && !_ssLatLng) return 'Titik Koordinat wajib diisi (ambil lokasi, klik di peta, atau isi manual).';
+  if (typeof cfg.custom === 'function') { var cErr = cfg.custom(); if (cErr) return cErr; }
   for (var j = 0; j < cfg.fotos.length; j++) {
     var arr = _ssPhotos[cfg.fotos[j].key];
     if (!arr || !arr.length) return cfg.fotos[j].label + ' wajib diupload.';
   }
   return null;
+}
+
+// ── Ukuran atap dinamis (multi-roof) ────────────────────────────────
+// Normalisasi ukuran atap ke array [{panjang,lebar}] — dukung data lama yg
+// hanya punya panjang/lebar tunggal.
+function _ssAtapUkuranArr(atap) {
+  atap = atap || {};
+  if (Array.isArray(atap.ukuran) && atap.ukuran.length) return atap.ukuran;
+  if (atap.panjang || atap.lebar) return [{ panjang: atap.panjang || 0, lebar: atap.lebar || 0 }];
+  return [];
+}
+// Baca nilai panjang/lebar tiap atap yg sedang tampil (utk preserve saat jumlah
+// diubah, dan saat submit).
+function _ssCollectAtapUkuran() {
+  var wrap = document.getElementById('ss-atapUkuranWrap');
+  var arr = [];
+  if (!wrap) return arr;
+  var pEls = wrap.querySelectorAll('[id^="ss-atapP-"]');
+  Array.prototype.forEach.call(pEls, function(pEl) {
+    var idx = pEl.id.replace('ss-atapP-', '');
+    var lEl = document.getElementById('ss-atapL-' + idx);
+    arr.push({ panjang: pEl.value !== '' ? Number(pEl.value) : '', lebar: (lEl && lEl.value !== '') ? Number(lEl.value) : '' });
+  });
+  return arr;
+}
+// Render N baris input panjang x lebar sesuai #ss-atapJumlah. `sizes` opsional
+// utk prefill (edit); tanpa itu, nilai yg sudah diisi dipertahankan.
+function _ssRenderAtapUkuran(sizes) {
+  var wrap = document.getElementById('ss-atapUkuranWrap');
+  var jEl = document.getElementById('ss-atapJumlah');
+  if (!wrap || !jEl) return;
+  var n = parseInt(jEl.value, 10) || 1; if (n < 1) n = 1;
+  var cur = sizes || _ssCollectAtapUkuran();
+  var inCls = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100';
+  var multi = n > 1;
+  var html = '';
+  for (var i = 0; i < n; i++) {
+    var u = cur[i] || {};
+    var p = (u.panjang || u.panjang === 0) && u.panjang !== '' ? u.panjang : '';
+    var l = (u.lebar || u.lebar === 0) && u.lebar !== '' ? u.lebar : '';
+    html += '<div class="' + (multi ? 'bg-slate-50 rounded-xl border border-slate-100 p-3' : '') + '">'
+      + (multi ? '<p class="text-[11px] font-bold text-slate-400 uppercase mb-2"><i class="fa-solid fa-square text-blue-300 mr-1 text-[9px]"></i>Atap ' + (i + 1) + '</p>' : '')
+      + '<div class="grid grid-cols-2 gap-4">'
+      +   '<input type="number" step="any" min="0" id="ss-atapP-' + i + '" value="' + p + '" placeholder="Panjang (m)" class="' + inCls + '">'
+      +   '<input type="number" step="any" min="0" id="ss-atapL-' + i + '" value="' + l + '" placeholder="Lebar (m)" class="' + inCls + '">'
+      + '</div></div>';
+  }
+  wrap.innerHTML = html;
 }
 
 // Upload foto pending milik step yang sedang ditinggalkan sebelum benar-benar
@@ -754,6 +815,8 @@ function _ssDoSubmit() {
   var g = function(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
   var gn = function(id) { var v = g(id); return v === '' ? 0 : Number(v); };
 
+  var atapUkuran = _ssCollectAtapUkuran().map(function(u) { return { panjang: Number(u.panjang) || 0, lebar: Number(u.lebar) || 0 }; });
+
   var payload = {
     id: _ssCurrentId,
     dibuatOleh: _ssUserNama(),
@@ -783,8 +846,11 @@ function _ssDoSubmit() {
     },
     atap: {
       jenis: g('ss-atapJenis'), arah: g('ss-atapArah'), rangka: g('ss-atapRangka'),
-      panjang: gn('ss-atapPanjang'), lebar: gn('ss-atapLebar'),
-      mounting: g('ss-atapMounting'), fotoAtap: _ssPhotos.fotoAtap || [], fotoRangka: _ssPhotos.fotoRangka || [], fotoAkses: _ssPhotos.fotoAkses || []
+      mounting: g('ss-atapMounting'),
+      jumlahAtap: atapUkuran.length, ukuran: atapUkuran,
+      // panjang/lebar (atap pertama) dipertahankan utk kompatibilitas data lama.
+      panjang: atapUkuran[0] ? atapUkuran[0].panjang : 0, lebar: atapUkuran[0] ? atapUkuran[0].lebar : 0,
+      fotoAtap: _ssPhotos.fotoAtap || [], fotoRangka: _ssPhotos.fotoRangka || [], fotoAkses: _ssPhotos.fotoAkses || []
     },
     jalurKabel: {
       panjangPV: gn('ss-panjangPV'), panjangAC: gn('ss-panjangAC'),
@@ -945,14 +1011,19 @@ function _ssRenderDetail() {
     + '</div>'
     + fotoGroup('Foto Area BoS & Titik Interkoneksi', bos.foto));
 
+  var atapUkr = _ssAtapUkuranArr(atap);
+  var atapUkrStr = atapUkr.length
+    ? atapUkr.map(function(u, i) { return (atapUkr.length > 1 ? 'Atap ' + (i + 1) + ': ' : '') + (u.panjang || 0) + ' x ' + (u.lebar || 0) + ' m'; }).join(atapUkr.length > 1 ? '  ·  ' : '')
+    : '';
   body += section('D. Informasi Atap', 'fa-house-chimney',
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">'
     +   row('Jenis Atap', atap.jenis)
     +   row('Arah Hadap Atap', atap.arah)
     +   row('Rangka Atap', atap.rangka)
     +   row('Jenis Mounting', atap.mounting)
-    +   row('Ukuran Atap', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '')
+    +   row('Jumlah Atap', atapUkr.length ? atapUkr.length + ' atap' : '')
     + '</div>'
+    + '<div class="mt-1">' + row('Ukuran Atap (Panjang x Lebar)', atapUkrStr) + '</div>'
     + fotoGroups(fotoGroup('Foto Atap', atap.fotoAtap), fotoGroup('Foto Rangka Atap', atap.fotoRangka), fotoGroup('Foto Akses ke Atap', atap.fotoAkses)));
 
   body += section('E. Jalur Kabel', 'fa-timeline',
@@ -1038,8 +1109,9 @@ function _ssFillEditForm(d) {
   set('ss-atapArah', atap.arah);
   set('ss-atapRangka', atap.rangka);
   set('ss-atapMounting', atap.mounting);
-  set('ss-atapPanjang', atap.panjang);
-  set('ss-atapLebar', atap.lebar);
+  var atapUkr = _ssAtapUkuranArr(atap);
+  document.getElementById('ss-atapJumlah').value = String(atapUkr.length || 1);
+  _ssRenderAtapUkuran(atapUkr);
   _ssPhotos.fotoAtap = (atap.fotoAtap || []).slice();
   _ssPhotos.fotoRangka = (atap.fotoRangka || []).slice();
   _ssPhotos.fotoAkses = (atap.fotoAkses || []).slice();
@@ -1310,14 +1382,17 @@ function _ssBuildPDF(d) {
   var atap = d.atap || {};
   newPage();
   sectionBar('D. INFORMASI ATAP');
+  var atapUkr = _ssAtapUkuranArr(atap);
+  var atapUkrStr = atapUkr.map(function(u, i) { return (atapUkr.length > 1 ? 'Atap ' + (i + 1) + ': ' : '') + (u.panjang || 0) + ' x ' + (u.lebar || 0) + ' m'; }).join('   ·   ');
   dataCard([
     { type: 'row', pairs: [
       ['Jenis Atap', atap.jenis],
       ['Arah Hadap Atap', atap.arah],
       ['Rangka Atap', atap.rangka],
       ['Jenis Mounting', atap.mounting],
-      ['Ukuran Atap (P x L)', (atap.panjang || atap.lebar) ? (atap.panjang || 0) + ' x ' + (atap.lebar || 0) + ' m' : '']
-    ] }
+      ['Jumlah Atap', atapUkr.length ? atapUkr.length + ' atap' : '']
+    ] },
+    { type: 'full', label: 'Ukuran Atap (Panjang x Lebar)', value: atapUkrStr }
   ]);
   photoGroup('Foto Atap', atap.fotoAtap);
   photoGroup('Foto Rangka Atap', atap.fotoRangka);
