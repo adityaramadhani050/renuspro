@@ -167,3 +167,105 @@ function getWODokumen(noWO) {
     return { success: false, message: e.toString() };
   }
 }
+
+// ── Data untuk generate Surat Perjanjian Kontrak (dirender jsPDF di frontend) ──
+var _WO_HARI   = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+var _WO_BULAN  = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+var _WO_ROMAWI = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+function _woParseTgl(s) {
+  var m = (s || '').toString().match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2] - 1, +m[1]);
+}
+
+function _woRowByNo(noWO) {
+  var sh = getSpreadsheet().getSheetByName('Work_Order');
+  if (!sh) return null;
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) { if ((data[i][0] || '').toString().trim() === noWO) return data[i]; }
+  return null;
+}
+
+// Rekening tujuan dari invoice WO ini — utamakan invoice DP, fallback invoice
+// lain. Sumber teks bebas multi-baris (kol 20 Bank Account).
+function _woInvoiceBankText(noWO) {
+  try {
+    var sh = getSpreadsheet().getSheetByName('Invoice_Main');
+    if (!sh) return '';
+    var data = sh.getDataRange().getValues();
+    var dpBank = '', anyBank = '';
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][1] || '').toString().trim() !== noWO) continue;
+      var bank = (data[i][19] || '').toString().trim();
+      if (!bank) continue;
+      if ((data[i][4] || '').toString() === 'DP' && !dpBank) dpBank = bank;
+      if (!anyBank) anyBank = bank;
+    }
+    return dpBank || anyBank;
+  } catch (e) { return ''; }
+}
+
+// Pisahkan teks rekening → {bank, noRek, atasNama}. Coba label dulu (Bank:/
+// No Rek:/a.n), lalu posisi (baris1=bank, baris paling banyak digit=no rek,
+// sisanya=atas nama). Selalu sertakan raw utk fallback tampilan.
+function _woParseBank(t) {
+  var raw = (t || '').toString();
+  var lines = raw.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+  var bank = '', noRek = '', atasNama = '';
+  lines.forEach(function (l) {
+    var low = l.toLowerCase();
+    if (/(a\.?n\.?|atas\s*nama)/.test(low)) atasNama = atasNama || l.replace(/.*(a\.?n\.?|atas\s*nama)\s*:?\s*/i, '').trim();
+    else if (/(no\.?\s*rek|rekening)/.test(low)) noRek = noRek || l.replace(/.*(no\.?\s*rek(ening)?)\s*:?\s*/i, '').trim();
+    else if (/bank/.test(low)) bank = bank || l.replace(/.*bank\s*:?\s*/i, '').trim();
+  });
+  if (!bank && !noRek && !atasNama && lines.length) {
+    bank = lines[0] || '';
+    var maxi = -1, maxd = -1;
+    lines.forEach(function (l, idx) { var dc = (l.match(/\d/g) || []).length; if (dc > maxd) { maxd = dc; maxi = idx; } });
+    if (maxi >= 0 && maxi !== 0) noRek = lines[maxi];
+    atasNama = lines.filter(function (l, idx) { return idx !== 0 && idx !== maxi; }).join(' ');
+  }
+  return { bank: bank, noRek: noRek, atasNama: atasNama, raw: raw };
+}
+
+function getKontrakData(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var row = _woRowByNo(noWO);
+    if (!row) return { success: false, message: 'Work Order tidak ditemukan.' };
+
+    var namaProject = (row[5] || '').toString();
+    var klienId = (row[6] || '').toString();
+    var namaKlien = (row[7] || '').toString();
+    var nilaiKontrak = parseFloat(row[9]) || 0;   // Subtotal = DPP (exclude PPN)
+    var tc = {}; try { tc = JSON.parse(row[16] || '{}'); } catch (e) {}
+    var k = tc.kontrak || {};
+    var d = _woParseTgl((row[19] || '').toString()) || new Date();  // Tanggal Deal
+
+    var alamat = '';
+    try { (getCustomerList() || []).forEach(function (c) { if (c.id === klienId) alamat = c.alamat || ''; }); } catch (e) {}
+
+    var digits = (noWO.match(/\d/g) || []).join('');
+    var seq = digits.length >= 3 ? digits.slice(-3) : (digits || noWO);
+    var spk = seq + '/RGI/SPK/' + (_WO_ROMAWI[d.getMonth() + 1] || '') + '/' + d.getFullYear();
+
+    return {
+      success: true,
+      noWO: noWO, namaProject: namaProject, spkNomor: spk,
+      klien: { nama: namaKlien, alamat: alamat },
+      nilaiKontrak: nilaiKontrak,
+      tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() },
+      termin: { dp: Number(k.terminDP) || 0, termin: Number(k.terminTermin) || 0, pelunasan: Number(k.terminPelunasan) || 0 },
+      leadTimeHari: Number(k.leadTimeHari) || 0,
+      garansi: {
+        instalasi: Number(k.garansiInstalasi) || 0, panel: Number(k.garansiPanel) || 0,
+        inverter: Number(k.garansiInverter) || 0, baterai: Number(k.garansiBaterai) || 0
+      },
+      rekening: _woParseBank(_woInvoiceBankText(noWO))
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}

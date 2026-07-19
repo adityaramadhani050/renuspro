@@ -464,19 +464,20 @@
           ? '<button onclick="document.getElementById(\'wo-kontrak-input\').click()" class="text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition shrink-0" title="Ganti"><i class="fa-solid fa-arrows-rotate"></i></button>'
             + '<button onclick="_woHapusKontrak()" class="text-[11px] font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg transition shrink-0" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>'
           : '';
+        var genBtn = '<button onclick="_woGenerateKontrak()" class="text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition shrink-0" title="Generate draft ulang"><i class="fa-solid fa-file-arrow-down"></i></button>';
         kontrakBody = '<div class="flex items-center justify-between gap-2">'
           + '<span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-400"></i> Kontrak</span>'
           + '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Tersimpan</span>'
           + '</div>'
-          + _woDocFileCard(k.fileUrl, (k.by ? k.by + ' · ' : '') + (k.at || ''), aksi);
+          + _woDocFileCard(k.fileUrl, (k.by ? k.by + ' · ' : '') + (k.at || ''), genBtn + aksi);
       } else {
         kontrakBody = '<div class="flex items-center justify-between gap-2">'
           + '<span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-300"></i> Kontrak</span>'
           + '<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">Belum ada</span>'
           + '</div>'
-          + '<p class="text-[11px] text-slate-400 mt-1">Generate dari template lalu upload versi bertandatangan.</p>'
-          + '<div class="flex items-center gap-2 mt-2">'
-          +   '<button disabled title="Segera hadir" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-not-allowed opacity-70"><i class="fa-solid fa-file-arrow-down"></i> Generate</button>'
+          + '<p class="text-[11px] text-slate-400 mt-1">Generate draft otomatis dari data penawaran/WO, lalu upload versi bertandatangan.</p>'
+          + '<div class="flex items-center gap-2 mt-2 flex-wrap">'
+          +   '<button onclick="_woGenerateKontrak()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-down"></i> Generate Draft</button>'
           +   (canManage
                 ? '<button onclick="document.getElementById(\'wo-kontrak-input\').click()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-orange-500 hover:bg-orange-600 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-up"></i> Upload Bertandatangan</button>'
                 : '<span class="text-[11px] text-slate-300 italic self-center">Belum diupload</span>')
@@ -547,6 +548,249 @@
           .hapusWODokumen(_woDetailCurrent.noWO, 'kontrak');
       } });
     };
+
+    // ── Generate Draft Surat Perjanjian Kontrak (jsPDF, data otomatis) ─────────
+    function _kTerbilang(n) {
+      n = Math.floor(Math.abs(Number(n) || 0));
+      var sat = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+      function t(x) {
+        if (x < 12) return sat[x];
+        if (x < 20) return t(x - 10) + ' belas';
+        if (x < 100) return t(Math.floor(x / 10)) + ' puluh' + (x % 10 ? ' ' + t(x % 10) : '');
+        if (x < 200) return 'seratus' + (x % 100 ? ' ' + t(x % 100) : '');
+        if (x < 1000) return t(Math.floor(x / 100)) + ' ratus' + (x % 100 ? ' ' + t(x % 100) : '');
+        if (x < 2000) return 'seribu' + (x % 1000 ? ' ' + t(x % 1000) : '');
+        if (x < 1000000) return t(Math.floor(x / 1000)) + ' ribu' + (x % 1000 ? ' ' + t(x % 1000) : '');
+        if (x < 1000000000) return t(Math.floor(x / 1000000)) + ' juta' + (x % 1000000 ? ' ' + t(x % 1000000) : '');
+        if (x < 1000000000000) return t(Math.floor(x / 1000000000)) + ' miliar' + (x % 1000000000 ? ' ' + t(x % 1000000000) : '');
+        return t(Math.floor(x / 1000000000000)) + ' triliun' + (x % 1000000000000 ? ' ' + t(x % 1000000000000) : '');
+      }
+      if (n === 0) return 'nol';
+      return t(n).replace(/\s+/g, ' ').trim();
+    }
+    function _kRp(n) { return 'Rp. ' + Math.round(Number(n) || 0).toLocaleString('id-ID') + ',-'; }
+
+    window._woGenerateKontrak = function() {
+      if (!_woDetailCurrent) return;
+      if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
+      toggleLoader(true, 'Menyiapkan draft kontrak...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal menyiapkan data kontrak.', 'error'); return; }
+        try { _woBuildKontrakPDF(res); showNotification('Draft kontrak berhasil dibuat.'); }
+        catch (e) { showNotification('Gagal membuat PDF: ' + e.message, 'error'); }
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyiapkan data kontrak.', 'error'); })
+        .getKontrakData(_woDetailCurrent.noWO);
+    };
+
+    function _woBuildKontrakPDF(d) {
+      var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      var PW = 210, PH = 297, ML = 20, MR = 20, CW = PW - ML - MR, BOTTOM = 280;
+      var y = 20, FS = 10, LH = 4.6;
+      doc.setFont('times', 'normal');
+
+      function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); y = 20; } }
+      function center(txt, size, bold) {
+        doc.setFont('times', bold ? 'bold' : 'normal'); doc.setFontSize(size || FS);
+        var lines = doc.splitTextToSize(txt, CW);
+        ensure(lines.length * (size ? size * 0.46 : LH));
+        lines.forEach(function(l) { doc.text(l, PW / 2, y, { align: 'center' }); y += (size ? size * 0.46 : LH); });
+      }
+      function para(txt, opts) {
+        opts = opts || {};
+        doc.setFont('times', opts.bold ? 'bold' : 'normal'); doc.setFontSize(FS);
+        var x = ML + (opts.indent || 0), w = CW - (opts.indent || 0);
+        var lines = doc.splitTextToSize(txt, w);
+        lines.forEach(function(l, i) {
+          ensure(LH);
+          // justify semua baris kecuali baris terakhir
+          if (opts.justify !== false && i < lines.length - 1) doc.text(l, x, y, { align: 'justify', maxWidth: w });
+          else doc.text(l, x, y);
+          y += LH;
+        });
+        y += (opts.gap == null ? 1.5 : opts.gap);
+      }
+      function kv(label, value) {
+        ensure(LH);
+        doc.setFont('times', 'normal'); doc.setFontSize(FS);
+        doc.text(label, ML, y);
+        var lx = ML + 22;
+        var lines = doc.splitTextToSize(value || '', CW - 22);
+        lines.forEach(function(l, i) { if (i > 0) { ensure(LH); } doc.text(l, lx, y); y += LH; });
+      }
+      function pasal(no, title) {
+        y += 2; ensure(LH * 2);
+        center('PASAL ' + no, FS, true);
+        center(title, FS, true);
+        y += 0.5;
+      }
+      // Daftar bernomor / berhuruf; items = array string.
+      function listed(items, style) {
+        doc.setFont('times', 'normal'); doc.setFontSize(FS);
+        items.forEach(function(it, idx) {
+          var mark = (style === 'a' ? String.fromCharCode(97 + idx) + '.' : (idx + 1) + '.');
+          var w = CW - 8;
+          var lines = doc.splitTextToSize(it, w);
+          lines.forEach(function(l, i) {
+            ensure(LH);
+            if (i === 0) doc.text(mark, ML, y);
+            if (i < lines.length - 1) doc.text(l, ML + 8, y, { align: 'justify', maxWidth: w });
+            else doc.text(l, ML + 8, y);
+            y += LH;
+          });
+          y += 1;
+        });
+      }
+
+      var np = d.namaProject || '-';
+      var tg = d.tanggal || {};
+      var kl = d.klien || {};
+      var tm = d.termin || {}, gr = d.garansi || {}, rk = d.rekening || {};
+      var nilai = d.nilaiKontrak || 0;
+      var nDp = Math.round(nilai * (tm.dp || 0) / 100);
+      var nTm = Math.round(nilai * (tm.termin || 0) / 100);
+      var nPl = Math.round(nilai * (tm.pelunasan || 0) / 100);
+      var lead = d.leadTimeHari || 0;
+
+      // ── Judul & pembuka ──
+      center('SURAT PERJANJIAN KONTRAK KERJA', 12, true);
+      center('PEMASANGAN ' + np.toUpperCase(), 12, true);
+      center('No: ' + (d.spkNomor || ''), FS, false);
+      y += 3;
+      para('Perjanjian ini dibuat dan ditandatangani pada hari ' + (tg.hari || '-') + ' tanggal ' + (tg.tgl || '-') + ' bulan ' + (tg.bulan || '-') + ' tahun ' + (tg.tahun || '-') + ' antara:');
+      kv('Nama', ':  ' + (kl.nama || '-'));
+      kv('Alamat', ':  ' + (kl.alamat || '-'));
+      para('Dalam Hal ini bertindak selaku pelanggan pemasangan ' + np + ' yang selanjutnya disebut sebagai PIHAK PERTAMA.');
+      kv('Nama', ':  Nur Ashri Kurnia Febrianti');
+      kv('Jabatan', ':  Direktur');
+      para('Dalam Hal ini bertindak selaku untuk dan atas nama Perseroan Terbatas PT. Renus Global Indonesia yang berkedudukan di Surabaya dan beralamat di Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari, Kec. Rungkut, Kota Surabaya, Jawa Timur 60293 selanjutnya disebut sebagai PIHAK KEDUA.');
+      para('Masing-masing PIHAK PERTAMA dan PIHAK KEDUA selanjutnya secara sendiri-sendiri disebut sebagai PIHAK dan secara bersama-sama disebut sebagai PARA PIHAK.');
+      para('Kedua belah pihak menerangkan terlebih dahulu hal-hal sebagai berikut:');
+      para('Bahwa PIHAK PERTAMA menyetujui untuk memberikan pekerjaan pemasangan instalasi ' + np + ' kepada PIHAK KEDUA, dan PIHAK KEDUA menerima pekerjaan pemasangan instalasi ' + np + '.');
+      para('PARA PIHAK sepakat untuk membuat Perjanjian pemasangan ' + np + ' dengan syarat-syarat dan ketentuan sebagai berikut:');
+
+      pasal(1, 'MACAM DAN TEMPAT PEKERJAAN');
+      para('PIHAK PERTAMA memberikan pekerjaan pada PIHAK KEDUA untuk melaksanakan pemasangan instalasi ' + np + ' yang berlokasi di ' + (kl.alamat || '-') + ' dengan sebaik-baiknya sesuai dengan spesifikasi teknis dan gambar terlampir yang telah disetujui oleh kedua belah pihak.');
+
+      pasal(2, 'WAKTU PELAKSANAAN PEKERJAAN');
+      para('Pekerjaan seperti yang tersebut dalam pasal 1 akan dimulai pada hari Surat Perjanjian Kontrak Kerja ini di tanda tangani dan harus diselesaikan dalam waktu maksimal ' + lead + ' (' + _kTerbilang(lead) + ') hari kerja.');
+
+      pasal(3, 'PELAKSANAAN PEKERJAAN');
+      listed([
+        'PIHAK KEDUA harus mulai melaksanakan pekerjaan sesuai tanggal yang ditetapkan bersama dan tidak dibenarkan melakukan penyimpangan atau pelanggaran terhadap ketentuan-ketentuan yang sudah ditetapkan bersama.',
+        'PIHAK KEDUA harus bekerja berdasarkan data-data yang lengkap dan tidak diperkenankan memutuskan sendiri perkara-perkara yang ada di luar gambar kerja (bestek) dan Rencana Anggaran yang sudah disepakati.',
+        'PIHAK PERTAMA harus memberikan detail spesifikasi material dan komponen yang dianggap perlu apabila belum tertera di gambar kerja maupun Rencana Anggaran.'
+      ]);
+
+      pasal(4, 'BIAYA PELAKSANAAN');
+      para('Biaya pelaksanaan pekerjaan pemasangan instalasi ' + np + ' tersebut adalah sebesar ' + _kRp(nilai) + ' (' + _kTerbilang(nilai) + ' rupiah).');
+      para('Harga tersebut sudah mencakup bahan material dan komponen utama, komponen pendukung panel surya, desain teknik, commissioning test, transportasi akomodasi, dan tidak termasuk PPN.');
+
+      pasal(5, 'PROSEDUR PENAGIHAN DAN PEMBAYARAN');
+      para('Prosedur pembayaran PIHAK PERTAMA pada PIHAK KEDUA sesuai dalam pasal 4 akan dilakukan secara bertahap sesuai 3 (tiga) termin yang disepakati bersama sebagai berikut:');
+      para('Termin I (satu)', { bold: true, gap: 0 });
+      para('Dibayarkan sebagai uang muka saat penandatanganan kontrak atau tanda jadi yaitu sebesar ' + (tm.dp || 0) + '% dari nilai kontrak: ' + _kRp(nDp));
+      para('Termin II (dua)', { bold: true, gap: 0 });
+      para('Dibayarkan setelah seluruh material tiba di lokasi pemasangan atau sebelum dilakukan pemasangan sebesar ' + (tm.termin || 0) + '% dari nilai kontrak: ' + _kRp(nTm));
+      para('Termin III (tiga)', { bold: true, gap: 0 });
+      para('Dibayarkan setelah seluruh pekerjaan selesai 100% (Commissioning Test dan tanda tangan Berita Acara Serah Terima) sebesar ' + (tm.pelunasan || 0) + '% dari nilai kontrak: ' + _kRp(nPl));
+      para('Pembayaran dapat dilakukan Tunai (Cash) ataupun Transfer ke:');
+      kv('Nama Bank', ':  ' + (rk.bank || rk.raw || '-'));
+      kv('No. Rekening', ':  ' + (rk.noRek || '-'));
+      kv('Atas Nama', ':  ' + (rk.atasNama || '-'));
+
+      pasal(6, 'MASA JAMINAN');
+      listed([
+        'Serah terima pekerjaan dilakukan oleh PIHAK PERTAMA dan PIHAK KEDUA.',
+        'Jaminan instalasi selama ' + (gr.instalasi || 0) + ' (' + _kTerbilang(gr.instalasi) + ') tahun (Vendor).',
+        'Jaminan panel surya selama ' + (gr.panel || 0) + ' (' + _kTerbilang(gr.panel) + ') tahun (Distributor).',
+        'Jaminan inverter selama ' + (gr.inverter || 0) + ' (' + _kTerbilang(gr.inverter) + ') tahun (Distributor).',
+        'Jaminan baterai selama ' + (gr.baterai || 0) + ' (' + _kTerbilang(gr.baterai) + ') tahun (Distributor).',
+        'Jaminan tidak berlaku jika terjadi keadaan Force Majeure.'
+      ]);
+
+      pasal(7, 'PROSEDUR KLAIM JAMINAN');
+      listed([
+        'Klaim jaminan instalasi pada pasal 6 ayat 2 dilakukan vendor datang ke lokasi pemasangan dengan biaya akomodasi teknisi ditanggung oleh PIHAK PERTAMA.',
+        'Klaim jaminan komponen pada pasal 6 ayat 3-5 dilakukan PIHAK PERTAMA mengirimkan unit kepada PIHAK KEDUA untuk dilakukan perbaikan, dengan biaya kirim dan balik ditanggung oleh PIHAK PERTAMA.',
+        'Klaim jaminan dapat dilakukan dengan prosedur sebagai berikut: (a) PIHAK PERTAMA mengumpulkan informasi dan dokumentasi permasalahan serta memastikan permasalahan tercakup dalam jaminan dan mengirimkannya kepada PIHAK KEDUA; (b) jika berada di luar kota, dapat melakukan panggilan telepon/video, dan PIHAK KEDUA memberikan instruksi diagnosis jarak jauh; (c) jika tidak dapat diselesaikan jarak jauh, PIHAK PERTAMA mengirimkan komponen bermasalah melalui ekspedisi terpercaya dengan kemasan yang baik; (d) jika perlu kunjungan teknisi, akan dijadwalkan perbaikan ke lokasi.'
+      ]);
+
+      pasal(8, 'PEKERJAAN TAMBAH KURANG');
+      listed([
+        'Jika di kemudian hari dalam proses pelaksanaan konstruksi terdapat pekerjaan tambah dan pekerjaan kurang akibat perubahan spesifikasi material bangunan atau gambar kerja, maka hal tersebut akan diatur dalam addendum tersendiri.',
+        'Setiap pekerjaan tambah atau kurang harus melalui dan dari PIHAK PERTAMA.',
+        'Pekerjaan tambah atau kurang yang melalui PIHAK KEDUA akibat masalah teknis, harus diberitahukan pada PIHAK PERTAMA.',
+        'PIHAK PERTAMA berhak tidak menyetujui, membongkar dan tidak mengganti biaya apabila terdapat pekerjaan tambah yang dilakukan PIHAK KEDUA tanpa sepengetahuan PIHAK PERTAMA.'
+      ]);
+
+      pasal(9, 'PENGAWAS LAPANGAN');
+      listed([
+        'Sebagai pengawas pekerjaan akan dilakukan langsung oleh PIHAK PERTAMA atau orang yang ditunjuk dan diberi kuasa oleh PIHAK KEDUA dan diberitahukan secara tertulis kepada PIHAK PERTAMA.',
+        'PIHAK PERTAMA berhak sewaktu-waktu mendatangi, mengawasi, memeriksa pekerjaan ataupun menanyakan kepada setiap pekerja lapangan (tukang atau mandor) yang berhubungan dengan pekerjaan tersebut.',
+        'PIHAK KEDUA harus bersedia jika diminta mendampingi oleh PIHAK PERTAMA dalam pengawasan pekerjaan di lokasi proyek.'
+      ]);
+
+      pasal(10, 'SUB KONTRAKTOR');
+      para('Keseluruhan pekerjaan merupakan tanggung jawab PIHAK KEDUA sepenuhnya, oleh karena itu tidak diperkenankan memberikan pekerjaan tersebut kepada pihak ketiga atau orang lain di luar Surat Perjanjian Kontrak Kerja ini.');
+
+      pasal(11, 'FORCE MAJEUR');
+      para('Yang dimaksud keadaan Force Majeure adalah berbagai keadaan yang mengganggu kelancaran pelaksanaan proyek seperti:');
+      listed([
+        'Bencana alam (gempa bumi, tanah longsor, angin topan, banjir, kebakaran, dll) yang bisa menyebabkan terganggunya jalannya proses konstruksi.',
+        'Kebijaksanaan pemerintah di bidang moneter (devaluasi) atau kenaikan harga BBM yang mengakibatkan proyek tersebut terganggu secara teknis maupun anggaran biaya.',
+        'Peperangan atau huru-hara yang mengakibatkan proyek tidak bisa dilanjutkan.',
+        'PIHAK KEDUA harus memberitahukan pada PIHAK PERTAMA tentang gangguan yang dimaksud beserta kendala dan akibat yang ditimbulkan paling lambat 2 x 24 jam terhitung sejak peristiwa tersebut terjadi, jika tidak maka akan dianggap tidak terjadi force majeur.',
+        'Jika terjadi force majeure, PIHAK KEDUA harus memberikan itikad baik mengenai kelanjutan proyek.',
+        'Dalam keadaan yang disebutkan, maka kedua belah pihak bisa bermusyawarah untuk kesepakatan dalam memutuskan keberlanjutan proyek.'
+      ]);
+
+      pasal(12, 'SANKSI-SANKSI');
+      listed([
+        'Apabila PIHAK KEDUA tidak sanggup memenuhi kesepakatan yang tercantum pada pasal 2 yaitu waktu pelaksanaan melebihi waktu yang disepakati bersama (' + lead + ' hari), maka PIHAK PERTAMA berhak mengklaim 1% dari nilai kontrak untuk setiap hari keterlambatan.',
+        'Keterlambatan pelaksanaan proyek dapat ditolerir apabila terjadi force majeure sesuai pasal 11 ayat 1.',
+        'Apabila kualitas pekerjaan yang dilaksanakan PIHAK KEDUA tidak sesuai dengan spesifikasi gambar kerja dan Rencana Anggaran, maka PIHAK PERTAMA berhak menunda pembayaran termin sampai kesepakatan lebih lanjut atau berhak memutuskan secara sepihak Surat Perjanjian Kontrak Kerja ini.',
+        'Apabila PIHAK PERTAMA lalai atau terlambat membayar termin kepada PIHAK KEDUA atas pekerjaan yang sesuai prosedur yang benar, maka PIHAK KEDUA berhak secara sepihak menghentikan jalannya proyek dengan sepengetahuan PIHAK PERTAMA (secara tertulis) sampai batas waktu yang ditentukan.',
+        'Sehubungan dengan ketentuan pada ayat 3 di atas, maka PIHAK PERTAMA mempunyai hak secara penuh untuk mencari dan menggunakan kontraktor lain untuk menggantikan pekerjaan PIHAK KEDUA dengan memberitahukannya terlebih dahulu.'
+      ]);
+
+      pasal(13, 'KEWAJIBAN PIHAK KEDUA');
+      listed([
+        'PIHAK KEDUA berkewajiban melaksanakan pekerjaan sesuai dengan spesifikasi yang telah tercantum pada gambar kerja dan Rencana Anggaran yang sudah disepakati bersama.',
+        'PIHAK KEDUA bisa mendatangkan/menambah tenaga kerja tanpa sepengetahuan PIHAK PERTAMA jika jadwal pelaksanaan sudah cenderung terlambat dari jadwal yang sudah disepakati bersama.',
+        'Pada saat berakhirnya masa kontrak, PIHAK KEDUA akan memberikan laporan performansi dan commissioning dari ' + np + ' kepada PIHAK PERTAMA.'
+      ]);
+
+      pasal(14, 'PERSELISIHAN');
+      para('Jika dalam menjalankan Surat Perjanjian Kontrak Kerja ini terdapat perselisihan atau perbedaan pendapat, maka kedua belah pihak akan menempuh jalan musyawarah mufakat. Apabila tidak tercapai, maka dapat dilimpahkan ke instansi yang berwenang.');
+
+      pasal(15, 'PENUTUP');
+      para('Jika terdapat hal-hal penting yang belum diatur dalam Surat Perjanjian Kontrak Kerja ini, maka kedua belah pihak secara mufakat akan menetapkan kemudian hari.');
+      para('Demikian Surat Perjanjian Kontrak Kerja ini dibuat dengan rangkap 2 (dua) bermaterai dan ditandatangani untuk masing-masing pihak dan merupakan surat perjanjian yang mengikat dan sah di mata hukum.');
+
+      // ── Tanda tangan ──
+      ensure(40); y += 6;
+      var colL = ML + 25, colR = PW - MR - 25;
+      doc.setFont('times', 'bold'); doc.setFontSize(FS);
+      doc.text('PIHAK PERTAMA', colL, y, { align: 'center' });
+      doc.text('PIHAK KEDUA', colR, y, { align: 'center' });
+      y += 26;
+      doc.setFont('times', 'normal');
+      doc.text('(………………………………)', colL, y, { align: 'center' });
+      doc.setFont('times', 'bold');
+      doc.text('Nur Ashri Kurnia Febrianti', colR, y, { align: 'center' });
+
+      // Footer nomor halaman
+      var tp = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= tp; p++) {
+        doc.setPage(p);
+        doc.setFont('times', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+        doc.text('Hal ' + p + ' / ' + tp, PW - MR, 289, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+      }
+
+      doc.save('Draft-Kontrak-' + (d.noWO || '') + '.pdf');
+    }
 
     function _catatanDariDetailWO() {
       if (!_woDetailCurrent) return;
