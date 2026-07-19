@@ -512,9 +512,16 @@ function _qcItemHtml(it) {
     // admin tetap boleh hapus (mis. utk membersihkan data percobaan).
     var del = (canUp && it.status !== 'NA' && (it.status !== 'Approved' || isAdmin)) ? '<button onclick="event.stopPropagation();_qcHapusFoto(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>' : '';
     var editedMark = f.editedBy ? '<span class="absolute bottom-0.5 left-0.5 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded" title="Diberi coretan oleh ' + _qcEsc(f.editedBy) + '"><i class="fa-solid fa-pen"></i></span>' : '';
-    return '<div class="relative">'
-      + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ', \'' + it.kode + '\')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
-      +   '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + editedMark + del + '</div>';
+    // Info singkat tiap foto: pengupload + tanggal (format sama spt di sheet).
+    var cap = (f.by || f.at)
+      ? '<p class="text-[9px] text-slate-400 mt-0.5 leading-tight break-words">' + (f.by ? '<span class="font-semibold text-slate-500">' + _qcEsc(f.by) + '</span>' : '') + (f.by && f.at ? ' · ' : '') + (f.at ? _qcEsc(f.at) : '') + '</p>'
+      : '';
+    return '<div class="w-20">'
+      + '<div class="relative">'
+      +   '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ', \'' + it.kode + '\')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
+      +     '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + editedMark + del
+      + '</div>' + cap
+      + '</div>';
   }).join('');
 
   var rejectNote = (it.status === 'Rejected' && it.catatanSPV)
@@ -563,19 +570,7 @@ function _qcItemHtml(it) {
       + '</div>'
     : '';
 
-  // Jejak audit: siapa mengupload & kapan, siapa mereview & kapan.
-  var metaRows = [];
-  if (it.uploadedBy || it.uploadedPada) {
-    metaRows.push('<div><i class="fa-solid fa-cloud-arrow-up mr-1.5 text-slate-300"></i>Diupload'
-      + (it.uploadedBy ? ' oleh <span class="font-semibold text-slate-500">' + _qcEsc(it.uploadedBy) + '</span>' : '')
-      + (it.uploadedPada ? ' · ' + _qcEsc(it.uploadedPada) : '') + '</div>');
-  }
-  if (it.reviewedBy || it.reviewedPada) {
-    metaRows.push('<div><i class="fa-solid fa-user-check mr-1.5 text-slate-300"></i>Direview'
-      + (it.reviewedBy ? ' oleh <span class="font-semibold text-slate-500">' + _qcEsc(it.reviewedBy) + '</span>' : '')
-      + (it.reviewedPada ? ' · ' + _qcEsc(it.reviewedPada) : '') + '</div>');
-  }
-  var metaHtml = metaRows.length ? '<div class="mt-2 text-[10px] text-slate-400 space-y-0.5">' + metaRows.join('') + '</div>' : '';
+  var metaHtml = _qcActivityHtml(it);
 
   return '<div class="px-5 py-3">'
     + '<div class="flex items-start justify-between gap-3">'
@@ -589,6 +584,37 @@ function _qcItemHtml(it) {
     + metaHtml
     + ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '')
     + reviewCtrl
+    + '</div>';
+}
+
+// Riwayat aktivitas per item: timeline event (upload/reject/approve/na) dgn
+// nama pelaku + waktu (format sama spt di sheet). Komentar reject selalu merah,
+// approve hijau — walau item sekarang sudah Approved, jejak reject tetap merah.
+function _qcActConfig(type) {
+  switch (type) {
+    case 'upload':  return { icon: 'fa-cloud-arrow-up', iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: 'mengunggah foto' };
+    case 'reject':  return { icon: 'fa-circle-xmark',   iconCls: 'text-rose-500',    textCls: 'text-rose-600',    noteCls: 'text-rose-600 font-medium',   verb: 'menolak (revisi)' };
+    case 'approve': return { icon: 'fa-circle-check',   iconCls: 'text-emerald-500', textCls: 'text-emerald-600', noteCls: 'text-emerald-600',            verb: 'menyetujui' };
+    case 'na':      return { icon: 'fa-ban',            iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: 'menandai Tidak Ada (N/A)' };
+    default:        return { icon: 'fa-circle',         iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: type || '-' };
+  }
+}
+function _qcActivityHtml(it) {
+  var acts = (it && it.activity) || [];
+  if (!acts.length) return '';
+  var rows = acts.map(function(ev) {
+    var c = _qcActConfig(ev.type);
+    var note = ev.note ? '<span class="' + c.noteCls + '"> — ' + _qcEsc(ev.note) + '</span>' : '';
+    return '<div class="flex items-start gap-2">'
+      + '<i class="fa-solid ' + c.icon + ' ' + c.iconCls + ' text-[10px] w-3 text-center mt-0.5"></i>'
+      + '<div class="flex-1 min-w-0 leading-snug">'
+      +   '<span class="' + c.textCls + '">' + (ev.by ? '<b class="font-semibold">' + _qcEsc(ev.by) + '</b> ' : '') + c.verb + '</span>' + note
+      +   '<span class="text-slate-300 ml-1 whitespace-nowrap">· ' + _qcEsc(ev.at || '') + '</span>'
+      + '</div></div>';
+  }).join('');
+  return '<div class="mt-3 border-t border-slate-100 pt-2.5">'
+    + '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Riwayat Aktivitas</p>'
+    + '<div class="space-y-1 text-[11px]">' + rows + '</div>'
     + '</div>';
 }
 

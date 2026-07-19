@@ -120,12 +120,27 @@ function _ensureQCMaster(ss) {
 function _ensureQCItemSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('QC_Item');
-  if (sheet) return sheet;
+  if (sheet) {
+    // Migrasi ringan: pastikan kolom 11 "Aktivitas" ada utk sheet lama.
+    if (sheet.getLastColumn() < 11) sheet.getRange(1, 11).setValue('Aktivitas');
+    return sheet;
+  }
   sheet = ss.insertSheet('QC_Item');
   sheet.appendRow(['ID', 'No WO', 'Kode', 'Foto', 'Status', 'Catatan SPV',
-    'Diupload Oleh', 'Diupload Pada', 'Direview Oleh', 'Direview Pada']);
-  sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
+    'Diupload Oleh', 'Diupload Pada', 'Direview Oleh', 'Direview Pada', 'Aktivitas']);
+  sheet.getRange(1, 1, 1, 11).setFontWeight('bold');
   return sheet;
+}
+
+// ── Log aktivitas per item (kolom 11, JSON array of {type,by,at,note}) ───────
+// type: 'upload' | 'reject' | 'approve' | 'na'. Dipakai utk timeline riwayat.
+function _qcParseActivity(cell) {
+  try { var a = JSON.parse(cell || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function _qcAppendActivity(sheet, rowIdx, ev) {
+  var cur = _qcParseActivity(sheet.getRange(rowIdx, 11).getValue());
+  cur.push(ev);
+  sheet.getRange(rowIdx, 11).setValue(JSON.stringify(cur));
 }
 
 function _getQCFolder(noWO) {
@@ -422,7 +437,8 @@ function _qcMergeItem(master, itemRow) {
     uploadedBy:   itemRow && itemRow[6] ? itemRow[6].toString() : '',
     uploadedPada: itemRow && itemRow[7] ? itemRow[7].toString() : '',
     reviewedBy:   itemRow && itemRow[8] ? itemRow[8].toString() : '',
-    reviewedPada: itemRow && itemRow[9] ? itemRow[9].toString() : ''
+    reviewedPada: itemRow && itemRow[9] ? itemRow[9].toString() : '',
+    activity:     itemRow ? _qcParseActivity(itemRow[10]) : []
   };
 }
 
@@ -496,15 +512,17 @@ function uploadQCFoto(payload) {
     var foto = { fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName,
                  by: (payload.oleh || '').toString(), at: when };
 
+    var uploadEv = { type: 'upload', by: foto.by, at: when, note: fileName };
     var arr;
     if (found) {
       arr = existing; arr.push(foto);
       sheet.getRange(found.rowIdx, 4).setValue(JSON.stringify(arr));      // Foto
       sheet.getRange(found.rowIdx, 5).setValue('Pending');                // Status
       sheet.getRange(found.rowIdx, 7, 1, 2).setValues([[foto.by, when]]); // Diupload Oleh/Pada
+      _qcAppendActivity(sheet, found.rowIdx, uploadEv);                   // Aktivitas
     } else {
       arr = [foto];
-      sheet.appendRow([_qcNextId(sheet), noWO, kode, JSON.stringify(arr), 'Pending', '', foto.by, when, '', '']);
+      sheet.appendRow([_qcNextId(sheet), noWO, kode, JSON.stringify(arr), 'Pending', '', foto.by, when, '', '', JSON.stringify([uploadEv])]);
     }
     return { success: true, message: 'Foto tersimpan.', foto: foto, status: 'Pending', foto_list: arr };
   } catch (e) {
@@ -623,6 +641,10 @@ function reviewQCItem(noWO, kode, keputusan, catatan, reviewer) {
     sheet.getRange(found.rowIdx, 5).setValue(keputusan);
     sheet.getRange(found.rowIdx, 6).setValue((catatan || '').toString());
     sheet.getRange(found.rowIdx, 9, 1, 2).setValues([[(reviewer || '').toString(), when]]);
+    _qcAppendActivity(sheet, found.rowIdx, {
+      type: keputusan === 'Approved' ? 'approve' : 'reject',
+      by: (reviewer || '').toString(), at: when, note: (catatan || '').toString()
+    });
     return { success: true, message: 'Item ' + kode + ' ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -641,11 +663,13 @@ function setQCItemNA(noWO, kode, isNA, oleh) {
     var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
     var found = _qcFindItemRow(sheet, noWO, kode);
     if (isNA) {
+      var naEv = { type: 'na', by: (oleh || '').toString(), at: when, note: '' };
       if (found) {
         sheet.getRange(found.rowIdx, 5).setValue('NA');
         sheet.getRange(found.rowIdx, 7, 1, 2).setValues([[(oleh || '').toString(), when]]);
+        _qcAppendActivity(sheet, found.rowIdx, naEv);
       } else {
-        sheet.appendRow([_qcNextId(sheet), noWO, kode, '[]', 'NA', '', (oleh || '').toString(), when, '', '']);
+        sheet.appendRow([_qcNextId(sheet), noWO, kode, '[]', 'NA', '', (oleh || '').toString(), when, '', '', JSON.stringify([naEv])]);
       }
     } else if (found) {
       var arr = _qcParseFoto(found.row[3]);
