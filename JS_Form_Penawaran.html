@@ -31,6 +31,7 @@
     if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
     _tcDropdownsLoaded = false;
     _loadTCDropdowns(tc);
+    _kIsiDataKontrak(tc.kontrak);
   } catch(e) {}
 
   // Diskon & pajak
@@ -311,6 +312,35 @@
 
       // Clear noPenawaran (kosong = penawaran baru, nomor di-generate server-side)
       document.getElementById('noPenawaran').value = '';
+      _kHitungTermin();
+    }
+
+    // ── Data Kontrak (utk generate Surat Perjanjian Kontrak) ──────────────
+    function _kNum(id, def) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? (def || 0) : v; }
+    function _kHitungTermin() {
+      var info = document.getElementById('k_terminInfo'); if (!info) return;
+      var t = _kNum('k_terminDP', 0) + _kNum('k_terminTermin', 0) + _kNum('k_terminPelunasan', 0);
+      var rounded = Math.round(t * 100) / 100;
+      var ok = Math.abs(rounded - 100) < 0.01;
+      info.textContent = 'Total: ' + rounded + '%' + (ok ? '' : ' — harus 100%');
+      info.className = 'text-[11px] font-semibold mt-1.5 ' + (ok ? 'text-emerald-600' : 'text-rose-600');
+    }
+    function _kAmbilDataKontrak() {
+      return {
+        terminDP: _kNum('k_terminDP', 30), terminTermin: _kNum('k_terminTermin', 50), terminPelunasan: _kNum('k_terminPelunasan', 20),
+        leadTimeHari: _kNum('k_leadTime', 14),
+        garansiInstalasi: _kNum('k_garInstalasi', 1), garansiPanel: _kNum('k_garPanel', 15),
+        garansiInverter: _kNum('k_garInverter', 5), garansiBaterai: _kNum('k_garBaterai', 5)
+      };
+    }
+    function _kIsiDataKontrak(k) {
+      k = k || {};
+      var set = function(id, v, def) { var el = document.getElementById(id); if (el) el.value = (v || v === 0) ? v : def; };
+      set('k_terminDP', k.terminDP, 30); set('k_terminTermin', k.terminTermin, 50); set('k_terminPelunasan', k.terminPelunasan, 20);
+      set('k_leadTime', k.leadTimeHari, 14);
+      set('k_garInstalasi', k.garansiInstalasi, 1); set('k_garPanel', k.garansiPanel, 15);
+      set('k_garInverter', k.garansiInverter, 5); set('k_garBaterai', k.garansiBaterai, 5);
+      _kHitungTermin();
     }
 
     function handleFormSubmission(e) {
@@ -318,6 +348,8 @@
       if(!document.getElementById('klienSelect').value) return showNotification("Silakan hubungkan Klien!", "error");
       if(!document.getElementById('channelMarketing').value) return showNotification("Silakan pilih Channel Marketing!", "error");
       const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
+      var _kt = _kAmbilDataKontrak();
+      if (Math.abs((_kt.terminDP + _kt.terminTermin + _kt.terminPelunasan) - 100) > 0.01) return showNotification("Total persen termin (Data Kontrak) harus 100%.", "error");
 
       const payload = {
         noPenawaran: document.getElementById('noPenawaran').value, tanggal: document.getElementById('tglPenawaran').value, validUntil: document.getElementById('validUntil').value,
@@ -329,7 +361,8 @@
           final_pay: document.getElementById('tc_final').value, delivery_time: document.getElementById('tc_delivery_time').value, delivery_cond: document.getElementById('tc_delivery_cond').value,
           warranty: document.getElementById('tc_warranty').value, bonus: document.getElementById('tc_bonus').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
           diskonNominal: kalkulasiGlobalState.diskonNominal, pajakPersen: parseFloat(document.getElementById('inputPajakPersen').value) ||0, pajakNominal: kalkulasiGlobalState.pajakNominal,
-          hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0
+          hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0,
+          kontrak: _kAmbilDataKontrak()
         }, items: []
       };
 

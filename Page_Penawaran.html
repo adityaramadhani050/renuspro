@@ -255,6 +255,35 @@
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Paket Bonus</label><select id="tc_bonus" class="input-field py-1.5 text-sm"></select></div>
                 </div>
               </div>
+
+              <!-- DATA KONTRAK: dipakai utk generate Surat Perjanjian Kontrak otomatis -->
+              <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
+                <h2 class="text-sm font-bold text-slate-900 mb-1 border-b border-slate-100 pb-2"><i class="fa-solid fa-file-contract mr-2 text-blue-600"></i>Data Kontrak</h2>
+                <p class="text-[11px] text-slate-400 mb-4">Dipakai untuk generate Surat Perjanjian Kontrak secara otomatis. Nominal termin dihitung dari nilai kontrak.</p>
+
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2">Termin Pembayaran (%)</p>
+                <div class="grid grid-cols-3 gap-3">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">DP</label><input type="number" step="any" min="0" max="100" id="k_terminDP" value="30" oninput="_kHitungTermin()" class="input-field py-1.5 text-sm"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Termin 2</label><input type="number" step="any" min="0" max="100" id="k_terminTermin" value="50" oninput="_kHitungTermin()" class="input-field py-1.5 text-sm"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pelunasan</label><input type="number" step="any" min="0" max="100" id="k_terminPelunasan" value="20" oninput="_kHitungTermin()" class="input-field py-1.5 text-sm"></div>
+                </div>
+                <p id="k_terminInfo" class="text-[11px] font-semibold text-slate-400 mt-1.5">Total: 100%</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lead Time (hari kerja)</label>
+                    <input type="number" step="1" min="1" id="k_leadTime" value="14" class="input-field py-1.5 text-sm">
+                  </div>
+                </div>
+
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2 mt-4">Garansi (tahun)</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Instalasi</label><input type="number" step="any" min="0" id="k_garInstalasi" value="1" class="input-field py-1.5 text-sm"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Panel Surya</label><input type="number" step="any" min="0" id="k_garPanel" value="15" class="input-field py-1.5 text-sm"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Inverter</label><input type="number" step="any" min="0" id="k_garInverter" value="5" class="input-field py-1.5 text-sm"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Baterai</label><input type="number" step="any" min="0" id="k_garBaterai" value="5" class="input-field py-1.5 text-sm"></div>
+                </div>
+              </div>
             </div>
 
             <!-- TOMBOL SUBMIT -->
