@@ -1177,6 +1177,7 @@ function _ssBuildPDF(d) {
   //  - >= 3 foto      → 2 kolom; bila jumlah ganjil, foto terakhir lebar penuh.
   var _SS_PH_GAP = 8, _SS_PH_MAXH_FULL = 135, _SS_PH_MAXH_HALF = 95;
   var _SS_CAP_FS = 8.5, _SS_CAP_LH = 3.8;   // font & tinggi baris caption foto
+  var _SS_CAP_PADX = 2.5, _SS_CAP_PADY = 1.8, _SS_CAP_GAP = 2; // latar kotak caption
   function _ssPhotoDims(f, boxW, maxH) {
     var iw = 4, ih = 3;
     try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
@@ -1186,9 +1187,10 @@ function _ssBuildPDF(d) {
   }
   function _ssPhotoCapLines(f, boxW) {
     if (!f.caption) return [];
-    // Set font caption dulu agar wrapping (splitTextToSize) sesuai ukuran render.
+    // Set font caption dulu agar wrapping (splitTextToSize) sesuai ukuran render;
+    // lebar dikurangi padding kotak latar.
     doc.setFont('helvetica','normal'); doc.setFontSize(_SS_CAP_FS);
-    var cap = doc.splitTextToSize(f.caption, boxW);
+    var cap = doc.splitTextToSize(f.caption, boxW - _SS_CAP_PADX * 2);
     if (cap.length > 6) { cap = cap.slice(0, 6); cap[5] = cap[5].replace(/.{0,3}$/, '...'); }
     return cap;
   }
@@ -1200,7 +1202,7 @@ function _ssBuildPDF(d) {
     var cells = row.map(function (f) {
       var d = _ssPhotoDims(f, boxW, maxH);
       var cap = _ssPhotoCapLines(f, boxW);
-      return { f: f, w: d.w, h: d.h, cap: cap, blockH: d.h + (cap.length ? cap.length * _SS_CAP_LH + 1.5 : 0) };
+      return { f: f, w: d.w, h: d.h, cap: cap, blockH: d.h + (cap.length ? _SS_CAP_GAP + cap.length * _SS_CAP_LH + _SS_CAP_PADY * 2 : 0) };
     });
     return { boxW: boxW, cells: cells, rowH: cells.reduce(function (m, c) { return Math.max(m, c.blockH); }, 0) };
   }
@@ -1236,8 +1238,14 @@ function _ssBuildPDF(d) {
         try { doc.addImage(c.f.dataUrl, drawX, y, c.w, c.h); } catch (e) {}
         doc.setDrawColor(226,232,240); doc.rect(drawX, y, c.w, c.h);
         if (c.cap.length) {
+          // Latar kotak abu-biru muda (slate-50) + border tipis, seperti kartu
+          // data section — agar keterangan foto tampak sebagai satu unit.
+          var capTop = y + c.h + _SS_CAP_GAP;
+          var capBoxH = c.cap.length * _SS_CAP_LH + _SS_CAP_PADY * 2;
+          doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240);
+          doc.roundedRect(colX, capTop, m.boxW, capBoxH, 1.5, 1.5, 'FD');
           doc.setFont('helvetica','normal'); doc.setFontSize(_SS_CAP_FS); doc.setTextColor(71, 85, 105);
-          doc.text(c.cap, colX, y + c.h + 4, { lineHeightFactor: 1.25 });
+          doc.text(c.cap, colX + _SS_CAP_PADX, capTop + _SS_CAP_PADY + 2.6, { lineHeightFactor: 1.27 });
         }
       });
       y += m.rowH + 6;
