@@ -303,8 +303,8 @@ var _SS_STEP_REQUIRED = {
   2: {
     fields: [
       { id: 'ss-idPelangganPLN', label: 'ID Pelanggan PLN' },
-      { id: 'ss-dayaPLN', label: 'Daya PLN' },
       { id: 'ss-phase', label: 'Phase Listrik' },
+      { id: 'ss-dayaPLN', label: 'Daya PLN' },
       { id: 'ss-ratingBreaker', label: 'Rating Breaker Utama' }
     ],
     fotos: [{ key: 'fotoKwh', label: 'Foto kWh Meter' }, { key: 'fotoPHB', label: 'Foto Panel Hubung Bagi (PHB)' }]
@@ -388,33 +388,54 @@ function _ssGeoErrMsg(err) {
   return err.message || 'Kesalahan tidak diketahui.';
 }
 
-// GPS presisi tinggi bisa lambat/timeout (sinyal lemah, dalam ruangan). Coba
-// dulu dgn presisi tinggi; kalau timeout/tidak tersedia, coba ulang dgn
-// presisi lebih longgar (lebih cepat & toleran) sebelum benar-benar gagal.
+// Strategi berjenjang biar andal walau sinyal GPS lemah / dalam ruangan.
+// Urutan sengaja: mulai dari yg PALING mungkin berhasil cepat (terima fix
+// yg baru saja tersimpan / akurasi longgar) baru naik ke presisi tinggi.
+// Ini menghindari "timeout" beruntun saat menunggu fix GPS baru yg lambat —
+// penyebab umum error "gagal mendapatkan lokasi" padahal izin sudah aktif.
+var _SS_GEO_ATTEMPTS = [
+  { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }, // cepat: terima fix s/d 10 menit terakhir
+  { enableHighAccuracy: true,  timeout: 15000, maximumAge: 0 },      // presisi tinggi (fix baru)
+  { enableHighAccuracy: false, timeout: 25000, maximumAge: 30000 }   // longgar & sabar (fallback terakhir)
+];
+
 // opts.silent = true: dipanggil otomatis di background (cek izin saat form
-// dibuka) — tak menampilkan loader/notifikasi error, cukup diam2 gagal.
+// dibuka) — tak menampilkan loader/notifikasi error, cukup diam2 gagal & cukup
+// 1 percobaan cepat (tak usah eskalasi supaya tidak menahan lama di background).
 function _ssAmbilLokasi(opts) {
   opts = opts || {};
   if (!navigator.geolocation) { if (!opts.silent) showNotification('Geolocation tidak didukung perangkat ini.', 'error'); return; }
+  var attempts = opts.silent ? [_SS_GEO_ATTEMPTS[0]] : _SS_GEO_ATTEMPTS;
   if (!opts.silent) toggleLoader(true, 'Mengambil lokasi...');
-  navigator.geolocation.getCurrentPosition(function(pos) {
-    if (!opts.silent) toggleLoader(false);
-    _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 18 });
-  }, function(err) {
-    if (err.code !== err.TIMEOUT && err.code !== err.POSITION_UNAVAILABLE) {
-      if (!opts.silent) { toggleLoader(false); showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err), 'error'); }
-      return;
-    }
-    if (opts.silent) return; // jangan retry berulang di background — cukup coba sekali
-    toggleLoader(true, 'Mencoba lagi dengan akurasi lebih longgar...');
+  var i = 0;
+  function tryNext() {
+    var cfg = attempts[i];
     navigator.geolocation.getCurrentPosition(function(pos) {
-      toggleLoader(false);
-      _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: 16 });
-    }, function(err2) {
-      toggleLoader(false);
-      showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err2) + '. Coba lagi, atau pilih titik langsung di peta / input manual.', 'error');
-    }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
-  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      if (!opts.silent) toggleLoader(false);
+      _ssSetLatLng(pos.coords.latitude, pos.coords.longitude, { zoom: cfg.enableHighAccuracy ? 18 : 16 });
+    }, function(err) {
+      // Izin ditolak = final; retry percuma. Beri arahan yg jelas.
+      if (err.code === err.PERMISSION_DENIED) {
+        if (!opts.silent) {
+          toggleLoader(false);
+          showNotification('Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser, muat ulang halaman, lalu coba lagi — atau pilih titik langsung di peta / isi manual.', 'error');
+        }
+        return;
+      }
+      // Timeout / posisi tak tersedia → coba konfigurasi berikutnya.
+      i++;
+      if (i < attempts.length) {
+        if (!opts.silent) toggleLoader(true, 'Mencoba lagi (' + (i + 1) + '/' + attempts.length + ')...');
+        tryNext();
+        return;
+      }
+      if (!opts.silent) {
+        toggleLoader(false);
+        showNotification('Gagal mengambil lokasi: ' + _ssGeoErrMsg(err) + '. Coba lagi, atau pilih titik langsung di peta / isi manual.', 'error');
+      }
+    }, cfg);
+  }
+  tryNext();
 }
 
 // Cek status izin lokasi tiap kali form dibuka. Kalau belum pernah
