@@ -7,6 +7,13 @@
         <!-- HOME: ringkasan + daftar Work Order -->
         <div id="qc-home">
           <div id="qc-cards" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5"></div>
+
+          <!-- Antrean Review & Kinerja Tim (khusus Lead Engineer/Admin) -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+            <div id="qc-review-queue-wrap" class="hidden bg-white rounded-2xl border border-slate-150 p-5"></div>
+            <div id="qc-team-wrap" class="hidden bg-white rounded-2xl border border-slate-150 p-5"></div>
+          </div>
+
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
             <div class="relative w-full sm:w-72">
               <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>

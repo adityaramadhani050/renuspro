@@ -76,6 +76,8 @@ window.loadQC = function() {
     _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _qcWOList = _qcDash.perWO || [];
     _qcRenderCards();
+    _qcRenderReviewQueue();
+    _qcRenderTeamStats();
     _qcPopulateFilter();
     _qcRenderWOList();
   }).withFailureHandler(function() {
@@ -95,6 +97,82 @@ function _qcRenderCards() {
     + _qcCard('Approved', g.approved || 0, 'text-emerald-500', 'fa-circle-check')
     + _qcCard('Pending', g.pending || 0, 'text-amber-500', 'fa-clock')
     + _qcCard('Rejected', g.rejected || 0, 'text-rose-500', 'fa-circle-xmark');
+}
+
+// Umur pending → label & warna (semakin lama semakin merah).
+function _qcAgeLabel(d) {
+  if (d == null) return { txt: '-', cls: 'text-slate-400 bg-slate-100' };
+  if (d <= 0) return { txt: 'hari ini', cls: 'text-emerald-700 bg-emerald-50' };
+  if (d === 1) return { txt: '1 hari', cls: 'text-amber-700 bg-amber-50' };
+  if (d <= 3) return { txt: d + ' hari', cls: 'text-amber-700 bg-amber-50' };
+  return { txt: d + ' hari', cls: 'text-rose-700 bg-rose-50' };
+}
+
+// ── Antrean Review + Umur Pending (Lead Engineer/Admin) ────────────────────
+function _qcRenderReviewQueue() {
+  var wrap = document.getElementById('qc-review-queue-wrap');
+  if (!wrap) return;
+  if (!_qcCanReview()) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  var q = (_qcDash && _qcDash.reviewQueue) || [];
+  var head = '<div class="flex items-center justify-between mb-3">'
+    + '<p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-list-check text-amber-500 text-[11px]"></i> Antrean Review</p>'
+    + '<span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ' + (q.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700') + '">' + q.length + ' menunggu</span>'
+    + '</div>';
+  if (!q.length) {
+    wrap.innerHTML = head + '<div class="text-center py-6 text-slate-400 text-xs"><i class="fa-solid fa-circle-check text-2xl mb-2 opacity-30 block text-emerald-400"></i>Tidak ada item menunggu review.</div>';
+    return;
+  }
+  var LIMIT = 12;
+  var rows = q.slice(0, LIMIT).map(function(it) {
+    var a = _qcAgeLabel(it.ageDays);
+    return '<button onclick="bukaQCDetail(\'' + _qcEsc(it.noWO) + '\')" class="w-full text-left flex items-center gap-2 bg-slate-50 hover:bg-amber-50 border border-slate-100 rounded-xl px-3 py-2 transition">'
+      + '<div class="min-w-0 flex-1">'
+      +   '<p class="text-xs font-semibold text-slate-700 truncate"><span class="font-mono text-[10px] text-slate-400 mr-1">' + _qcEsc(it.kode) + '</span>' + _qcEsc(it.label) + '</p>'
+      +   '<p class="text-[10px] text-slate-400 truncate">' + _qcEsc(it.noWO) + (it.namaProject ? ' · ' + _qcEsc(it.namaProject) : '') + (it.uploadedBy ? ' · ' + _qcEsc(it.uploadedBy) : '') + '</p>'
+      + '</div>'
+      + '<span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-lg ' + a.cls + '">' + a.txt + '</span>'
+      + '</button>';
+  }).join('');
+  var more = q.length > LIMIT ? '<p class="text-[11px] text-slate-400 text-center mt-2">dan ' + (q.length - LIMIT) + ' item lainnya…</p>' : '';
+  wrap.innerHTML = head + '<div class="space-y-1.5 max-h-80 overflow-y-auto">' + rows + '</div>' + more;
+}
+
+// ── Kinerja & Beban Tim per Site Engineer (Lead Engineer/Admin) ────────────
+function _qcRenderTeamStats() {
+  var wrap = document.getElementById('qc-team-wrap');
+  if (!wrap) return;
+  if (!_qcCanReview()) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  var team = (_qcDash && _qcDash.teamStats) || [];
+  var head = '<div class="flex items-center justify-between mb-3">'
+    + '<p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-users-gear text-indigo-500 text-[11px]"></i> Kinerja &amp; Beban Tim</p>'
+    + '<span class="text-[11px] font-bold text-slate-400">' + team.length + ' engineer</span>'
+    + '</div>';
+  if (!team.length) {
+    wrap.innerHTML = head + '<div class="text-center py-6 text-slate-400 text-xs"><i class="fa-solid fa-user-helmet-safety text-2xl mb-2 opacity-30 block"></i>Belum ada aktivitas tim.</div>';
+    return;
+  }
+  var rows = team.map(function(t) {
+    var ftr = t.ftrPct == null ? '—' : t.ftrPct + '%';
+    var rej = t.rejectRatePct == null ? '—' : t.rejectRatePct + '%';
+    var ftrCls = t.ftrPct == null ? 'text-slate-400' : (t.ftrPct >= 80 ? 'text-emerald-600' : (t.ftrPct >= 50 ? 'text-amber-600' : 'text-rose-600'));
+    var rejCls = t.rejectRatePct == null ? 'text-slate-400' : (t.rejectRatePct <= 15 ? 'text-emerald-600' : (t.rejectRatePct <= 35 ? 'text-amber-600' : 'text-rose-600'));
+    return '<div class="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">'
+      + '<div class="flex items-center justify-between gap-2 mb-1.5">'
+      +   '<p class="text-xs font-bold text-slate-700 truncate"><i class="fa-solid fa-user-helmet-safety text-indigo-300 mr-1"></i>' + _qcEsc(t.nama) + '</p>'
+      +   '<span class="text-[10px] font-bold text-slate-400 shrink-0">' + t.items + ' item · ' + t.woCount + ' WO</span>'
+      + '</div>'
+      + '<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold">'
+      +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + t.approved + '</span>'
+      +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + t.pending + '</span>'
+      +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + t.rejected + '</span>'
+      +   '<span class="ml-auto ' + ftrCls + '" title="Lolos sekali review (tanpa revisi)">FTR ' + ftr + '</span>'
+      +   '<span class="' + rejCls + '" title="Tingkat penolakan">Tolak ' + rej + '</span>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+  wrap.innerHTML = head + '<div class="space-y-1.5 max-h-80 overflow-y-auto">' + rows + '</div>';
 }
 
 // ── Tambah Project ke QC (Lead Engineer / Admin) ──────────────────────────

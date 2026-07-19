@@ -884,6 +884,14 @@ function removeQCProject(noWO) {
 
 // ── Dashboard: ringkasan WO (opsional filter utk site engineer) ─────────────
 // opts.siteUserId → hanya WO yang di-assign ke user itu.
+// Parse timestamp "dd/MM/yyyy HH:mm" (format yg disimpan di sheet) → Date|null.
+function _qcParseTs(s) {
+  s = (s || '').toString().trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), 0);
+}
+
 function getQCDashboard(opts) {
   try {
     var ss = getSpreadsheet();
@@ -891,23 +899,9 @@ function getQCDashboard(opts) {
     // item WAJIB dibagi total item wajib — item opsional/N-A tak masuk hitungan.
     var master = getQCChecklist().list;
     var masterCount = master.length;
-    var wajibTotal = 0, wajibKode = {};
-    master.forEach(function (m) { if (m.wajib) { wajibTotal++; wajibKode[m.kode] = true; } });
-    var itemSheet = _ensureQCItemSheet(ss);
-    var data = itemSheet.getDataRange().getValues();
-    var byWO = {};
-    for (var i = 1; i < data.length; i++) {
-      var w = (data[i][1] || '').toString().trim();
-      if (!w) continue;
-      if (!byWO[w]) byWO[w] = { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
-      var st = (data[i][4] || '').toString();
-      var kd = (data[i][2] || '').toString().trim();
-      byWO[w].touched++;
-      if (st === 'Approved') { byWO[w].approved++; if (wajibKode[kd]) byWO[w].wajibApproved++; }
-      else if (st === 'Pending') byWO[w].pending++;
-      else if (st === 'Rejected') byWO[w].rejected++;
-      else if (st === 'NA') byWO[w].na++;
-    }
+    var wajibTotal = 0, wajibKode = {}, labelMap = {};
+    master.forEach(function (m) { labelMap[m.kode] = m.label; if (m.wajib) { wajibTotal++; wajibKode[m.kode] = true; } });
+
     var assignedMap = _qcAssignedMap();
     var siteUserId = (opts && opts.siteUserId) ? opts.siteUserId.toString().trim() : '';
     // Hanya WO yang terdaftar di QC (bukan seluruh WO). Nama project/klien pakai
@@ -920,6 +914,54 @@ function getQCDashboard(opts) {
         return (assignedMap[wo.noWO] || []).some(function (a) { return a.id === siteUserId; });
       });
     }
+    var visible = {}, woName = {};
+    woList.forEach(function (wo) { visible[wo.noWO] = true; woName[wo.noWO] = wo.namaProject; });
+
+    var itemSheet = _ensureQCItemSheet(ss);
+    var data = itemSheet.getDataRange().getValues();
+    var now = new Date();
+    var byWO = {}, reviewQueue = [], teamAgg = {};
+    for (var i = 1; i < data.length; i++) {
+      var w = (data[i][1] || '').toString().trim();
+      if (!w || !visible[w]) continue;
+      if (!byWO[w]) byWO[w] = { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
+      var st = (data[i][4] || '').toString();
+      var kd = (data[i][2] || '').toString().trim();
+      byWO[w].touched++;
+      if (st === 'Approved') { byWO[w].approved++; if (wajibKode[kd]) byWO[w].wajibApproved++; }
+      else if (st === 'Pending') byWO[w].pending++;
+      else if (st === 'Rejected') byWO[w].rejected++;
+      else if (st === 'NA') byWO[w].na++;
+
+      var upBy = (data[i][6] || '').toString().trim();
+      var upPada = (data[i][7] || '').toString().trim();
+      var acts = _qcParseActivity(data[i][10]);
+
+      // Antrean review: item Pending (menunggu keputusan Lead) + umur menunggu.
+      if (st === 'Pending') {
+        var ts = _qcParseTs(upPada);
+        reviewQueue.push({
+          noWO: w, namaProject: woName[w] || '', kode: kd, label: labelMap[kd] || kd,
+          uploadedBy: upBy, uploadedPada: upPada,
+          ageDays: ts ? Math.floor((now - ts) / 86400000) : null
+        });
+      }
+
+      // Statistik tim: diatribusikan ke pengupload terakhir (Diupload Oleh).
+      if (upBy) {
+        var t = teamAgg[upBy] || (teamAgg[upBy] = { nama: upBy, items: 0, approved: 0, pending: 0, rejected: 0, ftr: 0, reviewed: 0, everRejected: 0, wos: {} });
+        t.items++; t.wos[w] = true;
+        if (st === 'Approved') t.approved++;
+        else if (st === 'Pending') t.pending++;
+        else if (st === 'Rejected') t.rejected++;
+        var hasReject = acts.some(function (e) { return e.type === 'reject'; });
+        var hasReview = acts.some(function (e) { return e.type === 'reject' || e.type === 'approve'; });
+        if (hasReview) t.reviewed++;
+        if (hasReject) t.everRejected++;
+        if (st === 'Approved' && !hasReject) t.ftr++;   // lolos sekali review (tanpa revisi)
+      }
+    }
+
     var global = { totalWO: 0, approved: 0, pending: 0, rejected: 0, belum: 0 };
     var perWO = woList.map(function (wo) {
       var g = byWO[wo.noWO] || { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
@@ -934,7 +976,19 @@ function getQCDashboard(opts) {
       };
     });
     perWO.sort(function (a, b) { return (b.pending + b.rejected) - (a.pending + a.rejected); });
-    return { success: true, global: global, perWO: perWO };
+
+    reviewQueue.sort(function (a, b) { return (b.ageDays == null ? -1 : b.ageDays) - (a.ageDays == null ? -1 : a.ageDays); });
+    var teamStats = Object.keys(teamAgg).map(function (name) {
+      var t = teamAgg[name];
+      return {
+        nama: t.nama, items: t.items, approved: t.approved, pending: t.pending, rejected: t.rejected,
+        woCount: Object.keys(t.wos).length,
+        ftrPct: t.approved ? Math.round(t.ftr / t.approved * 100) : null,
+        rejectRatePct: t.reviewed ? Math.round(t.everRejected / t.reviewed * 100) : null
+      };
+    }).sort(function (a, b) { return b.items - a.items; });
+
+    return { success: true, global: global, perWO: perWO, reviewQueue: reviewQueue, teamStats: teamStats };
   } catch (e) {
     return { success: false, message: e.toString(), global: {}, perWO: [] };
   }
