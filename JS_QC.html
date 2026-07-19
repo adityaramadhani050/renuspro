@@ -215,8 +215,14 @@ function _qcRenderWOList() {
       + '<div class="flex items-center gap-3 w-full sm:w-auto">'
       +   '<div class="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5 flex-1 sm:flex-none w-full sm:w-auto">'
       +     '<div class="flex flex-wrap gap-1 flex-1 min-w-0 sm:flex-none sm:justify-end">' + seBadges + '</div>'
-      +     '<div class="w-28 shrink-0"><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
-      +       '<div class="text-[10px] text-slate-400 mt-1 text-right">' + w.approved + '/' + w.total + ' approved</div></div>'
+      +     '<div class="shrink-0 text-right">'
+      +       '<div class="w-28 h-2 rounded-full bg-slate-100 overflow-hidden ml-auto"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
+      +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">'
+      +         '<span class="text-emerald-600" title="Approved"><i class="fa-solid fa-circle-check"></i> ' + (w.approved || 0) + '</span>'
+      +         ((w.pending || 0) ? '<span class="text-amber-600" title="Pending — perlu direview"><i class="fa-solid fa-clock"></i> ' + w.pending + '</span>' : '')
+      +         ((w.rejected || 0) ? '<span class="text-rose-600" title="Rejected"><i class="fa-solid fa-circle-xmark"></i> ' + w.rejected + '</span>' : '')
+      +       '</div>'
+      +     '</div>'
       +   '</div>'
       +   removeBtn
       +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
@@ -451,9 +457,14 @@ function _qcRenderDetailBody() {
   document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
     var ap = 0, rej = 0, pen = 0;
     g.items.forEach(function(it) { if (it.status === 'Approved') ap++; else if (it.status === 'Rejected') rej++; else if (it.status === 'Pending') pen++; });
-    var mini = '<span class="text-[10px] font-bold text-slate-400 ml-2">' + ap + '/' + g.items.length + '</span>'
-      + (rej ? '<span class="text-[10px] font-bold text-rose-600 ml-1"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>' : '')
-      + (pen ? '<span class="text-[10px] font-bold text-amber-600 ml-1"><i class="fa-solid fa-clock"></i> ' + pen + '</span>' : '');
+    // Semua item section tuntas (Approved atau N/A, tak ada Pending/Rejected/
+    // Belum) → badge "Approved" hijau. Selain itu tampilkan hitungan ringkas.
+    var allDone = g.items.length > 0 && g.items.every(function(it) { return it.status === 'Approved' || it.status === 'NA'; });
+    var mini = allDone
+      ? '<span class="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><i class="fa-solid fa-circle-check mr-0.5"></i>Approved</span>'
+      : '<span class="text-[10px] font-bold text-slate-400 ml-2">' + ap + '/' + g.items.length + '</span>'
+        + (rej ? '<span class="text-[10px] font-bold text-rose-600 ml-1"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>' : '')
+        + (pen ? '<span class="text-[10px] font-bold text-amber-600 ml-1"><i class="fa-solid fa-clock"></i> ' + pen + '</span>' : '');
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<button onclick="_qcToggleSection(\'' + g.section + '\')" class="w-full flex items-center gap-1 px-5 py-3.5 hover:bg-slate-50 transition text-left">'
       +   '<span class="font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</span>' + mini
