@@ -878,17 +878,23 @@ function removeQCProject(noWO) {
 function getQCDashboard(opts) {
   try {
     var ss = getSpreadsheet();
-    var masterCount = getQCChecklist().list.length;
+    // % memakai rumus yang SAMA dgn detail (_qcCountSummary): approved di antara
+    // item WAJIB dibagi total item wajib — item opsional/N-A tak masuk hitungan.
+    var master = getQCChecklist().list;
+    var masterCount = master.length;
+    var wajibTotal = 0, wajibKode = {};
+    master.forEach(function (m) { if (m.wajib) { wajibTotal++; wajibKode[m.kode] = true; } });
     var itemSheet = _ensureQCItemSheet(ss);
     var data = itemSheet.getDataRange().getValues();
     var byWO = {};
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][1] || '').toString().trim();
       if (!w) continue;
-      if (!byWO[w]) byWO[w] = { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0 };
+      if (!byWO[w]) byWO[w] = { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
       var st = (data[i][4] || '').toString();
+      var kd = (data[i][2] || '').toString().trim();
       byWO[w].touched++;
-      if (st === 'Approved') byWO[w].approved++;
+      if (st === 'Approved') { byWO[w].approved++; if (wajibKode[kd]) byWO[w].wajibApproved++; }
       else if (st === 'Pending') byWO[w].pending++;
       else if (st === 'Rejected') byWO[w].rejected++;
       else if (st === 'NA') byWO[w].na++;
@@ -907,9 +913,9 @@ function getQCDashboard(opts) {
     }
     var global = { totalWO: 0, approved: 0, pending: 0, rejected: 0, belum: 0 };
     var perWO = woList.map(function (wo) {
-      var g = byWO[wo.noWO] || { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0 };
+      var g = byWO[wo.noWO] || { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
       var belum = Math.max(0, masterCount - g.touched);
-      var pct = masterCount ? Math.round((g.approved / masterCount) * 100) : 0;
+      var pct = wajibTotal ? Math.round((g.wajibApproved / wajibTotal) * 100) : 0;
       global.totalWO++; global.approved += g.approved; global.pending += g.pending;
       global.rejected += g.rejected; global.belum += belum;
       return {
