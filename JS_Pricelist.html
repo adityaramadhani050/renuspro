@@ -157,10 +157,19 @@ function simpanPricelistItem() {
   else google.script.run.withSuccessHandler(done).withFailureHandler(fail).tambahPricelistItem(payload);
 }
 
+// Konfirmasi hapus pakai modal kustom aplikasi (#modal-hapus, ikon di atas
+// center) — konsisten dgn hapus Invoice/Penawaran, bukan confirm() bawaan browser.
 function hapusPricelist(id) {
   var it = _cachedPricelist.filter(function(x) { return x.id === id; })[0];
   var nm = it ? it.namaMaterial : id;
-  if (!confirm('Hapus item "' + nm + '" dari pricelist?')) return;
+  var span = document.getElementById('hapus-nama-item');
+  if (span) span.innerText = 'item "' + nm + '" dari pricelist';
+  var btn = document.getElementById('btn-konfirmasi-hapus');
+  if (btn) btn.onclick = function() { _hapusPricelistExec(id); };
+  document.getElementById('modal-hapus').classList.remove('hidden');
+}
+function _hapusPricelistExec(id) {
+  document.getElementById('modal-hapus').classList.add('hidden');
   toggleLoader(true, 'Menghapus item...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
