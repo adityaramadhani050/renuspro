@@ -1171,35 +1171,66 @@ function _ssBuildPDF(d) {
     });
     y = top + panelH + 5;
   }
-  // Foto laporan ini sengaja dibuat besar (boxW 85mm, 2 kolom) agar mudah
-  // dilihat — berbeda dari laporan QC yang memakai foto kecil (30mm).
+  // Layout foto DINAMIS mengikuti jumlah foto per grup, agar tidak banyak ruang
+  // kosong & foto sebesar mungkin:
+  //  - 1 atau 2 foto  → 1 kolom, lebar penuh (2 foto ditumpuk 2 baris).
+  //  - >= 3 foto      → 2 kolom; bila jumlah ganjil, foto terakhir lebar penuh.
+  var _SS_PH_GAP = 8, _SS_PH_MAXH_FULL = 135, _SS_PH_MAXH_HALF = 95;
+  function _ssPhotoDims(f, boxW, maxH) {
+    var iw = 4, ih = 3;
+    try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
+    var w = boxW, h = w * (ih / iw);
+    if (h > maxH) { h = maxH; w = h * (iw / ih); }   // batasi tinggi → sesuaikan lebar
+    return { w: w, h: h };
+  }
+  function _ssPhotoCapLines(f, boxW) {
+    var cap = f.caption ? doc.splitTextToSize(f.caption, boxW) : [];
+    if (cap.length > 6) { cap = cap.slice(0, 6); cap[5] = cap[5].replace(/.{0,3}$/, '...'); }
+    return cap;
+  }
   function photoGroup(label, arr) {
-    arr = arr || [];
+    arr = (arr || []).filter(function (f) { return f && f.dataUrl; });
     if (!arr.length) return;
     ensure(8);
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor.apply(doc, SLATE);
     doc.text(label.toUpperCase(), ML, y + 2.5); y += 4.5;
-    var boxW = 85, gap = 12, px = ML, rowMaxH = 0;
-    arr.forEach(function (f) {
-      var iw = 4, ih = 3;
-      try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
-      var w = boxW, h = w * (ih / iw);
-      if (h > 100) h = 100;
-      var capLines = f.caption ? doc.splitTextToSize(f.caption, boxW) : [];
-      if (capLines.length > 6) { capLines = capLines.slice(0, 6); capLines[5] = capLines[5].replace(/.{0,3}$/, '...'); }
-      var blockH = h + (capLines.length ? capLines.length * 3.2 + 1.5 : 0);
-      if (px + w > ML + CW + 0.5) { px = ML; y += rowMaxH + 6; rowMaxH = 0; }
-      if (y + blockH > BOTTOM) { newPage(); px = ML; rowMaxH = 0; }
-      try { doc.addImage(f.dataUrl, px, y, w, h); } catch (e) {}
-      doc.setDrawColor(226,232,240); doc.rect(px, y, w, h);
-      if (capLines.length) {
-        doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc, SLATE);
-        doc.text(capLines, px, y + h + 3.5);
+
+    // Susun baris: 1-2 foto → tiap foto 1 baris penuh; >=3 → berpasangan,
+    // sisa ganjil terakhir jadi 1 baris penuh.
+    var rows = [];
+    if (arr.length <= 2) {
+      arr.forEach(function (f) { rows.push([f]); });
+    } else {
+      for (var i = 0; i < arr.length; i += 2) {
+        if (i === arr.length - 1) rows.push([arr[i]]);
+        else rows.push([arr[i], arr[i + 1]]);
       }
-      px += w + gap;
-      if (blockH > rowMaxH) rowMaxH = blockH;
+    }
+
+    rows.forEach(function (row) {
+      var full = row.length === 1;
+      var boxW = full ? CW : (CW - _SS_PH_GAP) / 2;
+      var maxH = full ? _SS_PH_MAXH_FULL : _SS_PH_MAXH_HALF;
+      // Tinggi baris = foto+caption tertinggi (utk page-break).
+      var cells = row.map(function (f) {
+        var d = _ssPhotoDims(f, boxW, maxH);
+        var cap = _ssPhotoCapLines(f, boxW);
+        return { f: f, w: d.w, h: d.h, cap: cap, blockH: d.h + (cap.length ? cap.length * 3.2 + 1.5 : 0) };
+      });
+      var rowH = cells.reduce(function (m, c) { return Math.max(m, c.blockH); }, 0);
+      if (y + rowH > BOTTOM) newPage();
+      cells.forEach(function (c, ci) {
+        var colX = ML + ci * (boxW + _SS_PH_GAP);
+        var drawX = colX + (boxW - c.w) / 2;  // tengahkan bila lebar foto < boxW (mis. potret)
+        try { doc.addImage(c.f.dataUrl, drawX, y, c.w, c.h); } catch (e) {}
+        doc.setDrawColor(226,232,240); doc.rect(drawX, y, c.w, c.h);
+        if (c.cap.length) {
+          doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc, SLATE);
+          doc.text(c.cap, colX, y + c.h + 3.5);
+        }
+      });
+      y += rowH + 6;
     });
-    y += rowMaxH + 6;
   }
 
   header();
