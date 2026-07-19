@@ -51,10 +51,15 @@ function uploadWODokumen(payload) {
     var noWO = (payload.noWO || '').toString().trim();
     var jenis = (payload.jenis || '').toString().trim() || 'kontrak';
     var base64Data = payload.base64Data ? payload.base64Data.toString() : '';
-    var mimeType = payload.mimeType ? payload.mimeType.toString() : 'application/pdf';
     if (!noWO) return { success: false, message: 'No WO wajib.' };
     if (!base64Data) return { success: false, message: 'File kosong.' };
-    if (mimeType.indexOf('pdf') === -1) return { success: false, message: 'Hanya file PDF yang diperbolehkan.' };
+
+    var bytes = Utilities.base64Decode(base64Data);
+    // Validasi PDF dari ISI file (magic number "%PDF"), bukan mimeType dari klien
+    // yg bisa dikosongkan/dipalsukan.
+    if (!(bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+      return { success: false, message: 'Hanya file PDF yang diperbolehkan.' };
+    }
 
     lock.waitLock(20000);
     var ss = getSpreadsheet();
@@ -64,7 +69,6 @@ function uploadWODokumen(payload) {
     var baseName = (origName.replace(/\.[a-zA-Z0-9]+$/, '') || jenis);
     var fileName = jenis + '-' + noWO + '-' + baseName + '.pdf';
 
-    var bytes = Utilities.base64Decode(base64Data);
     var blob = Utilities.newBlob(bytes, 'application/pdf', fileName);
     var file = _getWODokumenFolder(noWO).createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
