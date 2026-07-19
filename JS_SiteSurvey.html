@@ -1188,12 +1188,21 @@ function _ssBuildPDF(d) {
     if (cap.length > 6) { cap = cap.slice(0, 6); cap[5] = cap[5].replace(/.{0,3}$/, '...'); }
     return cap;
   }
+  // Ukur sel-sel 1 baris (foto+caption) + boxW/maxH-nya.
+  function _ssMeasureRow(row) {
+    var full = row.length === 1;
+    var boxW = full ? CW : (CW - _SS_PH_GAP) / 2;
+    var maxH = full ? _SS_PH_MAXH_FULL : _SS_PH_MAXH_HALF;
+    var cells = row.map(function (f) {
+      var d = _ssPhotoDims(f, boxW, maxH);
+      var cap = _ssPhotoCapLines(f, boxW);
+      return { f: f, w: d.w, h: d.h, cap: cap, blockH: d.h + (cap.length ? cap.length * 3.2 + 1.5 : 0) };
+    });
+    return { boxW: boxW, cells: cells, rowH: cells.reduce(function (m, c) { return Math.max(m, c.blockH); }, 0) };
+  }
   function photoGroup(label, arr) {
     arr = (arr || []).filter(function (f) { return f && f.dataUrl; });
     if (!arr.length) return;
-    ensure(8);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor.apply(doc, SLATE);
-    doc.text(label.toUpperCase(), ML, y + 2.5); y += 4.5;
 
     // Susun baris: 1-2 foto → tiap foto 1 baris penuh; >=3 → berpasangan,
     // sisa ganjil terakhir jadi 1 baris penuh.
@@ -1207,21 +1216,19 @@ function _ssBuildPDF(d) {
       }
     }
 
-    rows.forEach(function (row) {
-      var full = row.length === 1;
-      var boxW = full ? CW : (CW - _SS_PH_GAP) / 2;
-      var maxH = full ? _SS_PH_MAXH_FULL : _SS_PH_MAXH_HALF;
-      // Tinggi baris = foto+caption tertinggi (utk page-break).
-      var cells = row.map(function (f) {
-        var d = _ssPhotoDims(f, boxW, maxH);
-        var cap = _ssPhotoCapLines(f, boxW);
-        return { f: f, w: d.w, h: d.h, cap: cap, blockH: d.h + (cap.length ? cap.length * 3.2 + 1.5 : 0) };
-      });
-      var rowH = cells.reduce(function (m, c) { return Math.max(m, c.blockH); }, 0);
-      if (y + rowH > BOTTOM) newPage();
-      cells.forEach(function (c, ci) {
-        var colX = ML + ci * (boxW + _SS_PH_GAP);
-        var drawX = colX + (boxW - c.w) / 2;  // tengahkan bila lebar foto < boxW (mis. potret)
+    // Label + baris foto PERTAMA harus muat bersama di halaman ini — cegah
+    // label "yatim" (tertinggal di halaman sebelumnya, fotonya pindah halaman).
+    var first = _ssMeasureRow(rows[0]);
+    ensure(4.5 + first.rowH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor.apply(doc, SLATE);
+    doc.text(label.toUpperCase(), ML, y + 2.5); y += 4.5;
+
+    rows.forEach(function (row, ri) {
+      var m = ri === 0 ? first : _ssMeasureRow(row);
+      if (y + m.rowH > BOTTOM) newPage();
+      m.cells.forEach(function (c, ci) {
+        var colX = ML + ci * (m.boxW + _SS_PH_GAP);
+        var drawX = colX + (m.boxW - c.w) / 2;  // tengahkan bila lebar foto < boxW (mis. potret)
         try { doc.addImage(c.f.dataUrl, drawX, y, c.w, c.h); } catch (e) {}
         doc.setDrawColor(226,232,240); doc.rect(drawX, y, c.w, c.h);
         if (c.cap.length) {
@@ -1229,7 +1236,7 @@ function _ssBuildPDF(d) {
           doc.text(c.cap, colX, y + c.h + 3.5);
         }
       });
-      y += rowH + 6;
+      y += m.rowH + 6;
     });
   }
 
