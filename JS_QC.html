@@ -524,15 +524,15 @@ function _qcItemHtml(it) {
       ? '<p class="text-[9px] text-slate-400 mt-0.5 leading-tight break-words">' + (f.by ? '<span class="font-semibold text-slate-500">' + _qcEsc(f.by) + '</span>' : '') + (f.by && f.at ? ' · ' : '') + (f.at ? _qcEsc(f.at) : '') + '</p>'
       : '';
     if (isFile) {
-      // Dokumen (PDF): tampil pratinjau halaman pertama (thumbnail Drive),
-      // fallback ikon PDF bila belum siap; klik = buka file PDF di tab baru.
+      // Dokumen (PDF): cukup ikon PDF (tanpa memuat thumbnail Drive yg lambat);
+      // klik = buka file PDF di tab baru. Pratinjau halaman pertama tetap di
+      // PDF laporan (server-side), bukan di sini.
       return '<div class="w-20">'
         + '<div class="relative">'
-        +   '<a href="' + _qcEsc(f.fileUrl) + '" target="_blank" class="flex items-center justify-center h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 relative">'
-        +     '<i class="fa-solid fa-file-pdf text-rose-300 text-2xl"></i>'
-        +     '<img src="' + _qcThumb(f.fileId) + '" alt="dokumen" loading="lazy" class="absolute inset-0 h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;">'
-        +   '</a>'
-        +   '<span class="absolute bottom-0.5 left-0.5 bg-rose-600 text-white text-[8px] font-bold px-1 py-0.5 rounded">PDF</span>' + del
+        +   '<a href="' + _qcEsc(f.fileUrl) + '" target="_blank" class="flex flex-col items-center justify-center gap-1 h-20 w-20 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition">'
+        +     '<i class="fa-solid fa-file-pdf text-rose-500 text-2xl"></i>'
+        +     '<span class="text-[8px] font-bold text-rose-500">PDF</span>'
+        +   '</a>' + del
         + '</div>' + cap
         + '</div>';
     }
