@@ -217,11 +217,7 @@ function _qcRenderWOList() {
       +     '<div class="flex flex-wrap gap-1 flex-1 min-w-0 sm:flex-none sm:justify-end">' + seBadges + '</div>'
       +     '<div class="shrink-0 text-right">'
       +       '<div class="w-28 h-2 rounded-full bg-slate-100 overflow-hidden ml-auto"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
-      +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">'
-      +         '<span class="text-emerald-600" title="Approved"><i class="fa-solid fa-circle-check"></i> ' + (w.approved || 0) + '</span>'
-      +         ((w.pending || 0) ? '<span class="text-amber-600" title="Pending — perlu direview"><i class="fa-solid fa-clock"></i> ' + w.pending + '</span>' : '')
-      +         ((w.rejected || 0) ? '<span class="text-rose-600" title="Rejected"><i class="fa-solid fa-circle-xmark"></i> ' + w.rejected + '</span>' : '')
-      +       '</div>'
+      +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">' + _qcCountChips(w.approved, w.pending, w.rejected, w.belum) + '</div>'
       +     '</div>'
       +   '</div>'
       +   removeBtn
@@ -440,6 +436,16 @@ function _qcRenderDetail(summary) {
   _qcRenderDetailBody();
 }
 
+// Chips hitungan status (Approved selalu tampil; Pending/Rejected/Belum hanya
+// bila >0). Dipakai bersama di header accordion section & list card QC.
+function _qcCountChips(ap, pen, rej, bel) {
+  var out = '<span class="text-emerald-600" title="Approved"><i class="fa-solid fa-circle-check"></i> ' + (ap || 0) + '</span>';
+  if (pen) out += '<span class="text-amber-600" title="Pending — perlu direview"><i class="fa-solid fa-clock"></i> ' + pen + '</span>';
+  if (rej) out += '<span class="text-rose-600" title="Rejected"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>';
+  if (bel) out += '<span class="text-slate-400" title="Belum diupload"><i class="fa-regular fa-circle"></i> ' + bel + '</span>';
+  return out;
+}
+
 // Body checklist = accordion per section (Item QC). Klik header buka/tutup detail.
 function _qcRenderDetailBody() {
   var groups = [];
@@ -451,16 +457,20 @@ function _qcRenderDetailBody() {
   _qcGroups = {};
   groups.forEach(function(g) { _qcGroups[g.section] = g; });
   document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
-    var ap = 0, rej = 0, pen = 0;
-    g.items.forEach(function(it) { if (it.status === 'Approved') ap++; else if (it.status === 'Rejected') rej++; else if (it.status === 'Pending') pen++; });
+    var ap = 0, rej = 0, pen = 0, bel = 0;
+    g.items.forEach(function(it) {
+      if (it.status === 'Approved') ap++;
+      else if (it.status === 'Rejected') rej++;
+      else if (it.status === 'Pending') pen++;
+      else if (it.status === 'Belum Upload') bel++;
+    });
     // Semua item section tuntas (Approved atau N/A, tak ada Pending/Rejected/
-    // Belum) → badge "Approved" hijau. Selain itu tampilkan hitungan ringkas.
+    // Belum) → badge "Approved" hijau. Selain itu tampilkan chips hitungan
+    // approved/pending/rejected/belum (konsisten dgn list QC).
     var allDone = g.items.length > 0 && g.items.every(function(it) { return it.status === 'Approved' || it.status === 'NA'; });
     var mini = allDone
       ? '<span class="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><i class="fa-solid fa-circle-check mr-0.5"></i>Approved</span>'
-      : '<span class="text-[10px] font-bold text-slate-400 ml-2">' + ap + '/' + g.items.length + '</span>'
-        + (rej ? '<span class="text-[10px] font-bold text-rose-600 ml-1"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>' : '')
-        + (pen ? '<span class="text-[10px] font-bold text-amber-600 ml-1"><i class="fa-solid fa-clock"></i> ' + pen + '</span>' : '');
+      : '<span class="ml-2 inline-flex items-center gap-1.5 text-[10px] font-bold">' + _qcCountChips(ap, pen, rej, bel) + '</span>';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<button onclick="_qcToggleSection(\'' + g.section + '\')" class="w-full flex items-center gap-1 px-5 py-3.5 hover:bg-slate-50 transition text-left">'
       +   '<span class="font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</span>' + mini
