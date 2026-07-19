@@ -238,7 +238,12 @@ function _ssResetForm() {
   document.getElementById('ss-dayaPLN').disabled = true;
   document.getElementById('ss-ratingBreaker').innerHTML = '<option value="">-- Pilih Phase Listrik dahulu --</option>';
   document.getElementById('ss-ratingBreaker').disabled = true;
-  var jEl = document.getElementById('ss-atapJumlah'); if (jEl) jEl.value = '1';
+  var jEl = document.getElementById('ss-atapJumlah');
+  if (jEl) {
+    // Buang opsi tambahan >8 yg mungkin tersisa dari edit sebelumnya.
+    Array.prototype.slice.call(jEl.options).forEach(function(o) { if ((parseInt(o.value, 10) || 0) > 8) jEl.removeChild(o); });
+    jEl.value = '1';
+  }
   _ssRenderAtapUkuran([]);
   _SS_FOTO_FIELDS.forEach(_ssRenderFotoSlot);
   var koorEl = document.getElementById('ss-koor-text'); if (koorEl) koorEl.innerText = 'Belum ada koordinat — klik di peta atau isi manual di bawah.';
@@ -391,12 +396,27 @@ function _ssCollectAtapUkuran() {
   });
   return arr;
 }
+// Set nilai select Jumlah Atap; tambah opsi bila n melebihi opsi bawaan (mis.
+// data lama/hasil edit sheet manual dgn >8 atap) supaya tak ada atap hilang.
+function _ssSetAtapJumlah(n) {
+  var jEl = document.getElementById('ss-atapJumlah');
+  if (!jEl) return;
+  n = Math.max(1, parseInt(n, 10) || 1);
+  if (!jEl.querySelector('option[value="' + n + '"]')) {
+    var opt = document.createElement('option');
+    opt.value = String(n); opt.textContent = n + ' atap';
+    jEl.appendChild(opt);
+  }
+  jEl.value = String(n);
+}
 // Render N baris input panjang x lebar sesuai #ss-atapJumlah. `sizes` opsional
-// utk prefill (edit); tanpa itu, nilai yg sudah diisi dipertahankan.
+// utk prefill (edit); bila diberi & tak kosong, jumlah select disamakan ke
+// banyaknya data. Tanpa `sizes`, nilai yg sudah diisi dipertahankan.
 function _ssRenderAtapUkuran(sizes) {
   var wrap = document.getElementById('ss-atapUkuranWrap');
   var jEl = document.getElementById('ss-atapJumlah');
   if (!wrap || !jEl) return;
+  if (sizes && sizes.length) _ssSetAtapJumlah(sizes.length);
   var n = parseInt(jEl.value, 10) || 1; if (n < 1) n = 1;
   var cur = sizes || _ssCollectAtapUkuran();
   var inCls = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100';
@@ -1109,9 +1129,7 @@ function _ssFillEditForm(d) {
   set('ss-atapArah', atap.arah);
   set('ss-atapRangka', atap.rangka);
   set('ss-atapMounting', atap.mounting);
-  var atapUkr = _ssAtapUkuranArr(atap);
-  document.getElementById('ss-atapJumlah').value = String(atapUkr.length || 1);
-  _ssRenderAtapUkuran(atapUkr);
+  _ssRenderAtapUkuran(_ssAtapUkuranArr(atap));   // set jumlah + render (dukung >8 atap)
   _ssPhotos.fotoAtap = (atap.fotoAtap || []).slice();
   _ssPhotos.fotoRangka = (atap.fotoRangka || []).slice();
   _ssPhotos.fotoAkses = (atap.fotoAkses || []).slice();
