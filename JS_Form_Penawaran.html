@@ -457,7 +457,7 @@
         termConditions: {
           material_status: document.getElementById('tc_material').value,
           delivery_time: _kGabungLead('k_leadTime','tc_delivery_time'), delivery_cond: document.getElementById('tc_delivery_cond').value,
-          warranty: document.getElementById('tc_warranty').value, bonus: document.getElementById('tc_bonus').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
+          warranty: document.getElementById('tc_warranty').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
           diskonNominal: kalkulasiGlobalState.diskonNominal, pajakPersen: parseFloat(document.getElementById('inputPajakPersen').value) ||0, pajakNominal: kalkulasiGlobalState.pajakNominal,
           hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0,
           kontrak: _kt
@@ -529,8 +529,7 @@
             material_status: 'tc_material',
             delivery_time:   'tc_delivery_time',
             delivery_cond:   'tc_delivery_cond',
-            warranty:        'tc_warranty',
-            bonus:           'tc_bonus'
+            warranty:        'tc_warranty'
           };
           // Dropdown pengiriman kini hanya menyimpan keterangan; angka dari input k_leadTime
           var STRIP = { delivery_time: 1 };

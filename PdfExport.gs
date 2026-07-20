@@ -360,7 +360,6 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   const tcRows = [
     { l1: 'Status Material', v1: ': ' + (tc.material_status || '-'), l2: 'Delivery Time', v2: ': ' + (tc.delivery_time || '-') },
     { l1: 'Delivery Cond',   v1: ': ' + (tc.delivery_cond   || '-'), l2: 'Warranty',      v2: ': ' + (tc.warranty      || '-') },
-    { l1: 'Bonus',           v1: ': ' + (tc.bonus           || '-'), l2: '',              v2: '' },
   ];
 
   sheet.insertRowsAfter(row - 1, tcRows.length);
@@ -400,29 +399,36 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
     });
   }
 
-  // ── Baris Termin Pembayaran (di akhir T&C; termin pertama = DP, terakhir = Final Payment) ──
-  var terminRows = [];
+  // ── Baris Termin Pembayaran (di akhir T&C, 2 kolom; termin pertama = DP, terakhir = Final Payment) ──
+  var terminFlat = [];
   if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
     var _tms = tc.kontrak.termins, _nT = _tms.length;
     _tms.forEach(function(t, i) {
       var lbl = (_nT <= 1) ? 'Final Payment' : (i === 0 ? 'Down Payment (DP)' : (i === _nT - 1 ? 'Final Payment' : 'Termin ke-' + (i + 1)));
       var val = (t.persen || 0) + '%' + (t.ket && t.ket !== '-' ? ' ' + t.ket : '');
-      terminRows.push({ l: lbl, v: ': ' + val });
+      terminFlat.push({ l: lbl, v: ': ' + val });
     });
   } else {
     [['Down Payment', tc.dp_status], ['Term Payment', tc.term_pay], ['Final Payment', tc.final_pay]].forEach(function(p) {
-      if (p[1]) terminRows.push({ l: p[0], v: ': ' + p[1] });
+      if (p[1]) terminFlat.push({ l: p[0], v: ': ' + p[1] });
     });
   }
-  if (terminRows.length) {
+  if (terminFlat.length) {
+    var terminRows = [];
+    for (var _ti = 0; _ti < terminFlat.length; _ti += 2) {
+      var _a = terminFlat[_ti], _b = terminFlat[_ti + 1];
+      terminRows.push({ l1: _a.l, v1: _a.v, l2: _b ? _b.l : '', v2: _b ? _b.v : '' });
+    }
     sheet.insertRowsAfter(row - 1, terminRows.length);
     terminRows.forEach(function(r, idx) {
       sheet.getRange(row, 1, 1, 8)
         .setBackground(idx % 2 === 0 ? '#efefef' : '#f3f3f3')
         .setFontColor('#000000');
       sheet.setRowHeight(row, 24);
-      sheet.getRange(row, 1).setValue(r.l).setFontWeight('bold').setFontColor('#000000').setWrap(false);
-      sheet.getRange(row, 3).setValue(r.v).setFontWeight('normal').setWrap(false);
+      sheet.getRange(row, 1).setValue(r.l1).setFontWeight('bold').setFontColor('#000000').setWrap(false);
+      sheet.getRange(row, 3).setValue(r.v1).setFontWeight('normal').setWrap(false);
+      sheet.getRange(row, 5).setValue(r.l2).setFontWeight('bold').setFontColor('#000000').setWrap(false);
+      sheet.getRange(row, 7).setValue(r.v2).setFontWeight('normal').setWrap(false);
       row++;
     });
   }
