@@ -308,6 +308,7 @@ function _qcRenderWOList() {
 // ── Detail per WO ─────────────────────────────────────────────────
 function bukaQCDetail(noWO) {
   _qcSectionOpen = {};   // mulai dari accordion tertutup
+  _qcPending = {};       // reset staging foto saat pindah WO
   _qcWO = _qcWOList.filter(function(w) { return w.noWO === noWO; })[0] || { noWO: noWO, namaProject: '', namaKlien: '' };
   document.getElementById('qc-home').classList.add('hidden');
   document.getElementById('qc-detail').classList.remove('hidden');
@@ -629,24 +630,46 @@ function _qcItemHtml(it) {
 
   // Upload / N/A (site engineer). Item yang sudah Approved terkunci — tak bisa
   // hapus foto / upload ulang / ubah N/A.
+  // Pola batch: foto/dokumen dipilih dulu (staging) → tampil sbg "Menunggu
+  // upload", lalu satu klik "Upload" mengirim semua & memicu 1 notif ke Lead.
   var uploadCtrl = '';
   var locked = (it.status === 'Approved');
   if (canUp && it.status !== 'NA' && !locked) {
     if (isFile) {
-      // Dokumen: hanya PDF, tanpa kamera & tanpa kompresi gambar.
-      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-file-arrow-up"></i> Upload Dokumen (PDF)'
-        + '<input type="file" accept="application/pdf,.pdf" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this, true)"></label>';
+      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-file-circle-plus"></i> Pilih Dokumen (PDF)'
+        + '<input type="file" accept="application/pdf,.pdf" multiple class="hidden" onchange="_qcStage(\'' + it.kode + '\', this, true)"></label>';
     } else {
-      // Tombol Kamera (capture) membuka kamera langsung di Android; Galeri untuk pilih file.
-      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
-        + '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>'
+      uploadCtrl += '<label class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-camera"></i> Kamera'
+        + '<input type="file" accept="image/*" capture="environment" class="hidden" onchange="_qcStage(\'' + it.kode + '\', this)"></label>'
         + '<label class="inline-flex items-center gap-2 ml-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-regular fa-images"></i> Galeri'
-        + '<input type="file" accept="image/*" multiple class="hidden" onchange="_qcUpload(\'' + it.kode + '\', this)"></label>';
+        + '<input type="file" accept="image/*" multiple class="hidden" onchange="_qcStage(\'' + it.kode + '\', this)"></label>';
     }
   }
   if (canUp && !it.wajib && !locked) {
     var naOn = it.status === 'NA';
     uploadCtrl += '<label class="inline-flex items-center gap-1.5 ml-2 text-xs font-semibold text-slate-500 cursor-pointer select-none"><input type="checkbox" ' + (naOn ? 'checked' : '') + ' onchange="_qcToggleNA(\'' + it.kode + '\', this.checked)" class="accent-slate-500"> Tidak Ada (N/A)</label>';
+  }
+
+  // Tray "Menunggu upload": preview lokal foto/dokumen yg dipilih (belum dikirim).
+  var pendHtml = '';
+  var pend = (typeof _qcPending !== 'undefined' && _qcPending[it.kode]) ? _qcPending[it.kode] : [];
+  if (pend.length && !locked) {
+    var noun2 = isFile ? 'dokumen' : 'foto';
+    var pthumbs = pend.map(function(p) {
+      var inner = p.isFile
+        ? '<div class="flex items-center justify-center h-20 w-20 rounded-lg border border-rose-200 bg-white"><i class="fa-solid fa-file-pdf text-rose-500 text-2xl"></i></div>'
+        : '<img src="' + p.preview + '" class="h-20 w-20 object-cover rounded-lg border border-orange-200">';
+      return '<div class="w-20"><div class="relative">' + inner
+        + '<button onclick="_qcUnstage(\'' + it.kode + '\',' + p.localId + ')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
+        + '</div></div>';
+    }).join('');
+    pendHtml = '<div class="mt-3 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">'
+      + '<div class="flex items-center justify-between gap-2 mb-2">'
+      +   '<span class="text-[11px] font-extrabold text-orange-600 uppercase tracking-wider"><i class="fa-solid fa-hourglass-half mr-1"></i>Menunggu upload (' + pend.length + ')</span>'
+      +   '<button onclick="_qcUploadStaged(\'' + it.kode + '\')" class="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-cloud-arrow-up"></i> Upload ' + pend.length + ' ' + noun2 + '</button>'
+      + '</div>'
+      + '<div class="flex flex-wrap gap-2">' + pthumbs + '</div>'
+      + '</div>';
   }
 
   // Review (SPV) — hanya saat item menunggu keputusan (Pending). Setelah
@@ -684,7 +707,7 @@ function _qcItemHtml(it) {
 
   var metaHtml = _qcActivityHtml(it);
 
-  return '<div class="px-5 py-3">'
+  return '<div id="qc-item-' + it.kode + '" class="px-5 py-3">'
     + '<div class="flex items-start justify-between gap-3">'
     +   '<div class="flex-1 min-w-0"><span class="font-mono text-[10px] font-bold text-slate-400 mr-1">' + it.kode + '</span><span class="text-sm font-semibold text-slate-700">' + _qcEsc(it.label) + '</span>'
     +     (it.wajib ? '' : '<span class="ml-1 text-[9px] font-bold text-slate-400">(opsional)</span>') + '</div>'
@@ -695,6 +718,7 @@ function _qcItemHtml(it) {
     + rejectNote + approvedNote
     + metaHtml
     + ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '')
+    + pendHtml
     + reviewCtrl
     + cancelCtrl
     + '</div>';
@@ -735,7 +759,25 @@ function _qcActivityHtml(it) {
 // ── Aksi ──────────────────────────────────────────────────────────
 // isFile=true → item bertipe Dokumen: hanya PDF, dikirim apa adanya (tanpa
 // resize/kompresi gambar). isFile=false → foto: di-resize dulu spt biasa.
-function _qcUpload(kode, input, isFile) {
+// ── Staging upload (pilih/foto banyak dulu, upload sekali klik) ────────────
+var _qcPending = {};     // kode → [{localId, isFile, base64, fileName, mimeType, preview}]
+var _qcLocalSeq = 0;
+
+function _qcFindItem(kode) {
+  var found = null;
+  Object.keys(_qcGroups).forEach(function(sec) {
+    (_qcGroups[sec].items || []).forEach(function(it) { if (it.kode === kode) found = it; });
+  });
+  return found;
+}
+function _qcRerenderItem(kode) {
+  var it = _qcFindItem(kode); if (!it) return;
+  var el = document.getElementById('qc-item-' + kode);
+  if (el) el.outerHTML = _qcItemHtml(it);
+}
+
+// Pilih foto/dokumen → simpan sbg "pending" (preview lokal), BELUM diupload.
+function _qcStage(kode, input, isFile) {
   var files = Array.prototype.slice.call(input.files || []);
   input.value = '';
   if (!files.length) return;
@@ -748,42 +790,48 @@ function _qcUpload(kode, input, isFile) {
       if (!isPdf) return showNotification('Hanya file PDF yang diperbolehkan: ' + files[k].name, 'error');
     }
   }
-  var i = 0;
-  toggleLoader(true, 'Mengupload ' + noun + ' (0/' + files.length + ')...');
-  function done() { toggleLoader(false); showNotification(files.length + ' ' + noun + ' terupload.'); _qcReloadDetail(); }
-  function send(base64, fileName, mimeType) {
-    google.script.run.withSuccessHandler(function(res) {
-      if (res && res.success === false) { toggleLoader(false); showNotification(res.message, 'error'); return; }
-      i++; next();
-    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload ' + noun + '.', 'error'); })
-      .uploadQCFoto({ noWO: _qcWO.noWO, kode: kode, base64Data: base64, fileName: fileName, mimeType: mimeType, oleh: _qcUserNama() });
-  }
-  function next() {
-    if (i >= files.length) { done(); return; }
-    var f = files[i];
-    toggleLoader(true, 'Mengupload ' + noun + ' (' + (i + 1) + '/' + files.length + ')...');
+  if (!_qcPending[kode]) _qcPending[kode] = [];
+  var remaining = files.length;
+  toggleLoader(true, 'Memproses ' + files.length + ' ' + noun + '...');
+  function fin() { if (--remaining <= 0) { toggleLoader(false); _qcRerenderItem(kode); } }
+  files.forEach(function(f) {
     if (isFile) {
-      // PDF: baca apa adanya (jangan di-resize — akan merusak file).
       var reader = new FileReader();
       reader.onload = function(e) {
         var dataUrl = e.target.result || '';
         var base64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : '';
-        if (!base64) { toggleLoader(false); showNotification('Gagal membaca dokumen: ' + f.name, 'error'); return; }
-        var fileName = (f.name || 'dokumen').replace(/\.[a-zA-Z0-9]+$/, '') + '.pdf';
-        send(base64, fileName, 'application/pdf');
+        if (base64) _qcPending[kode].push({ localId: ++_qcLocalSeq, isFile: true, base64: base64, fileName: (f.name || 'dokumen').replace(/\.[a-zA-Z0-9]+$/, '') + '.pdf', mimeType: 'application/pdf', preview: '' });
+        fin();
       };
-      reader.onerror = function() { toggleLoader(false); showNotification('Gagal membaca dokumen: ' + f.name, 'error'); };
+      reader.onerror = function() { fin(); };
       reader.readAsDataURL(f);
     } else {
       _qcResizeImage(f, function(dataUrl) {
-        if (!dataUrl) { toggleLoader(false); showNotification('Gagal memproses foto: ' + f.name, 'error'); return; }
-        var base64 = dataUrl.split(',')[1];
-        var fileName = (f.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg';
-        send(base64, fileName, 'image/jpeg');
+        if (dataUrl) _qcPending[kode].push({ localId: ++_qcLocalSeq, isFile: false, base64: dataUrl.split(',')[1], fileName: (f.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg', mimeType: 'image/jpeg', preview: dataUrl });
+        fin();
       });
     }
-  }
-  next();
+  });
+}
+function _qcUnstage(kode, localId) {
+  if (!_qcPending[kode]) return;
+  _qcPending[kode] = _qcPending[kode].filter(function(p) { return p.localId !== localId; });
+  _qcRerenderItem(kode);
+}
+// Kirim semua pending sekaligus → 1 kali set Pending + 1 notif ke Lead.
+function _qcUploadStaged(kode) {
+  var pend = _qcPending[kode] || [];
+  if (!pend.length) return;
+  var files = pend.map(function(p) { return { base64Data: p.base64, fileName: p.fileName, mimeType: p.mimeType }; });
+  toggleLoader(true, 'Mengupload ' + files.length + ' file...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    _qcPending[kode] = [];
+    showNotification((res && res.count ? res.count : files.length) + ' file terupload.');
+    _qcReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
+    .uploadQCFotoBatch({ noWO: _qcWO.noWO, kode: kode, oleh: _qcUserNama(), files: files });
 }
 
 function _qcHapusFoto(kode, fileId) {

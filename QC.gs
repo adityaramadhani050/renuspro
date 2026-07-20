@@ -541,6 +541,69 @@ function uploadQCFoto(payload) {
   }
 }
 
+// ── Upload BANYAK foto/dokumen sekaligus (1 klik) → 1x set Pending + 1 notif ──
+// payload: { noWO, kode, oleh, files: [{ base64Data, fileName, mimeType }] }
+function uploadQCFotoBatch(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var noWO = (payload.noWO || '').toString().trim();
+    var kode = (payload.kode || '').toString().trim();
+    var oleh = (payload.oleh || '').toString();
+    var files = (payload.files && payload.files.length) ? payload.files : [];
+    if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
+    if (!files.length) return { success: false, message: 'Tidak ada file untuk diupload.' };
+
+    lock.waitLock(30000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureQCItemSheet(ss);
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    var found = _qcFindItemRow(sheet, noWO, kode);
+    var arr = found ? _qcParseFoto(found.row[3]) : [];
+    var wasStatus = found ? (found.row[4] || '').toString() : 'Belum Upload';
+    var folder = _getQCFolder(noWO);
+    var added = [], evts = [];
+
+    files.forEach(function (fobj) {
+      var base64 = fobj.base64Data ? fobj.base64Data.toString() : '';
+      if (!base64) return;
+      var mimeType = fobj.mimeType ? fobj.mimeType.toString() : 'image/jpeg';
+      var origName = fobj.fileName ? fobj.fileName.toString() : '';
+      var ext = (origName.indexOf('.') !== -1) ? origName.split('.').pop().toLowerCase() : '';
+      if (!ext) ext = (mimeType.split('/')[1] || 'jpg').toLowerCase();
+      if (ext === 'jpeg') ext = 'jpg';
+      var fileName = kode + '-' + (arr.length + added.length + 1) + '.' + ext;
+      var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, fileName);
+      var file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      var foto = { fileId: file.getId(), fileUrl: file.getUrl(), fileName: fileName, by: oleh, at: when };
+      added.push(foto);
+      evts.push({ type: 'upload', by: oleh, at: when, note: fileName });
+    });
+
+    if (!added.length) return { success: false, message: 'Semua file gagal diproses.' };
+
+    var all = arr.concat(added);
+    if (found) {
+      sheet.getRange(found.rowIdx, 4).setValue(JSON.stringify(all));
+      sheet.getRange(found.rowIdx, 5).setValue('Pending');
+      sheet.getRange(found.rowIdx, 7, 1, 2).setValues([[oleh, when]]);
+      evts.forEach(function (ev) { _qcAppendActivity(sheet, found.rowIdx, ev); });
+    } else {
+      sheet.appendRow([_qcNextId(sheet), noWO, kode, JSON.stringify(all), 'Pending', '', oleh, when, '', '', JSON.stringify(evts)]);
+    }
+
+    // Notifikasi WA ke Lead Engineer (item baru perlu direview). Aman bila WA off.
+    try { if (typeof _qcNotifLeadReview === 'function') _qcNotifLeadReview(noWO, kode, oleh, added.length, wasStatus); } catch (e) {}
+
+    return { success: true, message: added.length + ' file terupload.', count: added.length, status: 'Pending', foto_list: all };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── Hapus 1 foto dari item ──────────────────────────────────────────────────
 function hapusQCFoto(noWO, kode, fileId) {
   var lock = LockService.getScriptLock();
