@@ -558,7 +558,17 @@ function buatDokumenPDF(item) {
       { label: 'Warranty',         value: tc.warranty        || '-' },
       { label: 'Bonus',            value: tc.bonus           || '-' },
     ];
-    // Termin Pembayaran (dinamis): termin pertama = DP, terakhir = Final Payment
+    if (tc.kontrak) {
+      var _kk = tc.kontrak;
+      var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
+      tcItems.push(
+        { label: 'Garansi Inverter',  value: _garTh(_kk.garansiInverter) },
+        { label: 'Garansi Panel',     value: _garTh(_kk.garansiPanel) },
+        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) },
+        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) }
+      );
+    }
+    // Termin Pembayaran (di akhir T&C): termin pertama = DP, terakhir = Final Payment
     if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
       var _tms = tc.kontrak.termins, _nT = _tms.length;
       _tms.forEach(function(t, i) {
@@ -569,16 +579,6 @@ function buatDokumenPDF(item) {
       [['Down Payment', tc.dp_status], ['Term Payment', tc.term_pay], ['Final Payment', tc.final_pay]].forEach(function(p) {
         if (p[1]) tcItems.push({ label: p[0], value: p[1] });
       });
-    }
-    if (tc.kontrak) {
-      var _kk = tc.kontrak;
-      var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
-      tcItems.push(
-        { label: 'Garansi Panel',     value: _garTh(_kk.garansiPanel) },
-        { label: 'Garansi Inverter',  value: _garTh(_kk.garansiInverter) },
-        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) },
-        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) }
-      );
     }
 
     const tcColCount = 2;

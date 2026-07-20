@@ -378,7 +378,29 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
     row++;
   });
 
-  // ── Baris Termin Pembayaran (dinamis: termin pertama = DP, terakhir = Final Payment) ──
+  // ── Baris Garansi Material (dari data kontrak penawaran) ──
+  if (tc.kontrak) {
+    var _kk = tc.kontrak;
+    var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
+    var garRows = [
+      { l1: 'Garansi Inverter',    v1: ': ' + _garTh(_kk.garansiInverter), l2: 'Garansi Panel Surya', v2: ': ' + _garTh(_kk.garansiPanel) },
+      { l1: 'Garansi Baterai',     v1: ': ' + _garTh(_kk.garansiBaterai),  l2: 'Garansi Instalasi',   v2: ': ' + _garTh(_kk.garansiInstalasi) },
+    ];
+    sheet.insertRowsAfter(row - 1, garRows.length);
+    garRows.forEach(function(r, idx) {
+      sheet.getRange(row, 1, 1, 8)
+        .setBackground(idx % 2 === 0 ? '#efefef' : '#f3f3f3')
+        .setFontColor('#000000');
+      sheet.setRowHeight(row, 24);
+      sheet.getRange(row, 1).setValue(r.l1).setFontWeight('bold').setFontColor('#000000').setWrap(false);
+      sheet.getRange(row, 3).setValue(r.v1).setFontWeight('normal').setWrap(false);
+      sheet.getRange(row, 5).setValue(r.l2).setFontWeight('bold').setFontColor('#000000').setWrap(false);
+      sheet.getRange(row, 7).setValue(r.v2).setFontWeight('normal').setWrap(false);
+      row++;
+    });
+  }
+
+  // ── Baris Termin Pembayaran (di akhir T&C; termin pertama = DP, terakhir = Final Payment) ──
   var terminRows = [];
   if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
     var _tms = tc.kontrak.termins, _nT = _tms.length;
@@ -401,28 +423,6 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
       sheet.setRowHeight(row, 24);
       sheet.getRange(row, 1).setValue(r.l).setFontWeight('bold').setFontColor('#000000').setWrap(false);
       sheet.getRange(row, 3).setValue(r.v).setFontWeight('normal').setWrap(false);
-      row++;
-    });
-  }
-
-  // ── Baris Garansi Sistem (dari data kontrak penawaran) ──
-  if (tc.kontrak) {
-    var _kk = tc.kontrak;
-    var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
-    var garRows = [
-      { l1: 'Garansi Panel Surya', v1: ': ' + _garTh(_kk.garansiPanel),   l2: 'Garansi Inverter',  v2: ': ' + _garTh(_kk.garansiInverter) },
-      { l1: 'Garansi Baterai',     v1: ': ' + _garTh(_kk.garansiBaterai), l2: 'Garansi Instalasi', v2: ': ' + _garTh(_kk.garansiInstalasi) },
-    ];
-    sheet.insertRowsAfter(row - 1, garRows.length);
-    garRows.forEach(function(r, idx) {
-      sheet.getRange(row, 1, 1, 8)
-        .setBackground(idx % 2 === 0 ? '#efefef' : '#f3f3f3')
-        .setFontColor('#000000');
-      sheet.setRowHeight(row, 24);
-      sheet.getRange(row, 1).setValue(r.l1).setFontWeight('bold').setFontColor('#000000').setWrap(false);
-      sheet.getRange(row, 3).setValue(r.v1).setFontWeight('normal').setWrap(false);
-      sheet.getRange(row, 5).setValue(r.l2).setFontWeight('bold').setFontColor('#000000').setWrap(false);
-      sheet.getRange(row, 7).setValue(r.v2).setFontWeight('normal').setWrap(false);
       row++;
     });
   }
