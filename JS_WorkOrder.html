@@ -649,7 +649,7 @@
         y += 4; ensure(LH * 2 + 6);
         center('PASAL ' + no, FS, true);
         center(title, FS, true);
-        ruleC(26, 0.8, 3.2);
+        ruleC(24, -2.6, 3);
       }
       // Daftar bernomor / berhuruf; items = array string. Hanging indent rapi.
       function listed(items, style, opts) {
@@ -808,6 +808,8 @@
       pasal(14, 'PERSELISIHAN');
       para('Jika dalam menjalankan Surat Perjanjian Kontrak Kerja ini terdapat perselisihan atau perbedaan pendapat, maka kedua belah pihak akan menempuh jalan musyawarah mufakat. Apabila tidak tercapai, maka dapat dilimpahkan ke instansi yang berwenang.');
 
+      // Jaga Pasal 15 (Penutup) + blok tanda tangan tetap satu halaman
+      if (y > BOTTOM - 118) { doc.addPage(); y = 20; }
       pasal(15, 'PENUTUP');
       para('Jika terdapat hal-hal penting yang belum diatur dalam Surat Perjanjian Kontrak Kerja ini, maka kedua belah pihak secara mufakat akan menetapkan kemudian hari.');
       para('Demikian Surat Perjanjian Kontrak Kerja ini dibuat dengan rangkap 2 (dua) bermaterai dan ditandatangani untuk masing-masing pihak dan merupakan surat perjanjian yang mengikat dan sah di mata hukum.');
