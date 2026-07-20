@@ -158,7 +158,7 @@ function _qcRenderTeamStats() {
     var ftr = t.ftrPct == null ? '—' : t.ftrPct + '%';
     var rej = t.rejectRatePct == null ? '—' : t.rejectRatePct + '%';
     var ftrCls = t.ftrPct == null ? 'text-slate-400' : (t.ftrPct >= 80 ? 'text-emerald-600' : (t.ftrPct >= 50 ? 'text-amber-600' : 'text-rose-600'));
-    var rejCls = t.rejectRatePct == null ? 'text-slate-400' : (t.rejectRatePct <= 15 ? 'text-emerald-600' : (t.rejectRatePct <= 35 ? 'text-amber-600' : 'text-rose-600'));
+    var rejCls = 'text-rose-600';
     return '<div class="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">'
       + '<div class="flex items-center justify-between gap-2 mb-1.5">'
       +   '<p class="text-xs font-bold text-slate-700 truncate"><i class="fa-solid fa-user-helmet-safety text-indigo-300 mr-1"></i>' + _qcEsc(t.nama) + '</p>'
@@ -168,7 +168,7 @@ function _qcRenderTeamStats() {
       +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + t.approved + '</span>'
       +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + t.pending + '</span>'
       +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + t.rejected + '</span>'
-      +   '<span class="ml-auto ' + ftrCls + '" title="Langsung Acc — disetujui pada review pertama tanpa revisi">Langsung Acc ' + ftr + '</span>'
+      +   '<span class="ml-auto ' + ftrCls + '" title="FTR (First-Time-Right) — disetujui pada review pertama tanpa revisi">FTR ' + ftr + '</span>'
       +   '<span class="' + rejCls + '" title="Tingkat penolakan">Tolak ' + rej + '</span>'
       + '</div>'
       + '</div>';
