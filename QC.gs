@@ -662,6 +662,30 @@ function reviewQCItem(noWO, kode, keputusan, catatan, reviewer) {
   }
 }
 
+// ── Batalkan persetujuan (Approved → Pending untuk direview ulang) ──────────
+function cancelQCApproval(noWO, kode, oleh) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureQCItemSheet(ss);
+    var found = _qcFindItemRow(sheet, noWO, kode);
+    if (!found) return { success: false, message: 'Item tidak ditemukan.' };
+    if ((found.row[4] || '').toString() !== 'Approved') return { success: false, message: 'Hanya item berstatus Approved yang bisa dibatalkan.' };
+    var arr = _qcParseFoto(found.row[3]);
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    sheet.getRange(found.rowIdx, 5).setValue(arr.length ? 'Pending' : 'Belum Upload');  // Status
+    sheet.getRange(found.rowIdx, 6).setValue('');                                        // Catatan SPV
+    sheet.getRange(found.rowIdx, 9, 1, 2).setValues([['', '']]);                          // Direview Oleh/Pada
+    _qcAppendActivity(sheet, found.rowIdx, { type: 'cancel', by: (oleh || '').toString(), at: when, note: '' });
+    return { success: true, message: 'Persetujuan item ' + kode + ' dibatalkan — kembali ke Pending.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── Tandai item opsional Tidak Ada (N/A) atau batalkan ──────────────────────
 function setQCItemNA(noWO, kode, isNA, oleh) {
   var lock = LockService.getScriptLock();

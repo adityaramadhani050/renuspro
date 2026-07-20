@@ -661,6 +661,14 @@ function _qcItemHtml(it) {
       + '</div></div>';
   }
 
+  // Batalkan Approve (SPV/Lead) — kembalikan item Approved ke Pending utk direview ulang.
+  var cancelCtrl = '';
+  if (canRev && it.status === 'Approved') {
+    cancelCtrl = '<div class="mt-3 border-t border-slate-100 pt-3 flex justify-end">'
+      + '<button onclick="_qcCancelApprove(\'' + it.kode + '\')" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-rotate-left"></i> Batalkan Approve</button>'
+      + '</div>';
+  }
+
   // Panduan foto dari Lead Engineer: instruksi + foto contoh (agar site engineer tahu foto yang benar).
   var contoh = it.contohFoto || [];
   var contohThumbs = contoh.map(function(f) {
@@ -688,6 +696,7 @@ function _qcItemHtml(it) {
     + metaHtml
     + ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '')
     + reviewCtrl
+    + cancelCtrl
     + '</div>';
 }
 
@@ -699,6 +708,7 @@ function _qcActConfig(type) {
     case 'upload':  return { icon: 'fa-cloud-arrow-up', iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: 'mengunggah foto' };
     case 'reject':  return { icon: 'fa-circle-xmark',   iconCls: 'text-rose-500',    textCls: 'text-rose-600',    noteCls: 'text-rose-600 font-medium',   verb: 'menolak (revisi)' };
     case 'approve': return { icon: 'fa-circle-check',   iconCls: 'text-emerald-500', textCls: 'text-emerald-600', noteCls: 'text-emerald-600',            verb: 'menyetujui' };
+    case 'cancel':  return { icon: 'fa-rotate-left',    iconCls: 'text-amber-500',   textCls: 'text-amber-600',   noteCls: 'text-amber-600',              verb: 'membatalkan persetujuan' };
     case 'na':      return { icon: 'fa-ban',            iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: 'menandai Tidak Ada (N/A)' };
     default:        return { icon: 'fa-circle',         iconCls: 'text-slate-300',   textCls: 'text-slate-500',   noteCls: 'text-slate-400',              verb: type || '-' };
   }
@@ -962,6 +972,26 @@ function _qcReview(kode, keputusan) {
     _qcReloadDetail();
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal review.', 'error'); })
     .reviewQCItem(_qcWO.noWO, kode, keputusan, catatan, _qcUserNama());
+}
+
+function _qcCancelApprove(kode) {
+  showConfirm({
+    title: 'Batalkan Approve',
+    message: 'Batalkan persetujuan item ' + kode + '? Item akan kembali ke status Pending untuk direview ulang.',
+    confirmText: 'Ya, Batalkan',
+    type: 'warning',
+    icon: 'fa-rotate-left',
+    onConfirm: function() {
+      toggleLoader(true, 'Membatalkan approve...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+        showNotification(res && res.message ? res.message : 'Approve dibatalkan.');
+        _qcReloadDetail();
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal membatalkan.', 'error'); })
+        .cancelQCApproval(_qcWO.noWO, kode, _qcUserNama());
+    }
+  });
 }
 
 // ── Penugasan Site Engineer (Lead Engineer / Admin) ───────────────
