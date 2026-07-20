@@ -358,10 +358,9 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
 
   // ── Baris T&C — insert semua sekaligus ──
   const tcRows = [
-    { l1: 'Status Material', v1: ': ' + (tc.material_status || '-'), l2: 'Down Payment',  v2: ': ' + (tc.dp_status     || '-') },
-    { l1: 'Term Payment',    v1: ': ' + (tc.term_pay        || '-'), l2: 'Final Payment', v2: ': ' + (tc.final_pay     || '-') },
-    { l1: 'Delivery Time',   v1: ': ' + (tc.delivery_time   || '-'), l2: 'Delivery Cond', v2: ': ' + (tc.delivery_cond || '-') },
-    { l1: 'Warranty',        v1: ': ' + (tc.warranty        || '-'), l2: 'Bonus',         v2: ': ' + (tc.bonus         || '-') },
+    { l1: 'Status Material', v1: ': ' + (tc.material_status || '-'), l2: 'Delivery Time', v2: ': ' + (tc.delivery_time || '-') },
+    { l1: 'Delivery Cond',   v1: ': ' + (tc.delivery_cond   || '-'), l2: 'Warranty',      v2: ': ' + (tc.warranty      || '-') },
+    { l1: 'Bonus',           v1: ': ' + (tc.bonus           || '-'), l2: '',              v2: '' },
   ];
 
   sheet.insertRowsAfter(row - 1, tcRows.length);
@@ -379,13 +378,40 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
     row++;
   });
 
+  // ── Baris Termin Pembayaran (dinamis: termin pertama = DP, terakhir = Final Payment) ──
+  var terminRows = [];
+  if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
+    var _tms = tc.kontrak.termins, _nT = _tms.length;
+    _tms.forEach(function(t, i) {
+      var lbl = (_nT <= 1) ? 'Final Payment' : (i === 0 ? 'Down Payment (DP)' : (i === _nT - 1 ? 'Final Payment' : 'Termin ke-' + (i + 1)));
+      var val = (t.persen || 0) + '%' + (t.ket && t.ket !== '-' ? ' ' + t.ket : '');
+      terminRows.push({ l: lbl, v: ': ' + val });
+    });
+  } else {
+    [['Down Payment', tc.dp_status], ['Term Payment', tc.term_pay], ['Final Payment', tc.final_pay]].forEach(function(p) {
+      if (p[1]) terminRows.push({ l: p[0], v: ': ' + p[1] });
+    });
+  }
+  if (terminRows.length) {
+    sheet.insertRowsAfter(row - 1, terminRows.length);
+    terminRows.forEach(function(r, idx) {
+      sheet.getRange(row, 1, 1, 8)
+        .setBackground(idx % 2 === 0 ? '#efefef' : '#f3f3f3')
+        .setFontColor('#000000');
+      sheet.setRowHeight(row, 24);
+      sheet.getRange(row, 1).setValue(r.l).setFontWeight('bold').setFontColor('#000000').setWrap(false);
+      sheet.getRange(row, 3).setValue(r.v).setFontWeight('normal').setWrap(false);
+      row++;
+    });
+  }
+
   // ── Baris Garansi Sistem (dari data kontrak penawaran) ──
   if (tc.kontrak) {
     var _kk = tc.kontrak;
     var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
     var garRows = [
-      { l1: 'Garansi Instalasi', v1: ': ' + _garTh(_kk.garansiInstalasi), l2: 'Garansi Panel Surya', v2: ': ' + _garTh(_kk.garansiPanel) },
-      { l1: 'Garansi Inverter',  v1: ': ' + _garTh(_kk.garansiInverter),  l2: 'Garansi Baterai',     v2: ': ' + _garTh(_kk.garansiBaterai) },
+      { l1: 'Garansi Panel Surya', v1: ': ' + _garTh(_kk.garansiPanel),   l2: 'Garansi Inverter',  v2: ': ' + _garTh(_kk.garansiInverter) },
+      { l1: 'Garansi Baterai',     v1: ': ' + _garTh(_kk.garansiBaterai), l2: 'Garansi Instalasi', v2: ': ' + _garTh(_kk.garansiInstalasi) },
     ];
     sheet.insertRowsAfter(row - 1, garRows.length);
     garRows.forEach(function(r, idx) {

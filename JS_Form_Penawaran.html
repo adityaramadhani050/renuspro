@@ -312,7 +312,12 @@
 
       // Clear noPenawaran (kosong = penawaran baru, nomor di-generate server-side)
       document.getElementById('noPenawaran').value = '';
-      _kHitungTermin();
+      // Reset data kontrak (garansi + termin dinamis)
+      ['k_leadTime','k_garPanel','k_garInverter','k_garBaterai','k_garInstalasi'].forEach(function(id){
+        var def = { k_leadTime:14, k_garPanel:15, k_garInverter:5, k_garBaterai:5, k_garInstalasi:1 }[id];
+        var el = document.getElementById(id); if (el) el.value = def;
+      });
+      _kResetTermin();
     }
 
     // ── Data Kontrak (utk generate Surat Perjanjian Kontrak) ──────────────
@@ -322,28 +327,90 @@
     function _kDescOnly(s) { return String(s == null ? '' : s).replace(/^\s*\d+(\.\d+)?\s*(-\s*\d+(\.\d+)?\s*)?%?\s*/, '').trim(); }
     // Ambil angka pertama dari teks tersimpan (utk edit penawaran lama tanpa data kontrak)
     function _kLeadNum(s) { var m = String(s == null ? '' : s).match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
-    // Gabung angka input + keterangan dropdown → string tampil di penawaran ("30% From PO")
-    function _kGabungTermin(numId, selId) {
-      var n = _kNum(numId, 0);
-      var d = _kDescOnly((document.getElementById(selId) || {}).value || '');
-      return (d && d !== '-') ? (n + '% ' + d) : (n + '%');
-    }
+    // Gabung angka input + keterangan dropdown → string tampil di penawaran ("14 Days After PO")
     function _kGabungLead(numId, selId) {
       var n = _kNum(numId, 0);
       var d = _kDescOnly((document.getElementById(selId) || {}).value || '');
       return (d && d !== '-') ? (n + ' ' + d) : (n + ' Hari');
     }
+    // ── Termin dinamis: termin pertama = DP, terakhir = Final Payment ──────
+    var _kTerminState = [];                                        // [{persen, ket}]
+    var _kTerminKetOpts = ['From PO', 'Material On Site', 'Before Shipping', 'After BAST', '-'];
+    function _kEscHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function _kTerminLabel(i, n) {
+      if (n <= 1) return 'Final Payment';
+      if (i === 0) return 'DP (Uang Muka)';
+      if (i === n - 1) return 'Final Payment';
+      return 'Termin ke-' + (i + 1);
+    }
+    function _kRenderTermin() {
+      var wrap = document.getElementById('k_terminList'); if (!wrap) return;
+      var n = _kTerminState.length;
+      wrap.innerHTML = '';
+      _kTerminState.forEach(function(t, i) {
+        var opts = _kTerminKetOpts.slice();
+        if (t.ket && opts.indexOf(t.ket) < 0) opts.unshift(t.ket);
+        var optHtml = opts.map(function(o) {
+          return '<option value="' + _kEscHtml(o) + '"' + (o === t.ket ? ' selected' : '') + '>' + _kEscHtml(o) + '</option>';
+        }).join('');
+        var row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+        row.innerHTML =
+          '<span class="text-[10px] font-bold text-slate-400 uppercase w-24 shrink-0">' + _kTerminLabel(i, n) + '</span>' +
+          '<input type="number" step="any" min="0" max="100" value="' + t.persen + '" oninput="_kTerminSync()" class="k-termin-persen input-field py-1.5 text-sm w-16 text-center shrink-0">' +
+          '<span class="text-xs font-semibold text-slate-400 shrink-0">%</span>' +
+          '<select onchange="_kTerminSync()" class="k-termin-ket input-field py-1.5 text-sm flex-1">' + optHtml + '</select>' +
+          (n > 1 ? '<button type="button" onclick="_kHapusTermin(' + i + ')" title="Hapus termin" class="text-slate-300 hover:text-rose-500 shrink-0 px-1"><i class="fa-solid fa-circle-xmark"></i></button>' : '');
+        wrap.appendChild(row);
+      });
+      _kHitungTermin();
+    }
+    function _kTerminSync() {
+      var wrap = document.getElementById('k_terminList'); if (!wrap) return;
+      var rows = wrap.children;
+      for (var i = 0; i < rows.length; i++) {
+        if (!_kTerminState[i]) continue;
+        var p = rows[i].querySelector('.k-termin-persen');
+        var k = rows[i].querySelector('.k-termin-ket');
+        if (p) _kTerminState[i].persen = parseFloat(p.value) || 0;
+        if (k) _kTerminState[i].ket = k.value;
+      }
+      _kHitungTermin();
+    }
+    function _kTambahTermin() {
+      _kTerminSync();
+      var n = _kTerminState.length;
+      var baru = { persen: 0, ket: _kTerminKetOpts[0] };
+      if (n >= 1) _kTerminState.splice(n - 1, 0, baru); else _kTerminState.push(baru);   // sisip sebelum Final
+      _kRenderTermin();
+    }
+    function _kHapusTermin(i) {
+      _kTerminSync();
+      if (_kTerminState.length <= 1) return;
+      _kTerminState.splice(i, 1);
+      _kRenderTermin();
+    }
+    function _kResetTermin() {
+      _kTerminState = [
+        { persen: 30, ket: 'From PO' },
+        { persen: 50, ket: 'Material On Site' },
+        { persen: 20, ket: 'After BAST' }
+      ];
+      _kRenderTermin();
+    }
     function _kHitungTermin() {
       var info = document.getElementById('k_terminInfo'); if (!info) return;
-      var t = _kNum('k_terminDP', 0) + _kNum('k_terminTermin', 0) + _kNum('k_terminPelunasan', 0);
+      var t = 0;
+      _kTerminState.forEach(function(x) { t += (parseFloat(x.persen) || 0); });
       var rounded = Math.round(t * 100) / 100;
       var ok = Math.abs(rounded - 100) < 0.01;
       info.textContent = 'Total termin: ' + rounded + '%' + (ok ? '' : ' — harus 100%');
-      info.className = 'text-[11px] font-semibold mt-1.5 ' + (ok ? 'text-emerald-600' : 'text-rose-600');
+      info.className = 'text-[11px] font-semibold mt-2 ' + (ok ? 'text-emerald-600' : 'text-rose-600');
     }
     function _kAmbilDataKontrak() {
+      _kTerminSync();
       return {
-        terminDP: _kNum('k_terminDP', 30), terminTermin: _kNum('k_terminTermin', 50), terminPelunasan: _kNum('k_terminPelunasan', 20),
+        termins: _kTerminState.map(function(t) { return { persen: parseFloat(t.persen) || 0, ket: _kDescOnly(t.ket) }; }),
         leadTimeHari: _kNum('k_leadTime', 14),
         garansiInstalasi: _kNum('k_garInstalasi', 1), garansiPanel: _kNum('k_garPanel', 15),
         garansiInverter: _kNum('k_garInverter', 5), garansiBaterai: _kNum('k_garBaterai', 5)
@@ -351,16 +418,25 @@
     }
     function _kIsiDataKontrak(k, tc) {
       k = k || {}; tc = tc || {};
-      // Fallback penawaran lama: angka dari string tersimpan bila belum ada data kontrak terstruktur
-      var pick = function(v, str, def) { return (v || v === 0) ? v : (_kLeadNum(str) != null ? _kLeadNum(str) : def); };
       var set = function(id, v, def) { var el = document.getElementById(id); if (el) el.value = (v || v === 0) ? v : def; };
-      set('k_terminDP', pick(k.terminDP, tc.dp_status, 30), 30);
-      set('k_terminTermin', pick(k.terminTermin, tc.term_pay, 50), 50);
-      set('k_terminPelunasan', pick(k.terminPelunasan, tc.final_pay, 20), 20);
-      set('k_leadTime', pick(k.leadTimeHari, tc.delivery_time, 14), 14);
+      // Termin: pakai array baru; fallback penawaran lama (terminDP/Termin/Pelunasan + dp_status/term_pay/final_pay)
+      if (Array.isArray(k.termins) && k.termins.length) {
+        _kTerminState = k.termins.map(function(t) { return { persen: (t.persen || t.persen === 0) ? t.persen : 0, ket: _kDescOnly(t.ket) || '-' }; });
+      } else {
+        var mig = function(v, str, def, defket) {
+          var p = (v || v === 0) ? v : (_kLeadNum(str) != null ? _kLeadNum(str) : def);
+          return { persen: p, ket: _kDescOnly(str) || defket };
+        };
+        _kTerminState = [
+          mig(k.terminDP, tc.dp_status, 30, 'From PO'),
+          mig(k.terminTermin, tc.term_pay, 50, 'Material On Site'),
+          mig(k.terminPelunasan, tc.final_pay, 20, 'After BAST')
+        ];
+      }
+      set('k_leadTime', (k.leadTimeHari || k.leadTimeHari === 0) ? k.leadTimeHari : (_kLeadNum(tc.delivery_time) != null ? _kLeadNum(tc.delivery_time) : 14), 14);
       set('k_garInstalasi', k.garansiInstalasi, 1); set('k_garPanel', k.garansiPanel, 15);
       set('k_garInverter', k.garansiInverter, 5); set('k_garBaterai', k.garansiBaterai, 5);
-      _kHitungTermin();
+      _kRenderTermin();
     }
 
     function handleFormSubmission(e) {
@@ -369,7 +445,9 @@
       if(!document.getElementById('channelMarketing').value) return showNotification("Silakan pilih Channel Marketing!", "error");
       const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
       var _kt = _kAmbilDataKontrak();
-      if (Math.abs((_kt.terminDP + _kt.terminTermin + _kt.terminPelunasan) - 100) > 0.01) return showNotification("Total persen termin (DP + Term 2 + Final) harus 100%.", "error");
+      var _sumTermin = (_kt.termins || []).reduce(function(a, t) { return a + (t.persen || 0); }, 0);
+      if (!(_kt.termins || []).length) return showNotification("Minimal 1 termin pembayaran.", "error");
+      if (Math.abs(_sumTermin - 100) > 0.01) return showNotification("Total persen termin harus 100%.", "error");
 
       const payload = {
         noPenawaran: document.getElementById('noPenawaran').value, tanggal: document.getElementById('tglPenawaran').value, validUntil: document.getElementById('validUntil').value,
@@ -377,12 +455,12 @@
         channelMarketing: document.getElementById('channelMarketing').value || '',
         subtotal: kalkulasiGlobalState.subtotalSemua, grandTotal: kalkulasiGlobalState.grandTotal,
         termConditions: {
-          material_status: document.getElementById('tc_material').value, dp_status: _kGabungTermin('k_terminDP','tc_dp'), term_pay: _kGabungTermin('k_terminTermin','tc_term'),
-          final_pay: _kGabungTermin('k_terminPelunasan','tc_final'), delivery_time: _kGabungLead('k_leadTime','tc_delivery_time'), delivery_cond: document.getElementById('tc_delivery_cond').value,
+          material_status: document.getElementById('tc_material').value,
+          delivery_time: _kGabungLead('k_leadTime','tc_delivery_time'), delivery_cond: document.getElementById('tc_delivery_cond').value,
           warranty: document.getElementById('tc_warranty').value, bonus: document.getElementById('tc_bonus').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
           diskonNominal: kalkulasiGlobalState.diskonNominal, pajakPersen: parseFloat(document.getElementById('inputPajakPersen').value) ||0, pajakNominal: kalkulasiGlobalState.pajakNominal,
           hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0,
-          kontrak: _kAmbilDataKontrak()
+          kontrak: _kt
         }, items: []
       };
 
@@ -436,6 +514,7 @@
         vForm.classList.remove('hidden');
         vTabel.classList.add('hidden');
         _loadTCDropdowns();
+        if (!window._editMode && !_kTerminState.length) _kResetTermin();
       }
     }
 
@@ -448,21 +527,17 @@
           _tcDropdownsLoaded = true;
           var map = {
             material_status: 'tc_material',
-            dp_status:       'tc_dp',
-            term_pay:        'tc_term',
-            final_pay:       'tc_final',
             delivery_time:   'tc_delivery_time',
             delivery_cond:   'tc_delivery_cond',
             warranty:        'tc_warranty',
             bonus:           'tc_bonus'
           };
-          // Dropdown termin/pengiriman kini hanya menyimpan keterangan; angka dari input k_*
-          var STRIP = { dp_status: 1, term_pay: 1, final_pay: 1, delivery_time: 1 };
+          // Dropdown pengiriman kini hanya menyimpan keterangan; angka dari input k_leadTime
+          var STRIP = { delivery_time: 1 };
           Object.keys(map).forEach(function(key) {
             var sel = document.getElementById(map[key]);
             if (!sel) return;
             var opts   = (r.options[key] || ['-']).map(function(o) { return STRIP[key] ? _kDescOnly(o) : o; });
-            // dedup keterangan yg jadi sama setelah dibuang angka (mis. "30% From PO"/"50% From PO"→"From PO")
             opts = opts.filter(function(o, i) { return opts.indexOf(o) === i; });
             var curVal = (selectedTC && selectedTC[key]) || sel.value || opts[0];
             if (STRIP[key]) curVal = _kDescOnly(curVal);
@@ -474,6 +549,17 @@
             });
             if (curVal) sel.value = curVal;
           });
+          // Keterangan termin: gabung opsi DP/Term/Final (buang angka) jadi 1 daftar untuk termin dinamis
+          var ket = [];
+          ['dp_status', 'term_pay', 'final_pay'].forEach(function(key) {
+            (r.options[key] || []).forEach(function(o) {
+              var d = _kDescOnly(o);
+              if (d && d !== '-' && ket.indexOf(d) < 0) ket.push(d);
+            });
+          });
+          ket.push('-');
+          _kTerminKetOpts = ket;
+          if (_kTerminState.length) _kRenderTermin();   // segarkan opsi select termin
         })
         .withFailureHandler(function() {})
         .getTCOptions();

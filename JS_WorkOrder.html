@@ -645,11 +645,9 @@
       var np = d.namaProject || '-';
       var tg = d.tanggal || {};
       var kl = d.klien || {};
-      var tm = d.termin || {}, gr = d.garansi || {}, rk = d.rekening || {};
+      var termins = (d.termins && d.termins.length) ? d.termins : [];
+      var gr = d.garansi || {}, rk = d.rekening || {};
       var nilai = d.nilaiKontrak || 0;
-      var nDp = Math.round(nilai * (tm.dp || 0) / 100);
-      var nTm = Math.round(nilai * (tm.termin || 0) / 100);
-      var nPl = Math.round(nilai * (tm.pelunasan || 0) / 100);
       var lead = d.leadTimeHari || 0;
 
       // ── Judul & pembuka ──
@@ -687,13 +685,24 @@
       para('Harga tersebut sudah mencakup bahan material dan komponen utama, komponen pendukung panel surya, desain teknik, commissioning test, transportasi akomodasi, dan tidak termasuk PPN.');
 
       pasal(5, 'PROSEDUR PENAGIHAN DAN PEMBAYARAN');
-      para('Prosedur pembayaran PIHAK PERTAMA pada PIHAK KEDUA sesuai dalam pasal 4 akan dilakukan secara bertahap sesuai 3 (tiga) termin yang disepakati bersama sebagai berikut:');
-      para('Termin I (satu)', { bold: true, gap: 0 });
-      para('Dibayarkan sebagai uang muka saat penandatanganan kontrak atau tanda jadi yaitu sebesar ' + (tm.dp || 0) + '% dari nilai kontrak: ' + _kRp(nDp));
-      para('Termin II (dua)', { bold: true, gap: 0 });
-      para('Dibayarkan setelah seluruh material tiba di lokasi pemasangan atau sebelum dilakukan pemasangan sebesar ' + (tm.termin || 0) + '% dari nilai kontrak: ' + _kRp(nTm));
-      para('Termin III (tiga)', { bold: true, gap: 0 });
-      para('Dibayarkan setelah seluruh pekerjaan selesai 100% (Commissioning Test dan tanda tangan Berita Acara Serah Terima) sebesar ' + (tm.pelunasan || 0) + '% dari nilai kontrak: ' + _kRp(nPl));
+      var _ROM = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+      var _TRB = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh'];
+      var nT = termins.length;
+      para('Prosedur pembayaran PIHAK PERTAMA pada PIHAK KEDUA sesuai dalam pasal 4 akan dilakukan secara bertahap sesuai ' + nT + ' (' + (_TRB[nT] || nT) + ') termin yang disepakati bersama sebagai berikut:');
+      termins.forEach(function (t, i) {
+        var pil = Math.round(nilai * (t.persen || 0) / 100);
+        var isFirst = (i === 0), isLast = (i === nT - 1);
+        var narasi;
+        if (isLast) {
+          narasi = 'Dibayarkan setelah seluruh pekerjaan selesai 100% (Commissioning Test dan tanda tangan Berita Acara Serah Terima) sebesar ' + (t.persen || 0) + '% dari nilai kontrak: ' + _kRp(pil);
+        } else if (isFirst) {
+          narasi = 'Dibayarkan sebagai uang muka saat penandatanganan kontrak atau tanda jadi yaitu sebesar ' + (t.persen || 0) + '% dari nilai kontrak: ' + _kRp(pil);
+        } else {
+          narasi = 'Dibayarkan pada tahap' + (t.ket ? ' ' + t.ket : '') + ' sebesar ' + (t.persen || 0) + '% dari nilai kontrak: ' + _kRp(pil);
+        }
+        para('Termin ' + (_ROM[i + 1] || (i + 1)) + ' (' + (_TRB[i + 1] || (i + 1)) + ')', { bold: true, gap: 0 });
+        para(narasi);
+      });
       para('Pembayaran dapat dilakukan Tunai (Cash) ataupun Transfer ke:');
       kv('Nama Bank', ':  ' + (rk.bank || rk.raw || '-'));
       kv('No. Rekening', ':  ' + (rk.noRek || '-'));
@@ -702,17 +711,17 @@
       pasal(6, 'MASA JAMINAN');
       listed([
         'Serah terima pekerjaan dilakukan oleh PIHAK PERTAMA dan PIHAK KEDUA.',
-        'Jaminan instalasi selama ' + (gr.instalasi || 0) + ' (' + _kTerbilang(gr.instalasi) + ') tahun (Vendor).',
         'Jaminan panel surya selama ' + (gr.panel || 0) + ' (' + _kTerbilang(gr.panel) + ') tahun (Distributor).',
         'Jaminan inverter selama ' + (gr.inverter || 0) + ' (' + _kTerbilang(gr.inverter) + ') tahun (Distributor).',
         'Jaminan baterai selama ' + (gr.baterai || 0) + ' (' + _kTerbilang(gr.baterai) + ') tahun (Distributor).',
+        'Jaminan instalasi selama ' + (gr.instalasi || 0) + ' (' + _kTerbilang(gr.instalasi) + ') tahun (Vendor).',
         'Jaminan tidak berlaku jika terjadi keadaan Force Majeure.'
       ]);
 
       pasal(7, 'PROSEDUR KLAIM JAMINAN');
       listed([
-        'Klaim jaminan instalasi pada pasal 6 ayat 2 dilakukan vendor datang ke lokasi pemasangan dengan biaya akomodasi teknisi ditanggung oleh PIHAK PERTAMA.',
-        'Klaim jaminan komponen pada pasal 6 ayat 3-5 dilakukan PIHAK PERTAMA mengirimkan unit kepada PIHAK KEDUA untuk dilakukan perbaikan, dengan biaya kirim dan balik ditanggung oleh PIHAK PERTAMA.',
+        'Klaim jaminan instalasi pada pasal 6 ayat 5 dilakukan vendor datang ke lokasi pemasangan dengan biaya akomodasi teknisi ditanggung oleh PIHAK PERTAMA.',
+        'Klaim jaminan komponen pada pasal 6 ayat 2-4 dilakukan PIHAK PERTAMA mengirimkan unit kepada PIHAK KEDUA untuk dilakukan perbaikan, dengan biaya kirim dan balik ditanggung oleh PIHAK PERTAMA.',
         'Klaim jaminan dapat dilakukan dengan prosedur sebagai berikut: (a) PIHAK PERTAMA mengumpulkan informasi dan dokumentasi permasalahan serta memastikan permasalahan tercakup dalam jaminan dan mengirimkannya kepada PIHAK KEDUA; (b) jika berada di luar kota, dapat melakukan panggilan telepon/video, dan PIHAK KEDUA memberikan instruksi diagnosis jarak jauh; (c) jika tidak dapat diselesaikan jarak jauh, PIHAK PERTAMA mengirimkan komponen bermasalah melalui ekspedisi terpercaya dengan kemasan yang baik; (d) jika perlu kunjungan teknisi, akan dijadwalkan perbaikan ke lokasi.'
       ]);
 

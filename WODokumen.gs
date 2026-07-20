@@ -257,7 +257,17 @@ function getKontrakData(noWO) {
       klien: { nama: namaKlien, alamat: alamat },
       nilaiKontrak: nilaiKontrak,
       tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() },
-      termin: { dp: Number(k.terminDP) || 0, termin: Number(k.terminTermin) || 0, pelunasan: Number(k.terminPelunasan) || 0 },
+      termins: (function () {
+        if (Array.isArray(k.termins) && k.termins.length) {
+          return k.termins.map(function (t) { return { persen: Number(t.persen) || 0, ket: String(t.ket || '') }; });
+        }
+        // Fallback penawaran lama (3 termin tetap)
+        return [
+          { persen: Number(k.terminDP) || 0, ket: 'From PO' },
+          { persen: Number(k.terminTermin) || 0, ket: 'Material On Site' },
+          { persen: Number(k.terminPelunasan) || 0, ket: 'After BAST' }
+        ];
+      })(),
       leadTimeHari: Number(k.leadTimeHari) || 0,
       garansi: {
         instalasi: Number(k.garansiInstalasi) || 0, panel: Number(k.garansiPanel) || 0,

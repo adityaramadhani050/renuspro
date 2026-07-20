@@ -553,22 +553,31 @@ function buatDokumenPDF(item) {
     // Sesuaikan field key dengan struktur data tc Anda
     const tcItems = [
       { label: 'Material Status',  value: tc.material_status || '-' },
-      { label: 'Down Payment',     value: tc.dp_status       || '-' },
-      { label: 'Term Payment',     value: tc.term_pay        || '-' },
-      { label: 'Final Payment',    value: tc.final_pay       || '-' },
       { label: 'Delivery Time',    value: tc.delivery_time   || '-' },
       { label: 'Delivery Cond.',   value: tc.delivery_cond   || '-' },
       { label: 'Warranty',         value: tc.warranty        || '-' },
       { label: 'Bonus',            value: tc.bonus           || '-' },
     ];
+    // Termin Pembayaran (dinamis): termin pertama = DP, terakhir = Final Payment
+    if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
+      var _tms = tc.kontrak.termins, _nT = _tms.length;
+      _tms.forEach(function(t, i) {
+        var lbl = (_nT <= 1) ? 'Final Payment' : (i === 0 ? 'Down Payment' : (i === _nT - 1 ? 'Final Payment' : 'Termin ' + (i + 1)));
+        tcItems.push({ label: lbl, value: (t.persen || 0) + '%' + (t.ket && t.ket !== '-' ? ' ' + t.ket : '') });
+      });
+    } else {
+      [['Down Payment', tc.dp_status], ['Term Payment', tc.term_pay], ['Final Payment', tc.final_pay]].forEach(function(p) {
+        if (p[1]) tcItems.push({ label: p[0], value: p[1] });
+      });
+    }
     if (tc.kontrak) {
       var _kk = tc.kontrak;
       var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
       tcItems.push(
-        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) },
         { label: 'Garansi Panel',     value: _garTh(_kk.garansiPanel) },
         { label: 'Garansi Inverter',  value: _garTh(_kk.garansiInverter) },
-        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) }
+        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) },
+        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) }
       );
     }
 
