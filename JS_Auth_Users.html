@@ -394,6 +394,7 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-password').value  = '';
   document.getElementById('modal-user-role').value      = 'sales';
   document.getElementById('modal-user-target').value    = '';
+  var waAdd = document.getElementById('modal-user-wa'); if (waAdd) waAdd.value = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
   var leadWrap = document.getElementById('modal-user-lead-wrap');
@@ -412,6 +413,7 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
   document.getElementById('modal-user-aktif').checked         = u.aktif;
   document.getElementById('modal-user-target').value          = u.targetBulanan || '';
+  var waEdit = document.getElementById('modal-user-wa'); if (waEdit) waEdit.value = u.noWa || '';
   var leadWrap = document.getElementById('modal-user-lead-wrap');
   if (leadWrap) {
     if (u.role === 'sales') {
@@ -438,6 +440,8 @@ function simpanUserModal() {
   const target   = parseFloat(document.getElementById('modal-user-target').value) || 0;
   const leadSel  = document.getElementById('modal-user-lead');
   const leadId   = (leadSel && role === 'sales') ? (leadSel.value || '') : '';
+  const waEl     = document.getElementById('modal-user-wa');
+  const noWa     = waEl ? waEl.value.trim() : '';
 
   if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
   if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
@@ -448,8 +452,8 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif, target, leadId]
-      : [nama, username, password, role, leadId];
+      ? [id, nama, username, password, role, aktif, target, leadId, noWa]
+      : [nama, username, password, role, leadId, noWa];
 
     google.script.run
       .withSuccessHandler(function(res) {

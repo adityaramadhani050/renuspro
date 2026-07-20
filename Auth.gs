@@ -14,14 +14,14 @@ function _getOrCreateMasterUser(ss) {
   if (!sheet) {
     sheet = ss.insertSheet('Master_User');
     // Header
-    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif', 'Target Bulanan', 'Lead_ID']);
+    sheet.appendRow(['ID', 'Nama Lengkap', 'Username', 'Password', 'Role', 'Aktif', 'Target Bulanan', 'Lead_ID', 'No WhatsApp']);
     // Format header
-    sheet.getRange(1, 1, 1, 8)
+    sheet.getRange(1, 1, 1, 9)
       .setBackground('#1e3a8a')
       .setFontColor('#ffffff')
       .setFontWeight('bold');
     sheet.setFrozenRows(1);
-    sheet.setColumnWidths(1, 8, [60, 160, 120, 120, 80, 60, 100, 80]);
+    sheet.setColumnWidths(1, 9, [60, 160, 120, 120, 80, 60, 100, 80, 120]);
 
     // Seed: 1 admin default
     sheet.appendRow(['U001', 'Administrator', 'admin', 'admin123', 'admin', 'TRUE']);
@@ -30,7 +30,23 @@ function _getOrCreateMasterUser(ss) {
     // Seed: contoh finance
     sheet.appendRow(['U003', 'Finance Officer', 'finance1', 'finance123', 'finance', 'TRUE']);
   }
+  // Migrasi: pastikan kolom "No WhatsApp" (kolom 9) ada pada sheet lama
+  try {
+    if (sheet.getLastColumn() < 9 || !sheet.getRange(1, 9).getValue()) {
+      sheet.getRange(1, 9).setValue('No WhatsApp').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+    }
+  } catch (e) {}
   return sheet;
+}
+
+// Normalisasi nomor WA ke format 62xxxx (buang spasi/tanda, 0 depan → 62).
+function _normalizePhone(p) {
+  var s = (p == null ? '' : p).toString().replace(/[^\d+]/g, '');
+  if (!s) return '';
+  s = s.replace(/^\+/, '');
+  if (s.charAt(0) === '0') s = '62' + s.slice(1);
+  else if (s.slice(0, 2) !== '62' && s.charAt(0) === '8') s = '62' + s;
+  return s;
 }
 
 // ── Login: verifikasi username + password ─────────────────────────────────
@@ -94,7 +110,8 @@ function getUserList() {
         role:          data[i][4].toString(),
         aktif:         data[i][5].toString().toUpperCase() !== 'FALSE',
         targetBulanan: parseFloat(data[i][6]) || 0,
-        leadId:        data[i][7] ? data[i][7].toString().trim() : ''
+        leadId:        data[i][7] ? data[i][7].toString().trim() : '',
+        noWa:          data[i][8] ? data[i][8].toString().trim() : ''
       });
     }
     return list;
@@ -102,7 +119,7 @@ function getUserList() {
 }
 
 // ── Tambah user baru (admin only) ─────────────────────────────────────────
-function simpanUser(nama, username, password, role, leadId) {
+function simpanUser(nama, username, password, role, leadId, noWa) {
   try {
     if (!nama || !username || !password || !role) {
       return { success: false, message: 'Semua field wajib diisi.' };
@@ -126,7 +143,7 @@ function simpanUser(nama, username, password, role, leadId) {
     }
     const nextId = 'U' + String(maxNum + 1).padStart(3, '0');
 
-    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || '')]);
+    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || ''), _normalizePhone(noWa)]);
     invalidateUserCache();
     return { success: true, message: 'User ' + nextId + ' (' + nama + ') berhasil ditambahkan!' };
   } catch(e) {
@@ -135,7 +152,7 @@ function simpanUser(nama, username, password, role, leadId) {
 }
 
 // ── Edit user (admin only) ────────────────────────────────────────────────
-function editUser(id, nama, username, password, role, aktif, targetBulanan, leadId) {
+function editUser(id, nama, username, password, role, aktif, targetBulanan, leadId, noWa) {
   try {
     if (!id || !nama || !username || !role) {
       return { success: false, message: 'Data tidak lengkap.' };
@@ -153,10 +170,12 @@ function editUser(id, nama, username, password, role, aktif, targetBulanan, lead
           }
         }
         const newPass = (password && password.trim()) ? password.trim() : data[i][3].toString();
-        sheet.getRange(i + 1, 2, 1, 7).setValues([[
+        // Jika noWa tidak dikirim (undefined) → pertahankan nilai lama (kol 9)
+        const noWaVal = (noWa === undefined || noWa === null) ? (data[i][8] ? data[i][8].toString() : '') : _normalizePhone(noWa);
+        sheet.getRange(i + 1, 2, 1, 8).setValues([[
           nama, username.trim().toLowerCase(), newPass,
           role.toLowerCase(), aktif ? 'TRUE' : 'FALSE',
-          parseFloat(targetBulanan) || 0, (leadId || '')
+          parseFloat(targetBulanan) || 0, (leadId || ''), noWaVal
         ]]);
         invalidateUserCache();
         return { success: true, message: 'User ' + id + ' berhasil diperbarui!' };

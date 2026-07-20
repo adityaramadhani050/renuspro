@@ -687,6 +687,12 @@
           <p class="text-[11px] text-slate-400 mt-1">Assign sales person ini ke Lead Sales tertentu.</p>
         </div>
       </div>
+      <!-- No WhatsApp (untuk notifikasi WA) -->
+      <div id="modal-user-wa-wrap">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No. WhatsApp</label>
+        <input type="text" id="modal-user-wa" class="input-field text-sm" placeholder="08xxxxxxxxxx" oninput="this.value=this.value.replace(/[^0-9+]/g,'')">
+        <p class="text-[11px] text-slate-400 mt-1">Untuk notifikasi WA (Lead &amp; Site Engineer). Format 08xx / 62xx.</p>
+      </div>
       <!-- Target Bulanan (untuk sales) -->
       <div id="modal-user-target-wrap">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Target Bulanan (Rp)</label>
