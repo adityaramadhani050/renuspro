@@ -432,7 +432,10 @@ function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
     var head = 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nItem: ' + kode + (label ? ' · ' + label : '');
     var msg;
     if (keputusan === 'Approved') {
-      msg = ['✅ *QC Disetujui*', head, '', 'Kerja bagus! Item ini sudah di-approve.'].join('\n');
+      var alines = ['✅ *QC Disetujui*', head];
+      if (catatan) alines.push('📝 Catatan: ' + catatan);
+      alines.push('', 'Kerja bagus! Item ini sudah di-approve.');
+      msg = alines.join('\n');
     } else {
       var lines = ['❌ *QC Ditolak — Perlu Revisi*', head];
       if (catatan) lines.push('📝 Catatan: ' + catatan);
