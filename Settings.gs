@@ -19,10 +19,10 @@ var _TC_FIELDS = [
 
 var _TC_DEFAULTS = {
   material_status: ['Ready Stock', 'Indent', '-'],
-  dp_status:       ['30% From PO', '50% From PO', 'Cover GIRO 30 days', '-'],
-  term_pay:        ['50% Material On Site', '50% Before Shipping', '-'],
-  final_pay:       ['After BAST', '100% Before Shipping', '70% Before Shipping', '-'],
-  delivery_time:   ['10-14 Days After PO', '4-6 Weeks After PO', '-'],
+  dp_status:       ['From PO', 'Cover GIRO 30 days', '-'],
+  term_pay:        ['Material On Site', 'Before Shipping', '-'],
+  final_pay:       ['After BAST', 'Before Shipping', '-'],
+  delivery_time:   ['Days After PO', 'Weeks After PO', '-'],
   delivery_cond:   ['Franco SBY/JKT', 'DDP Site', '-'],
   warranty:        ['Back to Back from Manufacture', 'Exclude', '-'],
   bonus:           ['-', 'Free Packing', 'Free Shipping Cost']

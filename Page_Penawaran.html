@@ -243,25 +243,24 @@
                 <textarea id="catatanTambahan" rows="8" class="input-field text-sm" placeholder="Contoh: Harga belum termasuk biaya perizinan..."></textarea>
               </div>
               <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-6">
-                <h2 class="text-sm font-bold text-slate-900 mb-1 border-b border-slate-100 pb-2"><i class="fa-solid fa-handshake mr-2 text-blue-600"></i>Syarat & Ketentuan Komerisal</h2>
-                <p class="text-[11px] text-slate-400 mb-4">Angka <span class="font-semibold text-blue-600">%</span>/<span class="font-semibold text-blue-600">hari</span>/<span class="font-semibold text-blue-600">tahun</span> di samping dipakai utk generate Surat Perjanjian Kontrak (dropdown teks tetap utk penawaran).</p>
+                <h2 class="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2"><i class="fa-solid fa-handshake mr-2 text-blue-600"></i>Syarat & Ketentuan Komerisal</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status Material</label><select id="tc_material" class="input-field py-1.5 text-sm"></select></div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Down Payment</label>
-                    <div class="flex gap-2"><select id="tc_dp" class="input-field py-1.5 text-sm flex-1"></select><input type="number" step="any" min="0" max="100" id="k_terminDP" value="30" oninput="_kHitungTermin()" title="% DP untuk kontrak" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"></div>
+                    <div class="flex gap-2"><input type="number" step="any" min="0" max="100" id="k_terminDP" value="30" oninput="_kHitungTermin()" title="% DP" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"><select id="tc_dp" class="input-field py-1.5 text-sm flex-1"></select></div>
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Term 2 Payment</label>
-                    <div class="flex gap-2"><select id="tc_term" class="input-field py-1.5 text-sm flex-1"></select><input type="number" step="any" min="0" max="100" id="k_terminTermin" value="50" oninput="_kHitungTermin()" title="% Termin 2 untuk kontrak" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"></div>
+                    <div class="flex gap-2"><input type="number" step="any" min="0" max="100" id="k_terminTermin" value="50" oninput="_kHitungTermin()" title="% Termin 2" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"><select id="tc_term" class="input-field py-1.5 text-sm flex-1"></select></div>
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Final Payment</label>
-                    <div class="flex gap-2"><select id="tc_final" class="input-field py-1.5 text-sm flex-1"></select><input type="number" step="any" min="0" max="100" id="k_terminPelunasan" value="20" oninput="_kHitungTermin()" title="% Pelunasan untuk kontrak" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"></div>
+                    <div class="flex gap-2"><input type="number" step="any" min="0" max="100" id="k_terminPelunasan" value="20" oninput="_kHitungTermin()" title="% Pelunasan" placeholder="%" class="input-field py-1.5 text-sm w-16 text-center shrink-0"><select id="tc_final" class="input-field py-1.5 text-sm flex-1"></select></div>
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pengiriman</label>
-                    <div class="flex gap-2"><select id="tc_delivery_time" class="input-field py-1.5 text-sm flex-1"></select><input type="number" step="1" min="0" id="k_leadTime" value="14" title="Lead time (hari) untuk kontrak" placeholder="hari" class="input-field py-1.5 text-sm w-16 text-center shrink-0"></div>
+                    <div class="flex gap-2"><input type="number" step="1" min="0" id="k_leadTime" value="14" title="Lead time (hari)" placeholder="hari" class="input-field py-1.5 text-sm w-16 text-center shrink-0"><select id="tc_delivery_time" class="input-field py-1.5 text-sm flex-1"></select></div>
                   </div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kondisi Pengiriman</label><select id="tc_delivery_cond" class="input-field py-1.5 text-sm"></select></div>
                   <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Garansi Material</label><select id="tc_warranty" class="input-field py-1.5 text-sm"></select></div>

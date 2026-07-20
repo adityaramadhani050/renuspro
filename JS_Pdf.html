@@ -561,6 +561,16 @@ function buatDokumenPDF(item) {
       { label: 'Warranty',         value: tc.warranty        || '-' },
       { label: 'Bonus',            value: tc.bonus           || '-' },
     ];
+    if (tc.kontrak) {
+      var _kk = tc.kontrak;
+      var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
+      tcItems.push(
+        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) },
+        { label: 'Garansi Panel',     value: _garTh(_kk.garansiPanel) },
+        { label: 'Garansi Inverter',  value: _garTh(_kk.garansiInverter) },
+        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) }
+      );
+    }
 
     const tcColCount = 2;
     const tcItemW    = CW / tcColCount;

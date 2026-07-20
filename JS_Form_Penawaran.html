@@ -31,7 +31,7 @@
     if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
     _tcDropdownsLoaded = false;
     _loadTCDropdowns(tc);
-    _kIsiDataKontrak(tc.kontrak);
+    _kIsiDataKontrak(tc.kontrak, tc);
   } catch(e) {}
 
   // Diskon & pajak
@@ -317,12 +317,28 @@
 
     // ── Data Kontrak (utk generate Surat Perjanjian Kontrak) ──────────────
     function _kNum(id, def) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? (def || 0) : v; }
+    // Buang prefix angka/persen/rentang dari teks dropdown → sisakan keterangan saja
+    // "30% From PO"→"From PO", "10-14 Days After PO"→"Days After PO", "After BAST"→"After BAST"
+    function _kDescOnly(s) { return String(s == null ? '' : s).replace(/^\s*\d+(\.\d+)?\s*(-\s*\d+(\.\d+)?\s*)?%?\s*/, '').trim(); }
+    // Ambil angka pertama dari teks tersimpan (utk edit penawaran lama tanpa data kontrak)
+    function _kLeadNum(s) { var m = String(s == null ? '' : s).match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+    // Gabung angka input + keterangan dropdown → string tampil di penawaran ("30% From PO")
+    function _kGabungTermin(numId, selId) {
+      var n = _kNum(numId, 0);
+      var d = _kDescOnly((document.getElementById(selId) || {}).value || '');
+      return (d && d !== '-') ? (n + '% ' + d) : (n + '%');
+    }
+    function _kGabungLead(numId, selId) {
+      var n = _kNum(numId, 0);
+      var d = _kDescOnly((document.getElementById(selId) || {}).value || '');
+      return (d && d !== '-') ? (n + ' ' + d) : (n + ' Hari');
+    }
     function _kHitungTermin() {
       var info = document.getElementById('k_terminInfo'); if (!info) return;
       var t = _kNum('k_terminDP', 0) + _kNum('k_terminTermin', 0) + _kNum('k_terminPelunasan', 0);
       var rounded = Math.round(t * 100) / 100;
       var ok = Math.abs(rounded - 100) < 0.01;
-      info.textContent = 'Total: ' + rounded + '%' + (ok ? '' : ' — harus 100%');
+      info.textContent = 'Total termin: ' + rounded + '%' + (ok ? '' : ' — harus 100%');
       info.className = 'text-[11px] font-semibold mt-1.5 ' + (ok ? 'text-emerald-600' : 'text-rose-600');
     }
     function _kAmbilDataKontrak() {
@@ -333,11 +349,15 @@
         garansiInverter: _kNum('k_garInverter', 5), garansiBaterai: _kNum('k_garBaterai', 5)
       };
     }
-    function _kIsiDataKontrak(k) {
-      k = k || {};
+    function _kIsiDataKontrak(k, tc) {
+      k = k || {}; tc = tc || {};
+      // Fallback penawaran lama: angka dari string tersimpan bila belum ada data kontrak terstruktur
+      var pick = function(v, str, def) { return (v || v === 0) ? v : (_kLeadNum(str) != null ? _kLeadNum(str) : def); };
       var set = function(id, v, def) { var el = document.getElementById(id); if (el) el.value = (v || v === 0) ? v : def; };
-      set('k_terminDP', k.terminDP, 30); set('k_terminTermin', k.terminTermin, 50); set('k_terminPelunasan', k.terminPelunasan, 20);
-      set('k_leadTime', k.leadTimeHari, 14);
+      set('k_terminDP', pick(k.terminDP, tc.dp_status, 30), 30);
+      set('k_terminTermin', pick(k.terminTermin, tc.term_pay, 50), 50);
+      set('k_terminPelunasan', pick(k.terminPelunasan, tc.final_pay, 20), 20);
+      set('k_leadTime', pick(k.leadTimeHari, tc.delivery_time, 14), 14);
       set('k_garInstalasi', k.garansiInstalasi, 1); set('k_garPanel', k.garansiPanel, 15);
       set('k_garInverter', k.garansiInverter, 5); set('k_garBaterai', k.garansiBaterai, 5);
       _kHitungTermin();
@@ -349,7 +369,7 @@
       if(!document.getElementById('channelMarketing').value) return showNotification("Silakan pilih Channel Marketing!", "error");
       const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
       var _kt = _kAmbilDataKontrak();
-      if (Math.abs((_kt.terminDP + _kt.terminTermin + _kt.terminPelunasan) - 100) > 0.01) return showNotification("Total persen termin (Data Kontrak) harus 100%.", "error");
+      if (Math.abs((_kt.terminDP + _kt.terminTermin + _kt.terminPelunasan) - 100) > 0.01) return showNotification("Total persen termin (DP + Term 2 + Final) harus 100%.", "error");
 
       const payload = {
         noPenawaran: document.getElementById('noPenawaran').value, tanggal: document.getElementById('tglPenawaran').value, validUntil: document.getElementById('validUntil').value,
@@ -357,8 +377,8 @@
         channelMarketing: document.getElementById('channelMarketing').value || '',
         subtotal: kalkulasiGlobalState.subtotalSemua, grandTotal: kalkulasiGlobalState.grandTotal,
         termConditions: {
-          material_status: document.getElementById('tc_material').value, dp_status: document.getElementById('tc_dp').value, term_pay: document.getElementById('tc_term').value,
-          final_pay: document.getElementById('tc_final').value, delivery_time: document.getElementById('tc_delivery_time').value, delivery_cond: document.getElementById('tc_delivery_cond').value,
+          material_status: document.getElementById('tc_material').value, dp_status: _kGabungTermin('k_terminDP','tc_dp'), term_pay: _kGabungTermin('k_terminTermin','tc_term'),
+          final_pay: _kGabungTermin('k_terminPelunasan','tc_final'), delivery_time: _kGabungLead('k_leadTime','tc_delivery_time'), delivery_cond: document.getElementById('tc_delivery_cond').value,
           warranty: document.getElementById('tc_warranty').value, bonus: document.getElementById('tc_bonus').value, diskonPersen: parseFloat(document.getElementById('inputDiskonPersen').value) ||0,
           diskonNominal: kalkulasiGlobalState.diskonNominal, pajakPersen: parseFloat(document.getElementById('inputPajakPersen').value) ||0, pajakNominal: kalkulasiGlobalState.pajakNominal,
           hppTotalGabungan: kalkulasiGlobalState.totalHpp, estimasiProfitBersih: kalkulasiGlobalState.profitInternal, marginPersenInternal: parseFloat(kalkulasiGlobalState.marginPersen) || 0,
@@ -436,11 +456,16 @@
             warranty:        'tc_warranty',
             bonus:           'tc_bonus'
           };
+          // Dropdown termin/pengiriman kini hanya menyimpan keterangan; angka dari input k_*
+          var STRIP = { dp_status: 1, term_pay: 1, final_pay: 1, delivery_time: 1 };
           Object.keys(map).forEach(function(key) {
             var sel = document.getElementById(map[key]);
             if (!sel) return;
-            var opts   = r.options[key] || ['-'];
+            var opts   = (r.options[key] || ['-']).map(function(o) { return STRIP[key] ? _kDescOnly(o) : o; });
+            // dedup keterangan yg jadi sama setelah dibuang angka (mis. "30% From PO"/"50% From PO"→"From PO")
+            opts = opts.filter(function(o, i) { return opts.indexOf(o) === i; });
             var curVal = (selectedTC && selectedTC[key]) || sel.value || opts[0];
+            if (STRIP[key]) curVal = _kDescOnly(curVal);
             sel.innerHTML = '';
             opts.forEach(function(o) {
               var el = document.createElement('option');
