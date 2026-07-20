@@ -559,12 +559,12 @@ function buatDokumenPDF(item) {
     ];
     if (tc.kontrak) {
       var _kk = tc.kontrak;
-      var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
+      var _garTh = function(v) { return (v || v === 0) ? (v + (Number(v) === 1 ? ' Year' : ' Years')) : '-'; };
       tcItems.push(
-        { label: 'Garansi Inverter',  value: _garTh(_kk.garansiInverter) },
-        { label: 'Garansi Panel',     value: _garTh(_kk.garansiPanel) },
-        { label: 'Garansi Baterai',   value: _garTh(_kk.garansiBaterai) },
-        { label: 'Garansi Instalasi', value: _garTh(_kk.garansiInstalasi) }
+        { label: 'Inverter Warranty',    value: _garTh(_kk.garansiInverter) },
+        { label: 'Solar Panel Warranty', value: _garTh(_kk.garansiPanel) },
+        { label: 'Battery Warranty',     value: _garTh(_kk.garansiBaterai) },
+        { label: 'Installation Warranty',value: _garTh(_kk.garansiInstalasi) }
       );
     }
     // Termin Pembayaran (di akhir T&C): termin pertama = DP, terakhir = Final Payment

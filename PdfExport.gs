@@ -380,10 +380,10 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   // ── Baris Garansi Material (dari data kontrak penawaran) ──
   if (tc.kontrak) {
     var _kk = tc.kontrak;
-    var _garTh = function(v) { return (v || v === 0) ? (v + ' Tahun') : '-'; };
+    var _garTh = function(v) { return (v || v === 0) ? (v + (Number(v) === 1 ? ' Year' : ' Years')) : '-'; };
     var garRows = [
-      { l1: 'Garansi Inverter',    v1: ': ' + _garTh(_kk.garansiInverter), l2: 'Garansi Panel Surya', v2: ': ' + _garTh(_kk.garansiPanel) },
-      { l1: 'Garansi Baterai',     v1: ': ' + _garTh(_kk.garansiBaterai),  l2: 'Garansi Instalasi',   v2: ': ' + _garTh(_kk.garansiInstalasi) },
+      { l1: 'Inverter Warranty',   v1: ': ' + _garTh(_kk.garansiInverter), l2: 'Solar Panel Warranty', v2: ': ' + _garTh(_kk.garansiPanel) },
+      { l1: 'Battery Warranty',    v1: ': ' + _garTh(_kk.garansiBaterai),  l2: 'Installation Warranty', v2: ': ' + _garTh(_kk.garansiInstalasi) },
     ];
     sheet.insertRowsAfter(row - 1, garRows.length);
     garRows.forEach(function(r, idx) {
