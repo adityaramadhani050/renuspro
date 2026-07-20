@@ -206,26 +206,52 @@ function _woInvoiceBankText(noWO) {
   } catch (e) { return ''; }
 }
 
-// Pisahkan teks rekening → {bank, noRek, atasNama}. Coba label dulu (Bank:/
-// No Rek:/a.n), lalu posisi (baris1=bank, baris paling banyak digit=no rek,
-// sisanya=atas nama). Selalu sertakan raw utk fallback tampilan.
+// Pisahkan teks rekening → {bank, noRek, atasNama}. Selalu sertakan raw.
+// Format yang didukung:
+//  (A) Berlabel multi-baris dgn ":"  → "Bank: BCA", "No Rek: 123", "a.n: Budi"
+//  (B) Satu baris gabung             → "Bank BCA 1930567945 (Belly Yan Dewantara)"
+//      nama bank = teks sebelum angka, no rekening = deret angka di tengah,
+//      atas nama = teks dalam kurung (atau setelah "a.n"/"atas nama").
+//  (C) Multi-baris tanpa label (posisi).
 function _woParseBank(t) {
   var raw = (t || '').toString();
   var lines = raw.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x; });
   var bank = '', noRek = '', atasNama = '';
+
+  // (A) Berlabel dengan tanda ":" — hindari salah cocok "an" di tengah nama
   lines.forEach(function (l) {
-    var low = l.toLowerCase();
-    if (/(a\.?n\.?|atas\s*nama)/.test(low)) atasNama = atasNama || l.replace(/.*(a\.?n\.?|atas\s*nama)\s*:?\s*/i, '').trim();
-    else if (/(no\.?\s*rek|rekening)/.test(low)) noRek = noRek || l.replace(/.*(no\.?\s*rek(ening)?)\s*:?\s*/i, '').trim();
-    else if (/bank/.test(low)) bank = bank || l.replace(/.*bank\s*:?\s*/i, '').trim();
+    if (/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:/i.test(l)) atasNama = atasNama || l.replace(/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:\s*/i, '').trim();
+    else if (/^\s*(no\.?\s*rek(ening)?|rekening)\s*:/i.test(l)) noRek = noRek || l.replace(/^\s*(no\.?\s*rek(ening)?|rekening)\s*:\s*/i, '').trim().replace(/[^\d]/g, '');
+    else if (/^\s*bank\s*:/i.test(l)) bank = bank || l.replace(/^\s*bank\s*:\s*/i, '').trim();
   });
+
+  // (B) Satu baris gabung: "Bank BCA 1930567945 (Belly Yan Dewantara)"
+  if (!bank && !noRek && !atasNama && (lines.length === 1 || /\(/.test(raw))) {
+    var s = raw.replace(/\r?\n/g, ' ').trim();
+    var mParen = s.match(/\(([^)]*)\)/);
+    if (mParen) { atasNama = mParen[1].trim(); s = (s.slice(0, mParen.index) + ' ' + s.slice(mParen.index + mParen[0].length)).trim(); }
+    if (!atasNama) {
+      var mAn = s.match(/(?:^|\s)(?:a\.n\.?|a\/n|atas\s+nama)\s*:?\s*(.+)$/i);
+      if (mAn) { atasNama = mAn[1].trim(); s = s.slice(0, mAn.index).trim(); }
+    }
+    var groups = s.match(/\d[\d.\- ]*\d|\d+/g);
+    if (groups) {
+      var best = '', bestLen = -1;
+      groups.forEach(function (g) { var d = (g.match(/\d/g) || []).length; if (d > bestLen) { bestLen = d; best = g; } });
+      if (bestLen >= 5) { noRek = best.replace(/[^\d]/g, ''); s = s.replace(best, ' ').trim(); }
+    }
+    bank = s.replace(/[,;]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  // (C) Multi-baris tanpa label (posisi): baris1=bank, baris terbanyak digit=no rek
   if (!bank && !noRek && !atasNama && lines.length) {
     bank = lines[0] || '';
     var maxi = -1, maxd = -1;
     lines.forEach(function (l, idx) { var dc = (l.match(/\d/g) || []).length; if (dc > maxd) { maxd = dc; maxi = idx; } });
-    if (maxi >= 0 && maxi !== 0) noRek = lines[maxi];
+    if (maxi > 0) noRek = lines[maxi].replace(/[^\d]/g, '');
     atasNama = lines.filter(function (l, idx) { return idx !== 0 && idx !== maxi; }).join(' ');
   }
+
   return { bank: bank, noRek: noRek, atasNama: atasNama, raw: raw };
 }
 
