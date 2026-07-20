@@ -404,7 +404,7 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
   if (tc.kontrak && tc.kontrak.termins && tc.kontrak.termins.length) {
     var _tms = tc.kontrak.termins, _nT = _tms.length;
     _tms.forEach(function(t, i) {
-      var lbl = (_nT <= 1) ? 'Final Payment' : (i === 0 ? 'Down Payment (DP)' : (i === _nT - 1 ? 'Final Payment' : 'Termin ke-' + (i + 1)));
+      var lbl = (_nT <= 1) ? 'Final Payment' : (i === 0 ? 'Down Payment' : (i === _nT - 1 ? 'Final Payment' : 'Term ' + (i + 1)));
       var val = (t.persen || 0) + '%' + (t.ket && t.ket !== '-' ? ' ' + t.ket : '');
       terminFlat.push({ l: lbl, v: ': ' + val });
     });
