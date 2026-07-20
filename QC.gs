@@ -717,6 +717,8 @@ function reviewQCItem(noWO, kode, keputusan, catatan, reviewer) {
       type: keputusan === 'Approved' ? 'approve' : 'reject',
       by: (reviewer || '').toString(), at: when, note: (catatan || '').toString()
     });
+    // Notifikasi WA ke site engineer WO ini (approve/reject). Aman bila WA off.
+    try { if (typeof _qcNotifSiteReview === 'function') _qcNotifSiteReview(noWO, kode, keputusan, (catatan || '').toString()); } catch (e) {}
     return { success: true, message: 'Item ' + kode + ' ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
   } catch (e) {
     return { success: false, message: e.toString() };

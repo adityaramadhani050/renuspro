@@ -108,6 +108,7 @@ function _loadWAConfig() {
       document.getElementById('wa-endpoint').value   = r.endpoint || '';
       document.getElementById('wa-target').value     = r.target   || '';
       document.getElementById('wa-token').value      = r.token    || '';
+      var qcEl = document.getElementById('wa-qc-notif'); if (qcEl) qcEl.checked = (r.qcNotif !== false);
       _updateWAEnabledLabel(!!r.enabled);
     })
     .withFailureHandler(function() {})
@@ -150,7 +151,7 @@ function simpanWAConfig() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token });
+    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token, qcNotif: (document.getElementById('wa-qc-notif') || {}).checked });
 }
 
 function testWAConfig() {
