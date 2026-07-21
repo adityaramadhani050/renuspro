@@ -338,3 +338,43 @@ function getBASTData(noWO) {
     return { success: false, message: e.toString() };
   }
 }
+
+// Data draft Surat Garansi. Tanggal dokumen & Tanggal BAST = hari ini; lokasi
+// dari alamat klien; nomor kontrak = pola SPK (dari Tanggal Deal); durasi
+// garansi dari setelan kontrak WO. PIHAK penyedia diisi di client dari akun.
+function getGaransiData(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var row = _woRowByNo(noWO);
+    if (!row) return { success: false, message: 'Work Order tidak ditemukan.' };
+
+    var namaProject = (row[5] || '').toString();
+    var klienId = (row[6] || '').toString();
+    var namaKlien = (row[7] || '').toString();
+    var tc = {}; try { tc = JSON.parse(row[16] || '{}'); } catch (e) {}
+    var k = tc.kontrak || {};
+    var alamat = '';
+    try { (getCustomerList() || []).forEach(function (c) { if (c.id === klienId) alamat = c.alamat || ''; }); } catch (e) {}
+
+    var dealD = _woParseTgl((row[19] || '').toString()) || new Date();
+    var digits = (noWO.match(/\d/g) || []).join('');
+    var seq = digits.length >= 3 ? digits.slice(-3) : (digits || noWO);
+    var spk = seq + '/RGI/SPK/' + (_WO_ROMAWI[dealD.getMonth() + 1] || '') + '/' + dealD.getFullYear();
+
+    var t = new Date();   // tanggal dokumen & Tanggal BAST = hari ini
+    return {
+      success: true,
+      noWO: noWO, namaProject: namaProject, spkNomor: spk,
+      klien: { nama: namaKlien, alamat: alamat },
+      lokasi: alamat,
+      tanggal: { hari: _WO_HARI[t.getDay()], tgl: t.getDate(), bulan: _WO_BULAN[t.getMonth()], tahun: t.getFullYear() },
+      garansi: {
+        panel: Number(k.garansiPanel) || 0, inverter: Number(k.garansiInverter) || 0,
+        baterai: Number(k.garansiBaterai) || 0, instalasi: Number(k.garansiInstalasi) || 0
+      }
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}

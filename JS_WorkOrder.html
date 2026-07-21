@@ -513,10 +513,13 @@
         } else {
           body += '<p class="text-[11px] text-slate-300 italic mt-1">Belum ada dokumen di QC (' + _woEsc(d.kode) + ').</p>';
         }
-        // BAST bisa dibuat draft-nya (mirip Kontrak) lalu ditandatangani & diupload ke QC.
-        if (key === 'bast') {
+        // BAST & Surat Garansi bisa dibuat draft-nya (mirip Kontrak) lalu
+        // ditandatangani & diupload kembali ke QC.
+        if (key === 'bast' || key === 'garansi') {
+          var genFn = key === 'bast' ? '_woGenerateBAST' : '_woGenerateGaransi';
+          var genLabel = key === 'bast' ? 'Draft BAST' : 'Draft Garansi';
           body += '<div class="mt-2 pt-2 border-t border-slate-100">'
-            + '<button onclick="_woGenerateBAST()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-down"></i> Draft BAST</button>'
+            + '<button onclick="' + genFn + '()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-down"></i> ' + genLabel + '</button>'
             + '</div>';
         }
         return '<div class="bg-slate-50 rounded-xl border border-slate-100 px-3.5 py-2.5">' + body + '</div>';
@@ -1018,6 +1021,242 @@
       }
 
       doc.save('Draft-BAST-' + (d.noWO || '') + '.pdf');
+    }
+
+    // ── Generate Draft Surat Garansi (jsPDF) ──────────────────────────────────
+    window._woGenerateGaransi = function() {
+      if (!_woDetailCurrent) return;
+      if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
+      toggleLoader(true, 'Menyiapkan draft Garansi...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        if (!res || !res.success) { showNotification((res && res.message) || 'Gagal menyiapkan data garansi.', 'error'); return; }
+        try { _woBuildGaransiPDF(res); showNotification('Draft Surat Garansi berhasil dibuat.'); }
+        catch (e) { showNotification('Gagal membuat PDF: ' + (e && e.message ? e.message : e), 'error'); }
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyiapkan data garansi.', 'error'); })
+        .getGaransiData(_woDetailCurrent.noWO);
+    };
+
+    function _woBuildGaransiPDF(d) {
+      var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      var PW = 210, ML = 20, MR = 20, CW = PW - ML - MR, BOTTOM = 280;
+      var FS = 11, LHF = 1.34, LH = FS / 72 * 25.4 * LHF;
+      var y = 22;
+      doc.setFont('times', 'normal');
+      doc.setLineHeightFactor(LHF);
+
+      function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); y = 22; } }
+      function center(txt, size, bold) {
+        doc.setFont('times', bold ? 'bold' : 'normal'); doc.setFontSize(size || FS);
+        var lines = doc.splitTextToSize(txt, CW), lh = (size ? size * 0.46 : LH);
+        ensure(lines.length * lh);
+        lines.forEach(function(l) { doc.text(l, PW / 2, y, { align: 'center' }); y += lh; });
+        doc.setFontSize(FS);
+      }
+      function para(txt, opts) {
+        opts = opts || {};
+        doc.setFont('times', opts.bold ? 'bold' : 'normal'); doc.setFontSize(opts.size || FS);
+        var x = ML + (opts.indent || 0), w = CW - (opts.indent || 0);
+        var lines = doc.splitTextToSize(txt, w);
+        ensure(lines.length * LH);
+        if ((opts.justify !== false) && lines.length > 1) doc.text(lines, x, y, { align: 'justify', maxWidth: w });
+        else doc.text(lines, x, y);
+        y += lines.length * LH + (opts.gap == null ? 2.6 : opts.gap);
+      }
+      function kv(label, value, opts) {
+        opts = opts || {};
+        ensure(LH); doc.setFontSize(FS);
+        var x = ML, colon = x + (opts.labelW || 40);
+        doc.setFont('times', 'normal'); doc.text(label, x, y); doc.text(':', colon, y);
+        doc.setFont('times', opts.bold ? 'bold' : 'normal');
+        var vx = colon + 3, vw = CW - (vx - ML);
+        var lines = doc.splitTextToSize(String(value == null ? '' : value), vw);
+        lines.forEach(function(l, i) { if (i > 0) { ensure(LH); } doc.text(l, vx, y); y += LH; });
+        doc.setFont('times', 'normal');
+      }
+      function heading(txt) {
+        y += 3; ensure(LH); doc.setFont('times', 'bold'); doc.setFontSize(FS);
+        doc.text(txt, ML, y); y += LH; doc.setFont('times', 'normal');
+      }
+      // Numbered heading tebal (mis. "1. Panel Surya").
+      function numHead(idx, txt) {
+        ensure(LH); doc.setFont('times', 'bold'); doc.setFontSize(FS);
+        doc.text(idx + '.', ML, y); doc.text(txt, ML + 7, y); y += LH; doc.setFont('times', 'normal');
+      }
+      // Daftar terurut; item = string ATAU {t, subs, substyle}. Nested sub-list.
+      function olist(items, opts) {
+        opts = opts || {};
+        var indent = opts.indent || 0, mx = ML + indent, pad = opts.pad || 7, gap = (opts.gap == null ? 2 : opts.gap);
+        doc.setFontSize(FS);
+        items.forEach(function(it, idx) {
+          var txt = (typeof it === 'string') ? it : it.t;
+          doc.setFont('times', 'normal');
+          var mark = (opts.style === 'a') ? String.fromCharCode(97 + idx) + '.' : (idx + 1) + '.';
+          var w = CW - indent - pad;
+          var lines = doc.splitTextToSize(txt, w);
+          ensure(lines.length * LH);
+          doc.text(mark, mx, y);
+          if (lines.length > 1) doc.text(lines, mx + pad, y, { align: 'justify', maxWidth: w });
+          else doc.text(lines, mx + pad, y);
+          y += lines.length * LH + gap;
+          if (it && it.subs) olist(it.subs, { style: it.substyle || 'a', indent: indent + pad, pad: pad, gap: (opts.subGap == null ? 1 : opts.subGap) });
+        });
+      }
+
+      var np = d.namaProject || '-';
+      var tg = d.tanggal || {};
+      var kl = d.klien || {};
+      var gr = d.garansi || {};
+      var lokasi = (d.lokasi || '').toString().trim() || '-';
+      var tglBast = (tg.tgl || '-') + ' ' + (tg.bulan || '-') + ' ' + (tg.tahun || '-');
+      var akunNama = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : '-';
+      var akunJab = _woBASTJabatan();
+      var COMP = 'PT RENUS GLOBAL INDONESIA';
+      var COMP_ADDR = 'Jl. Penjaringan Asri X Blok PS 1H No.5, Penjaringan Sari, Kec. Rungkut, Surabaya, Jawa Timur 60293';
+      function thn(n) { return n + ' (' + _kTerbilang(n) + ') tahun'; }
+
+      // ── Judul ──
+      center('SURAT PERNYATAAN DAN KETENTUAN GARANSI', 13.5, true);
+      center('SISTEM PEMBANGKIT LISTRIK TENAGA SURYA (PLTS)', 12.5, true);
+      y += 4;
+
+      // ── Pembuka & identitas ──
+      para('Dokumen ini merupakan Surat Pernyataan dan Ketentuan Garansi yang dibuat dan ditetapkan pada hari ' + (tg.hari || '-') + ' tanggal ' + (tg.tgl || '-') + ' bulan ' + (tg.bulan || '-') + ' tahun ' + (tg.tahun || '-') + ' oleh:', { gap: 3.5 });
+
+      kv('Nama Perusahaan', COMP, { bold: true });
+      kv('Alamat Kantor', COMP_ADDR);
+      y += 2.5;
+      para('Dalam hal ini diwakili oleh :', { justify: false, gap: 1 });
+      kv('Nama', akunNama, { bold: true });
+      kv('Jabatan', akunJab);
+      para('Selanjutnya disebut sebagai “Penyedia”', { justify: false, gap: 3 });
+
+      para('Kepada :', { justify: false, gap: 1 });
+      kv('Nama Pelanggan', kl.nama || '-', { bold: true });
+      kv('Alamat', kl.alamat || '-');
+      para('Selanjutnya disebut sebagai “Pelanggan”', { justify: false, gap: 3 });
+
+      para('Garansi ini berkaitan dengan sistem Pembangkit Listrik Tenaga Surya (PLTS) yang telah dipasang dan diserahterimakan dengan rincian sebagai berikut:', { gap: 2.5 });
+      kv('Lokasi Instalasi', lokasi);
+      kv('Tanggal BAST', tglBast);
+      kv('Nomor Kontrak', d.spkNomor || '-');
+      y += 1;
+      para('Para pihak sepakat bahwa garansi diberikan dengan ketentuan sebagai berikut:', { justify: false, gap: 2 });
+
+      // ── Ruang Lingkup ──
+      heading('RUANG LINGKUP GARANSI');
+      olist([
+        'Garansi ini mencakup cacat produksi (manufacturing defects), kegagalan material (material failure), dan/atau kegagalan fungsi (functional failure) yang terjadi dalam kondisi penggunaan normal sesuai manual operasional dan spesifikasi teknis pabrikan.',
+        'Garansi terbatas pada tindakan perbaikan (repair) atau penggantian (replacement) komponen yang dinyatakan cacat berdasarkan hasil evaluasi teknis Penyedia atau pusat layanan resmi pabrikan.',
+        'Penggantian komponen dapat dilakukan dengan unit baru atau unit rekondisi dengan spesifikasi setara.',
+        'Garansi tidak mencakup pengembalian dana, kompensasi finansial, atau bentuk ganti rugi lainnya selain yang secara tegas disebutkan dalam dokumen ini.',
+        'Garansi hanya berlaku untuk sistem yang terpasang di lokasi sebagaimana tercantum di atas dan tidak berlaku apabila sistem dipindahkan tanpa persetujuan tertulis dari Penyedia.'
+      ]);
+
+      // ── Masa Garansi ──
+      heading('MASA GARANSI KOMPONEN');
+      para('Masa garansi dihitung sejak tanggal Berita Acara Serah Terima (BAST):', { justify: false, gap: 2 });
+      numHead(1, 'Panel Surya (PV Module)');
+      olist([
+        'Garansi Produk (Product Warranty) adalah ' + thn(gr.panel || 0) + ' terhadap cacat produksi.',
+        'Garansi Performa (Performance Warranty) mengikuti standar pabrikan dengan skema linear performance warranty.'
+      ], { style: 'a', indent: 7 });
+      numHead(2, 'Inverter');
+      olist([
+        'Garansi ' + thn(gr.inverter || 0) + ' terhadap kegagalan fungsi akibat cacat produksi.',
+        'Perpanjangan garansi mengikuti kebijakan resmi pabrikan (jika tersedia dan didaftarkan).'
+      ], { style: 'a', indent: 7 });
+      numHead(3, 'Baterai (jika ada)');
+      olist([
+        (gr.baterai > 0
+          ? 'Garansi ' + thn(gr.baterai) + ' atau sesuai batas siklus pakai (cycle life) yang tercantum dalam spesifikasi teknis.'
+          : 'Garansi sesuai batas siklus pakai (cycle life) yang tercantum dalam spesifikasi teknis.'),
+        'Garansi performa minimal 70% dari kapasitas nominal, dengan ketentuan Depth of Discharge (DoD), suhu operasional, dan pola penggunaan sesuai rekomendasi pabrikan.'
+      ], { style: 'a', indent: 7 });
+      numHead(4, 'Instalasi dan Pekerjaan (Workmanship)');
+      olist([
+        'Garansi instalasi selama ' + thn(gr.instalasi || 0) + ' terhadap kesalahan pemasangan, kesalahan koneksi, atau ketidaksesuaian instalasi dengan standar teknik yang berlaku.',
+        'Tidak termasuk kerusakan akibat perubahan struktur bangunan setelah instalasi.'
+      ], { style: 'a', indent: 7 });
+
+      // ── Pengecualian ──
+      heading('PENGECUALIAN GARANSI');
+      para('Garansi tidak berlaku terhadap kerusakan yang disebabkan oleh:', { justify: false, gap: 2 });
+      olist([
+        'Kesalahan penggunaan, kelalaian, vandalisme, atau penggunaan di luar spesifikasi teknis.',
+        'Instalasi ulang, pembongkaran, perbaikan, atau modifikasi oleh pihak selain Penyedia atau teknisi yang ditunjuk resmi.',
+        'Force majeure termasuk namun tidak terbatas pada banjir, petir, gempa bumi, kebakaran, angin topan, huru-hara, sabotase, dan bencana alam lainnya.',
+        'Lonjakan tegangan (power surge) atau gangguan kualitas daya dari jaringan PLN atau genset.',
+        'Korosi ekstrem, paparan bahan kimia, lingkungan laut tanpa proteksi tambahan, atau kondisi agresif lainnya di luar desain sistem.',
+        'Keausan normal (normal wear and tear).'
+      ]);
+
+      // ── Prosedur Klaim ──
+      heading('PROSEDUR PENGAJUAN KLAIM');
+      olist([
+        { t: 'Klaim harus diajukan secara tertulis melalui email/resmi disertai:', subs: [
+          'Nomor kontrak Foto/Video kerusakan',
+          'Log data inverter (jika tersedia)',
+          'Kronologi kejadian'
+        ] },
+        'Penyedia melakukan diagnosa awal secara remote monitoring.',
+        'Penyedia berhak meminta data tambahan untuk analisa teknis.',
+        'Jika diperlukan pemeriksaan fisik, komponen harus dikirim ke service point resmi.',
+        'Biaya pengiriman menjadi tanggung jawab Pelanggan.',
+        'Waktu penanganan klaim mengikuti SLA internal dan/atau kebijakan pabrikan.'
+      ]);
+
+      // ── Batasan Tanggung Jawab ──
+      heading('BATASAN TANGGUNG JAWAB');
+      olist([
+        'Tanggung jawab maksimum Penyedia terbatas pada nilai komponen yang digaransikan.',
+        { t: 'Penyedia tidak bertanggung jawab atas:', subs: [
+          'Kehilangan produksi energi (loss of generation)',
+          'Kehilangan pendapatan atau keuntungan',
+          'Kerugian tidak langsung atau konsekuensial'
+        ] },
+        'Penyedia tidak berkewajiban menyediakan unit pengganti sementara selama proses klaim berlangsung.'
+      ]);
+
+      // ── Ketentuan Lain ──
+      heading('KETENTUAN LAIN-LAIN');
+      olist([
+        'Keputusan teknis Penyedia dan/atau pabrikan bersifat final dan mengikat.',
+        'Garansi ini tidak dapat dipindahtangankan tanpa persetujuan tertulis dari Penyedia.',
+        'Garansi batal apabila sistem dipindahkan dari lokasi awal instalasi.',
+        'Segala perselisihan diselesaikan terlebih dahulu secara musyawarah.',
+        'Apabila tidak tercapai kesepakatan, penyelesaian dilakukan sesuai hukum yang berlaku di Republik Indonesia.'
+      ]);
+
+      // ── Penutup ──
+      y += 3; center('PENUTUP', FS, true); y += 1;
+      para('Surat Pernyataan dan Ketentuan Garansi ini dibuat dalam keadaan sadar, tanpa paksaan dari pihak mana pun, dan berlaku efektif sejak tanggal penandatanganan.', { gap: 4 });
+
+      // ── Tanda tangan ──
+      ensure(52); y += 10;
+      var colL = ML + 30, colR = PW - MR - 30;
+      doc.setFont('times', 'bold'); doc.setFontSize(FS);
+      doc.text('PENYEDIA', colL, y, { align: 'center' });
+      doc.text('PELANGGAN', colR, y, { align: 'center' });
+      y += 28;
+      doc.setFont('times', 'bold');
+      doc.text('(' + akunNama + ')', colL, y, { align: 'center' });
+      doc.text('(' + (kl.nama || '-') + ')', colR, y, { align: 'center' });
+      y += LH;
+      doc.setFont('times', 'normal'); doc.setFontSize(9.5); doc.setTextColor(80, 80, 80);
+      doc.text(akunJab, colL, y, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+
+      // Footer nomor halaman
+      var tp = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= tp; p++) {
+        doc.setPage(p);
+        doc.setFont('times', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+        doc.text('Hal ' + p + ' / ' + tp, PW - MR, 289, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+      }
+
+      doc.save('Draft-Garansi-' + (d.noWO || '') + '.pdf');
     }
 
     function _catatanDariDetailWO() {
