@@ -885,8 +885,9 @@
       return LABEL[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1) : '-');
     }
 
-    window._woGenerateBAST = function() {
-      if (!_woDetailCurrent) return;
+    window._woGenerateBAST = function(noWO) {
+      noWO = noWO || (_woDetailCurrent && _woDetailCurrent.noWO);
+      if (!noWO) return;
       if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
       toggleLoader(true, 'Menyiapkan draft BAST...');
       google.script.run.withSuccessHandler(function(res) {
@@ -895,7 +896,7 @@
         try { _woBuildBASTPDF(res); showNotification('Draft BAST berhasil dibuat.'); }
         catch (e) { showNotification('Gagal membuat PDF: ' + (e && e.message ? e.message : e), 'error'); }
       }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyiapkan data BAST.', 'error'); })
-        .getBASTData(_woDetailCurrent.noWO);
+        .getBASTData(noWO);
     };
 
     function _woBuildBASTPDF(d) {
@@ -1024,8 +1025,9 @@
     }
 
     // ── Generate Draft Surat Garansi (jsPDF) ──────────────────────────────────
-    window._woGenerateGaransi = function() {
-      if (!_woDetailCurrent) return;
+    window._woGenerateGaransi = function(noWO) {
+      noWO = noWO || (_woDetailCurrent && _woDetailCurrent.noWO);
+      if (!noWO) return;
       if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
       toggleLoader(true, 'Menyiapkan draft Garansi...');
       google.script.run.withSuccessHandler(function(res) {
@@ -1034,7 +1036,7 @@
         try { _woBuildGaransiPDF(res); showNotification('Draft Surat Garansi berhasil dibuat.'); }
         catch (e) { showNotification('Gagal membuat PDF: ' + (e && e.message ? e.message : e), 'error'); }
       }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyiapkan data garansi.', 'error'); })
-        .getGaransiData(_woDetailCurrent.noWO);
+        .getGaransiData(noWO);
     };
 
     function _woBuildGaransiPDF(d) {

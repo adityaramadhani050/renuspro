@@ -513,7 +513,28 @@ function _qcRenderDetail(summary) {
     + '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2"><i class="fa-solid fa-user-helmet-safety mr-1"></i>Site Engineer</span>'
     + assignedHtml + '</div>';
 
+  // Download draft dokumen langsung dari QC (BAST & Surat Garansi) — site &
+  // lead engineer bisa unduh tanpa harus buka detail Work Order.
+  head.innerHTML += '<div class="mt-2 flex items-center flex-wrap gap-2">'
+    + '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1"><i class="fa-solid fa-file-lines mr-1"></i>Draft Dokumen</span>'
+    + '<button onclick="_qcDraftBAST()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-down"></i> Draft BAST</button>'
+    + '<button onclick="_qcDraftGaransi()" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2.5 py-1.5 rounded-lg transition"><i class="fa-solid fa-file-arrow-down"></i> Draft Garansi</button>'
+    + '</div>';
+
   _qcRenderDetailBody();
+}
+
+// Download draft BAST / Surat Garansi utk WO yg sedang dibuka di QC. Memakai
+// generator yang sama dengan panel Dokumen Project (detail Work Order).
+function _qcDraftBAST() {
+  var no = _qcWO && _qcWO.noWO; if (!no) return;
+  if (typeof window._woGenerateBAST === 'function') window._woGenerateBAST(no);
+  else showNotification('Modul dokumen belum siap. Muat ulang halaman.', 'error');
+}
+function _qcDraftGaransi() {
+  var no = _qcWO && _qcWO.noWO; if (!no) return;
+  if (typeof window._woGenerateGaransi === 'function') window._woGenerateGaransi(no);
+  else showNotification('Modul dokumen belum siap. Muat ulang halaman.', 'error');
 }
 
 // Chips hitungan status (Approved selalu tampil; Pending/Rejected/Belum hanya
