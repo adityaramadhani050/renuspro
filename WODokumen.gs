@@ -139,7 +139,7 @@ function _getWOQCDocs(noWO) {
       var foto = _qcParseFoto(row[3]);
       if (foto.length) {
         var f = foto[foto.length - 1];
-        doc.file = { fileId: f.fileId, fileUrl: f.fileUrl };
+        doc.file = { fileId: f.fileId, fileUrl: f.fileUrl, fileName: f.fileName || '' };
         doc.by = f.by || (row[6] || '').toString();
         doc.at = f.at || (row[7] || '').toString();
       }
