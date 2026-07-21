@@ -490,10 +490,19 @@ function _qcRenderDetail(summary) {
       : '';
     actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + draftBtns + manageBtns + '</div>';
   }
-  head.innerHTML = '<div>'
-    + '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
+  // Penugasan site engineer — badge nama tampil rata kanan, sejajar judul.
+  var assigned = _qcWO.assigned || [];
+  var assignedHtml = assigned.length
+    ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 inline-block">' + _qcEsc(a.nama) + '</span>'; }).join(' ')
+    : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
+
+  head.innerHTML = '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0">'
+    +   '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _qcEsc(_qcWO.noWO) + '</span></div>'
     +   '<div class="font-bold text-slate-800">' + _qcEsc(_qcWO.namaProject || '-') + '</div>'
     +   '<div class="text-xs text-slate-400">' + _qcEsc(_qcWO.namaKlien || '') + '</div>'
+    + '</div>'
+    + '<div class="flex flex-wrap justify-end gap-1 shrink-0 max-w-[45%]">' + assignedHtml + '</div>'
     + '</div>'
     + '<div class="flex items-center gap-2 mt-3">'
     +   '<div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-2.5 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-orange-400') + '" style="width:' + pct + '%"></div></div>'
@@ -506,15 +515,6 @@ function _qcRenderDetail(summary) {
     +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (summary.belum || 0) + ' Belum</span>'
     +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
     + '</div>';
-
-  // Penugasan site engineer (daftar nama; tombol Atur ada di kanan atas)
-  var assigned = _qcWO.assigned || [];
-  var assignedHtml = assigned.length
-    ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 mr-1 mb-1 inline-block">' + _qcEsc(a.nama) + '</span>'; }).join('')
-    : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
-  head.innerHTML += '<div class="mt-3 border-t border-slate-100 pt-3 flex items-center flex-wrap">'
-    + '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2"><i class="fa-solid fa-user-helmet-safety mr-1"></i>Site Engineer</span>'
-    + assignedHtml + '</div>';
 
   _qcRenderDetailBody();
 }
