@@ -305,3 +305,36 @@ function getKontrakData(noWO) {
     return { success: false, message: e.toString() };
   }
 }
+
+// Data draft BAST (Berita Acara Serah Terima). Tanggal = hari ini (tgl serah
+// terima); lokasi diambil dari alamat klien. PIHAK PERTAMA (nama/jabatan)
+// diisi di client dari akun yang generate.
+function getBASTData(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var row = _woRowByNo(noWO);
+    if (!row) return { success: false, message: 'Work Order tidak ditemukan.' };
+
+    var namaProject = (row[5] || '').toString();
+    var klienId = (row[6] || '').toString();
+    var namaKlien = (row[7] || '').toString();
+    var alamat = '';
+    try { (getCustomerList() || []).forEach(function (c) { if (c.id === klienId) alamat = c.alamat || ''; }); } catch (e) {}
+
+    var d = new Date();   // tanggal serah terima = hari generate
+    var digits = (noWO.match(/\d/g) || []).join('');
+    var seq = digits.length >= 3 ? digits.slice(-3) : (digits || noWO);
+    var bast = seq + '/RGI/BAST/' + (_WO_ROMAWI[d.getMonth() + 1] || '') + '/' + d.getFullYear();
+
+    return {
+      success: true,
+      noWO: noWO, namaProject: namaProject, bastNomor: bast,
+      klien: { nama: namaKlien, alamat: alamat },
+      lokasi: alamat,
+      tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() }
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
