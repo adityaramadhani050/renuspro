@@ -52,29 +52,6 @@
           <div id="qc-detail-body" class="space-y-5"></div>
         </div>
 
-        <!-- EDITOR: coret/anotasi foto QC (Lead Engineer) -->
-        <div id="modal-qc-anotasi" class="hidden fixed inset-0 z-[330] flex flex-col bg-slate-900/95 px-2 sm:px-3 py-3">
-          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <button data-color="#ef4444" onclick="_qcAnotSetColor('#ef4444')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-white" style="background:#ef4444" title="Merah"></button>
-              <button data-color="#eab308" onclick="_qcAnotSetColor('#eab308')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#eab308" title="Kuning"></button>
-              <button data-color="#22c55e" onclick="_qcAnotSetColor('#22c55e')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#22c55e" title="Hijau"></button>
-              <button data-color="#111827" onclick="_qcAnotSetColor('#111827')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#111827" title="Hitam"></button>
-              <button data-color="#ffffff" onclick="_qcAnotSetColor('#ffffff')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent border border-white/40" style="background:#ffffff" title="Putih"></button>
-              <input type="range" id="qc-anot-size" min="2" max="28" value="6" oninput="_qcAnotSetSize(this.value)" class="w-20 sm:w-28 ml-1 accent-orange-500">
-              <button onclick="_qcAnotUndo()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Undo</button>
-              <button onclick="_qcAnotClear()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-eraser mr-1"></i>Hapus</button>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="_qcAnotClose()" class="text-white/80 hover:text-white text-xs font-bold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Batal</button>
-              <button onclick="_qcAnotSave()" class="text-white text-xs font-bold px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 shadow"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>
-            </div>
-          </div>
-          <div class="flex-1 flex items-center justify-center overflow-auto">
-            <canvas id="qc-anot-canvas" class="max-w-full max-h-full rounded-lg bg-slate-800 touch-none" style="touch-action:none"></canvas>
-          </div>
-        </div>
-
         <!-- MODAL: Tambah Project ke QC -->
         <div id="modal-qc-project" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
@@ -131,6 +108,34 @@
           </div>
         </div>
       </section>
+
+      <!-- EDITOR: coret/anotasi foto QC (Lead Engineer). Di LUAR section (sama
+           spt lightbox) + kartu ter-center vertikal, bukan toolbar dipaku ke
+           top:0 — supaya saat app di-embed via iframe (sites.google.com)
+           toolbar tidak terpotong chrome embed di tepi atas. -->
+      <div id="modal-qc-anotasi" class="hidden fixed inset-0 z-[330] flex items-center justify-center bg-slate-900/95 px-2 sm:px-3 py-3">
+        <div class="w-full max-w-4xl mx-auto flex flex-col" style="max-height:92vh">
+          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap shrink-0">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button data-color="#ef4444" onclick="_qcAnotSetColor('#ef4444')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-white" style="background:#ef4444" title="Merah"></button>
+              <button data-color="#eab308" onclick="_qcAnotSetColor('#eab308')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#eab308" title="Kuning"></button>
+              <button data-color="#22c55e" onclick="_qcAnotSetColor('#22c55e')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#22c55e" title="Hijau"></button>
+              <button data-color="#111827" onclick="_qcAnotSetColor('#111827')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent" style="background:#111827" title="Hitam"></button>
+              <button data-color="#ffffff" onclick="_qcAnotSetColor('#ffffff')" class="qc-anot-color h-7 w-7 rounded-full ring-2 ring-transparent border border-white/40" style="background:#ffffff" title="Putih"></button>
+              <input type="range" id="qc-anot-size" min="2" max="28" value="6" oninput="_qcAnotSetSize(this.value)" class="w-20 sm:w-28 ml-1 accent-orange-500">
+              <button onclick="_qcAnotUndo()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Undo</button>
+              <button onclick="_qcAnotClear()" class="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 text-xs font-bold px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-eraser mr-1"></i>Hapus</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="_qcAnotClose()" class="text-white/80 hover:text-white text-xs font-bold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Batal</button>
+              <button onclick="_qcAnotSave()" class="text-white text-xs font-bold px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 shadow"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>
+            </div>
+          </div>
+          <div class="flex-1 min-h-0 flex items-center justify-center overflow-auto">
+            <canvas id="qc-anot-canvas" class="max-w-full max-h-full rounded-lg bg-slate-800 touch-none" style="touch-action:none"></canvas>
+          </div>
+        </div>
+      </div>
 
       <!-- LIGHTBOX: preview foto QC in-app. Sengaja diletakkan di LUAR section
            halaman QC (bukan nested di dalamnya) — dipakai ulang dari modul lain
