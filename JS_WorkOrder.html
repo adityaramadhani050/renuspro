@@ -443,6 +443,19 @@
 
     // Kartu file PDF kecil (ikon PDF + nama/keterangan + tombol Buka). aksiHtml
     // = tombol tambahan (ganti/hapus) opsional.
+    // Normalisasi tanggal dokumen ke "DD/MM/YYYY HH:mm". Nilai yang sudah
+    // berformat dd/MM/yyyy (mis. dari QC) dibiarkan; string Date mentah lama
+    // (mis. "Tue Jul 21 2026 ...") di-parse & diformat ulang.
+    function _woFmtTgl(v) {
+      if (!v) return '';
+      v = v.toString().trim();
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) return v;
+      var d = new Date(v);
+      if (isNaN(d.getTime())) return v;
+      var p = function(n) { return (n < 10 ? '0' : '') + n; };
+      return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
     function _woDocFileCard(fileUrl, meta, aksiHtml) {
       return '<div class="flex items-center gap-2 mt-2">'
         + '<a href="' + _woEsc(fileUrl) + '" target="_blank" class="flex items-center justify-center h-10 w-10 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition shrink-0" title="Buka dokumen"><i class="fa-solid fa-file-pdf text-rose-500 text-lg"></i></a>'
@@ -469,7 +482,7 @@
           + '<span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-400"></i> Kontrak</span>'
           + '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Tersimpan</span>'
           + '</div>'
-          + _woDocFileCard(k.fileUrl, (k.by ? k.by + ' · ' : '') + (k.at || ''), genBtn + aksi);
+          + _woDocFileCard(k.fileUrl, (k.by ? k.by + ' · ' : '') + _woFmtTgl(k.at), genBtn + aksi);
       } else {
         kontrakBody = '<div class="flex items-center justify-between gap-2">'
           + '<span class="text-sm font-semibold text-slate-500 flex items-center gap-2"><i class="fa-solid fa-file-contract text-slate-300"></i> Kontrak</span>'
@@ -493,7 +506,7 @@
           + _woQCStatusBadge(d.status)
           + '</div>';
         if (d.file && d.file.fileId) {
-          body += _woDocFileCard(d.file.fileUrl, (d.by ? d.by + ' · ' : '') + (d.at || '') + (d.status === 'Approved' ? '' : ' · (belum disetujui)'), '');
+          body += _woDocFileCard(d.file.fileUrl, (d.by ? d.by + ' · ' : '') + _woFmtTgl(d.at) + (d.status === 'Approved' ? '' : ' · (belum disetujui)'), '');
         } else {
           body += '<p class="text-[11px] text-slate-300 italic mt-1">Belum ada dokumen di QC (' + _woEsc(d.kode) + ').</p>';
         }
