@@ -71,6 +71,22 @@
     </tr>
   </template>
 
+  <!-- Baris Hidden Cost (internal — HPP saja, tidak tampil ke klien/PDF) -->
+  <template id="barisHiddenCostTemplate">
+    <tr class="border-b border-slate-150 hover:bg-slate-50 transition baris-hidden">
+      <td class="p-2 text-center text-xs font-bold text-slate-400 hidden-index">1</td>
+      <td class="p-2 space-y-1">
+        <select onchange="onHiddenCostSelectChanged(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white select-hidden-produk"><option value="">-- Pilih Item --</option></select>
+        <textarea placeholder="Deskripsi..." class="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs hidden-deskripsi" rows="1"></textarea>
+      </td>
+      <td class="p-2"><input type="number" step="any" min="0" value="1" oninput="hitungHiddenCostBaris(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold hidden-qty"></td>
+      <td class="p-2"><input type="text" class="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-center text-xs text-slate-500 hidden-unit" readonly></td>
+      <td class="p-2"><div class="relative"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-rose-500 font-bold">HPP</span><input type="text" oninput="formatAksiHiddenCostHpp(this)" class="w-full pl-8 pr-2 py-1.5 text-xs border border-rose-200 bg-rose-50 text-rose-900 rounded-md hidden-hpp"></div></td>
+      <td class="p-2 text-right"><div class="font-extrabold text-rose-700 text-xs">Rp <span class="txt-hpp-hidden" data-raw-hpp="0">0</span></div></td>
+      <td class="p-2 text-center"><button type="button" onclick="hapusBarisHiddenCost(this)" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition"><i class="fa-regular fa-trash-can"></i></button></td>
+    </tr>
+  </template>
+
     <!-- MODAL EDIT PRODUK -->
     <div id="modal-edit-produk" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl">

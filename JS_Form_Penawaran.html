@@ -247,6 +247,66 @@
       hitungSubtotalBaris(sel);
     }
 
+    // ── Hidden Cost (internal) — HPP saja, tidak tampil ke klien/PDF ──────────
+    function _initSelectHiddenCost(kontainer) {
+      const selects = kontainer.querySelectorAll ? kontainer.querySelectorAll('.select-hidden-produk:not([data-sd-init])') : [];
+      selects.forEach(function(sel) {
+        if (sel.dataset.sdInit) return;
+        const uid = 'sd-hidden-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+        sel.id = uid;
+        if (typeof initSearchableDropdown === 'function') {
+          initSearchableDropdown(uid, { placeholder: '-- Pilih Item --', searchPlaceholder: 'Cari produk/jasa...', onChange: function() { onHiddenCostSelectChanged(sel); } });
+        }
+      });
+    }
+    function _renumberHidden() {
+      document.querySelectorAll('#tbodyHiddenCost .baris-hidden').forEach(function(b, i) { const el = b.querySelector('.hidden-index'); if (el) el.innerText = i + 1; });
+    }
+    function _isiOpsiProdukHidden(sel, selectedId) {
+      const sorted = [...(erpState.produk || [])].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+      sorted.forEach(function(p) { const o = document.createElement('option'); o.value = p.id; o.text = p.nama; o.dataset.unit = p.unit; o.dataset.hpp = p.hpp; if (selectedId && p.id === selectedId) o.selected = true; sel.add(o); });
+    }
+    function tambahBarisHiddenCost() {
+      const tb = document.getElementById('tbodyHiddenCost');
+      const tr = document.getElementById('barisHiddenCostTemplate').content.cloneNode(true);
+      _isiOpsiProdukHidden(tr.querySelector('.select-hidden-produk'));
+      tb.appendChild(tr);
+      _renumberHidden();
+      const newTr = tb.lastElementChild;
+      if (newTr) setTimeout(function() { _initSelectHiddenCost(newTr); }, 30);
+    }
+    function hapusBarisHiddenCost(btn) { btn.closest('tr').remove(); _renumberHidden(); hitungKalkulasiGabungan(); }
+    function onHiddenCostSelectChanged(sel) {
+      const tr = sel.closest('tr'); const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) { tr.querySelector('.hidden-deskripsi').value = ""; tr.querySelector('.hidden-unit').value = ""; tr.querySelector('.hidden-hpp').value = "0"; }
+      else { tr.querySelector('.hidden-deskripsi').value = opt.text; tr.querySelector('.hidden-unit').value = opt.dataset.unit || ''; tr.querySelector('.hidden-hpp').value = formatNominalRupiah(parseFloat(opt.dataset.hpp)); }
+      hitungHiddenCostBaris(sel);
+    }
+    function formatAksiHiddenCostHpp(e) { e.value = formatNominalRupiah(pN(e.value)); hitungHiddenCostBaris(e); }
+    function hitungHiddenCostBaris(e) {
+      const tr = e.closest('tr'); const q = parseFloat(tr.querySelector('.hidden-qty').value) || 0; const hpp = pN(tr.querySelector('.hidden-hpp').value);
+      const span = tr.querySelector('.txt-hpp-hidden'); span.innerText = (q * hpp).toLocaleString('id-ID'); span.dataset.rawHpp = (q * hpp);
+      hitungKalkulasiGabungan();
+    }
+    function _hiddenCostTotal() {
+      let t = 0; document.querySelectorAll('#tbodyHiddenCost .baris-hidden').forEach(function(r) { t += parseFloat(r.querySelector('.txt-hpp-hidden').dataset.rawHpp) || 0; }); return t;
+    }
+    // Muat 1 baris hidden cost dari data tersimpan (untuk mode edit).
+    function _muatBarisHiddenCost(h) {
+      const tb = document.getElementById('tbodyHiddenCost'); if (!tb) return;
+      const tr = document.getElementById('barisHiddenCostTemplate').content.cloneNode(true);
+      _isiOpsiProdukHidden(tr.querySelector('.select-hidden-produk'), h.produkId);
+      tr.querySelector('.hidden-deskripsi').value = h.deskripsi || '';
+      tr.querySelector('.hidden-qty').value = (h.qty || h.qty === 0) ? h.qty : 1;
+      tr.querySelector('.hidden-unit').value = h.unit || '';
+      tr.querySelector('.hidden-hpp').value = formatNominalRupiah(h.hpp || 0);
+      const tot = (parseFloat(h.qty) || 0) * (parseFloat(h.hpp) || 0);
+      const span = tr.querySelector('.txt-hpp-hidden'); span.innerText = tot.toLocaleString('id-ID'); span.dataset.rawHpp = tot;
+      tb.appendChild(tr);
+      _renumberHidden();
+      const newTr = tb.lastElementChild; if (newTr) setTimeout(function() { _initSelectHiddenCost(newTr); }, 30);
+    }
+
     function formatNominalRupiah(n){ if(!n||isNaN(n))return"0"; const s=Math.abs(Math.round(n)).toString(); const m=s.length%3; let r=s.substr(0,m); const b=s.substr(m).match(/\d{3}/g); if(b)r+=(m?'.':'')+b.join('.'); return(n<0?'-':'')+r; }
     function pN(str){ return parseFloat(str.toString().replace(/[^\d-]/g, ''))||0; }
     function formatAksiHargaSatuan(e){ e.value=formatNominalRupiah(pN(e.value)); hitungSubtotalBaris(e); }
@@ -271,7 +331,12 @@
       if(isDiskNom){ inP.value = subG>0?Number(((pN(inN.value)/subG)*100).toFixed(2)):0; } else { inN.value = formatNominalRupiah(subG*((parseFloat(inP.value)||0)/100)); }
       let netSub=Math.max(0, subG-pN(inN.value)); const pNom = netSub*((parseFloat(document.getElementById('inputPajakPersen').value)||0)/100);
       document.getElementById('txtPajakNominal').innerText=Math.round(pNom).toLocaleString('id-ID'); document.getElementById('txtGrandTotalSemua').innerText=Math.round(netSub+pNom).toLocaleString('id-ID');
-      
+
+      // Hidden cost (internal) langsung digabung ke Total HPP → memengaruhi margin & tersimpan.
+      const hiddenG = _hiddenCostTotal();
+      hppG += hiddenG;
+      const hEl = document.getElementById('txtHiddenCostTotal'); if (hEl) hEl.innerText = Math.round(hiddenG).toLocaleString('id-ID');
+
       const prof=netSub-hppG; const m=(netSub>0?(prof/netSub)*100:0).toFixed(1);
       document.getElementById('txtJualBersihInternal').innerText=Math.round(netSub).toLocaleString('id-ID'); document.getElementById('txtHppSemua').innerText=Math.round(hppG).toLocaleString('id-ID');
       document.getElementById('txtProfitInternal').innerText=Math.round(prof).toLocaleString('id-ID'); document.getElementById('txtMarginInternal').innerText=m;
@@ -304,6 +369,10 @@
       document.getElementById('inputDiskonPersen').value  = '0';
       document.getElementById('inputDiskonNominal').value = '0';
       document.getElementById('inputPajakPersen').value   = '11';
+
+      // Reset hidden cost (internal)
+      var _htb = document.getElementById('tbodyHiddenCost'); if (_htb) _htb.innerHTML = '';
+      var _hct = document.getElementById('txtHiddenCostTotal'); if (_hct) _hct.innerText = '0';
 
       // Reset container kelompok item
       document.getElementById('containerKelompok').innerHTML = '';
@@ -471,6 +540,18 @@
         b.querySelectorAll('.baris-item').forEach((row, i) => {
           sub.subItems.push({ noItem: i+1, produkId: row.querySelector('.select-produk').value, deskripsi: row.querySelector('.custom-deskripsi').value, qty: parseFloat(row.querySelector('.input-qty').value)||0, unit: row.querySelector('.input-unit').value||"unit", harga: pN(row.querySelector('.input-harga').value), hpp: pN(row.querySelector('.input-hpp').value), total: parseFloat(row.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0 });
         }); payload.items.push(sub);
+      });
+
+      // Hidden cost (internal) — disimpan di termConditions, TIDAK di items → tak
+      // pernah masuk PDF/tampilan klien. Sudah ikut totalHpp (via kalkulasi).
+      payload.termConditions.hiddenCosts = [];
+      document.querySelectorAll('#tbodyHiddenCost .baris-hidden').forEach(function(row) {
+        const pid = row.querySelector('.select-hidden-produk').value;
+        const desk = (row.querySelector('.hidden-deskripsi').value || '').trim();
+        const q = parseFloat(row.querySelector('.hidden-qty').value) || 0;
+        const hpp = pN(row.querySelector('.hidden-hpp').value);
+        if (!pid && !desk && !hpp) return;   // lewati baris kosong
+        payload.termConditions.hiddenCosts.push({ produkId: pid, deskripsi: desk, qty: q, unit: row.querySelector('.hidden-unit').value || 'unit', hpp: hpp, total: q * hpp });
       });
 
       toggleLoader(true, window._editMode ? "Menyimpan Revisi..." : "Menyimpan Transaksi...");
@@ -1158,6 +1239,14 @@
         if (!kelompokList.length) tambahKelompokBaru();
         else kelompokList.forEach(k => muatKelompokDariData(k));
       } catch(e) { tambahKelompokBaru(); }
+
+      // Bangun ulang hidden cost (internal) dari termConditions
+      try {
+        const _htb = document.getElementById('tbodyHiddenCost'); if (_htb) _htb.innerHTML = '';
+        const _tcHC = JSON.parse(item.termConditions || '{}');
+        const _hcList = Array.isArray(_tcHC.hiddenCosts) ? _tcHC.hiddenCosts : [];
+        _hcList.forEach(function(h) { _muatBarisHiddenCost(h); });
+      } catch(e) {}
 
       // Restore diskon & pajak setelah DOM selesai dihitung
       setTimeout(() => {
