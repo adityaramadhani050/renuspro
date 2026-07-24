@@ -1469,6 +1469,35 @@
           },
         });
 
+        // ── Hidden Cost (Internal) — itemized. Sudah termasuk dalam Total HPP
+        //    (bukan biaya tambahan / bukan realisasi terpisah). Dokumen internal. ──
+        const hcList = Array.isArray(tc.hiddenCosts) ? tc.hiddenCosts : [];
+        if (hcList.length) {
+          const hcBody = hcList.map(function(h, i) {
+            const q = h.qty || 0, hpp = h.hpp || 0, tot = (h.total != null) ? h.total : q * hpp;
+            return [String(i + 1), h.deskripsi || '', String(q), h.unit || '', rp(hpp), rp(tot)];
+          });
+          const hcTotal = hcList.reduce(function(a, h) { return a + ((h.total != null) ? h.total : (h.qty || 0) * (h.hpp || 0)); }, 0);
+          hcBody.push([
+            { content: 'Total Hidden Cost', colSpan: 5, styles: { fontStyle: 'bold', halign: 'right', fillColor: [254, 235, 235], textColor: [190, 30, 30] } },
+            { content: rp(hcTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [254, 235, 235], textColor: [190, 30, 30] } }
+          ]);
+          let hcY = doc.lastAutoTable.finalY + 5;
+          if (hcY + 20 > PH - 14) { doc.addPage(); hcY = 20; }
+          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(153, 27, 27);
+          doc.text('HIDDEN COST (INTERNAL) — sudah termasuk dalam Total HPP di bawah', ML, hcY);
+          doc.autoTable({
+            startY: hcY + 2,
+            head: [['No', 'Deskripsi (Internal)', 'Qty', 'Unit', 'HPP Satuan', 'HPP Total']],
+            body: hcBody, theme: 'grid',
+            margin: { left: ML, right: MR },
+            headStyles: { fillColor: [153, 27, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+            bodyStyles: { fontSize: 7.5, textColor: [120, 40, 40], lineColor: [220, 200, 200], lineWidth: 0.15, cellPadding: 1.6 },
+            columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' } },
+            styles: { overflow: 'linebreak' }
+          });
+        }
+
         let curY = doc.lastAutoTable.finalY + 5;
         const netSub    = (item.subtotal||0) - (item.diskon||0);
         // Fallback: hitung dari items JSON jika kolom hpp belum tersimpan (data lama/migrasi)
