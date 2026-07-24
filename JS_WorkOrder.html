@@ -1485,7 +1485,7 @@
           let hcY = doc.lastAutoTable.finalY + 5;
           if (hcY + 20 > PH - 14) { doc.addPage(); hcY = 20; }
           doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(153, 27, 27);
-          doc.text('HIDDEN COST (INTERNAL) — sudah termasuk dalam Total HPP di bawah', ML, hcY);
+          doc.text('HIDDEN COST (INTERNAL)', ML, hcY);
           doc.autoTable({
             startY: hcY + 2,
             head: [['No', 'Deskripsi (Internal)', 'Qty', 'Unit', 'HPP Satuan', 'HPP Total']],
