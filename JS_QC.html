@@ -546,6 +546,28 @@ function _qcComputeSummary() {
 }
 function _qcRefreshHead() { try { _qcRenderHead(_qcComputeSummary()); } catch (e) {} }
 
+// Badge ringkasan per section (semua tuntas → "Approved" hijau; selain itu
+// chips hitungan). Dipakai saat render awal & saat refresh live.
+function _qcSectionBadgeHtml(g) {
+  var ap = 0, rej = 0, pen = 0, bel = 0;
+  g.items.forEach(function(it) {
+    if (it.status === 'Approved') ap++;
+    else if (it.status === 'Rejected') rej++;
+    else if (it.status === 'Pending') pen++;
+    else if (it.status === 'Belum Upload') bel++;
+  });
+  var allDone = g.items.length > 0 && g.items.every(function(it) { return it.status === 'Approved' || it.status === 'NA'; });
+  return allDone
+    ? '<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><i class="fa-solid fa-circle-check mr-0.5"></i>Approved</span>'
+    : '<span class="inline-flex items-center gap-1.5 text-[10px] font-bold">' + _qcCountChips(ap, pen, rej, bel) + '</span>';
+}
+// Refresh badge 1 section (tanpa render ulang isinya).
+function _qcRefreshSection(sec) {
+  var g = _qcGroups[sec]; if (!g) return;
+  var el = document.getElementById('qc-sec-badge-' + sec);
+  if (el) el.innerHTML = _qcSectionBadgeHtml(g);
+}
+
 // Download draft BAST / Surat Garansi utk WO yg sedang dibuka di QC. Memakai
 // generator yang sama dengan panel Dokumen Project (detail Work Order).
 function _qcDraftBAST() {
@@ -580,20 +602,9 @@ function _qcRenderDetailBody() {
   _qcGroups = {};
   groups.forEach(function(g) { _qcGroups[g.section] = g; });
   document.getElementById('qc-detail-body').innerHTML = groups.map(function(g) {
-    var ap = 0, rej = 0, pen = 0, bel = 0;
-    g.items.forEach(function(it) {
-      if (it.status === 'Approved') ap++;
-      else if (it.status === 'Rejected') rej++;
-      else if (it.status === 'Pending') pen++;
-      else if (it.status === 'Belum Upload') bel++;
-    });
-    // Semua item section tuntas (Approved atau N/A, tak ada Pending/Rejected/
-    // Belum) → badge "Approved" hijau. Selain itu tampilkan chips hitungan
-    // approved/pending/rejected/belum (konsisten dgn list QC).
-    var allDone = g.items.length > 0 && g.items.every(function(it) { return it.status === 'Approved' || it.status === 'NA'; });
-    var mini = allDone
-      ? '<span class="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><i class="fa-solid fa-circle-check mr-0.5"></i>Approved</span>'
-      : '<span class="ml-2 inline-flex items-center gap-1.5 text-[10px] font-bold">' + _qcCountChips(ap, pen, rej, bel) + '</span>';
+    // Badge dibungkus span ber-id agar bisa di-refresh live (tanpa render ulang
+    // isi section) setelah approve/reject/upload per-item.
+    var mini = '<span id="qc-sec-badge-' + g.section + '" class="ml-2 inline-flex items-center">' + _qcSectionBadgeHtml(g) + '</span>';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<button onclick="_qcToggleSection(\'' + g.section + '\')" class="w-full flex items-center gap-1 px-5 py-3.5 hover:bg-slate-50 transition text-left">'
       +   '<span class="font-extrabold text-sm text-slate-700">' + _qcEsc(g.section) + '. ' + _qcEsc(g.label) + '</span>' + mini
@@ -899,6 +910,7 @@ function _qcUploadStaged(kode) {
     if (it) { it.status = res && res.status ? res.status : 'Pending'; if (res && res.foto_list) it.foto = res.foto_list; it.uploadedBy = _qcUserNama(); }
     _qcRerenderItem(kode);
     _qcRefreshHead();
+    if (it) _qcRefreshSection(it.section);
     showNotification((res && res.count ? res.count : files.length) + ' file terupload.');
   }).withFailureHandler(function(err) { delete _qcBusy[kode]; _qcRerenderItem(kode); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
     .uploadQCFotoBatch({ noWO: _qcWO.noWO, kode: kode, oleh: _qcUserNama(), files: files });
@@ -1092,6 +1104,7 @@ function _qcReview(kode, keputusan) {
     if (it) { it.status = keputusan; it.catatanSPV = catatan; }
     _qcRerenderItem(kode);
     _qcRefreshHead();
+    if (it) _qcRefreshSection(it.section);
     showNotification(res && res.message ? res.message : 'Tersimpan.');
   }).withFailureHandler(function(err) { delete _qcBusy[kode]; _qcRerenderItem(kode); showNotification((err && err.message) || 'Gagal review.', 'error'); })
     .reviewQCItem(_qcWO.noWO, kode, keputusan, catatan, _qcUserNama());
