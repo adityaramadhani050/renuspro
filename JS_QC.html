@@ -490,7 +490,18 @@ function _qcRenderDetail(summary) {
       : '';
     actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + draftBtns + manageBtns + '</div>';
   }
-  // Penugasan site engineer — badge nama tampil rata kanan, sejajar judul.
+  _qcRenderHead(summary);
+  _qcRenderDetailBody();
+}
+
+// Header ringkasan (progress + chips + badge site engineer). Dipisah dari
+// _qcRenderDetail agar bisa di-refresh sendiri (tanpa render ulang body) setelah
+// aksi approve/reject/upload per-item — sehingga item lain tak terganggu.
+function _qcRenderHead(summary) {
+  summary = summary || {};
+  var head = document.getElementById('qc-detail-head');
+  if (!head) return;
+  var pct = summary.pct || 0;
   var assigned = _qcWO.assigned || [];
   var assignedHtml = assigned.length
     ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 inline-block">' + _qcEsc(a.nama) + '</span>'; }).join(' ')
@@ -515,9 +526,25 @@ function _qcRenderDetail(summary) {
     +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (summary.belum || 0) + ' Belum</span>'
     +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
     + '</div>';
-
-  _qcRenderDetailBody();
 }
+
+// Hitung ulang ringkasan dari data lokal (_qcItems). Meniru _qcCountSummary di
+// server (pct = item wajib yang Approved / total item wajib).
+function _qcComputeSummary() {
+  var s = { total: 0, approved: 0, pending: 0, rejected: 0, belum: 0, na: 0, wajibTotal: 0, wajibSelesai: 0 };
+  (_qcItems || []).forEach(function(it) {
+    s.total++;
+    if (it.status === 'Approved') s.approved++;
+    else if (it.status === 'Pending') s.pending++;
+    else if (it.status === 'Rejected') s.rejected++;
+    else if (it.status === 'NA') s.na++;
+    else s.belum++;
+    if (it.wajib) { s.wajibTotal++; if (it.status === 'Approved') s.wajibSelesai++; }
+  });
+  s.pct = s.wajibTotal ? Math.round((s.wajibSelesai / s.wajibTotal) * 100) : 0;
+  return s;
+}
+function _qcRefreshHead() { try { _qcRenderHead(_qcComputeSummary()); } catch (e) {} }
 
 // Download draft BAST / Surat Garansi utk WO yg sedang dibuka di QC. Memakai
 // generator yang sama dengan panel Dokumen Project (detail Work Order).
@@ -723,6 +750,28 @@ function _qcItemHtml(it) {
 
   var metaHtml = _qcActivityHtml(it);
 
+  // Loading per-item (tanpa layar penuh): saat item sedang diproses, kontrol
+  // upload/review-nya diganti spinner inline agar item ini terkunci, sementara
+  // item lain tetap bisa dikerjakan.
+  var busy = (typeof _qcBusy !== 'undefined' && _qcBusy[it.kode]) ? _qcBusy[it.kode] : '';
+  var uploadArea, reviewArea;
+  if (busy === 'upload') {
+    var upThumbs = pend.map(function(p) {
+      return '<div class="w-20">' + (p.isFile
+        ? '<div class="flex items-center justify-center h-20 w-20 rounded-lg border border-rose-200 bg-white opacity-70"><i class="fa-solid fa-file-pdf text-rose-500 text-2xl"></i></div>'
+        : '<img src="' + p.preview + '" class="h-20 w-20 object-cover rounded-lg border border-orange-200 opacity-70">') + '</div>';
+    }).join('');
+    uploadArea = '<div class="mt-3 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">'
+      + '<div class="flex items-center gap-2 mb-2 text-[11px] font-extrabold text-orange-600 uppercase tracking-wider"><i class="fa-solid fa-spinner fa-spin"></i> Mengupload…</div>'
+      + (upThumbs ? '<div class="flex flex-wrap gap-2">' + upThumbs + '</div>' : '')
+      + '</div>';
+  } else {
+    uploadArea = ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '') + pendHtml;
+  }
+  reviewArea = (busy === 'review')
+    ? '<div class="mt-3 border-t border-slate-100 pt-3 inline-flex items-center gap-2 text-[12px] font-bold text-emerald-600"><i class="fa-solid fa-spinner fa-spin"></i> Menyimpan keputusan…</div>'
+    : reviewCtrl;
+
   return '<div id="qc-item-' + it.kode + '" class="px-5 py-3">'
     + '<div class="flex items-start justify-between gap-3">'
     +   '<div class="flex-1 min-w-0"><span class="font-mono text-[10px] font-bold text-slate-400 mr-1">' + it.kode + '</span><span class="text-sm font-semibold text-slate-700">' + _qcEsc(it.label) + '</span>'
@@ -733,9 +782,8 @@ function _qcItemHtml(it) {
     + (thumbs ? '<div class="flex flex-wrap gap-2 mt-3">' + thumbs + '</div>' : '')
     + rejectNote + approvedNote
     + metaHtml
-    + ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap">' + uploadCtrl + '</div>' : '')
-    + pendHtml
-    + reviewCtrl
+    + uploadArea
+    + reviewArea
     + cancelCtrl
     + '</div>';
 }
@@ -778,6 +826,7 @@ function _qcActivityHtml(it) {
 // ── Staging upload (pilih/foto banyak dulu, upload sekali klik) ────────────
 var _qcPending = {};     // kode → [{localId, isFile, base64, fileName, mimeType, preview}]
 var _qcLocalSeq = 0;
+var _qcBusy = {};        // kode → 'upload' | 'review' (item sedang diproses, kunci per-item)
 
 function _qcFindItem(kode) {
   var found = null;
@@ -836,17 +885,22 @@ function _qcUnstage(kode, localId) {
 }
 // Kirim semua pending sekaligus → 1 kali set Pending + 1 notif ke Lead.
 function _qcUploadStaged(kode) {
+  if (_qcBusy[kode]) return;   // item ini sedang diupload — kunci per-item
   var pend = _qcPending[kode] || [];
   if (!pend.length) return;
   var files = pend.map(function(p) { return { base64Data: p.base64, fileName: p.fileName, mimeType: p.mimeType }; });
-  toggleLoader(true, 'Mengupload ' + files.length + ' file...');
+  _qcBusy[kode] = 'upload';
+  _qcRerenderItem(kode);   // spinner inline di area item, tanpa layar penuh
   google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    delete _qcBusy[kode];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _qcRerenderItem(kode); return; }
     _qcPending[kode] = [];
+    var it = _qcFindItem(kode);
+    if (it) { it.status = res && res.status ? res.status : 'Pending'; if (res && res.foto_list) it.foto = res.foto_list; it.uploadedBy = _qcUserNama(); }
+    _qcRerenderItem(kode);
+    _qcRefreshHead();
     showNotification((res && res.count ? res.count : files.length) + ' file terupload.');
-    _qcReloadDetail();
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
+  }).withFailureHandler(function(err) { delete _qcBusy[kode]; _qcRerenderItem(kode); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
     .uploadQCFotoBatch({ noWO: _qcWO.noWO, kode: kode, oleh: _qcUserNama(), files: files });
 }
 
@@ -1025,16 +1079,21 @@ function _qcToggleNA(kode, checked) {
 }
 
 function _qcReview(kode, keputusan) {
+  if (_qcBusy[kode]) return;   // item ini sedang diproses — kunci per-item
   var ta = document.getElementById('qc-note-' + kode);
   var catatan = ta ? ta.value.trim() : '';
   if (keputusan === 'Rejected' && !catatan) return showNotification('Isi catatan revisi untuk menolak item.', 'error');
-  toggleLoader(true, 'Menyimpan review...');
+  _qcBusy[kode] = 'review';
+  _qcRerenderItem(kode);   // spinner inline di area tombol, tanpa layar penuh
   google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    delete _qcBusy[kode];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _qcRerenderItem(kode); return; }
+    var it = _qcFindItem(kode);
+    if (it) { it.status = keputusan; it.catatanSPV = catatan; }
+    _qcRerenderItem(kode);
+    _qcRefreshHead();
     showNotification(res && res.message ? res.message : 'Tersimpan.');
-    _qcReloadDetail();
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal review.', 'error'); })
+  }).withFailureHandler(function(err) { delete _qcBusy[kode]; _qcRerenderItem(kode); showNotification((err && err.message) || 'Gagal review.', 'error'); })
     .reviewQCItem(_qcWO.noWO, kode, keputusan, catatan, _qcUserNama());
 }
 
