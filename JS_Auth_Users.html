@@ -208,7 +208,8 @@ function _onLoginSuccess(user, message) {
   document.body.classList.remove('login-active');
   _renderUserSidebar(user);
   showNotification(message || ('Selamat datang, ' + user.nama + '!'));
-  muatSeluruhDataAwal(true);
+  // Tanpa "Sinkronisasi ERP" penuh di awal — data penawaran (klien/produk/
+  // template) dimuat saat form penawaran dibuka; tiap menu punya loading lokal.
   navigate(_defaultPage(user));
 }
 
@@ -243,7 +244,7 @@ window.onload = function() {
   if (_loadSession() && _currentUser) {
     document.getElementById('login-screen').classList.add('hidden');
     _renderUserSidebar(_currentUser);
-    muatSeluruhDataAwal(true);
+    // Tanpa sinkronisasi ERP penuh di awal (dimuat saat dibutuhkan per menu).
     navigate(_defaultPage(_currentUser));
   }
 };
