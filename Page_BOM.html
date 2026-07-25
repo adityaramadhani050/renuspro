@@ -30,6 +30,30 @@
             <div id="bom-detail-actions"></div>
           </div>
           <div id="bom-detail-head" class="bg-white rounded-2xl border border-slate-150 p-5 mb-4"></div>
+
+          <!-- Inline tambah material (seperti penawaran/PO): pilih dari pricelist per baris -->
+          <div id="bom-add-panel" class="hidden bg-white rounded-2xl border-2 border-indigo-200 p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-sm font-extrabold text-slate-700"><i class="fa-solid fa-cubes-stacked text-indigo-500 mr-1.5"></i>Tambah Material</h4>
+              <button onclick="_bomCancelNew()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="overflow-x-auto tabel-item-wrap">
+              <table class="w-full text-left border-collapse tabel-item-penawaran">
+                <thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
+                  <th class="p-2 w-10 text-center">No</th><th class="p-2">Material (Pricelist / Manual)</th><th class="p-2 w-24 text-center">Qty</th><th class="p-2 w-12 text-center">Aksi</th>
+                </tr></thead>
+                <tbody id="bom-new-tbody"></tbody>
+              </table>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-2 mt-3">
+              <button type="button" onclick="_bomAddRow()" class="text-indigo-600 text-xs font-bold px-2 py-1 hover:bg-indigo-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Baris</button>
+              <div class="flex gap-2">
+                <button onclick="_bomCancelNew()" class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+                <button onclick="_bomSaveNew()" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Material</button>
+              </div>
+            </div>
+          </div>
+
           <div id="bom-detail-body" class="space-y-4"></div>
         </div>
 

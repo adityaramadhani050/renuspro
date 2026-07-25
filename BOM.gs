@@ -344,6 +344,47 @@ function addBOMItem(payload) {
   }
 }
 
+// Tambah banyak material sekaligus (input inline seperti penawaran/PO).
+// payload: { noWO, oleh, items: [{ pricelistId, namaMaterial, merek, supplier, satuan, kategori, qty, catatan }] }
+function addBOMItemsBatch(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var noWO = (payload.noWO || '').toString().trim();
+    var items = (payload.items && payload.items.length) ? payload.items : [];
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (!items.length) return { success: false, message: 'Tidak ada material untuk ditambahkan.' };
+    var guard = _bomEditGuard(noWO);
+    if (!guard.ok) return { success: false, message: guard.message };
+
+    lock.waitLock(20000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    SpreadsheetApp.flush();
+    var oleh = (payload.oleh || '').toString(), when = _bomNow(), added = 0;
+    items.forEach(function (it) {
+      var nama = (it.namaMaterial || '').toString().trim();
+      var qty = Number(it.qty) || 0;
+      if (!nama || qty <= 0) return;
+      var id = _bomNextId(sheet);
+      sheet.appendRow([
+        id, noWO, (it.kategori || 'Lainnya').toString().trim() || 'Lainnya',
+        (it.pricelistId || '').toString(), nama,
+        (it.merek || '').toString(), (it.supplier || '').toString(),
+        (it.satuan || '').toString(), qty, (it.catatan || '').toString(),
+        oleh, when
+      ]);
+      added++;
+    });
+    if (!added) return { success: false, message: 'Tidak ada baris valid (nama material & qty wajib).' };
+    return { success: true, message: added + ' material ditambahkan.', count: added };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 function updateBOMItem(id, payload) {
   var lock = LockService.getScriptLock();
   try {
