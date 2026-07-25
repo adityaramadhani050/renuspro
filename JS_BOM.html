@@ -277,7 +277,9 @@ function _bomOptsForCat(kat) {
   list.sort(function(a, b){ return a.namaMaterial.localeCompare(b.namaMaterial, 'id'); });
   var opts = '<option value="">-- Pilih material --</option>';
   list.forEach(function(p){
-    var lbl = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + p.namaSupplier;
+    // Label = nama material saja (+ spesifikasi bila ada). Merek & supplier
+    // sudah punya kolom sendiri, jadi tak diulang di sini.
+    var lbl = p.namaMaterial + (p.spesifikasi ? ' (' + p.spesifikasi + ')' : '');
     opts += '<option value="' + _bomEsc(p.id) + '" data-nama="' + _bomEsc(p.namaMaterial) + '" data-merek="' + _bomEsc(p.merek) + '" data-supplier="' + _bomEsc(p.namaSupplier) + '" data-satuan="' + _bomEsc(p.satuan) + '">' + _bomEsc(lbl) + '</option>';
   });
   opts += '<option value="__manual__">— Input Manual —</option>';
