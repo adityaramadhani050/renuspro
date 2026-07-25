@@ -151,7 +151,7 @@
           <button type="button" onclick="hapusKelompok(this)" class="text-rose-500 text-xs font-bold flex-shrink-0 px-2 py-1"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>
         </div>
         <div class="overflow-x-auto bg-white border border-slate-200 rounded-lg tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Deskripsi Produk/Jasa</th><th class="p-2 w-20 text-center">Qty</th><th class="p-2 w-20 text-center">Unit</th><th class="p-2 w-44">Harga Jual & HPP</th><th class="p-2 w-40 text-right">Total</th><th class="p-2 w-10 text-center">Aksi</th></tr></thead><tbody class="tbody-item-kelompok"></tbody></table></div>
-        <div class="flex justify-between items-center mt-3"><button type="button" onclick="tambahBarisItemDiKelompok(this)" class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button><div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok">0</span></span></div></div>
+        <div class="flex justify-between items-center mt-3 gap-2 flex-wrap"><button type="button" onclick="tambahBarisItemDiKelompok(this)" class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button><div class="text-right"><div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok">0</span></span></div><div class="text-[11px] font-bold text-rose-600 mt-0.5">Sub-Total HPP: Rp <span class="txt-hpp-kelompok">0</span></div></div></div>
       `;
       cont.appendChild(div);
       if (idTpl) muatItemDariTemplate(div.querySelector('.tbody-item-kelompok'), idTpl);
@@ -323,8 +323,9 @@
     function hitungKalkulasiGabungan(isDiskNom=false) {
       let subG=0, hppG=0;
       document.querySelectorAll('.block-kelompok').forEach(b => {
-        let subK=0; b.querySelectorAll('.baris-item').forEach(r => { subK+=parseFloat(r.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0; hppG+=parseFloat(r.querySelector('.txt-hpp-baris').dataset.rawHpp)||0; });
+        let subK=0, hppK=0; b.querySelectorAll('.baris-item').forEach(r => { subK+=parseFloat(r.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0; var rh=parseFloat(r.querySelector('.txt-hpp-baris').dataset.rawHpp)||0; hppK+=rh; hppG+=rh; });
         b.querySelector('.txt-subtotal-kelompok').innerText=subK.toLocaleString('id-ID'); b.querySelector('.txt-subtotal-kelompok').dataset.rawSubtotal=subK; subG+=subK;
+        var hk=b.querySelector('.txt-hpp-kelompok'); if(hk) hk.innerText=hppK.toLocaleString('id-ID');
       });
       document.getElementById('txtSubtotalSemua').innerText=subG.toLocaleString('id-ID');
       const inP=document.getElementById('inputDiskonPersen'), inN=document.getElementById('inputDiskonNominal');
@@ -1310,8 +1311,9 @@
             class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded">
             <i class="fa-solid fa-plus"></i> Tambah Item
           </button>
-          <div class="text-xs font-bold text-slate-700">
-            Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok" data-raw-subtotal="0">0</span></span>
+          <div class="text-right">
+            <div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok" data-raw-subtotal="0">0</span></span></div>
+            <div class="text-[11px] font-bold text-rose-600 mt-0.5">Sub-Total HPP: Rp <span class="txt-hpp-kelompok">0</span></div>
           </div>
         </div>`;
       cont.appendChild(div);
