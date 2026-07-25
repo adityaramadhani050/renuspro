@@ -200,7 +200,7 @@ function _bomRenderBody() {
   var body = document.getElementById('bom-detail-body');
   if (!_bomCanEdit()) { _bomRenderGrouped(body); return; }
   // Editable: tabel langsung bisa diisi/diedit (seperti penawaran/PO).
-  _bomLoadPricelist(function() { _bomBuildOpts(); _bomRenderEditTable(body); });
+  _bomLoadPricelist(function() { _bomRenderEditTable(body); });
 }
 
 // Tampilan read-only (viewer / BOM Final / WO Closed) — dikelompokkan per kategori.
@@ -211,7 +211,7 @@ function _bomRenderGrouped(body) {
   }
   var groups = {}, order = [];
   _bomItems.forEach(function(it) { var k = it.kategori || 'Lainnya'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
-  order.sort(function(a, b){ return a.localeCompare(b, 'id'); });
+  // Urutan kategori mengikuti urutan penyusunan (bukan diurut abjad).
   body.innerHTML = order.map(function(kat) {
     var rows = groups[kat].map(function(it, i) {
       var cat = it.catatan ? '<div class="text-[10px] text-slate-400 italic mt-0.5">' + _bomEsc(it.catatan) + '</div>' : '';
@@ -231,19 +231,21 @@ function _bomRenderGrouped(body) {
   }).join('');
 }
 
-// Tabel material yang bisa diisi & diedit langsung (baris + dropdown), 1 tombol Simpan.
+// Editor material dikelompokkan per kategori (seperti sub-paket penawaran).
+// Tiap blok kategori punya tabelnya; dropdown material di-filter ke kategori
+// blok tsb. Urutan blok = urutan tampil (juga di read-only & PDF).
 function _bomRenderEditTable(body) {
   body.innerHTML =
-      '<div class="bg-white rounded-2xl border border-slate-150 p-4">'
-    + '<div class="overflow-x-auto tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Material (Pricelist / Manual)</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-20 text-center">Qty</th><th class="p-2 w-12 text-center">Aksi</th></tr></thead><tbody id="bom-edit-tbody"></tbody></table></div>'
-    + '<div class="flex flex-col sm:flex-row justify-between items-center gap-2 mt-3">'
-    +   '<button type="button" onclick="_bomAddRow()" class="text-indigo-600 text-xs font-bold px-2 py-1 hover:bg-indigo-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Baris</button>'
-    +   '<button onclick="_bomSaveItems()" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Material</button>'
-    + '</div></div>';
-  var tb = document.getElementById('bom-edit-tbody');
-  if (_bomItems.length) _bomItems.forEach(function(it){ _bomAppendRow(it); });
-  else _bomAppendRow(null);
-  _bomRenumber();
+      '<div id="bom-cat-container" class="space-y-3"></div>'
+    + '<datalist id="bom-cat-list">' + _bomCatDatalist() + '</datalist>'
+    + '<div class="flex flex-col sm:flex-row justify-between items-center gap-2 mt-4">'
+    +   '<button type="button" onclick="_bomAddCat()" class="bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2"><i class="fa-solid fa-folder-plus"></i> Tambah Kategori</button>'
+    +   '<button onclick="_bomSaveItems()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Material</button>'
+    + '</div>';
+  var groups = {}, order = [];
+  _bomItems.forEach(function(it){ var k = it.kategori || 'Lainnya'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
+  if (!order.length) _bomAddCat();
+  else order.forEach(function(kat){ _bomAppendBlock(kat, groups[kat]); });
 }
 
 // ── Katalog pricelist (lazy) ────────────────────────────────────
@@ -255,27 +257,46 @@ function _bomLoadPricelist(cb) {
   }).withFailureHandler(function() { _bomPricelist = []; cb(); }).getPricelistAll();
 }
 
-// ── Inline tambah material (seperti penawaran/PO) ───────────────
-var _bomNewOpts = '';   // cache <option> string pricelist utk baris
-
-function _bomBuildOpts() {
-  var sorted = (_bomPricelist || []).slice().sort(function(a, b){ return (a.kategori + a.namaMaterial).localeCompare(b.kategori + b.namaMaterial, 'id'); });
-  var opts = '<option value="">-- Pilih material --</option><option value="__manual__">— Input Manual —</option>';
-  sorted.forEach(function(p) {
-    var lbl = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + p.namaSupplier;
-    opts += '<option value="' + _bomEsc(p.id) + '" data-nama="' + _bomEsc(p.namaMaterial) + '" data-merek="' + _bomEsc(p.merek) + '" data-supplier="' + _bomEsc(p.namaSupplier) + '" data-satuan="' + _bomEsc(p.satuan) + '" data-kategori="' + _bomEsc(p.kategori) + '">' + _bomEsc(lbl) + '</option>';
-  });
-  _bomNewOpts = opts;
+// ── Blok kategori + material (mirip sub-paket penawaran) ────────
+function _bomCatList() {
+  var seen = {}, out = [];
+  (_bomPricelist || []).forEach(function(p){ var k = (p.kategori || '').trim(); if (k && !seen[k.toLowerCase()]) { seen[k.toLowerCase()] = true; out.push(k); } });
+  out.sort(function(a, b){ return a.localeCompare(b, 'id'); });
+  return out;
 }
-function _bomRowHtml() {
+function _bomCatDatalist() {
+  return _bomCatList().map(function(k){ return '<option value="' + _bomEsc(k) + '">'; }).join('');
+}
+// Opsi <option> material yang HANYA berisi kategori terpilih (+ Input Manual).
+function _bomOptsForCat(kat) {
+  var k = (kat || '').trim().toLowerCase();
+  var list = k ? (_bomPricelist || []).filter(function(p){ return (p.kategori || '').trim().toLowerCase() === k; }) : [];
+  list.sort(function(a, b){ return a.namaMaterial.localeCompare(b.namaMaterial, 'id'); });
+  var opts = '<option value="">-- Pilih material --</option>';
+  list.forEach(function(p){
+    var lbl = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + p.namaSupplier;
+    opts += '<option value="' + _bomEsc(p.id) + '" data-nama="' + _bomEsc(p.namaMaterial) + '" data-merek="' + _bomEsc(p.merek) + '" data-supplier="' + _bomEsc(p.namaSupplier) + '" data-satuan="' + _bomEsc(p.satuan) + '">' + _bomEsc(lbl) + '</option>';
+  });
+  opts += '<option value="__manual__">— Input Manual —</option>';
+  return opts;
+}
+function _bomBlockHtml(kategori) {
+  return '<div class="bom-cat-block bg-slate-50 border border-slate-200 rounded-xl p-3">'
+    + '<div class="flex items-center gap-2 mb-2">'
+    +   '<span class="bg-indigo-600 text-white h-7 w-7 rounded-lg inline-flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-layer-group"></i></span>'
+    +   '<input list="bom-cat-list" onchange="_bomCatChanged(this)" class="bom-cat-name flex-1 min-w-0 border border-slate-200 rounded-md bg-white text-sm font-bold text-slate-800 px-2 py-1.5" placeholder="Pilih / ketik kategori..." value="' + _bomEsc(kategori || '') + '">'
+    +   '<button type="button" onclick="_bomRemoveCat(this)" class="text-rose-500 hover:bg-rose-50 text-xs font-bold px-2 py-1.5 rounded-lg shrink-0"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>'
+    + '</div>'
+    + '<div class="overflow-x-auto tabel-item-wrap bg-white border border-slate-200 rounded-lg"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Material</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-16 text-center">Qty</th><th class="p-2 w-12 text-center">Aksi</th></tr></thead><tbody class="bom-cat-tbody"></tbody></table></div>'
+    + '<button type="button" onclick="_bomAddItemToCat(this)" class="text-indigo-600 text-xs font-bold px-2 py-1 mt-2 hover:bg-indigo-100 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button>'
+    + '</div>';
+}
+function _bomRowHtml(optsStr) {
   return '<tr class="border-b border-slate-100 bom-new-row baris-kartu">'
     + '<td class="p-2 text-center text-xs font-bold text-slate-400 col-no bom-new-no">1</td>'
     + '<td class="p-2 col-desk" data-label="Material">'
-    +   '<select onchange="_bomOnPickRow(this)" class="bom-new-pl w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + _bomNewOpts + '</select>'
-    +   '<div class="bom-new-manual hidden mt-1.5 space-y-1.5">'
-    +     '<input class="bom-nm-nama w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Nama material (manual)">'
-    +     '<input class="bom-nm-kategori w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Kategori">'
-    +   '</div>'
+    +   '<select onchange="_bomOnPickRow(this)" class="bom-new-pl w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + optsStr + '</select>'
+    +   '<div class="bom-new-manual hidden mt-1.5"><input class="bom-nm-nama w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Nama material (manual)"></div>'
     +   '<input class="bom-new-catatan w-full mt-1.5 px-2 py-1.5 border border-slate-200 rounded-md text-[11px]" placeholder="Catatan (opsional)">'
     + '</td>'
     + '<td class="p-2 col-merek" data-label="Merek"><input class="bom-new-merek w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Merek"></td>'
@@ -285,34 +306,60 @@ function _bomRowHtml() {
     + '<td class="p-2 text-center col-aksi"><button type="button" onclick="_bomRemoveRow(this)" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md"><i class="fa-regular fa-trash-can text-xs"></i></button></td>'
     + '</tr>';
 }
-function _bomRenumber() {
-  var rows = document.querySelectorAll('#bom-edit-tbody .bom-new-row');
+function _bomRenumberBlock(block) {
+  var rows = block.querySelectorAll('.bom-cat-tbody .bom-new-row');
   for (var i = 0; i < rows.length; i++) { var el = rows[i].querySelector('.bom-new-no'); if (el) el.innerText = i + 1; }
 }
-function _bomAppendRow(item) {
-  var tb = document.getElementById('bom-edit-tbody'); if (!tb) return;
-  tb.insertAdjacentHTML('beforeend', _bomRowHtml());
+function _bomAppendRowToBlock(block, optsStr, item) {
+  var tb = block.querySelector('.bom-cat-tbody');
+  tb.insertAdjacentHTML('beforeend', _bomRowHtml(optsStr));
   var tr = tb.lastElementChild;
   if (item) {
     var sel = tr.querySelector('.bom-new-pl');
-    var plExists = item.pricelistId && (_bomPricelist || []).some(function(p){ return p.id === item.pricelistId; });
+    var plExists = item.pricelistId && sel.querySelector('option[value="' + item.pricelistId + '"]');
     sel.value = plExists ? item.pricelistId : '__manual__';
     _bomOnPickRow(sel);
-    // Tampilkan nilai tersimpan (snapshot) di kolom merek/supplier/satuan.
     tr.querySelector('.bom-new-merek').value = item.merek || '';
     tr.querySelector('.bom-new-supplier').value = item.supplier || '';
     tr.querySelector('.bom-new-satuan').value = item.satuan || '';
-    if (!plExists) {
-      tr.querySelector('.bom-nm-nama').value = item.namaMaterial || '';
-      tr.querySelector('.bom-nm-kategori').value = item.kategori || '';
-    }
+    if (!plExists) tr.querySelector('.bom-nm-nama').value = item.namaMaterial || '';
     tr.querySelector('.bom-new-qty').value = (item.qty || item.qty === 0) ? item.qty : 1;
     tr.querySelector('.bom-new-catatan').value = item.catatan || '';
   }
-  _bomRenumber();
+  _bomRenumberBlock(block);
 }
-function _bomAddRow() { _bomAppendRow(null); }
-function _bomRemoveRow(btn) { btn.closest('tr').remove(); _bomRenumber(); }
+function _bomAppendBlock(kategori, items) {
+  var cont = document.getElementById('bom-cat-container');
+  cont.insertAdjacentHTML('beforeend', _bomBlockHtml(kategori));
+  var block = cont.lastElementChild;
+  var opts = _bomOptsForCat(kategori);
+  if (items && items.length) items.forEach(function(it){ _bomAppendRowToBlock(block, opts, it); });
+  else _bomAppendRowToBlock(block, opts, null);
+}
+function _bomAddCat() { _bomAppendBlock('', null); }
+function _bomRemoveCat(btn) { var b = btn.closest('.bom-cat-block'); if (b) b.remove(); }
+function _bomAddItemToCat(btn) {
+  var block = btn.closest('.bom-cat-block');
+  _bomAppendRowToBlock(block, _bomOptsForCat(block.querySelector('.bom-cat-name').value.trim()), null);
+}
+// Ganti kategori blok → rebuild dropdown material tiap baris (filter kategori baru).
+function _bomCatChanged(input) {
+  var block = input.closest('.bom-cat-block');
+  var opts = _bomOptsForCat(input.value.trim());
+  block.querySelectorAll('.bom-cat-tbody .bom-new-row').forEach(function(tr){
+    var sel = tr.querySelector('.bom-new-pl');
+    var cur = sel.value;
+    sel.innerHTML = opts;
+    if (cur && (cur === '__manual__' || sel.querySelector('option[value="' + cur + '"]'))) sel.value = cur;
+    else sel.value = '';
+    _bomOnPickRow(sel);
+  });
+}
+function _bomRemoveRow(btn) {
+  var block = btn.closest('.bom-cat-block');
+  btn.closest('tr').remove();
+  if (block) _bomRenumberBlock(block);
+}
 function _bomOnPickRow(sel) {
   var tr = sel.closest('tr');
   var manual = tr.querySelector('.bom-new-manual');
@@ -336,28 +383,27 @@ function _bomOnPickRow(sel) {
     ro(mk, true); ro(sp, true); ro(st, true);
   }
 }
-// Kumpulkan baris tabel + simpan (replace-all seperti submit penawaran/PO).
+// Kumpulkan seluruh blok+baris (replace-all). Kategori = nama blok; urutan blok
+// dipertahankan sehingga tampilan read-only & PDF mengikuti urutan penyusunan.
 function _bomCollectRows() {
-  var rows = document.querySelectorAll('#bom-edit-tbody .bom-new-row');
   var items = [];
-  Array.prototype.forEach.call(rows, function(tr) {
-    var sel = tr.querySelector('.bom-new-pl');
-    var v = sel.value;
-    if (!v) return;
-    var qty = parseFloat(tr.querySelector('.bom-new-qty').value) || 0;
-    var merek = tr.querySelector('.bom-new-merek').value.trim();
-    var supplier = tr.querySelector('.bom-new-supplier').value.trim();
-    var satuan = tr.querySelector('.bom-new-satuan').value.trim();
-    var catatan = tr.querySelector('.bom-new-catatan').value.trim();
-    var nama, kategori, pricelistId;
-    if (v === '__manual__') {
-      pricelistId = ''; nama = tr.querySelector('.bom-nm-nama').value.trim(); kategori = tr.querySelector('.bom-nm-kategori').value.trim() || 'Lainnya';
-    } else {
-      var opt = sel.options[sel.selectedIndex];
-      pricelistId = v; nama = opt.getAttribute('data-nama'); kategori = opt.getAttribute('data-kategori') || 'Lainnya';
-    }
-    var item = { pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, kategori: kategori, qty: qty, catatan: catatan };
-    if (item.namaMaterial && qty > 0) items.push(item);
+  document.querySelectorAll('#bom-cat-container .bom-cat-block').forEach(function(block) {
+    var kat = block.querySelector('.bom-cat-name').value.trim() || 'Lainnya';
+    block.querySelectorAll('.bom-cat-tbody .bom-new-row').forEach(function(tr) {
+      var sel = tr.querySelector('.bom-new-pl');
+      var v = sel.value;
+      if (!v) return;
+      var qty = parseFloat(tr.querySelector('.bom-new-qty').value) || 0;
+      var merek = tr.querySelector('.bom-new-merek').value.trim();
+      var supplier = tr.querySelector('.bom-new-supplier').value.trim();
+      var satuan = tr.querySelector('.bom-new-satuan').value.trim();
+      var catatan = tr.querySelector('.bom-new-catatan').value.trim();
+      var nama, pricelistId;
+      if (v === '__manual__') { pricelistId = ''; nama = tr.querySelector('.bom-nm-nama').value.trim(); }
+      else { var opt = sel.options[sel.selectedIndex]; pricelistId = v; nama = opt.getAttribute('data-nama'); }
+      var item = { pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, kategori: kat, qty: qty, catatan: catatan };
+      if (nama && qty > 0) items.push(item);
+    });
   });
   return items;
 }
@@ -511,7 +557,6 @@ function _bomExportPDF() {
     else {
       var groups = {}, order = [];
       _bomItems.forEach(function(it){ var k = it.kategori || 'Lainnya'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
-      order.sort(function(a, b){ return a.localeCompare(b, 'id'); });
       order.forEach(function(kat) {
         var bodyRows = groups[kat].map(function(it, i){ return [String(i + 1), it.namaMaterial || '', it.merek || '-', it.supplier || '-', it.satuan || '-', _bomRp(it.qty)]; });
         doc.autoTable({
