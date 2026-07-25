@@ -385,6 +385,50 @@ function addBOMItemsBatch(payload) {
   }
 }
 
+// Simpan seluruh material 1 WO sekaligus (replace-all) — pola submit penawaran/PO.
+// Hapus semua baris WO ini lalu tulis ulang dari payload.items.
+// payload: { noWO, oleh, items: [{ pricelistId, namaMaterial, merek, supplier, satuan, kategori, qty, catatan }] }
+function saveBOMItems(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var noWO = (payload.noWO || '').toString().trim();
+    var items = payload.items || [];
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var guard = _bomEditGuard(noWO);
+    if (!guard.ok) return { success: false, message: guard.message };
+
+    lock.waitLock(20000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = data.length - 1; i >= 1; i--) {
+      if ((data[i][1] || '').toString().trim() === noWO) sheet.deleteRow(i + 1);
+    }
+    SpreadsheetApp.flush();
+    var oleh = (payload.oleh || '').toString(), when = _bomNow(), added = 0;
+    items.forEach(function (it) {
+      var nama = (it.namaMaterial || '').toString().trim();
+      var qty = Number(it.qty) || 0;
+      if (!nama || qty <= 0) return;
+      var id = _bomNextId(sheet);
+      sheet.appendRow([
+        id, noWO, (it.kategori || 'Lainnya').toString().trim() || 'Lainnya',
+        (it.pricelistId || '').toString(), nama,
+        (it.merek || '').toString(), (it.supplier || '').toString(),
+        (it.satuan || '').toString(), qty, (it.catatan || '').toString(),
+        oleh, when
+      ]);
+      added++;
+    });
+    return { success: true, message: 'BOM disimpan (' + added + ' material).', count: added };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 function updateBOMItem(id, payload) {
   var lock = LockService.getScriptLock();
   try {
