@@ -453,12 +453,12 @@ function _bomSubmitAddProject() {
   var noWO = document.getElementById('bom-proj-wo').value;
   if (!noWO) return showNotification('Pilih Work Order dulu.', 'error');
   var ids = Array.prototype.slice.call(document.querySelectorAll('.bom-proj-cb:checked')).map(function(cb){ return cb.value; });
+  _bomCloseAddProject();   // tutup modal dulu agar tak menutupi loading screen
   toggleLoader(true, 'Menambahkan...');
   google.script.run.withSuccessHandler(function(res) {
     toggleLoader(false);
     if (res && res.success === false) { showNotification(res.message, 'error'); return; }
     showNotification(res && res.message ? res.message : 'Ditambahkan.');
-    _bomCloseAddProject();
     loadBOM();
   }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
     .addBOMProject(noWO, ids, _bomUserNama());
