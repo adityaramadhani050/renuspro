@@ -34,6 +34,10 @@ function _bomRp(n){ return (Number(n)||0).toLocaleString('id-ID'); }
 
 // ── HOME ────────────────────────────────────────────────────────
 window.loadBOM = function() {
+  // Selalu ambil ulang katalog & kategori saat masuk menu BOM agar kategori/
+  // material yang baru dibuat di menu Pricelist langsung muncul (tanpa reload).
+  _bomPricelist = null;
+  _bomKategori = null;
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
