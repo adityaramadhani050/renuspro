@@ -9,6 +9,10 @@
               <input type="text" id="search-pricelist" oninput="filterPricelist()" placeholder="Cari material, merek, supplier..."
                 class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
             </div>
+            <button onclick="_plOpenKategori()"
+              class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+              <i class="fa-solid fa-tags text-slate-500"></i> Kelola Kategori
+            </button>
             <button onclick="bukaFormTambahPricelist()"
               class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-plus"></i> Tambah Item
@@ -62,16 +66,6 @@
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori</label>
                   <select id="pl-kategori" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
                     <option value="">— Pilih kategori —</option>
-                    <option value="Panel Surya">Panel Surya</option>
-                    <option value="Inverter">Inverter</option>
-                    <option value="Baterai">Baterai</option>
-                    <option value="Kabel">Kabel</option>
-                    <option value="PJU">PJU</option>
-                    <option value="Pompa">Pompa</option>
-                    <option value="Aksesoris Inverter">Aksesoris Inverter</option>
-                    <option value="Portable Power Station">Portable Power Station</option>
-                    <option value="Mounting Panel Surya">Mounting Panel Surya</option>
-                    <option value="Panel Proteksi">Panel Proteksi</option>
                   </select>
                 </div>
                 <div>
@@ -103,6 +97,24 @@
             <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
               <button onclick="document.getElementById('modal-pricelist').classList.add('hidden')" class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
               <button onclick="simpanPricelistItem()" class="px-6 py-2.5 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL: Kelola Kategori -->
+        <div id="modal-kategori" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 flex flex-col" style="max-height:88vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-3 border-b border-slate-100">
+              <span class="bg-orange-100 text-orange-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-tags text-sm"></i></span>
+              <h3 class="text-base font-extrabold text-slate-800">Kelola Kategori</h3>
+              <button onclick="document.getElementById('modal-kategori').classList.add('hidden')" class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="px-6 py-4">
+              <div class="flex gap-2 mb-4">
+                <input type="text" id="kat-input" class="input-field text-sm flex-1" placeholder="Nama kategori baru..." onkeydown="if(event.key==='Enter')_plTambahKategori()">
+                <button onclick="_plTambahKategori()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button>
+              </div>
+              <div id="kat-list" class="space-y-1.5 max-h-72 overflow-y-auto"></div>
             </div>
           </div>
         </div>

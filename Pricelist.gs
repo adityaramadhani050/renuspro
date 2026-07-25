@@ -61,6 +61,94 @@ function _pricelistNextId(sheet) {
 }
 
 // Semua item pricelist + nama supplier (di-join dari master Supplier).
+// ── Master Kategori (dikelola dari menu Pricelist; dipakai pricelist & BOM) ──
+function _ensureKategoriSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('Pricelist_Kategori');
+  if (sheet) return sheet;
+  sheet = ss.insertSheet('Pricelist_Kategori');
+  sheet.appendRow(['Nama']);
+  sheet.getRange(1, 1, 1, 1).setFontWeight('bold');
+  ['Panel Surya', 'Inverter', 'Baterai', 'Kabel', 'PJU', 'Pompa', 'Aksesoris Inverter',
+   'Portable Power Station', 'Mounting Panel Surya', 'Panel Proteksi']
+    .forEach(function (n) { sheet.appendRow([n]); });
+  return sheet;
+}
+
+function getKategoriList() {
+  try {
+    var sheet = _ensureKategoriSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) { var n = (data[i][0] || '').toString().trim(); if (n) out.push(n); }
+    out.sort(function (a, b) { return a.localeCompare(b, 'id'); });
+    return { success: true, list: out };
+  } catch (e) { return { success: false, list: [], message: e.toString() }; }
+}
+
+function tambahKategori(nama) {
+  var lock = LockService.getScriptLock();
+  try {
+    nama = (nama || '').toString().trim();
+    if (!nama) return { success: false, message: 'Nama kategori wajib diisi.' };
+    lock.waitLock(15000);
+    var sheet = _ensureKategoriSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim().toLowerCase() === nama.toLowerCase()) return { success: false, message: 'Kategori "' + nama + '" sudah ada.' };
+    }
+    sheet.appendRow([nama]);
+    return { success: true, message: 'Kategori "' + nama + '" ditambahkan.' };
+  } catch (e) { return { success: false, message: e.toString() }; } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+// Rename kategori + cascade ke item Pricelist_Supplier yang memakainya.
+function updateKategori(oldNama, newNama) {
+  var lock = LockService.getScriptLock();
+  try {
+    oldNama = (oldNama || '').toString().trim(); newNama = (newNama || '').toString().trim();
+    if (!oldNama || !newNama) return { success: false, message: 'Nama kategori wajib.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureKategoriSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var n = (data[i][0] || '').toString().trim();
+      if (n.toLowerCase() === newNama.toLowerCase() && n.toLowerCase() !== oldNama.toLowerCase()) return { success: false, message: 'Kategori "' + newNama + '" sudah ada.' };
+    }
+    var found = false;
+    for (var j = 1; j < data.length; j++) {
+      if ((data[j][0] || '').toString().trim().toLowerCase() === oldNama.toLowerCase()) { sheet.getRange(j + 1, 1).setValue(newNama); found = true; break; }
+    }
+    if (!found) return { success: false, message: 'Kategori tidak ditemukan.' };
+    try {
+      var pl = _ensurePricelistSheet(ss), pd = pl.getDataRange().getValues();
+      for (var k = 1; k < pd.length; k++) { if ((pd[k][2] || '').toString().trim().toLowerCase() === oldNama.toLowerCase()) pl.getRange(k + 1, 3).setValue(newNama); }
+    } catch (e) {}
+    return { success: true, message: 'Kategori diperbarui.' };
+  } catch (e) { return { success: false, message: e.toString() }; } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
+function hapusKategori(nama) {
+  var lock = LockService.getScriptLock();
+  try {
+    nama = (nama || '').toString().trim();
+    if (!nama) return { success: false, message: 'Nama kategori wajib.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var inUse = 0;
+    try {
+      var pl = _ensurePricelistSheet(ss), pd = pl.getDataRange().getValues();
+      for (var k = 1; k < pd.length; k++) { if ((pd[k][2] || '').toString().trim().toLowerCase() === nama.toLowerCase()) inUse++; }
+    } catch (e) {}
+    if (inUse > 0) return { success: false, message: 'Kategori dipakai ' + inUse + ' item pricelist — ubah item tersebut dulu.' };
+    var sheet = _ensureKategoriSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = data.length - 1; i >= 1; i--) { if ((data[i][0] || '').toString().trim().toLowerCase() === nama.toLowerCase()) sheet.deleteRow(i + 1); }
+    return { success: true, message: 'Kategori "' + nama + '" dihapus.' };
+  } catch (e) { return { success: false, message: e.toString() }; } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
 function getPricelistAll() {
   try {
     var ss = getSpreadsheet();

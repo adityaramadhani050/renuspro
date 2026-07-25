@@ -6,6 +6,7 @@
 
 let _cachedPricelist = [];      // semua item pricelist
 let _pricelistSuppliers = [];   // daftar supplier (master) untuk dropdown form
+let _pricelistKategori = [];    // master kategori (dropdown form + Kelola Kategori)
 
 function _plParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g, '')) || 0; }
 function _plFmtRp(n) { return Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
@@ -19,6 +20,11 @@ window.loadPricelist = function() {
     _pricelistSuppliers = list || [];
     _isiPickerSupplierPl();
   }).withFailureHandler(function() {}).getSupplierList();
+
+  google.script.run.withSuccessHandler(function(res) {
+    _pricelistKategori = (res && res.success) ? (res.list || []) : [];
+    _plFillKategori();
+  }).withFailureHandler(function() {}).getKategoriList();
 
   var tb = document.getElementById('table-pricelist');
   if (tb) tb.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pricelist...</td></tr>';
@@ -109,6 +115,7 @@ function bukaFormTambahPricelist() {
     var el = document.getElementById(id); if (el) el.value = '';
   });
   _isiPickerSupplierPl();
+  _plFillKategori('');
   document.getElementById('pl-supplier').value = '';
   document.getElementById('modal-pricelist').classList.remove('hidden');
 }
@@ -120,7 +127,7 @@ function bukaFormEditPricelist(id) {
   document.getElementById('pl-id').value = it.id;
   _isiPickerSupplierPl();
   document.getElementById('pl-supplier').value = it.idSupplier;
-  document.getElementById('pl-kategori').value = it.kategori || '';
+  _plFillKategori(it.kategori || '');
   document.getElementById('pl-merek').value = it.merek || '';
   document.getElementById('pl-nama').value = it.namaMaterial || '';
   document.getElementById('pl-spesifikasi').value = it.spesifikasi || '';
@@ -177,5 +184,81 @@ function _hapusPricelistExec(id) {
     showNotification(res && res.message ? res.message : 'Item dihapus.');
     loadPricelist();
   }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus item.', 'error'); }).hapusPricelistItem(id);
+}
+// ── Master Kategori ───────────────────────────────────────────────
+function _plFillKategori(selected) {
+  var sel = document.getElementById('pl-kategori');
+  if (!sel) return;
+  var cur = (selected != null) ? selected : sel.value;
+  var opts = '<option value="">— Pilih kategori —</option>';
+  (_pricelistKategori || []).forEach(function(k) { opts += '<option value="' + _plEsc(k) + '">' + _plEsc(k) + '</option>'; });
+  if (cur && (_pricelistKategori || []).indexOf(cur) === -1) opts += '<option value="' + _plEsc(cur) + '">' + _plEsc(cur) + ' (lama)</option>';
+  sel.innerHTML = opts;
+  sel.value = cur || '';
+}
+function _plOpenKategori() {
+  document.getElementById('modal-kategori').classList.remove('hidden');
+  _plRenderKatList();
+}
+function _plReloadKategori(cb) {
+  google.script.run.withSuccessHandler(function(res) {
+    _pricelistKategori = (res && res.success) ? (res.list || []) : [];
+    _plFillKategori();
+    if (cb) cb();
+  }).withFailureHandler(function() { if (cb) cb(); }).getKategoriList();
+}
+function _plRenderKatList() {
+  var box = document.getElementById('kat-list');
+  if (!box) return;
+  if (!(_pricelistKategori || []).length) { box.innerHTML = '<div class="text-xs text-slate-400 py-2 text-center">Belum ada kategori.</div>'; return; }
+  box.innerHTML = _pricelistKategori.map(function(k) {
+    var ke = _plEsc(k).replace(/'/g, "\\'");
+    return '<div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-150 bg-slate-50">'
+      + '<span class="flex-1 text-sm font-semibold text-slate-700 truncate">' + _plEsc(k) + '</span>'
+      + '<button onclick="_plEditKategori(\'' + ke + '\')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded" title="Ubah nama"><i class="fa-solid fa-pen text-xs"></i></button>'
+      + '<button onclick="_plHapusKategori(\'' + ke + '\')" class="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
+      + '</div>';
+  }).join('');
+}
+function _plTambahKategori() {
+  var inp = document.getElementById('kat-input');
+  var nama = (inp.value || '').trim();
+  if (!nama) return showNotification('Isi nama kategori.', 'error');
+  toggleLoader(true, 'Menambah kategori...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Ditambahkan.');
+    inp.value = '';
+    _plReloadKategori(_plRenderKatList);
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .tambahKategori(nama);
+}
+function _plEditKategori(oldNama) {
+  var newNama = window.prompt('Ubah nama kategori:', oldNama);
+  if (newNama == null) return;
+  newNama = newNama.trim();
+  if (!newNama || newNama === oldNama) return;
+  toggleLoader(true, 'Menyimpan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Diperbarui.');
+    _plReloadKategori(_plRenderKatList);
+    loadPricelist();
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .updateKategori(oldNama, newNama);
+}
+function _plHapusKategori(nama) {
+  showConfirm({ title: 'Hapus Kategori', message: 'Hapus kategori "' + nama + '"?', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Menghapus...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      showNotification(res && res.message ? res.message : 'Dihapus.');
+      _plReloadKategori(_plRenderKatList);
+    }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .hapusKategori(nama);
+  }});
 }
 </script>
