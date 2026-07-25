@@ -446,6 +446,76 @@ function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
   } catch (e) { Logger.log('_qcNotifSiteReview error: ' + e); }
 }
 
+// ── Reminder manual QC (tombol di detail QC per WO) ─────────────────────────
+var _QC_REMINDER_COOLDOWN_MS = 30 * 60 * 1000;   // 30 menit per WO per jenis
+function _qcReminderKey(type, noWO) { return 'QCREM_' + type + '_' + noWO; }
+// Sisa cooldown dalam menit (0 = boleh kirim).
+function _qcReminderCooldown(type, noWO) {
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty(_qcReminderKey(type, noWO));
+    if (!v) return 0;
+    var elapsed = (new Date()).getTime() - parseInt(v, 10);
+    if (isNaN(elapsed) || elapsed >= _QC_REMINDER_COOLDOWN_MS) return 0;
+    return Math.max(1, Math.ceil((_QC_REMINDER_COOLDOWN_MS - elapsed) / 60000));
+  } catch (e) { return 0; }
+}
+function _qcReminderStamp(type, noWO) {
+  try { PropertiesService.getScriptProperties().setProperty(_qcReminderKey(type, noWO), String((new Date()).getTime())); } catch (e) {}
+}
+
+// Lead → Site Engineer: ingatkan lengkapi QC yang Belum Upload / Rejected.
+function qcRemindSiteEngineer(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (!_waQCEnabled()) return { success: false, message: 'Notifikasi WA QC tidak aktif. Aktifkan di Pengaturan.' };
+    var cd = _qcReminderCooldown('site', noWO);
+    if (cd > 0) return { success: false, message: 'Reminder baru saja dikirim. Coba lagi dalam ' + cd + ' menit.' };
+    var sum = (getQCByWO(noWO) || {}).summary || {};
+    var belum = sum.belum || 0, reject = sum.rejected || 0;
+    if (belum + reject === 0) return { success: false, message: 'Tidak ada item yang perlu diingatkan (tak ada Belum Upload / Reject).' };
+    var sites = _qcPhonesForWO(noWO);
+    if (!sites.length) return { success: false, message: 'Tidak ada Site Engineer dengan No. WhatsApp untuk WO ini.' };
+    var proj = _qcWOProject(noWO);
+    var parts = [];
+    if (belum) parts.push(belum + ' item belum diupload');
+    if (reject) parts.push(reject + ' item ditolak (perlu revisi)');
+    var msg = ['🔔 *Reminder QC*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Mohon segera lengkapi: ' + parts.join(' & ') + '.',
+      '',
+      'Silakan upload di RenusPro.'].join('\n');
+    sites.forEach(function (s) { _waSendTo(s.phone, msg); });
+    _qcReminderStamp('site', noWO);
+    return { success: true, message: 'Reminder terkirim ke ' + sites.length + ' Site Engineer.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
+// Site → semua Lead Engineer: ingatkan review QC yang sudah terupload (Pending).
+function qcRemindLeadEngineer(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (!_waQCEnabled()) return { success: false, message: 'Notifikasi WA QC tidak aktif. Aktifkan di Pengaturan.' };
+    var cd = _qcReminderCooldown('lead', noWO);
+    if (cd > 0) return { success: false, message: 'Reminder baru saja dikirim. Coba lagi dalam ' + cd + ' menit.' };
+    var sum = (getQCByWO(noWO) || {}).summary || {};
+    var pending = sum.pending || 0;
+    if (pending === 0) return { success: false, message: 'Tidak ada item Pending yang perlu direview.' };
+    var leads = _qcPhonesByRole('leadengineer');
+    if (!leads.length) return { success: false, message: 'Tidak ada Lead Engineer dengan No. WhatsApp.' };
+    var proj = _qcWOProject(noWO);
+    var msg = ['🔔 *Reminder Review QC*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      pending + ' item menunggu direview.',
+      '',
+      'Mohon segera direview di RenusPro.'].join('\n');
+    leads.forEach(function (l) { _waSendTo(l.phone, msg); });
+    _qcReminderStamp('lead', noWO);
+    return { success: true, message: 'Reminder terkirim ke ' + leads.length + ' Lead Engineer.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 // ── Trigger harian (self-installing, dipanggil dari doGet) ──────────────────
 function _ensureTriggerReminderExpired() {
   try {
