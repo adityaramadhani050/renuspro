@@ -402,6 +402,21 @@ function _pgRenderTemplate(keys) {
 }
 
 window.loadTemplate = function() {
+  // erpState dipakai untuk render list template. Jika belum termuat (mis. tak
+  // ada preload di awal), muat dulu dengan spinner lokal di tabel — bukan
+  // "Sinkronisasi ERP" layar penuh.
+  if (!erpState.produk || !erpState.produk.length) {
+    var tb = document.getElementById('table-template');
+    if (tb) tb.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat template...</td></tr>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { erpState.klien = res.klien || []; erpState.produk = res.produk || []; erpState.templatePaket = res.templatePaket || {}; erpState.nextNo = res.nextNo || erpState.nextNo; }
+      _renderTemplateList();
+    }).withFailureHandler(function() { _renderTemplateList(); }).getInitialData();
+    return;
+  }
+  _renderTemplateList();
+};
+function _renderTemplateList() {
   resetSearch('template');
   const tpl  = erpState.templatePaket;
   const keys = Object.keys(tpl).sort((a, b) => {
@@ -412,7 +427,7 @@ window.loadTemplate = function() {
   _pgState.template.page = 1;
   _injectPgBar('template', '#table-template');
   _pgRender('template');
-};
+}
 
 // ── CUSTOMER ──────────────────────────────────────────────────────
 let _cachedCustomerData = [];
