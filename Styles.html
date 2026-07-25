@@ -371,6 +371,14 @@
         display: inline-block; width: 48%; vertical-align: top;
       }
       .tabel-item-penawaran tr.baris-kartu > td.col-qty { margin-right: 3%; }
+      /* BOM: merek+supplier & satuan+qty berpasangan 2 kolom di mobile */
+      .tabel-item-penawaran tr.baris-kartu > td.col-merek,
+      .tabel-item-penawaran tr.baris-kartu > td.col-supplier,
+      .tabel-item-penawaran tr.baris-kartu > td.col-satuan {
+        display: inline-block; width: 48%; vertical-align: top;
+      }
+      .tabel-item-penawaran tr.baris-kartu > td.col-merek,
+      .tabel-item-penawaran tr.baris-kartu > td.col-satuan { margin-right: 3%; }
       .tabel-item-penawaran tr.baris-kartu > td.col-total {
         text-align: right !important;
         border-top: 1px dashed #e5e7eb; margin-top: 0.35rem; padding-top: 0.55rem;
