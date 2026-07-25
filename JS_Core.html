@@ -171,6 +171,7 @@
         loadPurchaseOrder();
       }
       if(pageId === 'qc') loadQC();
+      if(pageId === 'bom' && typeof loadBOM === 'function') loadBOM();
   if(pageId === 'inventory') {
         var listInv = document.getElementById('inv-list-section');
         if (listInv) listInv.classList.remove('hidden');

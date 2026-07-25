@@ -1,0 +1,106 @@
+      <section id="page-bom" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Bill of Material</h2>
+          <span id="bom-role-hint" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500"></span>
+        </div>
+
+        <!-- HOME: ringkasan + daftar Work Order -->
+        <div id="bom-home">
+          <div id="bom-cards" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5"></div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+            <div class="relative w-full sm:w-72">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="bom-search" oninput="_bomRenderWOList()" placeholder="Cari No WO / project / klien..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+            </div>
+            <div class="flex items-center gap-2 sm:ml-auto">
+              <button id="bom-add-project-btn" onclick="_bomOpenAddProject()" class="hidden flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Project ke BOM</button>
+            </div>
+          </div>
+          <div id="bom-wo-list" class="space-y-2">
+            <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>
+          </div>
+        </div>
+
+        <!-- DETAIL: material per Work Order -->
+        <div id="bom-detail" class="hidden">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <button onclick="kembaliBOMHome()" class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar</button>
+            <div id="bom-detail-actions"></div>
+          </div>
+          <div id="bom-detail-head" class="bg-white rounded-2xl border border-slate-150 p-5 mb-4"></div>
+          <div id="bom-detail-body" class="space-y-4"></div>
+        </div>
+
+        <!-- MODAL: Tambah Project ke BOM -->
+        <div id="bom-modal-project" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-diagram-project text-sm"></i></span>
+              <h3 class="text-base font-extrabold text-slate-800">Tambah Project ke BOM</h3>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Work Order</label>
+            <select id="bom-proj-wo" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3"><option value="">Memuat WO...</option></select>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tugaskan Site Engineer (opsional)</label>
+            <div id="bom-proj-se" class="max-h-40 overflow-y-auto border border-slate-150 rounded-xl p-3 space-y-1 mb-4 text-sm text-slate-400">Memuat...</div>
+            <div class="flex justify-end gap-2">
+              <button onclick="_bomCloseAddProject()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_bomSubmitAddProject()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambahkan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL: Tambah / Edit Material -->
+        <div id="bom-modal-item" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-100 flex flex-col" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-3 border-b border-slate-100">
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-cubes-stacked text-sm"></i></span>
+              <h3 id="bom-item-title" class="text-base font-extrabold text-slate-800">Tambah Material</h3>
+            </div>
+            <div class="px-6 py-4 space-y-3 overflow-y-auto">
+              <input type="hidden" id="bom-item-id">
+              <input type="hidden" id="bom-item-wo">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pilih dari Pricelist Supplier</label>
+                <select id="bom-item-pl" onchange="_bomOnPickPricelist(this)" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white"><option value="">-- Pilih material --</option></select>
+                <p class="text-[11px] text-slate-400 mt-1">Pilih dari pricelist (nama/merk/supplier/satuan terisi otomatis), atau pilih <b>Input Manual</b> bila belum terdaftar.</p>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Material</label>
+                  <input type="text" id="bom-item-nama" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="Nama material">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Merek</label>
+                  <input type="text" id="bom-item-merek" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="Merek / brand">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Supplier</label>
+                  <input type="text" id="bom-item-supplier" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="Supplier">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kategori</label>
+                  <input type="text" id="bom-item-kategori" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="Kategori">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Satuan</label>
+                  <input type="text" id="bom-item-satuan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="mis. unit / m / set">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Qty</label>
+                  <input type="number" step="any" min="0" id="bom-item-qty" value="1" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-right font-bold">
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan (opsional)</label>
+                  <input type="text" id="bom-item-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white" placeholder="Catatan">
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 px-6 pb-5 pt-2 border-t border-slate-100">
+              <button onclick="_bomCloseItemModal()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_bomSubmitItem()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+            </div>
+          </div>
+        </div>
+      </section>
