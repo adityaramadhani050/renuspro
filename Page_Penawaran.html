@@ -99,7 +99,12 @@
         </div>
 
         <!-- Tampilan Form Pembuat Penawaran -->
-        <div id="view-form-penawaran" class="hidden">
+        <div id="view-form-penawaran" class="hidden relative">
+          <!-- Loading overlay saat menyiapkan data form (klien/produk/template) -->
+          <div id="penawaran-form-loading" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center rounded-2xl min-h-[200px]">
+            <div class="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+            <p class="text-sm font-semibold text-slate-500">Menyiapkan data penawaran...</p>
+          </div>
           <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
             <div>
               <button onclick="toggleFormPenawaran()" class="text-slate-500 hover:text-blue-600 font-semibold text-sm mb-2 flex items-center gap-1 transition"><i class="fas fa-arrow-left"></i> Kembali ke Daftar</button>

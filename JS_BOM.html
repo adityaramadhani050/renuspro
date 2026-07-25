@@ -165,18 +165,18 @@ function _bomReloadDetail() {
 }
 
 function _bomRenderDetail() {
-  // Actions bar — urutan: Finalkan · Export PDF · Atur Site Engineer · Tambah Material
+  // Actions bar — urutan: Export PDF · Atur Site Engineer · Finalkan
   var actions = document.getElementById('bom-detail-actions');
   var btns = '';
-  if (_bomCanManage() && _bomWOStatus !== 'Closed') {
-    btns += (_bomStatus === 'Final')
-      ? '<button onclick="_bomReopen()" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-lock-open"></i><span class="hidden sm:inline"> Buka Kembali</span></button>'
-      : '<button onclick="_bomFinalize()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-lock"></i><span class="hidden sm:inline"> Finalkan</span></button>';
-  }
   btns += '<button onclick="_bomExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>';
   if (_bomCanManage()) {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
       + '<div id="bom-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
+  }
+  if (_bomCanManage() && _bomWOStatus !== 'Closed') {
+    btns += (_bomStatus === 'Final')
+      ? '<button onclick="_bomReopen()" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-lock-open"></i><span class="hidden sm:inline"> Buka Kembali</span></button>'
+      : '<button onclick="_bomFinalize()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-lock"></i><span class="hidden sm:inline"> Finalkan</span></button>';
   }
   actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 

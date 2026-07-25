@@ -6,10 +6,9 @@
         document.getElementById('btnSubmitForm').innerHTML =
           '<i class="fa-solid fa-floppy-disk text-sky-300"></i> Simpan Penawaran Ke Database';
       }
-      // Reset form ke kondisi bersih
-      resetFormQuotation();
-      // Tampilkan form
+      // Tampilkan form; overlay loader menutupi sampai data siap (pola form PO).
       toggleFormPenawaran(true);
+      _penawaranEnsureData(function() { resetFormQuotation(); });
     }
 
     function formatModalProdukHarga(el) {

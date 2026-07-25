@@ -97,7 +97,7 @@
     // LOGIKA INTI PEMBUAT PENAWARAN
     // =======================================================================
     
-    function muatSeluruhDataAwal(showLoadingUI = true) {
+    function muatSeluruhDataAwal(showLoadingUI = true, onDone) {
       if(showLoadingUI) toggleLoader(true, "Sinkronisasi ERP...", [
         'Memuat master produk & jasa…',
         'Menyiapkan data klien…',
@@ -118,10 +118,23 @@
             }
           } else showNotification("Gagal muat data: " + res.error, "error");
           if(showLoadingUI) toggleLoader(false);
+          if (typeof window._initAllSD === 'function') window._initAllSD();
+          if (typeof onDone === 'function') onDone();
+        }).withFailureHandler(err => {
+          if(showLoadingUI) toggleLoader(false);
+          showNotification((err && err.message) || 'Gagal memuat data.', 'error');
+          if (typeof onDone === 'function') onDone();
         }).getInitialData();
-      } else { if(showLoadingUI) toggleLoader(false); }
-      // Init searchable dropdown setelah data klien termuat (DOM klienSelect siap)
-      setTimeout(function() { if (window._initAllSD) window._initAllSD(); }, 400);
+      } else { if(showLoadingUI) toggleLoader(false); if (typeof onDone === 'function') onDone(); }
+    }
+
+    // Pastikan data form penawaran (klien/produk/template) siap. Tampilkan overlay
+    // loader di form (pola sama seperti form PO) bila belum termuat.
+    function _penawaranEnsureData(cb) {
+      if (erpState.produk && erpState.produk.length) { cb(); return; }
+      var ov = document.getElementById('penawaran-form-loading');
+      if (ov) ov.classList.remove('hidden');
+      muatSeluruhDataAwal(false, function() { if (ov) ov.classList.add('hidden'); cb(); });
     }
 
     function onKlienChanged(sel) {
@@ -1202,6 +1215,7 @@
       }
       navigate('penawaran');
       toggleFormPenawaran(true);
+      _penawaranEnsureData(function() {   // overlay loader sampai data form siap
 
       // Simpan flag edit mode
       window._editMode = { noPenawaran: item.id, rev: item.rev, status: item.status };
@@ -1266,6 +1280,7 @@
 
       // Scroll ke atas
       document.querySelector('.flex-1.overflow-y-auto').scrollTop = 0;
+      });   // _penawaranEnsureData
     }
 
     function muatKelompokDariData(k) {
