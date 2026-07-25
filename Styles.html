@@ -334,4 +334,51 @@
       color: #fff;
       border-color: #1e40af;
     }
+
+    /* ── Form penawaran: tabel item material jadi kartu di layar kecil (mobile) ── */
+    @media (max-width: 640px) {
+      .tabel-item-wrap { overflow-x: visible; border: none !important; background: transparent !important; }
+      .tabel-item-penawaran { display: block; }
+      .tabel-item-penawaran thead { display: none; }
+      .tabel-item-penawaran tbody { display: block; }
+      .tabel-item-penawaran tr.baris-item {
+        display: block; position: relative;
+        border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff;
+        margin-bottom: 0.75rem; padding: 2.4rem 0.75rem 0.75rem;
+      }
+      .tabel-item-penawaran tr.baris-item > td {
+        display: block; width: 100%; border: none;
+        padding: 0.3rem 0; text-align: left !important;
+      }
+      .tabel-item-penawaran tr.baris-item > td::before {
+        content: attr(data-label); display: block; margin-bottom: 3px;
+        font-size: 10px; font-weight: 700; letter-spacing: .04em;
+        text-transform: uppercase; color: #94a3b8;
+      }
+      .tabel-item-penawaran tr.baris-item > td.col-no {
+        position: absolute; top: 0.55rem; left: 0.75rem; width: auto; padding: 0;
+        background: #eff6ff; color: #1d4ed8; border-radius: 0.5rem;
+        min-width: 1.6rem; height: 1.6rem; line-height: 1.6rem;
+        text-align: center !important; font-size: 11px;
+      }
+      .tabel-item-penawaran tr.baris-item > td.col-no::before { display: none; }
+      .tabel-item-penawaran tr.baris-item > td.col-aksi {
+        position: absolute; top: 0.35rem; right: 0.4rem; width: auto; padding: 0;
+      }
+      .tabel-item-penawaran tr.baris-item > td.col-aksi::before { display: none; }
+      .tabel-item-penawaran tr.baris-item > td.col-qty,
+      .tabel-item-penawaran tr.baris-item > td.col-unit {
+        display: inline-block; width: 48%; vertical-align: top;
+      }
+      .tabel-item-penawaran tr.baris-item > td.col-qty { margin-right: 3%; }
+      .tabel-item-penawaran tr.baris-item > td.col-total {
+        text-align: right !important;
+        border-top: 1px dashed #e5e7eb; margin-top: 0.35rem; padding-top: 0.55rem;
+      }
+      /* Input lebih besar + font ≥16px agar tak auto-zoom di iOS */
+      .tabel-item-penawaran tr.baris-item input,
+      .tabel-item-penawaran tr.baris-item textarea {
+        font-size: 16px; padding-top: 0.5rem; padding-bottom: 0.5rem;
+      }
+    }
   </style>
