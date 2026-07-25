@@ -12,10 +12,10 @@
             <div class="relative w-full sm:w-72">
               <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
               <input type="text" id="bom-search" oninput="_bomRenderWOList()" placeholder="Cari No WO / project / klien..."
-                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
             </div>
             <div class="flex items-center gap-2 sm:ml-auto">
-              <button id="bom-add-project-btn" onclick="_bomOpenAddProject()" class="hidden flex-1 sm:flex-none justify-center bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Project ke BOM</button>
+              <button id="bom-add-project-btn" onclick="_bomOpenAddProject()" class="hidden flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Project ke BOM</button>
             </div>
           </div>
           <div id="bom-wo-list" class="space-y-2">
@@ -37,7 +37,7 @@
         <div id="bom-modal-project" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
             <div class="flex items-center gap-3 mb-4">
-              <span class="bg-orange-100 text-orange-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-diagram-project text-sm"></i></span>
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-diagram-project text-sm"></i></span>
               <h3 class="text-base font-extrabold text-slate-800">Tambah Project ke BOM</h3>
             </div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Work Order</label>
@@ -46,7 +46,7 @@
             <div id="bom-proj-se" class="max-h-40 overflow-y-auto border border-slate-150 rounded-xl p-3 space-y-1 mb-4 text-sm text-slate-400">Memuat...</div>
             <div class="flex justify-end gap-2">
               <button onclick="_bomCloseAddProject()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
-              <button onclick="_bomSubmitAddProject()" class="px-5 py-2.5 text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambahkan</button>
+              <button onclick="_bomSubmitAddProject()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambahkan</button>
             </div>
           </div>
         </div>
@@ -55,7 +55,7 @@
         <div id="bom-modal-item" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4 py-6">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-100 flex flex-col" style="max-height:92vh">
             <div class="flex items-center gap-3 px-6 pt-5 pb-3 border-b border-slate-100">
-              <span class="bg-orange-100 text-orange-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-cubes-stacked text-sm"></i></span>
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-cubes-stacked text-sm"></i></span>
               <h3 id="bom-item-title" class="text-base font-extrabold text-slate-800">Tambah Material</h3>
             </div>
             <div class="px-6 py-4 space-y-3 overflow-y-auto">
@@ -99,7 +99,7 @@
             </div>
             <div class="flex justify-end gap-2 px-6 pb-5 pt-2 border-t border-slate-100">
               <button onclick="_bomCloseItemModal()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
-              <button onclick="_bomSubmitItem()" class="px-5 py-2.5 text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+              <button onclick="_bomSubmitItem()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
             </div>
           </div>
         </div>

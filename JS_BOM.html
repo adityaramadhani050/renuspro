@@ -58,7 +58,7 @@ function _bomCard(label, val, cls) {
 }
 function _bomRenderCards(g) {
   document.getElementById('bom-cards').innerHTML =
-      _bomCard('Project (WO)', g.jumlahWO || 0, 'text-orange-600')
+      _bomCard('Project (WO)', g.jumlahWO || 0, 'text-indigo-700')
     + _bomCard('Total Material', g.jumlahItem || 0, 'text-slate-800')
     + _bomCard('Draft', g.jumlahDraft || 0, 'text-amber-600')
     + _bomCard('Final', g.jumlahFinal || 0, 'text-emerald-600');
@@ -90,7 +90,7 @@ function _bomRenderWOList() {
     var removeBtn = _bomCanManage()
       ? '<button onclick="event.stopPropagation();_bomRemoveProject(\'' + _bomEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari BOM"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
-    return '<div onclick="bukaBOMDetail(\'' + _bomEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
+    return '<div onclick="bukaBOMDetail(\'' + _bomEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-indigo-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
       +   '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + '</div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _bomEsc(w.namaProject || '-') + '</div>'
@@ -152,27 +152,27 @@ function _bomReloadDetail() {
 }
 
 function _bomRenderDetail() {
-  // Actions bar
+  // Actions bar — urutan: Finalkan · Export PDF · Atur Site Engineer · Tambah Material
   var actions = document.getElementById('bom-detail-actions');
   var btns = '';
-  if (_bomCanEdit()) btns += '<button onclick="_bomOpenItemModal()" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i><span class="hidden sm:inline"> Tambah Material</span></button>';
+  if (_bomCanManage() && _bomWOStatus !== 'Closed') {
+    btns += (_bomStatus === 'Final')
+      ? '<button onclick="_bomReopen()" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-lock-open"></i><span class="hidden sm:inline"> Buka Kembali</span></button>'
+      : '<button onclick="_bomFinalize()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-lock"></i><span class="hidden sm:inline"> Finalkan</span></button>';
+  }
+  btns += '<button onclick="_bomExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>';
   if (_bomCanManage()) {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
       + '<div id="bom-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
-    if (_bomWOStatus !== 'Closed') {
-      btns += (_bomStatus === 'Final')
-        ? '<button onclick="_bomReopen()" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-lock-open"></i><span class="hidden sm:inline"> Buka Kembali</span></button>'
-        : '<button onclick="_bomFinalize()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-lock"></i><span class="hidden sm:inline"> Finalkan</span></button>';
-    }
   }
-  btns += '<button onclick="_bomExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>';
+  if (_bomCanEdit()) btns += '<button onclick="_bomOpenItemModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i><span class="hidden sm:inline"> Tambah Material</span></button>';
   actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 
-  // Head — konsisten dgn QC: judul kiri, badge site engineer rata kanan sejajar
-  // judul, lalu baris hitungan material/kategori.
+  // Head — judul kiri; badge Site Engineer di kanan, hitungan Material/Kategori
+  // tepat DI BAWAH badge (format sama dgn card list).
   var assignedHtml = (_bomAssigned || []).length
-    ? _bomAssigned.map(function(a){ return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 inline-block">' + _bomEsc(a.nama) + '</span>'; }).join(' ')
-    : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
+    ? _bomAssigned.map(function(a){ return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">' + _bomEsc(a.nama) + '</span>'; }).join('')
+    : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400">Belum ditugaskan</span>';
   var katSet = {}; _bomItems.forEach(function(it){ katSet[it.kategori || 'Lainnya'] = true; });
   var lockNote = (_bomWOStatus === 'Closed') ? '<span class="ml-1 text-[10px] font-bold text-rose-600"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>WO Closed</span>' : '';
   document.getElementById('bom-detail-head').innerHTML =
@@ -180,11 +180,10 @@ function _bomRenderDetail() {
     + '<div class="min-w-0"><div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _bomEsc(_bomWO.noWO) + '</span>' + _bomStatusBadge(_bomStatus) + lockNote + '</div>'
     +   '<div class="font-bold text-slate-800">' + _bomEsc(_bomWO.namaProject || '-') + '</div>'
     +   '<div class="text-xs text-slate-400">' + _bomEsc(_bomWO.namaKlien || '') + '</div></div>'
-    + '<div class="flex flex-wrap justify-end gap-1 shrink-0 max-w-[45%]">' + assignedHtml + '</div>'
+    + '<div class="flex flex-col items-end gap-1.5 shrink-0 max-w-[55%]">'
+    +   '<div class="flex flex-wrap justify-end gap-1">' + assignedHtml + '</div>'
+    +   '<div class="text-right whitespace-nowrap"><span class="text-lg font-extrabold text-slate-800">' + _bomItems.length + '</span> <span class="text-[10px] text-slate-400 font-bold uppercase">material · ' + Object.keys(katSet).length + ' kat.</span></div>'
     + '</div>'
-    + '<div class="flex flex-wrap gap-4 mt-3 text-[11px] font-bold text-slate-500">'
-    +   '<span><i class="fa-solid fa-cubes-stacked text-slate-400 mr-1"></i>' + _bomItems.length + ' Material</span>'
-    +   '<span><i class="fa-solid fa-layer-group text-slate-400 mr-1"></i>' + Object.keys(katSet).length + ' Kategori</span>'
     + '</div>';
 
   _bomRenderBody();
@@ -217,7 +216,7 @@ function _bomRenderBody() {
         + '<td class="p-2 col-merek" data-label="Merek"><span class="text-xs text-slate-600">' + (_bomEsc(it.merek) || '-') + '</span></td>'
         + '<td class="p-2 col-supplier" data-label="Supplier"><span class="text-xs text-slate-600">' + (_bomEsc(it.supplier) || '-') + '</span></td>'
         + '<td class="p-2 text-center col-satuan" data-label="Satuan"><span class="text-xs text-slate-500">' + (_bomEsc(it.satuan) || '-') + '</span></td>'
-        + '<td class="p-2 text-center col-qty" data-label="Qty"><span class="text-sm font-extrabold text-orange-600">' + _bomRp(it.qty) + '</span></td>'
+        + '<td class="p-2 text-center col-qty" data-label="Qty"><span class="text-sm font-extrabold text-indigo-700">' + _bomRp(it.qty) + '</span></td>'
         + aksi
         + '</tr>';
     }).join('');
@@ -374,10 +373,10 @@ function _bomToggleAssign(e) {
   var render = function() {
     var assignedIds = (_bomAssigned || []).map(function(a){ return a.id; });
     var rows = (_bomSiteEngineers || []).map(function(u) {
-      return '<label class="flex items-center gap-2 py-1.5 cursor-pointer"><input type="checkbox" value="' + _bomEsc(u.id) + '" ' + (assignedIds.indexOf(u.id) !== -1 ? 'checked' : '') + ' class="bom-assign-cb w-4 h-4 accent-orange-500"><span class="text-sm text-slate-700">' + _bomEsc(u.nama) + '</span></label>';
+      return '<label class="flex items-center gap-2 py-1.5 cursor-pointer"><input type="checkbox" value="' + _bomEsc(u.id) + '" ' + (assignedIds.indexOf(u.id) !== -1 ? 'checked' : '') + ' class="bom-assign-cb w-4 h-4 accent-indigo-600"><span class="text-sm text-slate-700">' + _bomEsc(u.nama) + '</span></label>';
     }).join('') || '<div class="text-xs text-slate-400 py-2">Belum ada Site Engineer.</div>';
     panel.innerHTML = '<div class="text-[11px] font-bold text-slate-400 uppercase mb-2">Tugaskan Site Engineer</div><div class="max-h-56 overflow-y-auto">' + rows + '</div>'
-      + '<button onclick="_bomSaveAssign()" class="w-full mt-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold py-2 rounded-lg">Simpan</button>';
+      + '<button onclick="_bomSaveAssign()" class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 rounded-lg">Simpan</button>';
   };
   if (_bomSiteEngineers) render();
   else google.script.run.withSuccessHandler(function(res){ _bomSiteEngineers = (res && res.success) ? (res.list || []) : []; render(); }).withFailureHandler(function(){ _bomSiteEngineers = []; render(); }).getSiteEngineerList();
@@ -409,7 +408,7 @@ function _bomOpenAddProject() {
   seWrap.innerHTML = 'Memuat...';
   var render = function() {
     seWrap.innerHTML = (_bomSiteEngineers || []).length
-      ? _bomSiteEngineers.map(function(u){ return '<label class="flex items-center gap-2 py-1 cursor-pointer"><input type="checkbox" value="' + _bomEsc(u.id) + '" class="bom-proj-cb w-4 h-4 accent-orange-500"><span class="text-sm text-slate-700">' + _bomEsc(u.nama) + '</span></label>'; }).join('')
+      ? _bomSiteEngineers.map(function(u){ return '<label class="flex items-center gap-2 py-1 cursor-pointer"><input type="checkbox" value="' + _bomEsc(u.id) + '" class="bom-proj-cb w-4 h-4 accent-indigo-600"><span class="text-sm text-slate-700">' + _bomEsc(u.nama) + '</span></label>'; }).join('')
       : '<div class="text-xs text-slate-400">Belum ada Site Engineer.</div>';
   };
   if (_bomSiteEngineers) render();
