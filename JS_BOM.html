@@ -502,7 +502,11 @@ function _bomExportPDF() {
     doc.setFont('helvetica', 'bold'); doc.text('Project', ML, y); doc.setFont('helvetica', 'normal'); doc.text(': ' + (_bomWO.namaProject || '-'), ML + 20, y);
     doc.setFont('helvetica', 'bold'); doc.text('Klien', ML, y + 5); doc.setFont('helvetica', 'normal'); doc.text(': ' + (_bomWO.namaKlien || '-'), ML + 20, y + 5);
     doc.setFont('helvetica', 'bold'); doc.text('Status', ML, y + 10); doc.setFont('helvetica', 'normal'); doc.text(': ' + _bomStatus, ML + 20, y + 10);
-    y += 16;
+    var engNames = (_bomAssigned || []).map(function(a){ return a.nama; }).filter(Boolean).join(', ') || '-';
+    doc.setFont('helvetica', 'bold'); doc.text('Engineer', ML, y + 15); doc.setFont('helvetica', 'normal');
+    var engLines = doc.splitTextToSize(': ' + engNames, PW - MR - (ML + 20));
+    doc.text(engLines, ML + 20, y + 15);
+    y += 21 + (engLines.length - 1) * 4.2;
 
     if (!_bomItems.length) { doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text('Belum ada material.', ML, y); }
     else {
