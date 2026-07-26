@@ -15,6 +15,7 @@ let _bomPricelist = null; // cache katalog pricelist
 let _bomKategori = null;  // cache master kategori (untuk dropdown blok)
 let _bomSiteEngineers = null;
 let _bomPlInited = false;
+let _bomBusyIds = {};     // id material yang sedang di-approve/reject (loading inline)
 
 function _bomRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _bomUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
@@ -231,11 +232,16 @@ function _bomRenderReview() {
       var rej = (it.status === 'Rejected' && it.catatanReview) ? '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(it.catatanReview) + '</div>' : '';
       var aksi = '';
       if (canReview) {
-        var acts = '';
-        if (it.status === 'Approved') acts += '<button onclick="_bomCancelApprove(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan Approve"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
-        else acts += '<button onclick="_bomApprove(\'' + _bomEsc(it.id) + '\')" class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-md" title="Approve"><i class="fa-solid fa-check text-sm"></i></button>'
-          + '<button onclick="_bomOpenReject(\'' + _bomEsc(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md" title="Reject"><i class="fa-solid fa-xmark text-sm"></i></button>';
-        aksi = '<td class="p-2 text-center col-aksi" data-label="Aksi"><div class="flex items-center justify-center gap-0.5">' + acts + '</div></td>';
+        var inner;
+        if (_bomBusyIds[it.id]) {
+          inner = '<i class="fas fa-spinner fa-spin text-slate-400 text-sm"></i>';
+        } else if (it.status === 'Approved') {
+          inner = '<button onclick="_bomCancelApprove(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan Approve"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
+        } else {
+          inner = '<button onclick="_bomApprove(\'' + _bomEsc(it.id) + '\')" class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-md" title="Approve"><i class="fa-solid fa-check text-sm"></i></button>'
+            + '<button onclick="_bomOpenReject(\'' + _bomEsc(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md" title="Reject"><i class="fa-solid fa-xmark text-sm"></i></button>';
+        }
+        aksi = '<td class="p-2 text-center col-aksi" data-label="Aksi" id="bom-act-' + _bomEsc(it.id) + '"><div class="flex items-center justify-center gap-0.5">' + inner + '</div></td>';
       }
       return '<tr class="border-b border-slate-100 baris-kartu">'
         + '<td class="p-2 text-center text-xs font-bold text-slate-400 col-no">' + (i + 1) + '</td>'
@@ -291,7 +297,6 @@ function _bomRowHtml(optsStr) {
     + '<td class="p-2 col-desk" data-label="Material">'
     +   '<select onchange="_bomOnPickRow(this)" class="bom-new-pl w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + optsStr + '</select>'
     +   '<div class="bom-new-manual hidden mt-1.5"><input class="bom-nm-nama w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Nama material (manual)"></div>'
-    +   '<input class="bom-new-catatan w-full mt-1.5 px-2 py-1.5 border border-slate-200 rounded-md text-[11px]" placeholder="Catatan (opsional)">'
     +   '<div class="bom-new-extra"></div>'
     + '</td>'
     + '<td class="p-2 col-merek" data-label="Merek"><input class="bom-new-merek w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Merek"></td>'
@@ -321,7 +326,6 @@ function _bomAppendRowToBlock(block, optsStr, item) {
     tr.querySelector('.bom-new-satuan').value = item.satuan || '';
     if (!plExists) tr.querySelector('.bom-nm-nama').value = item.namaMaterial || '';
     tr.querySelector('.bom-new-qty').value = (item.qty || item.qty === 0) ? item.qty : 1;
-    tr.querySelector('.bom-new-catatan').value = item.catatan || '';
     tr.querySelector('.bom-new-status').innerHTML = _bomStatusItemBadge(item.status || 'Pending');
     if (item.status === 'Rejected' && item.catatanReview) tr.querySelector('.bom-new-extra').innerHTML = '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(item.catatanReview) + '</div>';
     if (item.status === 'Approved') _bomLockRow(tr);
@@ -418,12 +422,11 @@ function _bomEditSave() {
       var merek = tr.querySelector('.bom-new-merek').value.trim();
       var supplier = tr.querySelector('.bom-new-supplier').value.trim();
       var satuan = tr.querySelector('.bom-new-satuan').value.trim();
-      var catatan = tr.querySelector('.bom-new-catatan').value.trim();
       var nama, pricelistId;
       if (v === '__manual__') { pricelistId = ''; nama = tr.querySelector('.bom-nm-nama').value.trim(); }
       else { var opt = sel.options[sel.selectedIndex]; pricelistId = v; nama = opt.getAttribute('data-nama'); }
       if (!nama || qty <= 0) return;
-      var obj = { kategori: kat, pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, qty: qty, catatan: catatan };
+      var obj = { kategori: kat, pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, qty: qty, catatan: '' };
       var id = tr.getAttribute('data-id'); if (id) obj.id = id;
       items.push(obj);
     });
@@ -481,26 +484,49 @@ function _bomOptsForCat(kat) {
   opts += '<option value="__manual__">— Input Manual —</option>';
   return opts;
 }
-// ── Review material (Lead Engineer) ─────────────────────────────
+// ── Review material (Lead Engineer) — loading inline di kolom aksi ──
+// Tanpa loading full-screen: Lead bisa approve/reject material lain tanpa
+// menunggu. Tombol baris tsb diganti spinner + dikunci (anti double-click);
+// state lokal diperbarui lalu detail dirender ulang (spinner baris lain tetap).
+function _bomSetActBusy(id) {
+  var cell = document.getElementById('bom-act-' + id);
+  if (cell) cell.innerHTML = '<div class="flex items-center justify-center py-0.5"><i class="fas fa-spinner fa-spin text-slate-400 text-sm"></i></div>';
+}
+// Sinkron status lokal + status BOM (Draft/Final), lalu render ulang detail.
+function _bomApplyLocalStatus(id, newStatus, catatanReview) {
+  var it = _bomItems.filter(function(x){ return x.id === id; })[0];
+  if (it) { it.status = newStatus; it.catatanReview = (newStatus === 'Rejected') ? (catatanReview || '') : ''; }
+  var total = _bomItems.length, appr = _bomItems.filter(function(x){ return x.status === 'Approved'; }).length;
+  _bomStatus = (total > 0 && appr === total) ? 'Final' : 'Draft';
+  if (_bomWO) _bomWO.status = _bomStatus;
+  _bomRenderDetail();
+}
+function _bomReviewDone(id, res, newStatus, catatanReview) {
+  delete _bomBusyIds[id];
+  if (res && res.success === false) { showNotification(res.message, 'error'); _bomRenderDetail(); return; }
+  _bomApplyLocalStatus(id, newStatus, catatanReview);
+}
+function _bomReviewFail(id, err) {
+  delete _bomBusyIds[id];
+  showNotification((err && err.message) || 'Gagal.', 'error');
+  _bomRenderDetail();
+}
 function _bomApprove(id) {
-  toggleLoader(true, 'Menyetujui...');
-  google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
-    showNotification(res && res.message ? res.message : 'Disetujui.');
-    _bomReloadDetail();
-  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+  if (_bomBusyIds[id]) return;
+  _bomBusyIds[id] = true;
+  _bomSetActBusy(id);
+  google.script.run.withSuccessHandler(function(res) { _bomReviewDone(id, res, 'Approved'); })
+    .withFailureHandler(function(err){ _bomReviewFail(id, err); })
     .reviewBOMItem(id, 'Approved', '', _bomUserNama());
 }
 function _bomCancelApprove(id) {
+  if (_bomBusyIds[id]) return;
   showConfirm({ title: 'Batalkan Approve', message: 'Batalkan persetujuan material ini? Material kembali ke status Pending dan bisa diedit Site Engineer.', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
-    toggleLoader(true, 'Membatalkan...');
-    google.script.run.withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
-      showNotification(res && res.message ? res.message : 'Dibatalkan.');
-      _bomReloadDetail();
-    }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    if (_bomBusyIds[id]) return;
+    _bomBusyIds[id] = true;
+    _bomSetActBusy(id);
+    google.script.run.withSuccessHandler(function(res) { _bomReviewDone(id, res, 'Pending'); })
+      .withFailureHandler(function(err){ _bomReviewFail(id, err); })
       .cancelBOMApproval(id, _bomUserNama());
   }});
 }
@@ -517,13 +543,11 @@ function _bomSubmitReject() {
   var catatan = document.getElementById('bom-reject-catatan').value.trim();
   if (!catatan) return showNotification('Catatan revisi wajib diisi.', 'error');
   _bomCloseReject();
-  toggleLoader(true, 'Menyimpan...');
-  google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
-    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
-    showNotification(res && res.message ? res.message : 'Ditolak.');
-    _bomReloadDetail();
-  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+  if (_bomBusyIds[id]) return;
+  _bomBusyIds[id] = true;
+  _bomSetActBusy(id);
+  google.script.run.withSuccessHandler(function(res) { _bomReviewDone(id, res, 'Rejected', catatan); })
+    .withFailureHandler(function(err){ _bomReviewFail(id, err); })
     .reviewBOMItem(id, 'Rejected', catatan, _bomUserNama());
 }
 
