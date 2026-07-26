@@ -59,40 +59,63 @@ function _ensureBOMItemSheet(ss) {
 // Status BOM diturunkan dari item: Final bila ada item & semua Approved.
 function _bomDeriveStatus(approved, total) { return (total > 0 && approved === total) ? 'Final' : 'Draft'; }
 
-// Sinkronkan status BOM_Project (kolom Status + Difinalkan Oleh/Pada) mengikuti
-// komposisi approve item. Dipanggil tiap kali status item berubah (approve/
-// reject/batalkan/simpan). olehIfFinal = nama yang men-final-kan, dicatat saat
-// transisi Draft→Final; saat kembali Draft, catatan finalisasi dibersihkan.
+// Tulis Status + Difinalkan Oleh/Pada ke BOM_Project. Hanya membaca sheet
+// BOM_Project (kecil: 1 baris per WO) — TIDAK memindai BOM_Item, sehingga
+// ringan dipanggil tiap approve/reject. olehIfFinal dicatat saat transisi
+// Draft→Final; saat kembali Draft, catatan finalisasi dibersihkan.
 // Kolom BOM_Project (1-based): 4=Status, 7=Difinalkan Oleh, 8=Difinalkan Pada.
-function _bomSyncProjectStatus(noWO, olehIfFinal) {
+function _bomWriteProjectStatus(noWO, status, olehIfFinal) {
   try {
     noWO = (noWO || '').toString().trim();
     if (!noWO) return;
-    var ss = getSpreadsheet();
-    SpreadsheetApp.flush();
-    var itemSheet = _ensureBOMItemSheet(ss);
-    var idata = itemSheet.getDataRange().getValues();
-    var total = 0, appr = 0;
-    for (var i = 1; i < idata.length; i++) {
-      if ((idata[i][1] || '').toString().trim() !== noWO) continue;
-      total++;
-      if ((idata[i][12] || '').toString().trim() === 'Approved') appr++;
-    }
-    var status = _bomDeriveStatus(appr, total);
-    var projSheet = _ensureBOMProjectSheet(ss);
+    var projSheet = _ensureBOMProjectSheet(getSpreadsheet());
     var pdata = projSheet.getDataRange().getValues();
     for (var r = 1; r < pdata.length; r++) {
       if ((pdata[r][0] || '').toString().trim() !== noWO) continue;
       var prev = (pdata[r][3] || '').toString().trim();
       projSheet.getRange(r + 1, 4).setValue(status);
       if (status === 'Final') {
-        // Catat pemfinalisasi hanya saat transisi ke Final (jangan timpa yg lama).
         if (prev !== 'Final') projSheet.getRange(r + 1, 7, 1, 2).setValues([[(olehIfFinal || '').toString(), _bomNow()]]);
       } else if ((pdata[r][6] || '').toString() || (pdata[r][7] || '').toString()) {
-        projSheet.getRange(r + 1, 7, 1, 2).setValues([['', '']]);   // kembali Draft → bersihkan
+        projSheet.getRange(r + 1, 7, 1, 2).setValues([['', '']]);
       }
       break;
     }
+  } catch (e) {}
+}
+
+// Hitung komposisi approve dari baris item yang SUDAH ada di memori (mis. dari
+// getDataRange di reviewBOMItem), tanpa membaca ulang sheet. overrideRow/
+// overrideStatus = paksa status baris ke-N (baris yang baru saja diubah, karena
+// tulisan setValues belum tentu terlihat di array lama).
+function _bomComposeAndWrite(rows, noWO, olehIfFinal, overrideRow, overrideStatus) {
+  var total = 0, appr = 0;
+  for (var k = 1; k < rows.length; k++) {
+    if ((rows[k][1] || '').toString().trim() !== noWO) continue;
+    total++;
+    var st = (k === overrideRow) ? overrideStatus : ((rows[k][12] || '').toString().trim() || 'Pending');
+    if (st === 'Approved') appr++;
+  }
+  _bomWriteProjectStatus(noWO, _bomDeriveStatus(appr, total), olehIfFinal);
+}
+
+// Sinkron dari sheet BOM_Item (baca ulang) — untuk aksi bulk (saveBOMItems)
+// di mana komposisi akhir sulit dihitung di memori. flush dulu agar append
+// terbaru terbaca.
+function _bomSyncProjectStatus(noWO, olehIfFinal) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return;
+    var ss = getSpreadsheet();
+    SpreadsheetApp.flush();
+    var idata = _ensureBOMItemSheet(ss).getDataRange().getValues();
+    var total = 0, appr = 0;
+    for (var i = 1; i < idata.length; i++) {
+      if ((idata[i][1] || '').toString().trim() !== noWO) continue;
+      total++;
+      if ((idata[i][12] || '').toString().trim() === 'Approved') appr++;
+    }
+    _bomWriteProjectStatus(noWO, _bomDeriveStatus(appr, total), olehIfFinal);
   } catch (e) {}
 }
 
@@ -639,7 +662,7 @@ function reviewBOMItem(id, keputusan, catatan, reviewer) {
         var stWO = ''; try { stWO = _getStatusWO(noWO); } catch (e) {}
         if (stWO === 'Closed') return { success: false, message: 'Work Order sudah Closed.' };
         sheet.getRange(i + 1, 13, 1, 4).setValues([[keputusan, (keputusan === 'Rejected' ? catatan : ''), (reviewer || '').toString(), _bomNow()]]);
-        _bomSyncProjectStatus(noWO, reviewer);   // update Status + Difinalkan Oleh/Pada
+        _bomComposeAndWrite(data, noWO, reviewer, i, keputusan);   // pakai data di memori, tanpa baca ulang
         return { success: true, message: 'Material ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
       }
     }
@@ -665,7 +688,7 @@ function cancelBOMApproval(id, oleh) {
       if ((data[i][0] || '').toString().trim() === id) {
         if ((data[i][12] || '').toString().trim() !== 'Approved') return { success: false, message: 'Material belum di-Approve.' };
         sheet.getRange(i + 1, 13, 1, 4).setValues([['Pending', '', '', '']]);
-        _bomSyncProjectStatus((data[i][1] || '').toString().trim(), oleh);   // kembali Draft → bersihkan finalisasi
+        _bomComposeAndWrite(data, (data[i][1] || '').toString().trim(), oleh, i, 'Pending');   // pakai data di memori
         return { success: true, message: 'Approve dibatalkan (Pending).' };
       }
     }
