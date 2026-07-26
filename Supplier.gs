@@ -24,9 +24,7 @@ function _ensureSupplierAliasKolom(sheet) {
 
 function getSupplierList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = _ensureSupplierSheet(ss);
-    const data = sheet.getDataRange().getValues();
+    const data = _cachedSupplier();   // ter-cache (invalidasi di simpan/edit/hapus supplier)
     const list = [];
 
     for (let i = 1; i < data.length; i++) {

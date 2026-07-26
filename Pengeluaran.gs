@@ -80,11 +80,7 @@ function _getStatusWO(noWO) {
 // ── Internal: build map noWO → {namaProject, namaKlien} ──────────────────────
 
 function _buildWOInfoMap() {
-  var klienData = _cachedKlien();
-  var klienMap  = {};
-  for (var k = 1; k < klienData.length; k++) {
-    if (klienData[k][0]) klienMap[klienData[k][0].toString()] = (klienData[k][1] || '').toString();
-  }
+  var klienMap  = _klienMap();
   var penData = _cachedPenawaran();
   var woMap   = {};
   for (var p = 1; p < penData.length; p++) {
@@ -105,9 +101,7 @@ function _buildWOInfoMap() {
 function getPengeluaranList(params) {
   try {
     params = params || {};
-    var ss    = getSpreadsheet();
-    var sheet = _ensurePengeluaranSheet(ss);
-    var data  = sheet.getDataRange().getValues();
+    var data  = _cachedPengeluaran();   // ter-cache (invalidasi di simpan/edit/hapus pengeluaran)
     var woMap = {};
     try { woMap = _buildWOInfoMap(); } catch(e2) {}
 

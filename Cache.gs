@@ -12,32 +12,62 @@
  * Invalidasi dipanggil dari setiap fungsi write (simpan/edit/hapus).
  */
 
-var CACHE_TTL = 480; // detik
+var CACHE_TTL   = 480;    // detik (GAS max 600, sisakan buffer)
+var CACHE_CHUNK = 90000;  // ~90KB/key (batas CacheService 100KB per key)
+var CACHE_MAXCH = 30;     // batas wajar jumlah chunk (~2.7MB); di atas ini jangan cache
+var CACHE_VER   = 'v2';   // prefix versi format; naikkan bila struktur cache berubah
 
-// ── Baca data sheet dengan cache ─────────────────────────────────────────────
+// ── Baca data sheet dengan cache (BER-CHUNK) ─────────────────────────────────
+// Sebelumnya sheet dgn JSON > 95KB gagal ter-cache (jatuh ke full read tiap
+// panggilan). Kini JSON dipecah ke beberapa key (<VER>_<key>_0..n) + meta,
+// sehingga sheet besar (Penawaran/PO/Pengeluaran/Invoice) tetap ter-cache.
+function _cacheChunkKeys(key, n) {
+  var arr = [];
+  for (var i = 0; i < n; i++) arr.push(CACHE_VER + '_' + key + '_' + i);
+  return arr;
+}
 
 function _cacheGetSheet(key, sheetName) {
   var cache = CacheService.getScriptCache();
-  var cached = cache.get(key);
-  if (cached) {
-    try { return JSON.parse(cached); } catch(e) {}
-  }
+  var metaKey = CACHE_VER + '_' + key + '_meta';
+  // ── Coba cache-hit (gabung chunk) ──
+  try {
+    var meta = cache.get(metaKey);
+    if (meta) {
+      var n = parseInt(meta, 10) || 0;
+      if (n > 0 && n <= CACHE_MAXCH) {
+        var keys = _cacheChunkKeys(key, n);
+        var parts = cache.getAll(keys);
+        var joined = '', ok = true;
+        for (var i = 0; i < n; i++) {
+          var p = parts[keys[i]];
+          if (p == null) { ok = false; break; }   // 1 chunk kedaluwarsa → miss
+          joined += p;
+        }
+        if (ok) { try { return JSON.parse(joined); } catch (e) {} }
+      }
+    }
+  } catch (e) {}
+  // ── Miss → baca sheet ──
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
   var data = sheet.getDataRange().getValues().map(function(row) {
     return row.map(function(cell) {
-      // Konversi Date → ISO string agar bisa di-JSON
-      return cell instanceof Date ? cell.toISOString() : cell;
+      return cell instanceof Date ? cell.toISOString() : cell;   // Date → ISO utk JSON
     });
   });
+  // ── Simpan ber-chunk ──
   try {
     var json = JSON.stringify(data);
-    // CacheService max 100KB per entry
-    if (json.length < 95000) {
-      cache.put(key, json, CACHE_TTL);
+    var chunks = Math.ceil(json.length / CACHE_CHUNK) || 1;
+    if (chunks <= CACHE_MAXCH) {
+      var obj = {}, cKeys = _cacheChunkKeys(key, chunks);
+      for (var c = 0; c < chunks; c++) obj[cKeys[c]] = json.substring(c * CACHE_CHUNK, (c + 1) * CACHE_CHUNK);
+      obj[metaKey] = String(chunks);
+      cache.putAll(obj, CACHE_TTL);
     }
-  } catch(e) {}
+  } catch (e) {}
   return data;
 }
 
@@ -62,7 +92,16 @@ function invalidateCache(keys) {
   var cache = CacheService.getScriptCache();
   var all = keys || ['cache_penawaran','cache_klien','cache_user','cache_produk',
                      'cache_invoice','cache_kwitansi','cache_template'];
-  cache.removeAll(all);
+  var toRemove = [];
+  for (var i = 0; i < all.length; i++) {
+    var k = all[i], metaKey = CACHE_VER + '_' + k + '_meta';
+    toRemove.push(metaKey);
+    var n = 0;
+    try { var meta = cache.get(metaKey); if (meta) n = parseInt(meta, 10) || 0; } catch (e) {}
+    var cap = (n > 0 && n <= CACHE_MAXCH) ? n : CACHE_MAXCH;   // meta hilang → hapus jaga2
+    for (var j = 0; j < cap; j++) toRemove.push(CACHE_VER + '_' + k + '_' + j);
+  }
+  try { cache.removeAll(toRemove); } catch (e) {}
 }
 
 function invalidatePenawaranCache()  { invalidateCache(['cache_penawaran']); }
@@ -84,12 +123,58 @@ function invalidatePemasukanCache()    { invalidateCache(['cache_pemasukan']); }
 function _fmtTgl(raw) {
   if (!raw) return '';
   if (raw instanceof Date) {
-    return isNaN(raw) ? '' : Utilities.formatDate(raw, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    return isNaN(raw) ? '' : Utilities.formatDate(raw, _tz(), 'dd/MM/yyyy');
   }
   var s = raw.toString();
   if (s.indexOf('T') > 0) { // ISO string dari cache
     var d = new Date(s);
-    return isNaN(d) ? '' : Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    return isNaN(d) ? '' : Utilities.formatDate(d, _tz(), 'dd/MM/yyyy');
   }
   return s; // sudah dalam format dd/MM/yyyy atau kosong
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Helper bersama (dedup logika berulang lintas fitur) — memakai layer cache.
+//  Tiap eksekusi Apps Script fresh, jadi var top-level = memo per-request.
+// ════════════════════════════════════════════════════════════════════════════
+var _TZ_MEMO = null;
+function _tz() { if (_TZ_MEMO == null) _TZ_MEMO = Session.getScriptTimeZone(); return _TZ_MEMO; }
+
+// Peta klienId → nama (dari Master_Klien cached). Ganti implementasi inline yg
+// ditulis ulang di getPenawaranList/Dashboard/SalesReport/Pengeluaran/PO.
+function _klienMap() {
+  var map = {}, arr = _cachedKlien();
+  for (var i = 1; i < arr.length; i++) {
+    if (arr[i][0]) map[arr[i][0].toString()] = (arr[i][1] != null ? arr[i][1].toString() : '');
+  }
+  return map;
+}
+
+// Dedup penawaran → revisi terakhir per No. filterFn(row) opsional (mis. filter
+// pembuat). Kembalikan map: no → { rev, row } (raw row dari Penawaran_Main).
+function _penawaranLatestRev(filterFn) {
+  var data = _cachedPenawaran(), latest = {};
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+    if (filterFn && !filterFn(row)) continue;
+    var no = row[0].toString(), rev = parseInt(row[1]) || 0;
+    if (!latest[no] || rev > latest[no].rev) latest[no] = { rev: rev, row: row };
+  }
+  return latest;
+}
+
+// Ambil 1 baris WO (bentuk sama dgn item getWorkOrderList) tanpa membangun ulang
+// daftar penuh berkali-kali: daftar di-memo per-request.
+var _WO_LIST_MEMO = null;
+function _woListMemo() {
+  if (_WO_LIST_MEMO == null) { try { _WO_LIST_MEMO = getWorkOrderList() || []; } catch (e) { _WO_LIST_MEMO = []; } }
+  return _WO_LIST_MEMO;
+}
+function _woRow(noWO) {
+  noWO = (noWO || '').toString().trim();
+  if (!noWO) return null;
+  var list = _woListMemo();
+  for (var i = 0; i < list.length; i++) if (list[i].noWO === noWO) return list[i];
+  return null;
 }

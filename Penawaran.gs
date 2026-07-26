@@ -19,19 +19,8 @@ function _isSameMonthDate(dateVal) {
 
 function getPenawaranList() {
   try {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Penawaran_Main') || buatSheetPenawaranDefault(ss);
-    const sheetKlien = ss.getSheetByName('Master_Klien');
-
-    const klienMap = {};
-    if (sheetKlien) {
-      const kd = sheetKlien.getDataRange().getValues();
-      for (let i = 1; i < kd.length; i++) {
-        if (kd[i][0]) klienMap[kd[i][0].toString()] = kd[i][1].toString();
-      }
-    }
-
-    const data = sheet.getDataRange().getValues();
+    const klienMap = _klienMap();            // Master_Klien (cached)
+    const data = _cachedPenawaran();         // Penawaran_Main (cached; Date → ISO string)
 
     // Kumpulkan semua baris dulu, key = noPenawaran
     // Simpan baris dengan rev TERTINGGI per nomor, pertahankan urutan kemunculan pertama
@@ -49,12 +38,9 @@ function getPenawaranList() {
       }
 
       if (!(no in latestMap) || rev > (parseInt(latestMap[no]._rev) || 0)) {
-        const tglStr = data[i][2] instanceof Date
-          ? Utilities.formatDate(data[i][2], Session.getScriptTimeZone(), "dd/MM/yyyy")
-          : data[i][2];
-        const validStr = data[i][3] instanceof Date
-          ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-          : data[i][3];
+        // _fmtTgl menangani Date maupun ISO string (dari cache) maupun dd/MM/yyyy.
+        const tglStr = _fmtTgl(data[i][2]);
+        const validStr = _fmtTgl(data[i][3]);
         const klienId = data[i][5].toString();
 
         latestMap[no] = {
@@ -78,13 +64,13 @@ function getPenawaranList() {
           items:          data[i][15] ? data[i][15].toString() : '[]',
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
           noWO:              data[i][17] ? data[i][17].toString() : '',
-          tanggalDeal:       data[i][18] instanceof Date ? Utilities.formatDate(data[i][18], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][18] ? data[i][18].toString() : ''),
+          tanggalDeal:       _fmtTgl(data[i][18]),
           channelMarketing:  data[i][19] ? data[i][19].toString() : '',
           catatanFail:       data[i][20] ? data[i][20].toString() : '',
           kodeWin:           data[i][22] ? data[i][22].toString() : '',
           catatanWin:        data[i][23] ? data[i][23].toString() : '',
           kodeLost:          data[i][24] ? data[i][24].toString() : '',
-          tanggalFail:       data[i][25] instanceof Date ? Utilities.formatDate(data[i][25], Session.getScriptTimeZone(), "dd/MM/yyyy") : (data[i][25] ? data[i][25].toString() : ''),
+          tanggalFail:       _fmtTgl(data[i][25]),
           lessonLearned:     data[i][26] ? data[i][26].toString() : '',
           action:            data[i][27] ? data[i][27].toString() : ''
         };
@@ -168,12 +154,11 @@ function getRiwayatRevisi(noPenawaran) {
 function getInitialData() {
   try {
     const ss = getSpreadsheet();
-    const sheetKlien = ss.getSheetByName('Master_Klien') || buatSheetKlienDefault(ss);
-    const sheetProduk = ss.getSheetByName('Master_Produk') || buatSheetProdukDefault(ss);
-    const templatePaketMap = getTemplatePaketMap(ss);
     const nextQuotationNo = generateNextQuotationNumber(ss);
 
-    const klienData = sheetKlien.getDataRange().getValues();
+    // Klien & Produk via cache (Master_Produk dibaca SEKALI di sini, produkMap
+    // dibagikan ke getTemplatePaketMap agar tak baca ulang sheet yg sama).
+    const klienData = _cachedKlien();
     const klienList = [];
     for (let i = 1; i < klienData.length; i++) {
       if (klienData[i][0]) {
@@ -187,19 +172,24 @@ function getInitialData() {
       }
     }
 
-    const produkData = sheetProduk.getDataRange().getValues();
+    const produkData = _cachedProduk();
     const produkList = [];
+    const produkMap = {};
     for (let i = 1; i < produkData.length; i++) {
       if (produkData[i][0]) {
-        produkList.push({
-          id: produkData[i][0].toString(),
-          nama: produkData[i][1].toString(),
-          unit: produkData[i][2].toString(),
+        const pid = produkData[i][0].toString();
+        const p = {
+          nama:  produkData[i][1].toString(),
+          unit:  produkData[i][2].toString(),
           harga: Number(produkData[i][3]) || 0,
-          hpp: Number(produkData[i][4]) || 0
-        });
+          hpp:   Number(produkData[i][4]) || 0
+        };
+        produkMap[pid] = p;
+        produkList.push({ id: pid, nama: p.nama, unit: p.unit, harga: p.harga, hpp: p.hpp });
       }
     }
+
+    const templatePaketMap = getTemplatePaketMap(ss, produkMap);
 
     return { klien: klienList, produk: produkList, templatePaket: templatePaketMap, nextNo: nextQuotationNo, success: true };
   } catch (e) {
@@ -207,18 +197,19 @@ function getInitialData() {
   }
 }
 
-function getTemplatePaketMap(ss) {
+// produkMapArg opsional: bila diberi (dari getInitialData), tak baca Master_Produk lagi.
+function getTemplatePaketMap(ss, produkMapArg) {
   try {
     ss = ss || getSpreadsheet();
     const sheet = ss.getSheetByName('Template_Paket') || buatSheetTemplatePaket(ss);
     const lastRow = sheet.getLastRow();
     if (lastRow <= 1) return {};
 
-    // Bangun produk map sekali — O(1) lookup
-    const produkMap = {};
-    const sheetProduk = ss.getSheetByName('Master_Produk');
-    if (sheetProduk) {
-      const pdData = sheetProduk.getDataRange().getValues();
+    // Bangun produk map sekali — O(1) lookup (pakai yg dioper bila ada).
+    let produkMap = produkMapArg;
+    if (!produkMap) {
+      produkMap = {};
+      const pdData = _cachedProduk();
       for (let i = 1; i < pdData.length; i++) {
         if (pdData[i][0]) {
           produkMap[pdData[i][0].toString()] = {
