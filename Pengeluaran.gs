@@ -921,3 +921,31 @@ function getExportPengeluaranWO(noWO) {
     return { success: false, message: e.toString() };
   }
 }
+
+// ── Agregator Cash Manager (kurangi round-trip) ──────────────────────────────
+// getMutasiBundle: 3 list arus kas sekaligus (ganti rantai serial 3-tingkat di
+// frontend getPemasukanList→getPengeluaranList→getAyatSilangList).
+function getMutasiBundle() {
+  var out = { success: true };
+  try { var pm = getPemasukanList({});   out.pemasukan   = (pm && pm.list) ? pm.list : []; } catch (e) { out.pemasukan = []; }
+  try { var pg = getPengeluaranList({}); out.pengeluaran = (pg && pg.list) ? pg.list : []; } catch (e) { out.pengeluaran = []; }
+  try { var as = getAyatSilangList({});  out.ayatSilang  = (as && as.list) ? as.list : []; } catch (e) { out.ayatSilang = []; }
+  return out;
+}
+
+// getCashManagerBootstrap: SEMUA data pembuka Cash Manager dalam 1 panggilan
+// (ganti ~10 round-trip: payment request, WO, akun bank, kategori, saldo, +3
+// list mutasi). Menghilangkan pula duplikat getPaymentRequestList & getBankAccounts.
+function getCashManagerBootstrap() {
+  var out = { success: true };
+  try { var pr = getPaymentRequestList({}); out.paymentRequests = (pr && pr.list) ? pr.list : []; } catch (e) { out.paymentRequests = []; }
+  try { out.workOrders = getWorkOrderList() || []; } catch (e) { out.workOrders = []; }
+  try { var ba = getBankAccounts(); out.bankAccounts = (ba && ba.accounts) ? ba.accounts : []; } catch (e) { out.bankAccounts = []; }
+  try { var kt = getKategoriPengeluaran(); out.kategori = (kt && kt.list) ? kt.list : []; } catch (e) { out.kategori = []; }
+  try { out.saldo = getSaldoAkun(); } catch (e) { out.saldo = { success: false }; }
+  var mut = getMutasiBundle();
+  out.pemasukan   = mut.pemasukan;
+  out.pengeluaran = mut.pengeluaran;
+  out.ayatSilang  = mut.ayatSilang;
+  return out;
+}

@@ -56,29 +56,49 @@ function _fmtTglExp(s) {
 // ── Load utama ─────────────────────────────────────────────────
 
 window.loadPengeluaran = function() {
-  loadPaymentRequestList();
-  _loadPendingApprovalKPI();
-  _loadWOOptionsExp('exp-wo', '');       // dropdown WO di form pengeluaran
-  _loadAkunOptionsExp('exp-akun', '');   // dropdown akun di form pengeluaran
-  _loadKategoriPengeluaranOptions('');   // kategori pengeluaran (dinamis)
-  // Cash Manager: saldo + mutasi (tab default)
-  if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
-  if (typeof loadMutasi === 'function') loadMutasi();
-};
-
-function _loadPendingApprovalKPI() {
+  // Skeleton loader per panel sambil menunggu 1 panggilan agregator.
+  var tbMut = document.getElementById('table-mutasi-kas');
+  if (tbMut && typeof _mutSkeletonRows === 'function') tbMut.innerHTML = _mutSkeletonRows(5);
+  var tbPr = document.getElementById('table-payreq');
+  if (tbPr) tbPr.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   if (typeof google === 'undefined') return;
+  // Satu round-trip menggantikan ~10 panggilan (payment request, WO, akun,
+  // kategori, saldo, + 3 list mutasi) dan duplikat getPaymentRequestList/getBankAccounts.
   google.script.run
     .withSuccessHandler(function(res) {
-      var list  = (res && res.list) ? res.list : [];
-      var badge = document.getElementById('exp-payreq-badge');
-      if (badge) {
-        if (list.length) { badge.textContent = list.length; badge.classList.remove('hidden'); }
-        else badge.classList.add('hidden');
-      }
+      res = res || {};
+      _cmApplyPaymentRequests(res.paymentRequests || []);
+      _fillWOOptionsExp('exp-wo', '', res.workOrders || []);
+      _fillAkunOptionsExp('exp-akun', '', res.bankAccounts || []);
+      _fillKategoriFromList(res.kategori || [], '');
+      if (res.saldo) _renderSaldoPanel(res.saldo);
+      if (typeof _fillInAkunFromAccounts === 'function') _fillInAkunFromAccounts(res.bankAccounts || []);
+      _inData  = res.pemasukan   || [];
+      _expData = res.pengeluaran || [];
+      _buildMutasi(res.pemasukan || [], res.pengeluaran || [], res.ayatSilang || []);
     })
-    .withFailureHandler(function() {})
-    .getPaymentRequestList({ status: 'Menunggu' });
+    .withFailureHandler(function() {
+      // Fallback ke loader individual bila agregator gagal.
+      loadPaymentRequestList();
+      _loadWOOptionsExp('exp-wo', '');
+      _loadAkunOptionsExp('exp-akun', '');
+      _loadKategoriPengeluaranOptions('');
+      if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
+      if (typeof loadMutasi === 'function') loadMutasi();
+    })
+    .getCashManagerBootstrap();
+};
+
+// Render daftar payment request + badge "Menunggu" (dari data agregator).
+function _cmApplyPaymentRequests(list) {
+  list = list || [];
+  _renderPaymentRequestList(list);
+  var menungguCount = list.filter(function(r) { return r.status === 'Menunggu'; }).length;
+  var badge = document.getElementById('exp-payreq-badge');
+  if (badge) {
+    if (menungguCount > 0) { badge.textContent = menungguCount; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  }
 }
 
 // Dipakai oleh handler simpan/hapus pengeluaran → segarkan mutasi + saldo
@@ -87,48 +107,50 @@ function _loadExpData() {
   if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
 }
 
+// Isi dropdown WO dari data (dipakai fetch tunggal & agregator bootstrap).
+function _fillWOOptionsExp(selId, selectedVal, data) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var isFilter = selId.startsWith('filter-');
+  var placeholder = isFilter ? '<option value="">Semua WO</option>' : '<option value="">-- Tanpa Project (Operasional) --</option>';
+  sel.innerHTML = placeholder;
+  _expWOList = (data || []).filter(function(w) { return w.status === 'Deal'; });
+  _expWOList.forEach(function(w) {
+    var opt = document.createElement('option');
+    opt.value = w.noWO;
+    opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
+    if (w.noWO === selectedVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 function _loadWOOptionsExp(selId, selectedVal) {
   if (typeof google === 'undefined') return;
   google.script.run
-    .withSuccessHandler(function(data) {
-      var sel = document.getElementById(selId);
-      if (!sel) return;
-      var isFilter = selId.startsWith('filter-');
-      var placeholder = isFilter ? '<option value="">Semua WO</option>' : '<option value="">-- Tanpa Project (Operasional) --</option>';
-      sel.innerHTML = placeholder;
-      _expWOList = (data || []).filter(function(w) { return w.status === 'Deal'; });
-      _expWOList.forEach(function(w) {
-        var opt = document.createElement('option');
-        opt.value = w.noWO;
-        opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
-        if (w.noWO === selectedVal) opt.selected = true;
-        sel.appendChild(opt);
-      });
-    })
+    .withSuccessHandler(function(data) { _fillWOOptionsExp(selId, selectedVal, data); })
     .withFailureHandler(function() {})
     .getWorkOrderList();
 }
 
+// Isi dropdown akun (bank) dari daftar accounts.
+function _fillAkunOptionsExp(selId, selectedVal, accounts) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var isFilter = selId.startsWith('filter-');
+  sel.innerHTML = isFilter ? '<option value="">Semua Akun</option>' : '<option value="">-- Pilih Akun --</option>';
+  _expAkunList = accounts || [];
+  _expAkunList.forEach(function(a) {
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    opt.dataset.nama = a.label;
+    opt.textContent = a.label;
+    if (a.id === selectedVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 function _loadAkunOptionsExp(selId, selectedVal) {
   if (typeof google === 'undefined') return;
   google.script.run
-    .withSuccessHandler(function(res) {
-      var sel = document.getElementById(selId);
-      if (!sel) return;
-      var isFilter = selId.startsWith('filter-');
-      var placeholder = isFilter ? '<option value="">Semua Akun</option>' : '<option value="">-- Pilih Akun --</option>';
-      sel.innerHTML = placeholder;
-      // Akun = Bank Account (data yang sama dengan invoice)
-      _expAkunList = (res && res.accounts ? res.accounts : []);
-      _expAkunList.forEach(function(a) {
-        var opt = document.createElement('option');
-        opt.value = a.id;
-        opt.dataset.nama = a.label;
-        opt.textContent = a.label;
-        if (a.id === selectedVal) opt.selected = true;
-        sel.appendChild(opt);
-      });
-    })
+    .withSuccessHandler(function(res) { _fillAkunOptionsExp(selId, selectedVal, (res && res.accounts) ? res.accounts : []); })
     .withFailureHandler(function() {})
     .getBankAccounts();
 }
@@ -286,13 +308,14 @@ function _onExpWOChange() {
 
 // ── Kategori pengeluaran (dinamis dari Settings) ───────────────
 var _expKategoriList = [];
+function _fillKategoriFromList(list, selectedVal) {
+  _expKategoriList = list || [];
+  _fillKategoriSelect(selectedVal);
+}
 function _loadKategoriPengeluaranOptions(selectedVal) {
   if (typeof google === 'undefined') { _fillKategoriSelect(selectedVal); return; }
   google.script.run
-    .withSuccessHandler(function(res) {
-      _expKategoriList = (res && res.list) ? res.list : [];
-      _fillKategoriSelect(selectedVal);
-    })
+    .withSuccessHandler(function(res) { _fillKategoriFromList((res && res.list) ? res.list : [], selectedVal); })
     .withFailureHandler(function() { _fillKategoriSelect(selectedVal); })
     .getKategoriPengeluaran();
 }
@@ -629,9 +652,8 @@ window.submitApprovePayReq = function() {
       toggleLoader(false);
       if (res.success) {
         showNotification(res.message || 'Pembayaran disetujui dan dicatat.');
-        loadPaymentRequestList();
+        loadPaymentRequestList();   // sekaligus perbarui badge Menunggu
         _loadExpData();
-        _loadPendingApprovalKPI();
       } else {
         showNotification(res.message, 'error');
       }
@@ -665,8 +687,7 @@ window.submitTolakPayReq = function() {
       toggleLoader(false);
       if (res.success) {
         showNotification(res.message || 'Request ditolak.');
-        loadPaymentRequestList();
-        _loadPendingApprovalKPI();
+        loadPaymentRequestList();   // sekaligus perbarui badge Menunggu
       } else {
         showNotification(res.message, 'error');
       }

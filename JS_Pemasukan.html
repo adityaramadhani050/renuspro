@@ -66,46 +66,23 @@ window.loadMutasi = function() {
   if (tb) tb.innerHTML = _mutSkeletonRows(5);
   _loadInAkunOptions();
   if (typeof google === 'undefined') return;
-  // Ambil pemasukan → lalu pengeluaran (berurutan, deterministik)
+  // Satu panggilan (getMutasiBundle) menggantikan rantai serial 3-tingkat
+  // getPemasukanList → getPengeluaranList → getAyatSilangList.
   google.script.run
-    .withSuccessHandler(function(rp) {
-      var pem = (rp && rp.success) ? (rp.list || []) : [];
+    .withSuccessHandler(function(res) {
+      res = res || {};
+      var pem = res.pemasukan || [], eng = res.pengeluaran || [], tf = res.ayatSilang || [];
       _inData = pem;
-      _fetchPengeluaranThenBuild(pem);
-    })
-    .withFailureHandler(function() { _inData = []; _fetchPengeluaranThenBuild([]); })
-    .getPemasukanList({});
-};
-
-function _fetchPengeluaranThenBuild(pem) {
-  if (typeof google === 'undefined') { _buildMutasi(pem, [], []); return; }
-  google.script.run
-    .withSuccessHandler(function(re) {
-      var eng = (re && re.success) ? (re.list || []) : [];
       _expData = eng;
-      _fetchTransferThenBuild(pem, eng);
-    })
-    .withFailureHandler(function(err) {
-      _expData = [];
-      _fetchTransferThenBuild(pem, []);
-      if (!pem.length) {
-        var tb = document.getElementById('table-mutasi-kas');
-        if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat data: ' + (err && err.message ? err.message : '') + '</td></tr>';
-      }
-    })
-    .getPengeluaranList({});
-}
-
-function _fetchTransferThenBuild(pem, eng) {
-  if (typeof google === 'undefined') { _buildMutasi(pem, eng, []); return; }
-  google.script.run
-    .withSuccessHandler(function(rt) {
-      var tf = (rt && rt.success) ? (rt.list || []) : [];
       _buildMutasi(pem, eng, tf);
     })
-    .withFailureHandler(function() { _buildMutasi(pem, eng, []); })
-    .getAyatSilangList({});
-}
+    .withFailureHandler(function(err) {
+      _inData = []; _expData = [];
+      _buildMutasi([], [], []);
+      if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat data: ' + (err && err.message ? err.message : '') + '</td></tr>';
+    })
+    .getMutasiBundle();
+};
 
 function _buildMutasi(pem, eng, tf) {
   _mutData = [];
@@ -206,15 +183,15 @@ function _cmHighlightAkun(id) {
 }
 
 // ── Akun options (filter + form) ───────────────────────────────
+// Isi dropdown in-akun dari daftar accounts (dipakai fetch tunggal & bootstrap).
+function _fillInAkunFromAccounts(accounts) {
+  _inAkunList = (accounts || []).map(function(b) { return { id: b.id, namaAkun: b.label }; });
+  _fillInAkunSelect('in-akun', '', false);
+}
 function _loadInAkunOptions() {
   if (typeof google === 'undefined') return;
   google.script.run
-    .withSuccessHandler(function(res) {
-      // Akun = Bank Account (data yang sama dengan invoice)
-      var list = (res && res.accounts) ? res.accounts : [];
-      _inAkunList = list.map(function(b) { return { id: b.id, namaAkun: b.label }; });
-      _fillInAkunSelect('in-akun', '', false);
-    })
+    .withSuccessHandler(function(res) { _fillInAkunFromAccounts((res && res.accounts) ? res.accounts : []); })
     .withFailureHandler(function() {})
     .getBankAccounts();
 }
