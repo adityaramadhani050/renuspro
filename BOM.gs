@@ -41,12 +41,23 @@ function _bomAssignmentSheet(ss) {
 function _ensureBOMItemSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('BOM_Item');
-  if (sheet) return sheet;
-  sheet = ss.insertSheet('BOM_Item');
-  sheet.appendRow(['ID', 'No WO', 'Kategori', 'Pricelist ID', 'Nama Material', 'Merek', 'Supplier', 'Satuan', 'Qty', 'Catatan', 'Dibuat Oleh', 'Dibuat Pada']);
-  sheet.getRange(1, 1, 1, 12).setFontWeight('bold');
+  if (!sheet) {
+    sheet = ss.insertSheet('BOM_Item');
+    sheet.appendRow(['ID', 'No WO', 'Kategori', 'Pricelist ID', 'Nama Material', 'Merek', 'Supplier', 'Satuan', 'Qty', 'Catatan', 'Dibuat Oleh', 'Dibuat Pada', 'Status', 'Catatan Review', 'Direview Oleh', 'Direview Pada']);
+    sheet.getRange(1, 1, 1, 16).setFontWeight('bold');
+    return sheet;
+  }
+  // Migrasi kolom review (approve/reject) untuk sheet lama.
+  try {
+    if (sheet.getLastColumn() < 16) {
+      sheet.getRange(1, 13, 1, 4).setValues([['Status', 'Catatan Review', 'Direview Oleh', 'Direview Pada']]).setFontWeight('bold');
+    }
+  } catch (e) {}
   return sheet;
 }
+
+// Status BOM diturunkan dari item: Final bila ada item & semua Approved.
+function _bomDeriveStatus(approved, total) { return (total > 0 && approved === total) ? 'Final' : 'Draft'; }
 
 function _bomNextId(sheet) {
   var lastRow = sheet.getLastRow();
@@ -97,7 +108,6 @@ function _bomEditGuard(noWO) {
   try { stWO = _getStatusWO(noWO); } catch (e) {}
   if (!stWO) return { ok: false, message: 'Work Order tidak ditemukan.' };
   if (stWO === 'Closed') return { ok: false, message: 'Work Order sudah Closed — BOM terkunci.' };
-  if (_bomStatusOf(noWO) === 'Final') return { ok: false, message: 'BOM sudah Final — buka kembali dulu untuk mengedit.' };
   return { ok: true };
 }
 
@@ -235,10 +245,10 @@ function getBOMDashboard(opts) {
     var visible = {};
     regs.forEach(function (r) { visible[r.noWO] = true; });
 
-    // Hitung jumlah item & kategori per WO dari BOM_Item.
+    // Hitung jumlah item, kategori, & approved per WO dari BOM_Item.
     var itemSheet = _ensureBOMItemSheet(ss);
     var data = itemSheet.getDataRange().getValues();
-    var cnt = {}, katSet = {};
+    var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {};
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][1] || '').toString().trim();
       if (!w || !visible[w]) continue;
@@ -246,13 +256,20 @@ function getBOMDashboard(opts) {
       var kat = (data[i][2] || 'Lainnya').toString().trim() || 'Lainnya';
       if (!katSet[w]) katSet[w] = {};
       katSet[w][kat] = true;
+      var st = (data[i][12] || '').toString().trim() || 'Pending';
+      if (st === 'Approved') appr[w] = (appr[w] || 0) + 1;
+      else if (st === 'Rejected') rej[w] = (rej[w] || 0) + 1;
+      else pend[w] = (pend[w] || 0) + 1;
     }
 
     var perWO = regs.map(function (r) {
+      var total = cnt[r.noWO] || 0, a = appr[r.noWO] || 0;
       return {
-        noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien, status: r.status,
-        jumlahItem: cnt[r.noWO] || 0,
+        noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien,
+        status: _bomDeriveStatus(a, total),
+        jumlahItem: total,
         jumlahKategori: katSet[r.noWO] ? Object.keys(katSet[r.noWO]).length : 0,
+        approved: a, pending: pend[r.noWO] || 0, rejected: rej[r.noWO] || 0,
         assigned: assignedMap[r.noWO] || []
       };
     });
@@ -279,8 +296,12 @@ function getBOMByWO(noWO) {
     var sheet = _ensureBOMItemSheet(ss);
     var data = sheet.getDataRange().getValues();
     var items = [];
+    var sum = { total: 0, approved: 0, pending: 0, rejected: 0 };
     for (var i = 1; i < data.length; i++) {
       if ((data[i][1] || '').toString().trim() !== noWO) continue;
+      var st = (data[i][12] || '').toString().trim() || 'Pending';
+      sum.total++;
+      if (st === 'Approved') sum.approved++; else if (st === 'Rejected') sum.rejected++; else sum.pending++;
       items.push({
         id:           (data[i][0] || '').toString(),
         kategori:     (data[i][2] || 'Lainnya').toString().trim() || 'Lainnya',
@@ -292,14 +313,19 @@ function getBOMByWO(noWO) {
         qty:          Number(data[i][8]) || 0,
         catatan:      (data[i][9] || '').toString(),
         dibuatOleh:   (data[i][10] || '').toString(),
-        dibuatPada:   (data[i][11] || '').toString()
+        dibuatPada:   (data[i][11] || '').toString(),
+        status:       st,
+        catatanReview:(data[i][13] || '').toString(),
+        reviewedBy:   (data[i][14] || '').toString(),
+        reviewedAt:   (data[i][15] || '').toString()
       });
     }
     var woStatus = '';
     try { woStatus = _getStatusWO(noWO) || ''; } catch (e) {}
     return {
       success: true,
-      status: _bomStatusOf(noWO) || 'Draft',
+      status: _bomDeriveStatus(sum.approved, sum.total),
+      summary: sum,
       woStatus: woStatus,
       assigned: _bomAssignedMap()[noWO] || [],
       items: items
@@ -334,7 +360,7 @@ function addBOMItem(payload) {
       (payload.pricelistId || '').toString(), nama,
       (payload.merek || '').toString(), (payload.supplier || '').toString(),
       (payload.satuan || '').toString(), qty, (payload.catatan || '').toString(),
-      (payload.oleh || '').toString(), _bomNow()
+      (payload.oleh || '').toString(), _bomNow(), 'Pending', '', '', ''
     ]);
     return { success: true, message: 'Material ' + id + ' ditambahkan.', id: id };
   } catch (e) {
@@ -449,6 +475,7 @@ function updateBOMItem(id, payload) {
         var noWO = (data[i][1] || '').toString().trim();
         var guard = _bomEditGuard(noWO);
         if (!guard.ok) return { success: false, message: guard.message };
+        if ((data[i][12] || '').toString().trim() === 'Approved') return { success: false, message: 'Material sudah di-Approve — minta Lead batalkan approve dulu.' };
         // Kolom 3–10 (Kategori s.d. Catatan)
         sheet.getRange(i + 1, 3, 1, 8).setValues([[
           (payload.kategori || 'Lainnya').toString().trim() || 'Lainnya',
@@ -456,6 +483,8 @@ function updateBOMItem(id, payload) {
           (payload.merek || '').toString(), (payload.supplier || '').toString(),
           (payload.satuan || '').toString(), qty, (payload.catatan || '').toString()
         ]]);
+        // Diedit → kembali Pending, catatan review dibersihkan (perlu review ulang).
+        sheet.getRange(i + 1, 13, 1, 4).setValues([['Pending', '', '', '']]);
         return { success: true, message: 'Material ' + id + ' diperbarui.' };
       }
     }
@@ -481,6 +510,7 @@ function hapusBOMItem(id) {
         var noWO = (data[i][1] || '').toString().trim();
         var guard = _bomEditGuard(noWO);
         if (!guard.ok) return { success: false, message: guard.message };
+        if ((data[i][12] || '').toString().trim() === 'Approved') return { success: false, message: 'Material sudah di-Approve — minta Lead batalkan approve dulu.' };
         sheet.deleteRow(i + 1);
         return { success: true, message: 'Material dihapus.' };
       }
@@ -493,24 +523,31 @@ function hapusBOMItem(id) {
   }
 }
 
-// ── Finalisasi (Lead/Admin) ─────────────────────────────────────────────────
-function _bomSetStatus(noWO, status, oleh) {
+// ── Review material (Lead/Admin): Approve / Reject / Batalkan Approve ────────
+// keputusan: 'Approved' | 'Rejected'. Reject wajib catatan revisi.
+function reviewBOMItem(id, keputusan, catatan, reviewer) {
   var lock = LockService.getScriptLock();
   try {
-    noWO = (noWO || '').toString().trim();
-    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    id = (id || '').toString().trim();
+    keputusan = (keputusan || '').toString().trim();
+    catatan = (catatan || '').toString().trim();
+    if (!id) return { success: false, message: 'ID item wajib.' };
+    if (keputusan !== 'Approved' && keputusan !== 'Rejected') return { success: false, message: 'Keputusan tidak valid.' };
+    if (keputusan === 'Rejected' && !catatan) return { success: false, message: 'Catatan revisi wajib diisi untuk menolak.' };
     lock.waitLock(15000);
-    var sheet = _ensureBOMProjectSheet(getSpreadsheet());
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
-      if ((data[i][0] || '').toString().trim() === noWO) {
-        sheet.getRange(i + 1, 4).setValue(status);
-        if (status === 'Final') sheet.getRange(i + 1, 7, 1, 2).setValues([[(oleh || '').toString(), _bomNow()]]);
-        else sheet.getRange(i + 1, 7, 1, 2).setValues([['', '']]);
-        return { success: true, message: status === 'Final' ? 'BOM difinalkan.' : 'BOM dibuka kembali (Draft).' };
+      if ((data[i][0] || '').toString().trim() === id) {
+        var noWO = (data[i][1] || '').toString().trim();
+        var stWO = ''; try { stWO = _getStatusWO(noWO); } catch (e) {}
+        if (stWO === 'Closed') return { success: false, message: 'Work Order sudah Closed.' };
+        sheet.getRange(i + 1, 13, 1, 4).setValues([[keputusan, (keputusan === 'Rejected' ? catatan : ''), (reviewer || '').toString(), _bomNow()]]);
+        return { success: true, message: 'Material ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
       }
     }
-    return { success: false, message: 'Work Order belum terdaftar di BOM.' };
+    return { success: false, message: 'Item tidak ditemukan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
   } finally {
@@ -518,13 +555,27 @@ function _bomSetStatus(noWO, status, oleh) {
   }
 }
 
-function finalizeBOM(noWO, oleh) {
-  var stWO = '';
-  try { stWO = _getStatusWO(noWO); } catch (e) {}
-  if (stWO === 'Closed') return { success: false, message: 'Work Order sudah Closed.' };
-  return _bomSetStatus(noWO, 'Final', oleh);
-}
-
-function reopenBOM(noWO, oleh) {
-  return _bomSetStatus(noWO, 'Draft', oleh);
+// Batalkan approve (Lead/Admin): Approved → Pending.
+function cancelBOMApproval(id, oleh) {
+  var lock = LockService.getScriptLock();
+  try {
+    id = (id || '').toString().trim();
+    if (!id) return { success: false, message: 'ID item wajib.' };
+    lock.waitLock(15000);
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === id) {
+        if ((data[i][12] || '').toString().trim() !== 'Approved') return { success: false, message: 'Material belum di-Approve.' };
+        sheet.getRange(i + 1, 13, 1, 4).setValues([['Pending', '', '', '']]);
+        return { success: true, message: 'Approve dibatalkan (Pending).' };
+      }
+    }
+    return { success: false, message: 'Item tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
 }
