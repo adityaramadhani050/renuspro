@@ -16,6 +16,8 @@ let _bomKategori = null;  // cache master kategori (untuk dropdown blok)
 let _bomSiteEngineers = null;
 let _bomPlInited = false;
 let _bomBusyIds = {};     // id material yang sedang di-approve/reject (loading inline)
+let _bomFinalizedBy = ''; // pemfinalisasi (saat semua material Approved)
+let _bomFinalizedAt = '';
 
 function _bomRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _bomUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
@@ -159,6 +161,8 @@ function _bomReloadDetail() {
     _bomStatus = res.status || 'Draft';
     _bomWOStatus = res.woStatus || '';
     _bomAssigned = res.assigned || [];
+    _bomFinalizedBy = res.finalizedBy || '';
+    _bomFinalizedAt = res.finalizedAt || '';
     if (_bomWO) _bomWO.status = _bomStatus;
     _bomRenderDetail();
   }).withFailureHandler(function() {
@@ -198,7 +202,8 @@ function _bomRenderDetail() {
         + '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + cA + ' Approved</span>'
         + '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + cP + ' Pending</span>'
         + '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + cR + ' Rejected</span>'
-        + '</div>') : '');
+        + '</div>') : '')
+    + ((_bomStatus === 'Final' && _bomFinalizedBy) ? ('<div class="mt-2 text-[11px] text-emerald-700 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Disetujui final oleh <b>' + _bomEsc(_bomFinalizedBy) + '</b>' + (_bomFinalizedAt ? ' · ' + _bomEsc(_bomFinalizedAt) : '') + '</div>') : '');
 
   _bomRenderBody();
 }
@@ -497,8 +502,12 @@ function _bomApplyLocalStatus(id, newStatus, catatanReview) {
   var it = _bomItems.filter(function(x){ return x.id === id; })[0];
   if (it) { it.status = newStatus; it.catatanReview = (newStatus === 'Rejected') ? (catatanReview || '') : ''; }
   var total = _bomItems.length, appr = _bomItems.filter(function(x){ return x.status === 'Approved'; }).length;
+  var wasFinal = (_bomStatus === 'Final');
   _bomStatus = (total > 0 && appr === total) ? 'Final' : 'Draft';
   if (_bomWO) _bomWO.status = _bomStatus;
+  // Cocokkan info finalisasi lokal dengan yang baru saja ditulis backend.
+  if (_bomStatus === 'Final') { if (!wasFinal) { _bomFinalizedBy = _bomUserNama(); _bomFinalizedAt = ''; } }
+  else { _bomFinalizedBy = ''; _bomFinalizedAt = ''; }
   _bomRenderDetail();
 }
 function _bomReviewDone(id, res, newStatus, catatanReview) {
