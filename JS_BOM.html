@@ -68,12 +68,12 @@ function _bomRenderCards(g) {
       _bomCard('Project (WO)', g.jumlahWO || 0, 'text-indigo-700')
     + _bomCard('Total Material', g.jumlahItem || 0, 'text-slate-800')
     + _bomCard('Draft', g.jumlahDraft || 0, 'text-amber-600')
-    + _bomCard('Final', g.jumlahFinal || 0, 'text-emerald-600');
+    + _bomCard('Approved', g.jumlahFinal || 0, 'text-emerald-600');
 }
 
 function _bomStatusBadge(status) {
   return status === 'Final'
-    ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"><i class="fa-solid fa-lock text-[9px] mr-0.5"></i>Final</span>'
+    ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Approved</span>'
     : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><i class="fa-solid fa-pen text-[9px] mr-0.5"></i>Draft</span>';
 }
 
@@ -650,7 +650,7 @@ function _bomExportPDF() {
     doc.setFontSize(9); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
     doc.setFont('helvetica', 'bold'); doc.text('Project', ML, y); doc.setFont('helvetica', 'normal'); doc.text(': ' + (_bomWO.namaProject || '-'), ML + 20, y);
     doc.setFont('helvetica', 'bold'); doc.text('Klien', ML, y + 5); doc.setFont('helvetica', 'normal'); doc.text(': ' + (_bomWO.namaKlien || '-'), ML + 20, y + 5);
-    doc.setFont('helvetica', 'bold'); doc.text('Status', ML, y + 10); doc.setFont('helvetica', 'normal'); doc.text(': ' + _bomStatus, ML + 20, y + 10);
+    doc.setFont('helvetica', 'bold'); doc.text('Status', ML, y + 10); doc.setFont('helvetica', 'normal'); doc.text(': ' + (_bomStatus === 'Final' ? 'Approved' : 'Draft'), ML + 20, y + 10);
     var engNames = (_bomAssigned || []).map(function(a){ return a.nama; }).filter(Boolean).join(', ') || '-';
     doc.setFont('helvetica', 'bold'); doc.text('Engineer', ML, y + 15); doc.setFont('helvetica', 'normal');
     var engLines = doc.splitTextToSize(': ' + engNames, PW - MR - (ML + 20));
