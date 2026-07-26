@@ -411,9 +411,12 @@ function addBOMItemsBatch(payload) {
   }
 }
 
-// Simpan seluruh material 1 WO sekaligus (replace-all) — pola submit penawaran/PO.
-// Hapus semua baris WO ini lalu tulis ulang dari payload.items.
-// payload: { noWO, oleh, items: [{ pricelistId, namaMaterial, merek, supplier, satuan, kategori, qty, catatan }] }
+// Sync material 1 WO (diff by ID) — pola submit inline tabel editable.
+// Baris ber-ID diperbarui (dan direset Pending bila berubah); baris tanpa ID
+// ditambahkan (Pending); baris existing yang tak ada di payload dihapus.
+// Material Approved dilindungi: tak boleh diedit-ubah maupun dihapus di sini
+// (UI mengunci baris tsb, tapi backend ikut menjaga).
+// payload: { noWO, oleh, items: [{ id?, kategori, pricelistId, namaMaterial, merek, supplier, satuan, qty, catatan }] }
 function saveBOMItems(payload) {
   var lock = LockService.getScriptLock();
   try {
@@ -428,26 +431,69 @@ function saveBOMItems(payload) {
     var ss = getSpreadsheet();
     var sheet = _ensureBOMItemSheet(ss);
     var data = sheet.getDataRange().getValues();
-    for (var i = data.length - 1; i >= 1; i--) {
-      if ((data[i][1] || '').toString().trim() === noWO) sheet.deleteRow(i + 1);
+    var norm = function (x) { return (x == null ? '' : String(x)).trim(); };
+
+    // Index baris existing WO ini berdasarkan ID.
+    var byId = {};
+    for (var i = 1; i < data.length; i++) {
+      if (norm(data[i][1]) !== noWO) continue;
+      byId[norm(data[i][0])] = { row: i + 1, v: data[i] };
     }
-    SpreadsheetApp.flush();
-    var oleh = (payload.oleh || '').toString(), when = _bomNow(), added = 0;
+    // Set ID yang dikirim dari UI.
+    var seen = {};
+    items.forEach(function (it) { if (it && it.id) seen[norm(it.id)] = true; });
+    // Lindungi material Approved dari penghapusan (omitted dari payload).
+    for (var id0 in byId) {
+      if (!seen[id0] && norm(byId[id0].v[12]) === 'Approved') {
+        return { success: false, message: 'Material yang sudah Approved tidak bisa dihapus. Minta Lead batalkan approve dulu.' };
+      }
+    }
+
+    var oleh = (payload.oleh || '').toString(), when = _bomNow();
+    var updated = 0, added = 0, toAppend = [];
+
     items.forEach(function (it) {
-      var nama = (it.namaMaterial || '').toString().trim();
+      var nama = norm(it.namaMaterial);
       var qty = Number(it.qty) || 0;
       if (!nama || qty <= 0) return;
-      var id = _bomNextId(sheet);
-      sheet.appendRow([
-        id, noWO, (it.kategori || 'Lainnya').toString().trim() || 'Lainnya',
-        (it.pricelistId || '').toString(), nama,
-        (it.merek || '').toString(), (it.supplier || '').toString(),
-        (it.satuan || '').toString(), qty, (it.catatan || '').toString(),
-        oleh, when
-      ]);
+      var core = [
+        norm(it.kategori) || 'Lainnya', norm(it.pricelistId), nama,
+        norm(it.merek), norm(it.supplier), norm(it.satuan), qty, norm(it.catatan)
+      ];
+      var id = it.id ? norm(it.id) : '';
+      if (id && byId[id]) {
+        var ex = byId[id];
+        var st = norm(ex.v[12]) || 'Pending';
+        if (st === 'Approved') return;   // terkunci — abaikan perubahan
+        // Tulis kolom 3–10 (Kategori s.d. Catatan).
+        sheet.getRange(ex.row, 3, 1, 8).setValues([core]);
+        // Bila konten berubah → reset ke Pending (perlu review ulang).
+        var exCore = [norm(ex.v[2]), norm(ex.v[3]), norm(ex.v[4]), norm(ex.v[5]), norm(ex.v[6]), norm(ex.v[7]), Number(ex.v[8]) || 0, norm(ex.v[9])];
+        var changed = false;
+        for (var c = 0; c < 8; c++) { if (String(core[c]) !== String(exCore[c])) { changed = true; break; } }
+        if (changed) sheet.getRange(ex.row, 13, 1, 4).setValues([['Pending', '', '', '']]);
+        updated++;
+      } else {
+        toAppend.push(core);
+      }
+    });
+
+    // Hapus baris existing yang tak ada di payload (Approved sudah dilindungi di atas).
+    var delRows = [];
+    for (var id2 in byId) { if (!seen[id2]) delRows.push(byId[id2].row); }
+    delRows.sort(function (a, b) { return b - a; });
+    delRows.forEach(function (r) { sheet.deleteRow(r); });
+
+    // Tambah baris baru.
+    SpreadsheetApp.flush();
+    toAppend.forEach(function (core) {
+      var newId = _bomNextId(sheet);
+      sheet.appendRow([newId, noWO, core[0], core[1], core[2], core[3], core[4], core[5], core[6], core[7], oleh, when, 'Pending', '', '', '']);
       added++;
     });
-    return { success: true, message: 'BOM disimpan (' + added + ' material).', count: added };
+
+    var msg = 'BOM disimpan (' + updated + ' diperbarui, ' + added + ' baru' + (delRows.length ? ', ' + delRows.length + ' dihapus' : '') + ').';
+    return { success: true, message: msg, updated: updated, added: added, deleted: delRows.length };
   } catch (e) {
     return { success: false, message: e.toString() };
   } finally {

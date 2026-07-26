@@ -51,49 +51,6 @@
           </div>
         </div>
 
-        <!-- MODAL: Tambah / Edit Material -->
-        <div id="bom-modal-item" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center gap-3 mb-4">
-              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-cubes-stacked text-sm"></i></span>
-              <h3 id="bom-item-title" class="text-base font-extrabold text-slate-800">Tambah Material</h3>
-            </div>
-            <input type="hidden" id="bom-item-id">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kategori</label>
-            <select id="bom-item-kat" onchange="_bomModalKatChange()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3"></select>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Material</label>
-            <select id="bom-item-pl" onchange="_bomModalPick()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3"></select>
-            <div id="bom-item-manual-wrap" class="hidden mb-3">
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Material (manual)</label>
-              <input id="bom-item-nama" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="Nama material">
-            </div>
-            <div class="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Merek</label>
-                <input id="bom-item-merek" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="Merek">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Supplier</label>
-                <input id="bom-item-supplier" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="Supplier">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Satuan</label>
-                <input id="bom-item-satuan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="Satuan">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Qty</label>
-                <input id="bom-item-qty" type="number" step="any" min="0" value="1" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl text-center font-bold">
-              </div>
-            </div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan (opsional)</label>
-            <input id="bom-item-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4" placeholder="Catatan">
-            <div class="flex justify-end gap-2">
-              <button onclick="_bomCloseItemModal()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
-              <button onclick="_bomSubmitItem()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
-            </div>
-          </div>
-        </div>
-
         <!-- MODAL: Tolak (reject) material -->
         <div id="bom-modal-reject" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
