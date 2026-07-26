@@ -39,11 +39,7 @@ function getDashboardRawData(namaUser, isAdmin, role, userId) {
       } catch(e) {}
     }
 
-    const klienMap = {};
-    const kdArr    = _cachedKlien();
-    for (let i = 1; i < kdArr.length; i++) {
-      if (kdArr[i][0]) klienMap[kdArr[i][0].toString()] = kdArr[i][1].toString();
-    }
+    const klienMap = _klienMap();
 
     function parseTanggal(raw) {
       if (raw instanceof Date) return isNaN(raw) ? null : raw;

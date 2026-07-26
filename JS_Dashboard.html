@@ -5,6 +5,8 @@
 
 // ── State ──────────────────────────────────────────────────────
 var _dbRawCache   = null;  // getDashboardRawData result (cached)
+var _dbResultCache = null; // { key, raw, sales, at } — cache re-nav dashboard (TTL pendek)
+var _DB_NAV_TTL   = 60000; // 60 dtk: buka kembali dashboard dalam rentang ini tak fetch ulang
 var _dbPeriodMode = 'mtd';
 var _dbTrendChart   = null;
 var _dbDonutChart   = null;
@@ -189,9 +191,22 @@ function _dbSetPeriod(mode) {
 
 // ── Entry point ────────────────────────────────────────────────
 window.loadDashboard = function(forceRefresh) {
-  if (forceRefresh) _dbRawCache = null;
+  if (forceRefresh) { _dbRawCache = null; _dbResultCache = null; }
+  // Buka kembali dashboard (nav) dalam TTL & periode sama → render dari cache,
+  // tanpa round-trip. Ganti periode / force refresh selalu fetch (via _dbLoad).
+  if (!forceRefresh && _dbResultCache && (Date.now() - _dbResultCache.at) < _DB_NAV_TTL
+      && _dbResultCache.key === _dbPeriodKey()) {
+    document.getElementById('db-loading').classList.add('hidden');
+    document.getElementById('db-main-content').classList.remove('hidden');
+    _dbRenderAll(_dbResultCache.raw, _dbResultCache.sales);
+    return;
+  }
   _dbLoad();
 };
+
+function _dbPeriodKey() {
+  try { var p = _dbGetPeriodParams(); return p ? JSON.stringify(p) : ''; } catch (e) { return ''; }
+}
 
 function _dbLoad() {
   // Show loading
@@ -229,6 +244,7 @@ function _dbLoad() {
       var raw   = (result && result.raw)   ? result.raw   : { success: false, items: [], isAdmin: params.isAdmin };
       var sales = (result && result.sales) ? result.sales : { success: false };
       _dbRawCache = raw.success ? raw : { success: false, items: [], isAdmin: params.isAdmin };
+      _dbResultCache = { key: _dbPeriodKey(), raw: raw, sales: sales, at: Date.now() };
       _dbRenderAll(raw, sales);
     })
     .withFailureHandler(function(e) { _dbShowError(e.message || 'Error'); })
