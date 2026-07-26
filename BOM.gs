@@ -398,7 +398,7 @@ function addBOMItemsBatch(payload) {
         (it.pricelistId || '').toString(), nama,
         (it.merek || '').toString(), (it.supplier || '').toString(),
         (it.satuan || '').toString(), qty, (it.catatan || '').toString(),
-        oleh, when
+        oleh, when, 'Pending', '', '', ''
       ]);
       added++;
     });

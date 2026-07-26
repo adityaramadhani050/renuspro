@@ -174,7 +174,6 @@ function _bomRenderDetail() {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
       + '<div id="bom-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
   }
-  if (_bomCanEdit()) btns += '<button onclick="_bomOpenItemModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i><span class="hidden sm:inline"> Tambah Material</span></button>';
   actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 
   // Head — judul + status; badge Site Engineer di kanan; ringkasan review di bawah.
@@ -211,15 +210,14 @@ function _bomStatusItemBadge(status) {
 
 function _bomRenderBody() {
   var body = document.getElementById('bom-detail-body');
-  _bomLoadPricelist(function(){});   // pra-muat katalog utk modal tambah/edit
-  if (!_bomItems.length) {
-    body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked text-2xl mb-2 block opacity-40"></i>Belum ada material.' + (_bomCanEdit() ? ' Klik "Tambah Material".' : '') + '</div>';
-    return;
-  }
   var canEdit = _bomCanEdit(), canReview = _bomCanReview(), showAksi = canEdit || canReview;
+  var html = '';
+  if (!_bomItems.length) {
+    html = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked text-2xl mb-2 block opacity-40"></i>Belum ada material.' + (canEdit ? ' Tambahkan lewat tabel di bawah.' : '') + '</div>';
+  } else {
   var groups = {}, order = [];
   _bomItems.forEach(function(it) { var k = it.kategori || 'Lainnya'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
-  body.innerHTML = order.map(function(kat) {
+  html = order.map(function(kat) {
     var rows = groups[kat].map(function(it, i) {
       var cat = it.catatan ? '<div class="text-[10px] text-slate-400 italic mt-0.5">' + _bomEsc(it.catatan) + '</div>' : '';
       var rej = (it.status === 'Rejected' && it.catatanReview) ? '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(it.catatanReview) + '</div>' : '';
@@ -246,13 +244,122 @@ function _bomRenderBody() {
         + aksi
         + '</tr>';
     }).join('');
-    var addBtn = canEdit ? '<button onclick="_bomOpenItemModal(\'\',\'' + _bomEsc(kat).replace(/'/g, "\\'") + '\')" class="text-indigo-600 text-[11px] font-bold hover:bg-indigo-50 px-2 py-1 rounded whitespace-nowrap"><i class="fa-solid fa-plus mr-0.5"></i>Tambah Item</button>' : '';
+    var addBtn = canEdit ? '<button onclick="_bomAddRow(\'' + _bomEsc(kat).replace(/'/g, "\\'") + '\')" class="text-indigo-600 text-[11px] font-bold hover:bg-indigo-50 px-2 py-1 rounded whitespace-nowrap"><i class="fa-solid fa-plus mr-0.5"></i>Tambah Item</button>' : '';
     var aksiHead = showAksi ? '<th class="p-2 w-24 text-center">Aksi</th>' : '';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2"><span class="font-extrabold text-sm text-slate-700 truncate"><i class="fa-solid fa-layer-group text-slate-400 mr-1.5"></i>' + _bomEsc(kat) + '</span><span class="flex items-center gap-2 shrink-0"><span class="text-[10px] font-bold text-slate-400">' + groups[kat].length + ' item</span>' + addBtn + '</span></div>'
       + '<div class="overflow-x-auto tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Nama Material</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-16 text-center">Qty</th><th class="p-2 w-24 text-center">Status</th>' + aksiHead + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   }).join('');
+  }
+  body.innerHTML = html;
+  // Panel tambah material (tabel input inline) — hanya untuk yang boleh edit.
+  if (canEdit) {
+    _bomLoadPricelist(function() {
+      var b = document.getElementById('bom-detail-body');
+      if (!b || document.getElementById('bom-add-tbody')) return;   // detail mungkin sudah pindah
+      b.insertAdjacentHTML('beforeend', _bomAddPanelHtml());
+      _bomAddRow('');   // satu baris kosong awal
+    });
+  }
+}
+
+// ── Tabel input inline (tambah material cepat, batch) ───────────
+function _bomAddPanelHtml() {
+  return '<div class="bg-white rounded-2xl border border-indigo-200 overflow-hidden">'
+    + '<div class="px-4 py-2.5 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2"><span class="font-extrabold text-sm text-indigo-700"><i class="fa-solid fa-plus mr-1.5"></i>Tambah Material</span><span class="text-[10px] font-bold text-indigo-400">isi baris lalu klik Simpan</span></div>'
+    + '<div class="overflow-x-auto tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-32">Kategori</th><th class="p-2">Material</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-16 text-center">Qty</th><th class="p-2 w-12 text-center">Aksi</th></tr></thead><tbody id="bom-add-tbody"></tbody></table></div>'
+    + '<div class="flex items-center justify-between gap-2 px-4 py-3 bg-slate-50 border-t border-slate-100">'
+    +   '<button type="button" onclick="_bomAddRow(\'\')" class="text-indigo-600 text-xs font-bold px-3 py-1.5 hover:bg-indigo-100 rounded-lg"><i class="fa-solid fa-plus mr-1"></i>Tambah Baris</button>'
+    +   '<button type="button" onclick="_bomSubmitAdd()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Material</button>'
+    + '</div></div>';
+}
+function _bomAddRowHtml() {
+  return '<tr class="border-b border-slate-100 bom-add-row baris-kartu">'
+    + '<td class="p-2 col-kat" data-label="Kategori"><select onchange="_bomAddRowCat(this)" class="bom-add-kat w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + _bomCatSelectOptions('') + '</select></td>'
+    + '<td class="p-2 col-desk" data-label="Material">'
+    +   '<select onchange="_bomAddRowPick(this)" class="bom-add-pl w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + _bomOptsForCat('') + '</select>'
+    +   '<div class="bom-add-manual hidden mt-1.5"><input class="bom-add-nama w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Nama material (manual)"></div>'
+    +   '<input class="bom-add-catatan w-full mt-1.5 px-2 py-1.5 border border-slate-200 rounded-md text-[11px]" placeholder="Catatan (opsional)">'
+    + '</td>'
+    + '<td class="p-2 col-merek" data-label="Merek"><input class="bom-add-merek w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Merek"></td>'
+    + '<td class="p-2 col-supplier" data-label="Supplier"><input class="bom-add-supplier w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Supplier"></td>'
+    + '<td class="p-2 col-satuan" data-label="Satuan"><input class="bom-add-satuan w-full px-2 py-1.5 border border-slate-200 rounded-md text-center text-xs" placeholder="Satuan"></td>'
+    + '<td class="p-2 col-qty" data-label="Qty"><input type="number" step="any" min="0" value="1" class="bom-add-qty w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold"></td>'
+    + '<td class="p-2 text-center col-aksi" data-label="Aksi"><button type="button" onclick="_bomAddRowRemove(this)" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md"><i class="fa-regular fa-trash-can text-xs"></i></button></td>'
+    + '</tr>';
+}
+function _bomAddRow(presetKat) {
+  var tb = document.getElementById('bom-add-tbody');
+  if (!tb) return;
+  tb.insertAdjacentHTML('beforeend', _bomAddRowHtml());
+  var tr = tb.lastElementChild;
+  if (presetKat) {
+    var katSel = tr.querySelector('.bom-add-kat');
+    katSel.innerHTML = _bomCatSelectOptions(presetKat);
+    katSel.value = presetKat;
+    _bomAddRowCat(katSel);
+  }
+  try { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+  var focusSel = tr.querySelector('.bom-add-pl'); if (focusSel && presetKat) focusSel.focus();
+}
+function _bomAddRowRemove(btn) { var tr = btn.closest('tr'); if (tr) tr.remove(); }
+// Ganti kategori baris → rebuild dropdown material (filter kategori baru).
+function _bomAddRowCat(sel) {
+  var tr = sel.closest('tr');
+  var plSel = tr.querySelector('.bom-add-pl');
+  plSel.innerHTML = _bomOptsForCat(sel.value.trim());
+  plSel.value = '';
+  _bomAddRowPick(plSel);
+}
+// Pilih material → auto-isi merek/supplier/satuan (read-only bila dari pricelist).
+function _bomAddRowPick(sel) {
+  var tr = sel.closest('tr');
+  var manual = tr.querySelector('.bom-add-manual');
+  var mk = tr.querySelector('.bom-add-merek'), sp = tr.querySelector('.bom-add-supplier'), st = tr.querySelector('.bom-add-satuan');
+  var opt = sel.options[sel.selectedIndex];
+  var ro = function(el, on) { el.readOnly = on; el.classList.toggle('bg-slate-100', on); el.classList.toggle('text-slate-500', on); };
+  if (opt && opt.value === '__manual__') {
+    manual.classList.remove('hidden');
+    ro(mk, false); ro(sp, false); ro(st, false);
+  } else if (opt && opt.value) {
+    manual.classList.add('hidden');
+    mk.value = opt.getAttribute('data-merek') || '';
+    sp.value = opt.getAttribute('data-supplier') || '';
+    st.value = opt.getAttribute('data-satuan') || '';
+    ro(mk, true); ro(sp, true); ro(st, true);
+  } else {
+    manual.classList.add('hidden');
+    mk.value = ''; sp.value = ''; st.value = '';
+    ro(mk, true); ro(sp, true); ro(st, true);
+  }
+}
+function _bomSubmitAdd() {
+  var items = [];
+  document.querySelectorAll('#bom-add-tbody .bom-add-row').forEach(function(tr) {
+    var kat = (tr.querySelector('.bom-add-kat').value || '').trim() || 'Lainnya';
+    var sel = tr.querySelector('.bom-add-pl');
+    var v = sel.value;
+    if (!v) return;
+    var qty = parseFloat(tr.querySelector('.bom-add-qty').value) || 0;
+    var merek = tr.querySelector('.bom-add-merek').value.trim();
+    var supplier = tr.querySelector('.bom-add-supplier').value.trim();
+    var satuan = tr.querySelector('.bom-add-satuan').value.trim();
+    var catatan = tr.querySelector('.bom-add-catatan').value.trim();
+    var nama, pricelistId;
+    if (v === '__manual__') { pricelistId = ''; nama = tr.querySelector('.bom-add-nama').value.trim(); }
+    else { var opt = sel.options[sel.selectedIndex]; pricelistId = v; nama = opt.getAttribute('data-nama'); }
+    if (nama && qty > 0) items.push({ pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, kategori: kat, qty: qty, catatan: catatan });
+  });
+  if (!items.length) return showNotification('Isi minimal satu baris (pilih material & qty > 0).', 'error');
+  toggleLoader(true, 'Menyimpan material...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : (items.length + ' material ditambahkan.'));
+    _bomReloadDetail();
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan.', 'error'); })
+    .addBOMItemsBatch({ noWO: _bomWO.noWO, oleh: _bomUserNama(), items: items });
 }
 
 // ── Katalog pricelist (lazy) ────────────────────────────────────
