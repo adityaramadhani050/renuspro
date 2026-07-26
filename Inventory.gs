@@ -873,6 +873,14 @@ function terimaPOItems(payload) {
       }
     }
 
+    // Set ID stok dibaca SEKALI (sebelumnya sheet Stok dibaca penuh per item — N+1).
+    var stokIdSet = {};
+    var sDataAll = sSheet.getDataRange().getValues();
+    for (var si = 1; si < sDataAll.length; si++) {
+      var sid = (sDataAll[si][0] || '').toString().trim();
+      if (sid) stokIdSet[sid] = true;
+    }
+
     for (var ii = 0; ii < items.length; ii++) {
       var it       = items[ii];
       var qtyTerima = Number(it.qty) || 0;
@@ -885,15 +893,10 @@ function terimaPOItems(payload) {
       if (qtyTerima > qtySisa) {
         return { success: false, message: 'Qty item "' + it.namaItem + '" melebihi sisa (' + qtySisa + ').' };
       }
-      // Validasi item stok ada di sheet Stok
+      // Validasi item stok ada di sheet Stok (pakai set di memori).
       var idStokCheck = it.idStok || it.idProduk;
-      if (idStokCheck) {
-        var sDataCheck = sSheet.getDataRange().getValues();
-        var stokFound = false;
-        for (var sc = 1; sc < sDataCheck.length; sc++) {
-          if ((sDataCheck[sc][0] || '').toString().trim() === idStokCheck) { stokFound = true; break; }
-        }
-        if (!stokFound) return { success: false, message: 'Item stok ' + idStokCheck + ' tidak ditemukan.' };
+      if (idStokCheck && !stokIdSet[idStokCheck]) {
+        return { success: false, message: 'Item stok ' + idStokCheck + ' tidak ditemukan.' };
       }
     }
 
@@ -962,19 +965,19 @@ function terimaPOItems(payload) {
       for (var r = 1; r < itDataFresh.length; r++) {
         if ((itDataFresh[r][0] || '').toString() === idItem) {
           itSheet.getRange(r + 1, 9).setValue(allQtyDiterimaMap[idItem]);
+          itDataFresh[r][8] = allQtyDiterimaMap[idItem];   // sinkron di memori (hindari baca ulang)
           break;
         }
       }
     }
 
-    // 3. Update status PO
-    var itDataCheck = itSheet.getDataRange().getValues();
+    // 3. Update status PO (pakai itDataFresh yg sudah disinkron, tanpa baca ulang sheet)
     var allDiterima = true;
     var adaDiterima = false;
-    for (var r2 = 1; r2 < itDataCheck.length; r2++) {
-      if ((itDataCheck[r2][1] || '').toString().trim() !== noPO) continue;
-      var qtyPesan2  = Number(itDataCheck[r2][3]) || 0;
-      var qtyDit2    = Number(itDataCheck[r2][8]) || 0;
+    for (var r2 = 1; r2 < itDataFresh.length; r2++) {
+      if ((itDataFresh[r2][1] || '').toString().trim() !== noPO) continue;
+      var qtyPesan2  = Number(itDataFresh[r2][3]) || 0;
+      var qtyDit2    = Number(itDataFresh[r2][8]) || 0;
       if (qtyDit2 > 0) adaDiterima = true;
       if (qtyDit2 < qtyPesan2) allDiterima = false;
     }
@@ -1363,6 +1366,15 @@ function batalkanPenggunaanStok(idMutasi, namaUser) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Bundle penerimaan: PO menunggu + riwayat dalam 1 panggilan (ganti rantai
+// serial getPOMenungguPenerimaan → getRiwayatPenerimaanList di frontend).
+function getPenerimaanBundle() {
+  var out = { success: true };
+  try { out.pending = getPOMenungguPenerimaan() || []; } catch (e) { out.pending = []; }
+  try { var rw = getRiwayatPenerimaanList({}); out.riwayat = (rw && rw.list) ? rw.list : []; } catch (e) { out.riwayat = []; }
+  return out;
 }
 
 function getPOMenungguPenerimaan() {

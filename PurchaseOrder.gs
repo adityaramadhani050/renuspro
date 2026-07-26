@@ -65,6 +65,10 @@ function _cachedPembayaranPO() {
   return _cacheGetSheet('cache_pem_po', 'Pembayaran_PO');
 }
 
+function _cachedPOItem() {
+  return _cacheGetSheet('cache_po_item', 'PO_Item');   // diinvalidasi via invalidatePOCache
+}
+
 function invalidatePembayaranPOCache() {
   invalidateCache(['cache_pem_po']);
 }
@@ -316,11 +320,9 @@ function getPOList() {
 function getPODetail(noPO) {
   try {
     var ss = getSpreadsheet();
-    SpreadsheetApp.flush();
 
-    // Header
-    var poSheet = _ensurePOSheet(ss);
-    var poData = poSheet.getDataRange().getValues();
+    // Header (via cache; diinvalidasi tiap tulis PO). Tanpa flush — read path.
+    var poData = _cachedPO();
     var header = null;
     for (var i = 1; i < poData.length; i++) {
       if (poData[i][0] && poData[i][0].toString() === noPO) {
@@ -358,9 +360,8 @@ function getPODetail(noPO) {
     }
     if (!header) return { success: false, message: 'No PO tidak ditemukan.' };
 
-    // Items
-    var itemSheet = _ensurePOItemSheet(ss);
-    var itemData = itemSheet.getDataRange().getValues();
+    // Items (cache)
+    var itemData = _cachedPOItem();
     var items = [];
     for (var j = 1; j < itemData.length; j++) {
       var ir = itemData[j];
@@ -380,9 +381,8 @@ function getPODetail(noPO) {
       }
     }
 
-    // Pembayaran
-    var bayarSheet = _ensurePembayaranPOSheet(ss);
-    var bayarData = bayarSheet.getDataRange().getValues();
+    // Pembayaran (cache)
+    var bayarData = _cachedPembayaranPO();
     var pembayaran = [];
     for (var k = 1; k < bayarData.length; k++) {
       var br = bayarData[k];
@@ -401,9 +401,8 @@ function getPODetail(noPO) {
       }
     }
 
-    // Payment Requests
+    // Payment Requests (tetap baca sheet; pastikan kolom invoice ada, tanpa flush)
     var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
-    SpreadsheetApp.flush();
     var prData  = prSheet.getDataRange().getValues();
     var paymentRequests = [];
     for (var pr = 1; pr < prData.length; pr++) {

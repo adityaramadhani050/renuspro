@@ -551,22 +551,19 @@ function loadPenerimaanBarang() {
   if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   if (typeof google === 'undefined') return;
   _penPending = null; _penRiwayat = null;
+  // Satu panggilan (getPenerimaanBundle) menggantikan rantai serial
+  // getPOMenungguPenerimaan → getRiwayatPenerimaanList.
   google.script.run
-    .withSuccessHandler(function(data) {
-      _penPending = data || [];
+    .withSuccessHandler(function(res) {
+      res = res || {};
+      _penPending = res.pending || [];
+      _penRiwayat = res.riwayat || [];
       var badge = document.getElementById('inv-penerimaan-badge');
       if (badge) { badge.textContent = _penPending.length; badge.classList.toggle('hidden', _penPending.length === 0); }
-      _penFetchRiwayat();
+      _penBuildAndRender();
     })
-    .withFailureHandler(function() { _penPending = []; _penFetchRiwayat(); })
-    .getPOMenungguPenerimaan();
-}
-
-function _penFetchRiwayat() {
-  google.script.run
-    .withSuccessHandler(function(res) { _penRiwayat = (res && res.list) || []; _penBuildAndRender(); })
-    .withFailureHandler(function() { _penRiwayat = []; _penBuildAndRender(); })
-    .getRiwayatPenerimaanList({});
+    .withFailureHandler(function() { _penPending = []; _penRiwayat = []; _penBuildAndRender(); })
+    .getPenerimaanBundle();
 }
 
 function _penBuildAndRender() {
