@@ -46,20 +46,23 @@
       }).join('');
     }
 
-    window.loadKwitansi = function() {
+    window.loadKwitansi = function(fromNav) {
       const btnBuat = document.querySelector('[onclick="bukaModalBuatKwitansi()"]');
       if (btnBuat) btnBuat.classList.toggle('hidden', !(typeof _isFinanceOrAdmin === 'function' && _isFinanceOrAdmin()));
+      var render = function(data) {
+        _cachedKwitansiData = data || [];
+        const s = document.getElementById('search-kwitansi'); if (s) s.value = '';
+        _pgState.kwitansi.data = _cachedKwitansiData;
+        _pgState.kwitansi.page = 1;
+        _injectPgBar('kwitansi', '#table-kwitansi');
+        _pgRender('kwitansi');
+      };
+      var c = fromNav ? navCacheGet('kwitansi') : null;
+      if (c) { render(c); return; }
       const tbody = document.getElementById('table-kwitansi');
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data kwitansi...</td></tr>`;
       if (typeof google !== 'undefined') {
-        google.script.run.withSuccessHandler(function(data) {
-          _cachedKwitansiData = data || [];
-          const s = document.getElementById('search-kwitansi'); if (s) s.value = '';
-          _pgState.kwitansi.data = _cachedKwitansiData;
-          _pgState.kwitansi.page = 1;
-          _injectPgBar('kwitansi', '#table-kwitansi');
-          _pgRender('kwitansi');
-        }).getKwitansiList();
+        google.script.run.withSuccessHandler(function(data) { navCacheSet('kwitansi', data); render(data); }).getKwitansiList();
       }
     };
 

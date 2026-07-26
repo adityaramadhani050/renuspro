@@ -111,17 +111,20 @@ function _pgRenderPurchaseOrder(data) {
 }
 
 // ── Load daftar PO ──────────────────────────────────────────────────────────
-window.loadPurchaseOrder = function() {
+window.loadPurchaseOrder = function(fromNav) {
+  var render = function(data) {
+    _cachedPOData = (data || []).slice().reverse();
+    _pgState.purchaseorder.data = _cachedPOData;
+    _pgState.purchaseorder.page = 1;
+    _injectPgBar('purchaseorder', '#table-purchaseorder');
+    _pgRender('purchaseorder');
+    _renderPOKPI(_cachedPOData);
+  };
+  var c = fromNav ? navCacheGet('purchaseorder') : null;
+  if (c) { render(c); return; }
   if (typeof google === 'undefined') return;
   google.script.run
-    .withSuccessHandler(function(data) {
-      _cachedPOData = (data || []).slice().reverse();
-      _pgState.purchaseorder.data = _cachedPOData;
-      _pgState.purchaseorder.page = 1;
-      _injectPgBar('purchaseorder', '#table-purchaseorder');
-      _pgRender('purchaseorder');
-      _renderPOKPI(_cachedPOData);
-    })
+    .withSuccessHandler(function(data) { navCacheSet('purchaseorder', data); render(data); })
     .withFailureHandler(function() {
       document.getElementById('table-purchaseorder').innerHTML =
         '<tr><td colspan="7" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';

@@ -164,20 +164,23 @@
       }).join('');
     }
 
-    window.loadInvoice = function() {
+    window.loadInvoice = function(fromNav) {
       const btnBuat = document.querySelector('[onclick="bukaModalBuatInvoice()"]');
       if (btnBuat) btnBuat.classList.toggle('hidden', !_isFinanceOrAdmin());
+      var render = function(data) {
+        _cachedInvoiceData = data || [];
+        const s = document.getElementById('search-invoice'); if (s) s.value = '';
+        _pgState.invoice.data = _cachedInvoiceData;
+        _pgState.invoice.page = 1;
+        _injectPgBar('invoice', '#table-invoice');
+        _pgRender('invoice');
+      };
+      var c = fromNav ? navCacheGet('invoice') : null;
+      if (c) { render(c); return; }
       const tbody = document.getElementById('table-invoice');
       if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data invoice...</td></tr>`;
       if (typeof google !== 'undefined') {
-        google.script.run.withSuccessHandler(function(data) {
-          _cachedInvoiceData = data || [];
-          const s = document.getElementById('search-invoice'); if (s) s.value = '';
-          _pgState.invoice.data = _cachedInvoiceData;
-          _pgState.invoice.page = 1;
-          _injectPgBar('invoice', '#table-invoice');
-          _pgRender('invoice');
-        }).getInvoiceList();
+        google.script.run.withSuccessHandler(function(data) { navCacheSet('invoice', data); render(data); }).getInvoiceList();
       }
     };
 

@@ -125,6 +125,7 @@ function updateKategori(oldNama, newNama) {
       var pl = _ensurePricelistSheet(ss), pd = pl.getDataRange().getValues();
       for (var k = 1; k < pd.length; k++) { if ((pd[k][2] || '').toString().trim().toLowerCase() === oldNama.toLowerCase()) pl.getRange(k + 1, 3).setValue(newNama); }
     } catch (e) {}
+    invalidatePricelistCache();   // updateKategori mengganti nama kategori di baris pricelist
     return { success: true, message: 'Kategori diperbarui.' };
   } catch (e) { return { success: false, message: e.toString() }; } finally { try { lock.releaseLock(); } catch (e) {} }
 }
@@ -151,9 +152,7 @@ function hapusKategori(nama) {
 
 function getPricelistAll() {
   try {
-    var ss = getSpreadsheet();
-    var sheet = _ensurePricelistSheet(ss);
-    var data = sheet.getDataRange().getValues();
+    var data = _cachedPricelist();   // ter-cache (invalidasi di tambah/update/hapus item & kategori)
     var supMap = {};
     try { (getSupplierList() || []).forEach(function (s) { supMap[s.id] = (s.alias && s.alias.trim()) ? s.alias : s.nama; }); } catch (e) {}
     var list = [];
@@ -208,6 +207,7 @@ function tambahPricelistItem(payload) {
       Number(payload.hargaBeli) || 0, payload.termasukPPN ? 'Ya' : 'Tidak',
       '', '', when, payload.ready ? 'Ya' : 'Tidak'
     ]);
+    invalidatePricelistCache();
     return { success: true, message: 'Item pricelist ' + id + ' ditambahkan.', id: id };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -237,6 +237,7 @@ function updatePricelistItem(id, payload) {
         ]]);
         sheet.getRange(i + 1, 12).setValue(when);                            // Update Terakhir
         if (payload.ready != null) sheet.getRange(i + 1, 13).setValue(payload.ready ? 'Ya' : 'Tidak');
+        invalidatePricelistCache();
         return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
       }
     }
@@ -261,6 +262,7 @@ function setPricelistReady(id, ready) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === id) {
         sheet.getRange(i + 1, 13).setValue(ready ? 'Ya' : 'Tidak');
+        invalidatePricelistCache();
         return { success: true, message: 'Status ready diperbarui.' };
       }
     }
@@ -284,6 +286,7 @@ function hapusPricelistItem(id) {
     for (var i = data.length - 1; i >= 1; i--) {
       if ((data[i][0] || '').toString().trim() === id) {
         sheet.deleteRow(i + 1);
+        invalidatePricelistCache();
         return { success: true, message: 'Item pricelist dihapus.' };
       }
     }

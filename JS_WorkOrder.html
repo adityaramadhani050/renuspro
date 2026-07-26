@@ -95,28 +95,31 @@
     }
 
     // ── Load ──
-    window.loadWorkOrder = function() {
+    window.loadWorkOrder = function(fromNav) {
       // Selalu mulai dari daftar (bila sebelumnya user tinggalkan di halaman detail).
       var detailView = document.getElementById('wo-detail-view');
       var listView = document.getElementById('wo-list-view');
       if (detailView) detailView.classList.add('hidden');
       if (listView) listView.classList.remove('hidden');
+      var render = function(res) {
+        const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
+        _cachedWorkOrderData = data;
+        if (res && res.summary) _updateWOSummary(res.summary);
+        const search = document.getElementById('search-workorder');
+        if (search) search.value = '';
+        const filterEl = document.getElementById('filter-wo-status');
+        if (filterEl) filterEl.value = '';
+        _pgState.workorder.data = _cachedWorkOrderData;
+        _pgState.workorder.page = 1;
+        _injectPgBar('workorder', '#table-workorder');
+        _pgRender('workorder');
+      };
+      var c = fromNav ? navCacheGet('workorder') : null;
+      if (c) { render(c); return; }
       const tbody = document.getElementById('table-workorder');
       if (tbody) tbody.innerHTML = `<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data work order...</div>`;
       if (typeof google !== 'undefined') {
-        google.script.run.withSuccessHandler(function(res) {
-          const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
-          _cachedWorkOrderData = data;
-          if (res && res.summary) _updateWOSummary(res.summary);
-          const search = document.getElementById('search-workorder');
-          if (search) search.value = '';
-          const filterEl = document.getElementById('filter-wo-status');
-          if (filterEl) filterEl.value = '';
-          _pgState.workorder.data = _cachedWorkOrderData;
-          _pgState.workorder.page = 1;
-          _injectPgBar('workorder', '#table-workorder');
-          _pgRender('workorder');
-        }).getWorkOrderDashboard();
+        google.script.run.withSuccessHandler(function(res) { navCacheSet('workorder', res); render(res); }).getWorkOrderDashboard();
       }
     };
 

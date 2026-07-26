@@ -97,17 +97,21 @@ function _pgRenderSupplier(data) {
 }
 
 // ── Load data supplier ────────────────────────────────────────────
-window.loadSupplier = function() {
+window.loadSupplier = function(fromNav) {
+  var render = function(data, resetDetail) {
+    _cachedSupplierData = data || [];
+    if (resetDetail) { _supPricelistLoaded = false; _supPricelist = {}; _supOpen = {}; }  // refresh detail cache saat fetch segar
+    if (typeof resetSearch === 'function') resetSearch('supplier');
+    _pgState.supplier.data = _cachedSupplierData;
+    _pgState.supplier.page = 1;
+    _injectPgBar('supplier', '#table-supplier');
+    _pgRender('supplier');
+  };
+  var c = fromNav ? navCacheGet('supplier') : null;
+  if (c) { render(c, false); return; }   // re-nav: pakai cache, jangan buang detail
   if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedSupplierData = data || [];
-      _supPricelistLoaded = false; _supPricelist = {}; _supOpen = {};  // refresh detail cache
-      if (typeof resetSearch === 'function') resetSearch('supplier');
-      _pgState.supplier.data = _cachedSupplierData;
-      _pgState.supplier.page = 1;
-      _injectPgBar('supplier', '#table-supplier');
-      _pgRender('supplier');
-    }).withFailureHandler(function(err) {
+    google.script.run.withSuccessHandler(function(data) { navCacheSet('supplier', data); render(data, true); })
+    .withFailureHandler(function(err) {
       const tbody = document.getElementById('table-supplier');
       if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-400">
         <i class="fas fa-exclamation-circle mr-2"></i>Gagal memuat data supplier.</td></tr>`;

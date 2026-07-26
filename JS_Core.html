@@ -132,6 +132,19 @@
       if (cb) cb();
     }
 
+    // --- Cache navigasi sisi klien (buka-tutup menu terasa instan) ---
+    // Navigasi memanggil loader dgn fromNav=true → render dari cache bila masih
+    // segar (TTL pendek). Aksi simpan/hapus memanggil loader TANPA fromNav →
+    // selalu fetch segar, jadi data setelah edit sendiri tak pernah basi.
+    var _navCache = {};
+    var NAV_CACHE_TTL = 45000; // 45 dtk
+    function navCacheGet(key) {
+      var e = _navCache[key];
+      return (e && (Date.now() - e.at) < NAV_CACHE_TTL) ? e.data : null;
+    }
+    function navCacheSet(key, data) { _navCache[key] = { data: data, at: Date.now() }; }
+    function invalidateNavCache(key) { if (key) { delete _navCache[key]; } else { _navCache = {}; } }
+
     // --- NAVIGASI DASHBOARD ---
     function navigate(pageId) {
       // Tutup semua modal floating sebelum pindah halaman
@@ -145,20 +158,20 @@
       document.getElementById('nav-' + pageId).classList.add('active');
       if(pageId === 'dashboard') loadDashboard();
       if(pageId === 'sitesurvey') loadSiteSurvey();
-      if(pageId === 'penawaran') { loadPenawaran(); toggleFormPenawaran(false); if(!erpState.klien.length) muatSeluruhDataAwal(false); }
-      if(pageId === 'workorder') loadWorkOrder();
-      if(pageId === 'invoice') loadInvoice();
-      if(pageId === 'kwitansi') loadKwitansi();
-      if(pageId === 'produk') loadProduk();
+      if(pageId === 'penawaran') { loadPenawaran(true); toggleFormPenawaran(false); if(!erpState.klien.length) muatSeluruhDataAwal(false); }
+      if(pageId === 'workorder') loadWorkOrder(true);
+      if(pageId === 'invoice') loadInvoice(true);
+      if(pageId === 'kwitansi') loadKwitansi(true);
+      if(pageId === 'produk') loadProduk(true);
       if(pageId === 'template') loadTemplate();
-      if(pageId === 'customer') loadCustomer();
+      if(pageId === 'customer') loadCustomer(true);
       if(pageId === 'users') loadUsers();
       if(pageId === 'laporanfinance') {
         _frUpdatePeriodLabel();
         loadFinanceReport();
       }
       if(pageId === 'settings') loadSettings();
-      if(pageId === 'supplier') loadSupplier();
+      if(pageId === 'supplier') loadSupplier(true);
       if(pageId === 'pricelist') loadPricelist();
       if(pageId === 'purchaseorder') {
         // Reset ke list view setiap navigasi masuk
@@ -168,7 +181,7 @@
         if (formPO)   formPO.classList.add('hidden');
         if (detailPO) detailPO.classList.add('hidden');
         if (listPO)   listPO.classList.remove('hidden');
-        loadPurchaseOrder();
+        loadPurchaseOrder(true);
       }
       if(pageId === 'qc') loadQC();
       if(pageId === 'bom' && typeof loadBOM === 'function') loadBOM();

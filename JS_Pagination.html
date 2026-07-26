@@ -292,16 +292,19 @@ window.resetFilterPenawaran = function() {
   if (infoEl) infoEl.innerText = '';
 };
 
-window.loadPenawaran = function() {
+window.loadPenawaran = function(fromNav) {
+  var render = function(data) {
+    _cachedPenawaranData = data || [];
+    _isiDropdownFilterPenawaran(data);            // rebuild dropdown, nilai filter dipertahankan
+    _injectPgBar('penawaran', '#table-penawaran');
+    // Terapkan ulang filter yang sedang aktif (bukan reset ke semua data),
+    // supaya pilihan filter tetap setelah tambah/edit/ubah status penawaran.
+    filterPenawaran();
+  };
+  var c = fromNav ? navCacheGet('penawaran') : null;
+  if (c) { render(c); return; }
   if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedPenawaranData = data || [];
-      _isiDropdownFilterPenawaran(data);            // rebuild dropdown, nilai filter dipertahankan
-      _injectPgBar('penawaran', '#table-penawaran');
-      // Terapkan ulang filter yang sedang aktif (bukan reset ke semua data),
-      // supaya pilihan filter tetap setelah tambah/edit/ubah status penawaran.
-      filterPenawaran();
-    }).getPenawaranList();
+    google.script.run.withSuccessHandler(function(data) { navCacheSet('penawaran', data); render(data); }).getPenawaranList();
   }
 };
 
@@ -350,20 +353,23 @@ function _prodComputeRole() {
   if (btn) btn.classList.toggle('hidden', !window._prodCanManage);
 }
 
-window.loadProduk = function() {
+window.loadProduk = function(fromNav) {
   _prodComputeRole();
+  var render = function(data) {
+    _cachedProdukData = data || [];
+    resetSearch('produk');
+    _pgState.produk.data = data;
+    _pgState.produk.page = 1;
+    _injectPgBar('produk', '#table-produk');
+    _pgRender('produk');
+  };
+  var c = fromNav ? navCacheGet('produk') : null;
+  if (c) { render(c); return; }
   // Bersihkan tabel lama agar tombol aksi role sebelumnya tidak sempat tampil
   var _tbProd = document.getElementById('table-produk');
   if (_tbProd) _tbProd.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data produk...</td></tr>';
   if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedProdukData = data || [];
-      resetSearch('produk');
-      _pgState.produk.data = data;
-      _pgState.produk.page = 1;
-      _injectPgBar('produk', '#table-produk');
-      _pgRender('produk');
-    }).getProdukList();
+    google.script.run.withSuccessHandler(function(data) { navCacheSet('produk', data); render(data); }).getProdukList();
   }
 };
 
@@ -455,16 +461,19 @@ function _pgRenderCustomer(data) {
     </tr>`).join('');
 }
 
-window.loadCustomer = function() {
+window.loadCustomer = function(fromNav) {
+  var render = function(data) {
+    _cachedCustomerData = data || [];
+    resetSearch('customer');
+    _pgState.customer.data = data;
+    _pgState.customer.page = 1;
+    _injectPgBar('customer', '#table-customer');
+    _pgRender('customer');
+  };
+  var c = fromNav ? navCacheGet('customer') : null;
+  if (c) { render(c); return; }
   if (typeof google !== 'undefined') {
-    google.script.run.withSuccessHandler(function(data) {
-      _cachedCustomerData = data || [];
-      resetSearch('customer');
-      _pgState.customer.data = data;
-      _pgState.customer.page = 1;
-      _injectPgBar('customer', '#table-customer');
-      _pgRender('customer');
-    }).getCustomerList();
+    google.script.run.withSuccessHandler(function(data) { navCacheSet('customer', data); render(data); }).getCustomerList();
   }
 };
 
