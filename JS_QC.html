@@ -281,8 +281,9 @@ function _qcRenderWOList() {
   });
   // Pisahkan per tab: Selesai (pct 100%) vs Sedang Proses (pct < 100%). Badge
   // mengikuti hasil pencarian/filter yang sedang aktif.
-  var selesai = list.filter(function(w) { return w.pct === 100; });
-  var proses  = list.filter(function(w) { return w.pct !== 100; });
+  var _qcIsSelesai = function(w) { return w.pct === 100 || w.selesaiManual; };
+  var selesai = list.filter(_qcIsSelesai);
+  var proses  = list.filter(function(w) { return !_qcIsSelesai(w); });
   var pb = document.getElementById('qc-tab-proses-badge');  if (pb) pb.textContent = proses.length;
   var sb = document.getElementById('qc-tab-selesai-badge'); if (sb) sb.textContent = selesai.length;
   var shown = (_qcTab === 'selesai') ? selesai : proses;
@@ -306,8 +307,9 @@ function _qcRenderWOList() {
       : '';
     return '<div onclick="bukaQCDetail(\'' + _qcEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
-      +   '<div class="flex items-center gap-2"><span class="font-mono font-extrabold text-slate-700">' + _qcEsc(w.noWO) + '</span>'
-      +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span></div>'
+      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _qcEsc(w.noWO) + '</span>'
+      +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span>'
+      +     (w.selesaiManual && w.pct !== 100 ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check mr-0.5"></i>Ditandai selesai</span>' : '') + '</div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _qcEsc(w.namaProject || '-') + '</div>'
       +   '<div class="text-[11px] text-slate-400 truncate">' + _qcEsc(w.namaKlien || '') + '</div>'
       + '</div>'
@@ -347,10 +349,37 @@ function _qcReloadDetail() {
   if (!_qcWO) return;
   google.script.run.withSuccessHandler(function(res) {
     _qcItems = (res && res.success) ? (res.list || []) : [];
+    if (_qcWO && res) { _qcWO.selesaiManual = !!res.selesaiManual; _qcWO.ditandaiOleh = res.ditandaiOleh || ''; _qcWO.ditandaiPada = res.ditandaiPada || ''; }
     _qcRenderDetail(res && res.summary);
   }).withFailureHandler(function() {
     document.getElementById('qc-detail-body').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat checklist.</div>';
   }).getQCByWO(_qcWO.noWO);
+}
+
+// ── Tandai / batalkan QC selesai manual (Lead/Admin) ─────────────
+function _qcTandaiSelesai() {
+  if (!_qcWO || !_qcCanAssign()) return;
+  showConfirm({ title: 'Tandai QC Selesai', message: 'Tandai QC ' + _qcWO.noWO + ' sebagai selesai secara manual? WO akan pindah ke tab "Selesai".', confirmText: 'Ya, Tandai Selesai', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai selesai...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { if (_qcWO) _qcWO.selesaiManual = true; _qcReloadDetail(); }
+    }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .tandaiQCSelesai(_qcWO.noWO, _qcUserNama());
+  }});
+}
+function _qcBatalkanSelesai() {
+  if (!_qcWO || !_qcCanAssign()) return;
+  showConfirm({ title: 'Batalkan Tanda Selesai', message: 'Batalkan tanda selesai QC ' + _qcWO.noWO + '? WO kembali ke tab "Sedang Proses".', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Membatalkan...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { if (_qcWO) _qcWO.selesaiManual = false; _qcReloadDetail(); }
+    }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .batalkanQCSelesai(_qcWO.noWO, _qcUserNama());
+  }});
 }
 
 // ── Export PDF laporan QC per WO (desain konsisten dgn laporan lain) ──
@@ -505,8 +534,13 @@ function _qcRenderDetail(summary) {
     var remindBtns = '';
     if (_qcCanReview()) remindBtns += '<button onclick="_qcRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
     if (_qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
+    // Tandai/Batalkan QC selesai manual (Lead/Admin) — independen dari progress %.
+    var selesaiBtn = (_qcWO && _qcWO.selesaiManual)
+      ? '<button onclick="_qcBatalkanSelesai()" title="Batalkan tanda selesai" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> QC Selesai</span></button>'
+      : '<button onclick="_qcTandaiSelesai()" title="Tandai QC selesai secara manual" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Selesai</span></button>';
     var manageBtns = canManage
-      ? '<button onclick="_qcExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>'
+      ? selesaiBtn
+        + '<button onclick="_qcExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>'
         + '<div class="relative">'
         +   '<button onclick="_qcToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span><i class="fa-solid fa-chevron-down text-[10px] ml-0.5 hidden sm:inline"></i></button>'
         +   '<div id="qc-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div>'

@@ -465,7 +465,11 @@ function getQCByWO(noWO) {
       if ((data[i][1] || '').toString().trim() === noWO) rowMap[(data[i][2] || '').toString().trim()] = data[i];
     }
     var list = master.map(function (m) { return _qcMergeItem(m, rowMap[m.kode] || null); });
-    return { success: true, list: list, summary: _qcCountSummary(list) };
+    var proj = _qcRegisteredWOs().filter(function (p) { return p.noWO === noWO; })[0] || {};
+    return {
+      success: true, list: list, summary: _qcCountSummary(list),
+      selesaiManual: !!proj.selesaiManual, ditandaiOleh: proj.ditandaiOleh || '', ditandaiPada: proj.ditandaiPada || ''
+    };
   } catch (e) {
     return { success: false, list: [], message: e.toString() };
   }
@@ -883,10 +887,16 @@ function setQCAssignment(noWO, userIds, assignedBy) {
 function _qcProjectSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('QC_Project');
-  if (sheet) return sheet;
-  sheet = ss.insertSheet('QC_Project');
-  sheet.appendRow(['No WO', 'Nama Project', 'Nama Klien', 'Ditambahkan Oleh', 'Ditambahkan Pada']);
-  sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+  if (!sheet) {
+    sheet = ss.insertSheet('QC_Project');
+    sheet.appendRow(['No WO', 'Nama Project', 'Nama Klien', 'Ditambahkan Oleh', 'Ditambahkan Pada', 'Selesai Manual', 'Ditandai Selesai Oleh', 'Ditandai Selesai Pada']);
+    sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
+    return sheet;
+  }
+  // Migrasi kolom "selesai manual" untuk sheet lama.
+  if (sheet.getLastColumn() < 8) {
+    sheet.getRange(1, 6, 1, 3).setValues([['Selesai Manual', 'Ditandai Selesai Oleh', 'Ditandai Selesai Pada']]).setFontWeight('bold');
+  }
   return sheet;
 }
 
@@ -899,10 +909,54 @@ function _qcRegisteredWOs() {
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][0] || '').toString().trim();
       if (!w) continue;
-      out.push({ noWO: w, namaProject: (data[i][1] || '').toString(), namaKlien: (data[i][2] || '').toString() });
+      out.push({
+        noWO: w, namaProject: (data[i][1] || '').toString(), namaKlien: (data[i][2] || '').toString(),
+        selesaiManual: ((data[i][5] || '').toString().trim().toLowerCase() === 'ya'),
+        ditandaiOleh: (data[i][6] || '').toString(), ditandaiPada: (data[i][7] || '').toString()
+      });
     }
   } catch (e) {}
   return out;
+}
+
+// Tandai / batalkan QC selesai secara MANUAL (Lead/Admin) — independen dari pct.
+// Kolom QC_Project (1-based): 6=Selesai Manual, 7=Ditandai Oleh, 8=Ditandai Pada.
+function tandaiQCSelesai(noWO, oleh) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    lock.waitLock(15000);
+    var sheet = _qcProjectSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === noWO) {
+        sheet.getRange(i + 1, 6, 1, 3).setValues([['Ya', (oleh || '').toString(), when]]);
+        return { success: true, message: 'QC ' + noWO + ' ditandai selesai.' };
+      }
+    }
+    return { success: false, message: 'WO tidak terdaftar di QC.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+function batalkanQCSelesai(noWO, oleh) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    lock.waitLock(15000);
+    var sheet = _qcProjectSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === noWO) {
+        sheet.getRange(i + 1, 6, 1, 3).setValues([['', '', '']]);
+        return { success: true, message: 'Tanda selesai QC dibatalkan.' };
+      }
+    }
+    return { success: false, message: 'WO tidak terdaftar di QC.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
 // WO yang BELUM terdaftar di QC (untuk dropdown "Tambah Project").
@@ -996,7 +1050,7 @@ function getQCDashboard(opts) {
     // Hanya WO yang terdaftar di QC (bukan seluruh WO). Nama project/klien pakai
     // snapshot registry — hindari getWorkOrderList() yang berat di jalur panas.
     var woList = _qcRegisteredWOs().map(function (r) {
-      return { noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien, status: '' };
+      return { noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien, status: '', selesaiManual: !!r.selesaiManual };
     });
     if (siteUserId) {
       woList = woList.filter(function (wo) {
@@ -1061,6 +1115,7 @@ function getQCDashboard(opts) {
       return {
         noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status,
         total: masterCount, approved: g.approved, pending: g.pending, rejected: g.rejected, na: g.na, belum: belum, pct: pct,
+        selesaiManual: !!wo.selesaiManual,
         assigned: assignedMap[wo.noWO] || []
       };
     });
