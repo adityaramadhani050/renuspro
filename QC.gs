@@ -1064,7 +1064,7 @@ function getQCDashboard(opts) {
         assigned: assignedMap[wo.noWO] || []
       };
     });
-    perWO.sort(function (a, b) { return (b.pending + b.rejected) - (a.pending + a.rejected); });
+    perWO.sort(function (a, b) { return (a.noWO || '').localeCompare((b.noWO || ''), undefined, { numeric: true }); });
 
     reviewQueue.sort(function (a, b) { return (b.ageDays == null ? -1 : b.ageDays) - (a.ageDays == null ? -1 : a.ageDays); });
     var teamStats = Object.keys(teamAgg).map(function (name) {
