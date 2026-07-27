@@ -101,11 +101,12 @@
         }
         _kwitansiEditId = null;
         _kwitansiInvoiceList = res.invoiceList || [];
-        _kwitansiNextNo = res.nextNo || '';
+        _kwitansiNextNo = '';
 
         document.getElementById('kw-modal-title').innerText = 'Buat Kwitansi Baru';
         document.getElementById('kw-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kwitansi';
-        document.getElementById('kw-nomor-preview').innerText = _kwitansiNextNo;
+        // Nomor dibuat otomatis saat simpan (bukan saat buka modal) → cegah duplikat.
+        document.getElementById('kw-nomor-preview').innerText = '(otomatis saat simpan)';
         _isiDropdownKwitansi(_kwitansiInvoiceList, '', false);
 
         document.getElementById('kw-tanggal').valueAsDate = new Date();

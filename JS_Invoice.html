@@ -212,10 +212,11 @@
         _invoiceEditId = null;
         _invoiceEditDpp = 0;
         _invoiceWOList = (res.woList || []).concat(res.penawaranPreDeal || []);
-        _invoiceNextNo = res.nextNo || '';
+        _invoiceNextNo = '';
         document.getElementById('inv-modal-title').innerText = 'Buat Invoice Baru';
         document.getElementById('inv-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Invoice';
-        document.getElementById('inv-nomor-preview').innerText = _invoiceNextNo;
+        // Nomor dibuat otomatis saat simpan (bukan saat buka modal) → cegah duplikat.
+        document.getElementById('inv-nomor-preview').innerText = '(otomatis saat simpan)';
 
         const sel = document.getElementById('inv-wo');
         sel.disabled = false;

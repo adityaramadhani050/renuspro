@@ -216,7 +216,10 @@ function getInvoiceInitialData() {
     // Penawaran yang belum Deal — hanya untuk invoice DP pre-deal
     const penawaranPreDeal = _getPenawaranPreDealList(ss, tagihByPen);
 
-    return { success: true, woList: woEnriched, penawaranPreDeal: penawaranPreDeal, nextNo: generateNextInvoiceNumber(ss) };
+    // No. invoice TIDAK di-generate saat buka modal — dibuat atomik saat submit
+    // (simpanInvoice, di dalam LockService) agar tak duplikat bila banyak user
+    // membuka modal bersamaan. Pola sama dgn penawaran.
+    return { success: true, woList: woEnriched, penawaranPreDeal: penawaranPreDeal, nextNo: '' };
   } catch (e) {
     return { success: false, error: e.toString(), woList: [], penawaranPreDeal: [], nextNo: '' };
   }

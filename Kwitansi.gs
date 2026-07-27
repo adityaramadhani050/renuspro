@@ -53,8 +53,10 @@ function generateNextKwitansiNumber(ss) {
 // ── Data awal form kwitansi: daftar invoice + nomor berikutnya ──────────────
 function getKwitansiInitialData() {
   try {
-    const ss = getSpreadsheet();
-    return { success: true, invoiceList: getInvoiceList(), nextNo: generateNextKwitansiNumber(ss) };
+    // No. kwitansi TIDAK di-generate saat buka modal — dibuat atomik saat submit
+    // (simpanKwitansi, di dalam LockService) agar tak duplikat bila banyak user
+    // membuka modal bersamaan. Pola sama dgn penawaran.
+    return { success: true, invoiceList: getInvoiceList(), nextNo: '' };
   } catch (e) {
     return { success: false, error: e.toString(), invoiceList: [], nextNo: '' };
   }
