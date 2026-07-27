@@ -356,6 +356,25 @@ function _qcReloadDetail() {
   }).getQCByWO(_qcWO.noWO);
 }
 
+// ── Dropdown "Draft Dokumen" (BAST / Surat Garansi) ──────────────
+function _qcToggleDraftMenu(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById('qc-draft-menu');
+  if (!m) return;
+  m.classList.toggle('hidden');
+  if (!window._qcDraftDocBound) {
+    window._qcDraftDocBound = true;
+    document.addEventListener('click', function(ev) {
+      var mm = document.getElementById('qc-draft-menu');
+      if (!mm || mm.classList.contains('hidden')) return;
+      var wrap = document.getElementById('qc-draft-wrap');
+      if (wrap && wrap.contains(ev.target)) return;   // klik di dalam dropdown → biarkan
+      mm.classList.add('hidden');
+    });
+  }
+}
+function _qcCloseDraftMenu() { var m = document.getElementById('qc-draft-menu'); if (m) m.classList.add('hidden'); }
+
 // ── Tandai / batalkan QC selesai manual (Lead/Admin) ─────────────
 function _qcTandaiSelesai() {
   if (!_qcWO || !_qcCanAssign()) return;
@@ -527,9 +546,15 @@ function _qcRenderDetail(summary) {
     // Draft BAST/Garansi tersedia utk semua (site & lead engineer); Export PDF
     // & Atur Site Engineer hanya untuk Lead Engineer / Admin.
     var canManage = _qcCanAssign();
+    // Satu tombol "Draft Dokumen" berupa dropdown → pilih BAST / Surat Garansi.
     var draftBtns =
-        '<button onclick="_qcDraftBAST()" title="Download draft BAST" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-arrow-down"></i><span> Draft BAST</span></button>'
-      + '<button onclick="_qcDraftGaransi()" title="Download draft Surat Garansi" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-arrow-down"></i><span> Draft Garansi</span></button>';
+        '<div id="qc-draft-wrap" class="relative">'
+      +   '<button onclick="_qcToggleDraftMenu(event)" title="Draft Dokumen" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-arrow-down"></i><span> Draft Dokumen</span><i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>'
+      +   '<div id="qc-draft-menu" class="hidden absolute left-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-slate-150 z-40 p-1.5">'
+      +     '<button onclick="_qcDraftBAST();_qcCloseDraftMenu();" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:bg-blue-50 transition"><i class="fa-solid fa-file-lines text-blue-500 w-4 text-center"></i> Draft BAST</button>'
+      +     '<button onclick="_qcDraftGaransi();_qcCloseDraftMenu();" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:bg-blue-50 transition"><i class="fa-solid fa-file-shield text-blue-500 w-4 text-center"></i> Draft Surat Garansi</button>'
+      +   '</div>'
+      + '</div>';
     // Reminder WA: Lead → Site (lengkapi upload/reject); Site → Lead (review Pending).
     var remindBtns = '';
     if (_qcCanReview()) remindBtns += '<button onclick="_qcRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
