@@ -478,6 +478,8 @@ function editPenawaran(payload) {
     let maxRevCheck = -1;
     let currentNoWO = '';
     let currentTanggalDeal = null;
+    // Catatan Win/Lost dari revisi terakhir agar tidak hilang saat direvisi.
+    let curKodeWin = '', curKodeLost = '', curTanggalFail = '', curLesson = '', curAction = '';
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() === payload.noPenawaran) {
         const rev = parseInt(data[i][1]) || 0;
@@ -486,6 +488,11 @@ function editPenawaran(payload) {
           currentStatus = data[i][16] ? data[i][16].toString() : '';
           currentNoWO = data[i][17] ? data[i][17].toString() : '';
           currentTanggalDeal = data[i][18] || null;
+          curKodeWin     = data[i][22] || '';
+          curKodeLost    = data[i][24] || '';
+          curTanggalFail = data[i][25] || '';
+          curLesson      = data[i][26] || '';
+          curAction      = data[i][27] || '';
         }
       }
     }
@@ -514,12 +521,30 @@ function editPenawaran(payload) {
     const noWOBaru         = currentStatus === 'Deal' ? currentNoWO : '';
     const tanggalDealBaru  = currentStatus === 'Deal' ? currentTanggalDeal : '';
 
+    // Bawa catatan Win/Lost sesuai status revisi baru agar tak hilang saat edit.
+    const isDeal = statusBaru === 'Deal';
+    const isFail = statusBaru === 'Fail';
+    const kodeWinBaru  = isDeal ? curKodeWin : '';
+    const kodeLostBaru = isFail ? curKodeLost : '';
+    const tglFailBaru  = isFail ? curTanggalFail : '';
+    const lessonBaru   = (isDeal || isFail) ? curLesson : '';
+    const actionBaru   = (isDeal || isFail) ? curAction : '';
+
+    _ensurePenawaranExtraCols(sheetMain);   // pastikan kolom 21-28 ada sebelum append
     sheetMain.appendRow([
       payload.noPenawaran, newRev, payload.tanggal, payload.validUntil, payload.namaProject,
       payload.klienId, userActiveName, payload.subtotal, diskon, pajak, payload.grandTotal,
       totalHpp, estimasiProfit, marginPersen, JSON.stringify(cleanTC),
       JSON.stringify(payload.items), statusBaru, noWOBaru, tanggalDealBaru,
-      payload.channelMarketing || ''
+      payload.channelMarketing || '',
+      '',            // 20: Catatan Fail (lama, tak dipakai)
+      '',            // 21: (tak dipakai)
+      kodeWinBaru,   // 22: Kode Win
+      '',            // 23: Catatan Win (lama, tak dipakai)
+      kodeLostBaru,  // 24: Kode Lost
+      tglFailBaru,   // 25: Tanggal Fail
+      lessonBaru,    // 26: Lesson Learned
+      actionBaru     // 27: Action
     ]);
 
     invalidatePenawaranCache();
@@ -542,6 +567,7 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
     const data = sheetMain.getDataRange().getValues();
 
     let maxRev = -1, currentStatus = '', targetRowIdx = -1, currentNoWO = '', currentTanggalDeal = null;
+    let curKodeWin = '', curKodeLost = '', curTanggalFail = '', curLesson = '', curAction = '';
     for (let i = 1; i < data.length; i++) {
       if (data[i][0].toString() !== noPenawaran) continue;
       const r = parseInt(data[i][1]) || 0;
@@ -550,6 +576,11 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
         currentStatus = data[i][16] ? data[i][16].toString() : '';
         currentNoWO = data[i][17] ? data[i][17].toString() : '';
         currentTanggalDeal = data[i][18] || null;
+        curKodeWin     = data[i][22] || '';
+        curKodeLost    = data[i][24] || '';
+        curTanggalFail = data[i][25] || '';
+        curLesson      = data[i][26] || '';
+        curAction      = data[i][27] || '';
       }
       if (r.toString() === rev.toString()) targetRowIdx = i;
     }
@@ -570,13 +601,31 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
     const noWOBaru         = currentStatus === 'Deal' ? currentNoWO : '';
     const tanggalDealBaru  = currentStatus === 'Deal' ? currentTanggalDeal : '';
 
+    // Bawa catatan Win/Lost dari revisi terakhir sesuai status baru.
+    const isDeal = statusBaru === 'Deal';
+    const isFail = statusBaru === 'Fail';
+    const kodeWinBaru  = isDeal ? curKodeWin : '';
+    const kodeLostBaru = isFail ? curKodeLost : '';
+    const tglFailBaru  = isFail ? curTanggalFail : '';
+    const lessonBaru   = (isDeal || isFail) ? curLesson : '';
+    const actionBaru   = (isDeal || isFail) ? curAction : '';
+
+    _ensurePenawaranExtraCols(sheetMain);   // pastikan kolom 21-28 ada sebelum append
     sheetMain.appendRow([
       noPenawaran, newRev, old[2], old[3], old[4],
       old[5], namaUser || (old[6] ? old[6].toString() : 'Sales Executive'),
       old[7], old[8], old[9], old[10],
       old[11], old[12], old[13], old[14],
       old[15], statusBaru, noWOBaru, tanggalDealBaru,
-      old[19] || ''
+      old[19] || '',
+      '',            // 20: Catatan Fail (lama, tak dipakai)
+      '',            // 21: (tak dipakai)
+      kodeWinBaru,   // 22: Kode Win
+      '',            // 23: Catatan Win (lama, tak dipakai)
+      kodeLostBaru,  // 24: Kode Lost
+      tglFailBaru,   // 25: Tanggal Fail
+      lessonBaru,    // 26: Lesson Learned
+      actionBaru     // 27: Action
     ]);
 
     invalidatePenawaranCache();
