@@ -33,6 +33,7 @@ function _qcResizeImage(file, cb) {
 }
 
 let _qcWOList = [];      // daftar Work Order
+let _qcTab    = 'proses';// tab daftar: 'proses' (pct<100) | 'selesai' (pct=100)
 let _qcDash   = null;    // ringkasan dashboard
 let _qcWO     = null;    // WO yang sedang dibuka
 let _qcItems  = [];      // checklist item WO terbuka
@@ -252,6 +253,17 @@ function _qcPopulateFilter() {
   if (sel.value !== prev) sel.value = '';
 }
 
+function _qcSwitchTab(tab) {
+  _qcTab = (tab === 'selesai') ? 'selesai' : 'proses';
+  var on  = 'px-4 py-2 text-sm font-bold border-b-2 border-orange-500 text-orange-600 -mb-px transition';
+  var off = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 -mb-px transition';
+  var pBtn = document.getElementById('qc-tab-proses-btn');
+  var sBtn = document.getElementById('qc-tab-selesai-btn');
+  if (pBtn) pBtn.className = (_qcTab === 'proses') ? on : off;
+  if (sBtn) sBtn.className = (_qcTab === 'selesai') ? on : off;
+  _qcRenderWOList();
+}
+
 function _qcRenderWOList() {
   var box = document.getElementById('qc-wo-list');
   if (!box) return;
@@ -267,13 +279,21 @@ function _qcRenderWOList() {
     }
     return true;
   });
-  if (!list.length) {
+  // Pisahkan per tab: Selesai (pct 100%) vs Sedang Proses (pct < 100%). Badge
+  // mengikuti hasil pencarian/filter yang sedang aktif.
+  var selesai = list.filter(function(w) { return w.pct === 100; });
+  var proses  = list.filter(function(w) { return w.pct !== 100; });
+  var pb = document.getElementById('qc-tab-proses-badge');  if (pb) pb.textContent = proses.length;
+  var sb = document.getElementById('qc-tab-selesai-badge'); if (sb) sb.textContent = selesai.length;
+  var shown = (_qcTab === 'selesai') ? selesai : proses;
+  if (!shown.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
-      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.');
+      : (_qcTab === 'selesai' ? 'Belum ada QC yang selesai (100%).'
+      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
-  box.innerHTML = list.map(function(w) {
+  box.innerHTML = shown.map(function(w) {
     var badge = (w.pending + w.rejected) === 0 && w.pct === 100 ? 'bg-emerald-100 text-emerald-700'
       : (w.rejected ? 'bg-rose-100 text-rose-700' : (w.pending ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'));
     var barCls = w.pct >= 100 ? 'bg-emerald-500' : (w.pct > 0 ? 'bg-orange-400' : 'bg-slate-200');
