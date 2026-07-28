@@ -446,6 +446,82 @@ function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
   } catch (e) { Logger.log('_qcNotifSiteReview error: ' + e); }
 }
 
+// ── Notifikasi DED (Detail Engineering Design) — mirror QC ───────────────────
+function _waDEDEnabled() {
+  var props = PropertiesService.getScriptProperties();
+  return props.getProperty('WA_ENABLED') === 'true' && props.getProperty('WA_DED_ENABLED') !== 'false';
+}
+function _dedLabelMap() {
+  var map = {};
+  try {
+    var sh = getSpreadsheet().getSheetByName('DED_Checklist');
+    if (sh) {
+      var d = sh.getDataRange().getValues();
+      for (var i = 1; i < d.length; i++) { if (d[i][0]) map[d[i][0].toString()] = (d[i][1] || '').toString(); }
+    }
+  } catch (e) {}
+  return map;
+}
+// Nomor WA site engineer yang ditugaskan ke WO (DED).
+function _dedPhonesForWO(noWO) {
+  var out = [];
+  try {
+    var assigned = (typeof _dedAssignedMap === 'function') ? (_dedAssignedMap()[noWO] || []) : [];
+    if (!assigned.length) return out;
+    var byId = {};
+    (getUserList() || []).forEach(function (u) { byId[u.id] = u; });
+    assigned.forEach(function (a) {
+      var u = byId[a.id];
+      if (u && u.aktif && u.noWa) out.push({ nama: u.nama, phone: _normalizePhone(u.noWa) });
+    });
+  } catch (e) {}
+  return out;
+}
+// Dokumen baru diunggah → DM semua Lead Engineer. wasStatus cegah dobel notif.
+function _dedNotifLeadReview(noWO, kode, oleh, count, wasStatus) {
+  try {
+    if (!_waDEDEnabled()) return;
+    if ((wasStatus || '') === 'Pending') return;
+    var leads = _qcPhonesByRole('leadengineer');
+    if (!leads.length) return;
+    var label = _dedLabelMap()[kode] || '';
+    var proj = _qcWOProject(noWO);
+    var msg = [
+      '📐 *Dokumen DED Baru Perlu Direview*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Dokumen: ' + (label || kode),
+      (count ? count + ' file PDF' : 'Dokumen') + ' diunggah oleh ' + (oleh || '-') + '.',
+      '',
+      'Mohon segera direview di RenusPro.'
+    ].join('\n');
+    leads.forEach(function (l) { _waSendTo(l.phone, msg); });
+  } catch (e) { Logger.log('_dedNotifLeadReview error: ' + e); }
+}
+// Hasil review → DM site engineer WO tsb (approve/reject).
+function _dedNotifSiteReview(noWO, kode, keputusan, catatan) {
+  try {
+    if (!_waDEDEnabled()) return;
+    var sites = _dedPhonesForWO(noWO);
+    if (!sites.length) return;
+    var label = _dedLabelMap()[kode] || '';
+    var proj = _qcWOProject(noWO);
+    var head = 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nDokumen: ' + (label || kode);
+    var msg;
+    if (keputusan === 'Approved') {
+      var alines = ['✅ *DED Disetujui*', head];
+      if (catatan) alines.push('📝 Catatan: ' + catatan);
+      alines.push('', 'Dokumen ini sudah di-approve.');
+      msg = alines.join('\n');
+    } else {
+      var lines = ['❌ *DED Ditolak — Perlu Revisi*', head];
+      if (catatan) lines.push('📝 Catatan: ' + catatan);
+      lines.push('', 'Mohon perbaiki & upload ulang.');
+      msg = lines.join('\n');
+    }
+    sites.forEach(function (s) { _waSendTo(s.phone, msg); });
+  } catch (e) { Logger.log('_dedNotifSiteReview error: ' + e); }
+}
+
 // ── Reminder manual QC (tombol di detail QC per WO) ─────────────────────────
 var _QC_REMINDER_COOLDOWN_MS = 30 * 60 * 1000;   // 30 menit per WO per jenis
 function _qcReminderKey(type, noWO) { return 'QCREM_' + type + '_' + noWO; }
