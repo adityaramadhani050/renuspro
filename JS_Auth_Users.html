@@ -49,6 +49,7 @@ const _ROLE_NAV = {
   warehouse:   ['workorder','inventory'],
   siteengineer:['qc','bom','ded'],
   leadengineer:['workorder','qc','bom','ded'],
+  projectcoordinator:['workorder','qc','bom','ded'],   // read-only (gating fitur di masing-masing modul)
   owner:       ['dashboard','workorder','qc','bom','ded','laporanfinance','laporanprofitabilitas','laporankeuangan']
 };
 const _ROLE_BADGE = {
@@ -60,9 +61,10 @@ const _ROLE_BADGE = {
   warehouse:   'bg-cyan-100 text-cyan-700',
   siteengineer:'bg-teal-100 text-teal-700',
   leadengineer:'bg-indigo-100 text-indigo-700',
+  projectcoordinator:'bg-sky-100 text-sky-700',
   owner:       'bg-rose-100 text-rose-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', leadengineer: 'LEAD ENGINEER', owner: 'OWNER' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', leadengineer: 'LEAD ENGINEER', projectcoordinator: 'PROJECT COORDINATOR', owner: 'OWNER' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
