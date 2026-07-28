@@ -1,9 +1,688 @@
 <script>
 // ================================================================
-//  DETAIL ENGINEERING DESIGN (DED) — placeholder (diisi penuh Fase 3+).
+//  DETAIL ENGINEERING DESIGN (DED) — upload dokumen (PDF) per Work
+//  Order dari Site Engineer; Lead Engineer approve/reject + catatan;
+//  master "Kelola Checklist" jenis dokumen (datar). Pola modul QC.
 // ================================================================
+
+let _dedWOList = [];       // dashboard perWO
+let _dedTab    = 'proses';  // 'proses' | 'selesai'
+let _dedDash   = null;
+let _dedWO     = null;      // WO yang sedang dibuka
+let _dedItems  = [];        // dokumen WO terbuka
+let _dedSiteEngineers = null;
+let _dedPending = {};       // kode → [{localId, base64, fileName}]
+let _dedLocalSeq = 0;
+let _dedBusy = {};          // kode → 'upload' | 'review'
+let _dedMasterList = [];    // cache checklist (Kelola Checklist)
+
+function _dedRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _dedUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _dedUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
+function _dedCanUpload(){ var r = _dedRole(); return r === 'siteengineer' || r === 'admin'; }
+function _dedCanReview(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
+function _dedCanAssign(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
+function _dedEsc(s){ return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ── HOME ────────────────────────────────────────────────────────
 window.loadDED = function() {
-  var box = document.getElementById('ded-wo-list');
-  if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Modul DED sedang disiapkan.</div>';
+  document.getElementById('ded-home').classList.remove('hidden');
+  document.getElementById('ded-detail').classList.add('hidden');
+  document.getElementById('ded-manage').classList.add('hidden');
+  var hint = document.getElementById('ded-role-hint');
+  if (hint) hint.innerText = (_dedCanReview() && _dedCanUpload()) ? 'Admin' : (_dedCanReview() ? 'Lead Engineer' : (_dedCanUpload() ? 'Site Engineer' : 'Lihat'));
+  var mbtn = document.getElementById('ded-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_dedCanAssign());
+  var abtn = document.getElementById('ded-add-project-btn'); if (abtn) abtn.classList.toggle('hidden', !_dedCanAssign());
+
+  document.getElementById('ded-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  var arg = (_dedRole() === 'siteengineer') ? { siteUserId: _dedUserId() } : {};
+  google.script.run.withSuccessHandler(function(res) {
+    _dedDash = (res && res.success) ? res : { global: {}, perWO: [] };
+    _dedWOList = _dedDash.perWO || [];
+    _dedRenderCards(_dedDash.global || {});
+    _dedRenderReviewQueue(_dedDash.reviewQueue || []);
+    _dedPopulateFilter();
+    _dedRenderWOList();
+  }).withFailureHandler(function() {
+    document.getElementById('ded-wo-list').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat data DED.</div>';
+  }).getDEDDashboard(arg);
 };
+
+function _dedCard(label, val, cls) {
+  return '<div class="bg-white rounded-2xl border border-slate-150 p-4">'
+    + '<div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">' + label + '</div>'
+    + '<div class="text-2xl font-extrabold ' + (cls || 'text-slate-800') + ' mt-1">' + val + '</div></div>';
+}
+function _dedRenderCards(g) {
+  document.getElementById('ded-cards').innerHTML =
+      _dedCard('Project (WO)', g.totalWO || 0, 'text-teal-700')
+    + _dedCard('Approved', g.approved || 0, 'text-emerald-600')
+    + _dedCard('Pending', g.pending || 0, 'text-amber-600')
+    + _dedCard('Rejected', g.rejected || 0, 'text-rose-600');
+}
+
+function _dedRenderReviewQueue(q) {
+  var wrap = document.getElementById('ded-review-queue-wrap');
+  if (!wrap) return;
+  if (!_dedCanReview() || !q.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  var rows = q.slice(0, 12).map(function(it) {
+    var age = (it.ageDays == null) ? '' : (it.ageDays === 0 ? 'hari ini' : it.ageDays + ' hari');
+    return '<button onclick="bukaDEDDetail(\'' + _dedEsc(it.noWO) + '\')" class="w-full text-left flex items-center gap-2 bg-slate-50 hover:bg-amber-50 border border-slate-100 rounded-xl px-3 py-2 transition">'
+      + '<i class="fa-solid fa-file-pdf text-rose-400"></i>'
+      + '<div class="flex-1 min-w-0"><div class="text-xs font-bold text-slate-700 truncate">' + _dedEsc(it.label) + '</div>'
+      +   '<div class="text-[10px] text-slate-400 truncate">' + _dedEsc(it.noWO) + (it.namaProject ? ' · ' + _dedEsc(it.namaProject) : '') + ' · ' + _dedEsc(it.uploadedBy || '') + '</div></div>'
+      + '<span class="text-[10px] font-bold text-amber-600 whitespace-nowrap">' + age + '</span></button>';
+  }).join('');
+  wrap.innerHTML = '<div class="flex items-center gap-2 mb-3"><span class="bg-amber-100 text-amber-600 h-8 w-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-clock"></i></span>'
+    + '<h3 class="font-extrabold text-slate-800">Antrean Review</h3><span class="text-xs text-slate-400">(' + q.length + ' dokumen menunggu)</span></div>'
+    + '<div class="space-y-2 max-h-72 overflow-y-auto">' + rows + '</div>';
+}
+
+function _dedPopulateFilter() {
+  var sel = document.getElementById('ded-filter-se');
+  if (!sel) return;
+  if (!_dedCanAssign()) { sel.classList.add('hidden'); return; }
+  var seen = {}, opts = [];
+  _dedWOList.forEach(function(w) { (w.assigned || []).forEach(function(a) { if (!seen[a.id]) { seen[a.id] = 1; opts.push(a); } }); });
+  opts.sort(function(a, b) { return (a.nama || '').localeCompare(b.nama || ''); });
+  if (!opts.length) { sel.classList.add('hidden'); return; }
+  sel.classList.remove('hidden');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Semua Site Engineer</option>' + opts.map(function(a) { return '<option value="' + _dedEsc(a.id) + '">' + _dedEsc(a.nama) + '</option>'; }).join('');
+  sel.value = cur;
+}
+
+function _dedSwitchTab(tab) {
+  _dedTab = (tab === 'selesai') ? 'selesai' : 'proses';
+  var on  = 'px-4 py-2 text-sm font-bold border-b-2 border-teal-500 text-teal-600 -mb-px transition';
+  var off = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 -mb-px transition';
+  var p = document.getElementById('ded-tab-proses-btn'), s = document.getElementById('ded-tab-selesai-btn');
+  if (p) p.className = (_dedTab === 'proses') ? on : off;
+  if (s) s.className = (_dedTab === 'selesai') ? on : off;
+  _dedRenderWOList();
+}
+
+function _dedCountChips(ap, pen, rej, bel) {
+  var out = '<span class="text-emerald-600" title="Approved"><i class="fa-solid fa-circle-check"></i> ' + (ap || 0) + '</span>';
+  if (pen) out += '<span class="text-amber-600" title="Pending"><i class="fa-solid fa-clock"></i> ' + pen + '</span>';
+  if (rej) out += '<span class="text-rose-600" title="Rejected"><i class="fa-solid fa-circle-xmark"></i> ' + rej + '</span>';
+  if (bel) out += '<span class="text-slate-400" title="Belum diupload"><i class="fa-regular fa-circle"></i> ' + bel + '</span>';
+  return out;
+}
+
+function _dedRenderWOList() {
+  var box = document.getElementById('ded-wo-list');
+  if (!box) return;
+  var q = ((document.getElementById('ded-search') || {}).value || '').toLowerCase().trim();
+  var fsel = document.getElementById('ded-filter-se');
+  var fval = fsel ? fsel.value : '';
+  var list = _dedWOList.filter(function(w) {
+    if (q && ((w.noWO || '') + (w.namaProject || '') + (w.namaKlien || '')).toLowerCase().indexOf(q) === -1) return false;
+    if (fval && !(w.assigned || []).some(function(a) { return a.id === fval; })) return false;
+    return true;
+  });
+  var isDone = function(w) { return w.pct === 100 || w.selesaiManual; };
+  var selesai = list.filter(isDone), proses = list.filter(function(w) { return !isDone(w); });
+  var pb = document.getElementById('ded-tab-proses-badge');  if (pb) pb.textContent = proses.length;
+  var sb = document.getElementById('ded-tab-selesai-badge'); if (sb) sb.textContent = selesai.length;
+  var shown = (_dedTab === 'selesai') ? selesai : proses;
+  if (!shown.length) {
+    var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
+      : (_dedTab === 'selesai' ? 'Belum ada DED yang selesai.'
+      : (_dedRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project DED. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-file-pen mr-2"></i>' + emptyMsg + '</div>';
+    return;
+  }
+  box.innerHTML = shown.map(function(w) {
+    var badge = (w.pending + w.rejected) === 0 && w.pct === 100 ? 'bg-emerald-100 text-emerald-700'
+      : (w.rejected ? 'bg-rose-100 text-rose-700' : (w.pending ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'));
+    var barCls = w.pct >= 100 ? 'bg-emerald-500' : (w.pct > 0 ? 'bg-teal-400' : 'bg-slate-200');
+    var asg = w.assigned || [];
+    var seBadges = asg.length
+      ? asg.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-50 text-teal-600">' + _dedEsc(a.nama) + '</span>'; }).join('')
+      : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400">Belum ditugaskan</span>';
+    var removeBtn = _dedCanAssign()
+      ? '<button onclick="event.stopPropagation();_dedRemoveProject(\'' + _dedEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari DED"><i class="fa-regular fa-trash-can text-sm"></i></button>'
+      : '';
+    return '<div onclick="bukaDEDDetail(\'' + _dedEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-teal-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
+      + '<div class="flex-1 min-w-0">'
+      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _dedEsc(w.noWO) + '</span>'
+      +     '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + badge + '">' + w.pct + '%</span>'
+      +     (w.selesaiManual && w.pct !== 100 ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check mr-0.5"></i>Ditandai selesai</span>' : '') + '</div>'
+      +   '<div class="font-bold text-slate-800 truncate">' + _dedEsc(w.namaProject || '-') + '</div>'
+      +   '<div class="text-[11px] text-slate-400 truncate">' + _dedEsc(w.namaKlien || '') + '</div>'
+      + '</div>'
+      + '<div class="flex items-center gap-3 w-full sm:w-auto">'
+      +   '<div class="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5 flex-1 sm:flex-none w-full sm:w-auto">'
+      +     '<div class="flex flex-wrap gap-1 flex-1 min-w-0 sm:flex-none sm:justify-end">' + seBadges + '</div>'
+      +     '<div class="shrink-0 text-right">'
+      +       '<div class="w-28 h-2 rounded-full bg-slate-100 overflow-hidden ml-auto"><div class="h-2 ' + barCls + '" style="width:' + w.pct + '%"></div></div>'
+      +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">' + _dedCountChips(w.approved, w.pending, w.rejected, w.belum) + '</div>'
+      +     '</div>'
+      +   '</div>'
+      +   removeBtn
+      +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── DETAIL per WO ───────────────────────────────────────────────
+function bukaDEDDetail(noWO) {
+  _dedPending = {}; _dedBusy = {};
+  _dedWO = _dedWOList.filter(function(w) { return w.noWO === noWO; })[0] || { noWO: noWO, namaProject: '', namaKlien: '' };
+  document.getElementById('ded-home').classList.add('hidden');
+  document.getElementById('ded-detail').classList.remove('hidden');
+  document.getElementById('ded-detail-body').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat dokumen...</div>';
+  document.getElementById('ded-detail-actions').innerHTML = '';
+  _dedReloadDetail();
+}
+function kembaliDEDHome() {
+  document.getElementById('ded-detail').classList.add('hidden');
+  document.getElementById('ded-manage').classList.add('hidden');
+  document.getElementById('ded-home').classList.remove('hidden');
+  loadDED();
+}
+function _dedReloadDetail() {
+  if (!_dedWO) return;
+  google.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { document.getElementById('ded-detail-body').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat.</div>'; return; }
+    _dedItems = res.list || [];
+    if (_dedWO) { _dedWO.selesaiManual = !!res.selesaiManual; _dedWO.ditandaiOleh = res.ditandaiOleh || ''; _dedWO.ditandaiPada = res.ditandaiPada || ''; }
+    _dedRenderDetail(res.summary);
+  }).withFailureHandler(function() {
+    document.getElementById('ded-detail-body').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat.</div>';
+  }).getDEDByWO(_dedWO.noWO);
+}
+
+function _dedRenderDetail(summary) {
+  summary = summary || {};
+  var actions = document.getElementById('ded-detail-actions');
+  if (actions) {
+    var btns = '';
+    if (_dedCanAssign()) {
+      var selesaiBtn = (_dedWO && _dedWO.selesaiManual)
+        ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan tanda selesai" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Selesai</span></button>'
+        : '<button onclick="_dedTandaiSelesai()" title="Tandai DED selesai" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Selesai</span></button>';
+      btns += selesaiBtn
+        + '<div class="relative"><button onclick="_dedToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
+        + '<div id="ded-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
+    }
+    actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
+  }
+  _dedRenderHead(summary);
+  _dedRenderDetailBody();
+}
+
+function _dedRenderHead(summary) {
+  summary = summary || {};
+  var head = document.getElementById('ded-detail-head');
+  if (!head) return;
+  var pct = summary.pct || 0;
+  var assigned = _dedWO.assigned || [];
+  var assignedHtml = assigned.length
+    ? assigned.map(function(a) { return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-50 text-teal-600 inline-block">' + _dedEsc(a.nama) + '</span>'; }).join(' ')
+    : '<span class="text-[11px] text-slate-400 italic">Belum ditugaskan</span>';
+  head.innerHTML = '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0">'
+    +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700 text-lg">' + _dedEsc(_dedWO.noWO) + '</span>'
+    +     (_dedWO.selesaiManual && pct !== 100 ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700"><i class="fa-solid fa-circle-check mr-0.5"></i>Ditandai selesai</span>' : '') + '</div>'
+    +   '<div class="font-bold text-slate-800">' + _dedEsc(_dedWO.namaProject || '-') + '</div>'
+    +   '<div class="text-xs text-slate-400">' + _dedEsc(_dedWO.namaKlien || '') + '</div>'
+    + '</div>'
+    + '<div class="flex flex-wrap justify-end gap-1 shrink-0 max-w-[45%]">' + assignedHtml + '</div>'
+    + '</div>'
+    + '<div class="flex items-center gap-2 mt-3">'
+    +   '<div class="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-2.5 ' + (pct >= 100 ? 'bg-emerald-500' : 'bg-teal-400') + '" style="width:' + pct + '%"></div></div>'
+    +   '<span class="text-base font-extrabold text-slate-800 shrink-0 w-12 text-right">' + pct + '%</span>'
+    + '</div>'
+    + '<div class="flex flex-wrap gap-3 mt-3 text-[11px] font-bold">'
+    +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (summary.approved || 0) + ' Approved</span>'
+    +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (summary.pending || 0) + ' Pending</span>'
+    +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (summary.rejected || 0) + ' Rejected</span>'
+    +   '<span class="text-slate-400"><i class="fa-regular fa-circle"></i> ' + (summary.belum || 0) + ' Belum</span>'
+    +   '<span class="text-slate-400">N/A ' + (summary.na || 0) + '</span>'
+    + '</div>';
+}
+function _dedComputeSummary() {
+  var s = { total: 0, approved: 0, pending: 0, rejected: 0, belum: 0, na: 0, wajibTotal: 0, wajibSelesai: 0 };
+  (_dedItems || []).forEach(function(it) {
+    s.total++;
+    if (it.status === 'Approved') s.approved++;
+    else if (it.status === 'Pending') s.pending++;
+    else if (it.status === 'Rejected') s.rejected++;
+    else if (it.status === 'NA') s.na++;
+    else s.belum++;
+    if (it.wajib) { s.wajibTotal++; if (it.status === 'Approved') s.wajibSelesai++; }
+  });
+  s.pct = s.wajibTotal ? Math.round((s.wajibSelesai / s.wajibTotal) * 100) : 0;
+  return s;
+}
+function _dedRefreshHead() { try { _dedRenderHead(_dedComputeSummary()); } catch (e) {} }
+
+function _dedRenderDetailBody() {
+  var body = document.getElementById('ded-detail-body');
+  if (!_dedItems.length) { body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Belum ada jenis dokumen. Lead Engineer dapat menambahkan lewat <b>Kelola Checklist</b>.</div>'; return; }
+  body.innerHTML = _dedItems.map(function(it) {
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' + _dedItemHtml(it) + '</div>';
+  }).join('');
+}
+
+function _dedBadge(status) {
+  if (status === 'Approved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check mr-0.5"></i>Approved</span>';
+  if (status === 'Rejected') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 whitespace-nowrap"><i class="fa-solid fa-circle-xmark mr-0.5"></i>Rejected</span>';
+  if (status === 'Pending')  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-solid fa-clock mr-0.5"></i>Pending</span>';
+  if (status === 'NA')       return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">N/A</span>';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 whitespace-nowrap">Belum Upload</span>';
+}
+
+function _dedFindItem(kode) { return (_dedItems || []).filter(function(x) { return x.kode === kode; })[0] || null; }
+function _dedRerenderItem(kode) {
+  var it = _dedFindItem(kode); if (!it) return;
+  var el = document.getElementById('ded-item-' + kode);
+  if (el) el.outerHTML = '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' + _dedItemHtml(it) + '</div>';
+}
+
+function _dedItemHtml(it) {
+  var canUp = _dedCanUpload(), canRev = _dedCanReview(), isAdmin = _dedRole() === 'admin';
+  var locked = (it.status === 'Approved');
+  var files = it.files || [];
+  var fileHtml = files.map(function(f) {
+    var del = (canUp && it.status !== 'NA' && (!locked || isAdmin))
+      ? '<button onclick="event.stopPropagation();_dedHapusFile(\'' + it.kode + '\',\'' + f.fileId + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-7 w-7 rounded-lg flex items-center justify-center shrink-0" title="Hapus dokumen"><i class="fa-solid fa-xmark text-xs"></i></button>'
+      : '';
+    var cap = (f.by || f.at) ? '<div class="text-[10px] text-slate-400">' + (f.by ? _dedEsc(f.by) : '') + (f.by && f.at ? ' · ' : '') + (f.at ? _dedEsc(f.at) : '') + '</div>' : '';
+    return '<div class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">'
+      + '<a href="' + _dedEsc(f.fileUrl) + '" target="_blank" class="flex items-center gap-2 flex-1 min-w-0 text-rose-600 hover:text-rose-700">'
+      +   '<i class="fa-solid fa-file-pdf text-lg shrink-0"></i>'
+      +   '<div class="min-w-0"><div class="text-xs font-semibold truncate">' + _dedEsc(f.fileName || 'Dokumen.pdf') + '</div>' + cap + '</div>'
+      + '</a>' + del + '</div>';
+  }).join('');
+
+  var rejectNote = (it.status === 'Rejected' && it.catatanReview)
+    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi Lead:</b> ' + _dedEsc(it.catatanReview) + '</div>' : '';
+  var approvedNote = (it.status === 'Approved' && it.catatanReview)
+    ? '<div class="mt-2 text-[11px] text-emerald-600"><i class="fa-solid fa-comment mr-1"></i>' + _dedEsc(it.catatanReview) + '</div>' : '';
+
+  var panduan = it.instruksi
+    ? '<div class="mt-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2"><div class="text-[11px] font-extrabold text-sky-700 uppercase tracking-wider"><i class="fa-solid fa-circle-info mr-1"></i>Instruksi</div><div class="text-[12px] text-sky-800 mt-1 whitespace-pre-line">' + _dedEsc(it.instruksi) + '</div></div>'
+    : '';
+
+  // Upload control (site engineer), item Approved terkunci.
+  var uploadCtrl = '';
+  if (canUp && it.status !== 'NA' && !locked) {
+    uploadCtrl += '<label class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition"><i class="fa-solid fa-file-circle-plus"></i> Pilih Dokumen (PDF)'
+      + '<input type="file" accept="application/pdf,.pdf" multiple class="hidden" onchange="_dedStage(\'' + it.kode + '\', this)"></label>';
+  }
+  if (canUp && !it.wajib && !locked) {
+    var naOn = it.status === 'NA';
+    uploadCtrl += '<label class="inline-flex items-center gap-1.5 ml-2 text-xs font-semibold text-slate-500 cursor-pointer select-none"><input type="checkbox" ' + (naOn ? 'checked' : '') + ' onchange="_dedToggleNA(\'' + it.kode + '\', this.checked)" class="accent-slate-500"> Tidak Ada (N/A)</label>';
+  }
+
+  // Tray "Menunggu upload".
+  var pendHtml = '';
+  var pend = _dedPending[it.kode] || [];
+  if (pend.length && !locked) {
+    var pthumbs = pend.map(function(p) {
+      return '<div class="flex items-center gap-2 bg-white border border-teal-200 rounded-lg px-2 py-1.5"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="text-[11px] text-slate-600 truncate max-w-[140px]">' + _dedEsc(p.fileName) + '</span>'
+        + '<button onclick="_dedUnstage(\'' + it.kode + '\',' + p.localId + ')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark text-xs"></i></button></div>';
+    }).join('');
+    pendHtml = '<div class="mt-3 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2.5">'
+      + '<div class="flex items-center justify-between gap-2 mb-2">'
+      +   '<span class="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider"><i class="fa-solid fa-hourglass-half mr-1"></i>Menunggu upload (' + pend.length + ')</span>'
+      +   '<button onclick="_dedUploadStaged(\'' + it.kode + '\')" class="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-cloud-arrow-up"></i> Upload ' + pend.length + ' dokumen</button>'
+      + '</div>'
+      + '<div class="flex flex-wrap gap-2">' + pthumbs + '</div>'
+      + '</div>';
+  }
+
+  // Review (Lead) — hanya saat Pending.
+  var reviewCtrl = '';
+  if (canRev && it.status === 'Pending') {
+    reviewCtrl = '<div class="mt-3 border-t border-slate-100 pt-3">'
+      + '<textarea id="ded-note-' + it.kode + '" rows="2" placeholder="Catatan / instruksi revisi (wajib bila reject)..." class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-teal-400">' + _dedEsc(it.catatanReview || '') + '</textarea>'
+      + '<div class="flex gap-2 mt-2">'
+      +   '<button onclick="_dedReview(\'' + it.kode + '\', \'Approved\')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-check mr-1"></i>Approve</button>'
+      +   '<button onclick="_dedReview(\'' + it.kode + '\', \'Rejected\')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-xmark mr-1"></i>Reject</button>'
+      + '</div></div>';
+  }
+  var cancelCtrl = '';
+  if (canRev && it.status === 'Approved') {
+    cancelCtrl = '<div class="mt-3 border-t border-slate-100 pt-3 flex justify-end">'
+      + '<button onclick="_dedCancelApprove(\'' + it.kode + '\')" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-rotate-left"></i> Batalkan Approve</button>'
+      + '</div>';
+  }
+
+  // Loading inline per item.
+  var busy = _dedBusy[it.kode] || '';
+  var uploadArea, reviewArea;
+  if (busy === 'upload') {
+    uploadArea = '<div class="mt-3 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2.5 text-[11px] font-extrabold text-teal-600 uppercase tracking-wider"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Mengupload…</div>';
+  } else {
+    uploadArea = ((uploadCtrl) ? '<div class="mt-3 flex items-center flex-wrap gap-2">' + uploadCtrl + '</div>' : '') + pendHtml;
+  }
+  reviewArea = (busy === 'review')
+    ? '<div class="mt-3 border-t border-slate-100 pt-3 inline-flex items-center gap-2 text-[12px] font-bold text-emerald-600"><i class="fa-solid fa-spinner fa-spin"></i> Menyimpan keputusan…</div>'
+    : reviewCtrl;
+
+  return '<div id="ded-item-' + it.kode + '" class="px-5 py-4">'
+    + '<div class="flex items-start justify-between gap-3">'
+    +   '<div class="flex-1 min-w-0"><span class="font-mono text-[10px] font-bold text-slate-400 mr-1">' + it.kode + '</span><span class="text-sm font-semibold text-slate-700">' + _dedEsc(it.label) + '</span>'
+    +     (it.wajib ? '' : '<span class="ml-1 text-[9px] font-bold text-slate-400">(opsional)</span>') + '</div>'
+    +   _dedBadge(it.status)
+    + '</div>'
+    + panduan
+    + (fileHtml ? '<div class="mt-3 space-y-1.5">' + fileHtml + '</div>' : '')
+    + rejectNote + approvedNote
+    + uploadArea
+    + reviewArea
+    + cancelCtrl
+    + '</div>';
+}
+
+// ── Upload PDF (staging → batch) ────────────────────────────────
+function _dedStage(kode, input) {
+  var files = Array.prototype.slice.call(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  var MAX = 15 * 1024 * 1024;
+  for (var k = 0; k < files.length; k++) {
+    if (files[k].size > MAX) return showNotification('Ukuran dokumen maksimal 15MB: ' + files[k].name, 'error');
+    if (!(files[k].type === 'application/pdf' || /\.pdf$/i.test(files[k].name || ''))) return showNotification('Hanya file PDF yang diperbolehkan: ' + files[k].name, 'error');
+  }
+  if (!_dedPending[kode]) _dedPending[kode] = [];
+  var remaining = files.length;
+  toggleLoader(true, 'Memproses ' + files.length + ' dokumen...');
+  function fin() { if (--remaining <= 0) { toggleLoader(false); _dedRerenderItem(kode); } }
+  files.forEach(function(f) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var dataUrl = e.target.result || '';
+      var base64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : '';
+      if (base64) _dedPending[kode].push({ localId: ++_dedLocalSeq, base64: base64, fileName: (f.name || 'dokumen').replace(/\.[a-zA-Z0-9]+$/, '') + '.pdf', mimeType: 'application/pdf' });
+      fin();
+    };
+    reader.onerror = function() { fin(); };
+    reader.readAsDataURL(f);
+  });
+}
+function _dedUnstage(kode, localId) {
+  if (!_dedPending[kode]) return;
+  _dedPending[kode] = _dedPending[kode].filter(function(p) { return p.localId !== localId; });
+  _dedRerenderItem(kode);
+}
+function _dedUploadStaged(kode) {
+  if (_dedBusy[kode]) return;
+  var pend = _dedPending[kode] || [];
+  if (!pend.length) return;
+  var files = pend.map(function(p) { return { base64Data: p.base64, fileName: p.fileName, mimeType: p.mimeType }; });
+  _dedBusy[kode] = 'upload';
+  _dedRerenderItem(kode);
+  google.script.run.withSuccessHandler(function(res) {
+    delete _dedBusy[kode];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _dedRerenderItem(kode); return; }
+    _dedPending[kode] = [];
+    var it = _dedFindItem(kode);
+    if (it) { it.status = res && res.status ? res.status : 'Pending'; if (res && res.file_list) it.files = res.file_list; it.uploadedBy = _dedUserNama(); }
+    _dedRerenderItem(kode);
+    _dedRefreshHead();
+    showNotification((res && res.count ? res.count : files.length) + ' dokumen terupload.');
+  }).withFailureHandler(function(err) { delete _dedBusy[kode]; _dedRerenderItem(kode); showNotification((err && err.message) || 'Gagal upload.', 'error'); })
+    .uploadDEDBatch({ noWO: _dedWO.noWO, kode: kode, oleh: _dedUserNama(), files: files });
+}
+function _dedHapusFile(kode, fileId) {
+  showConfirm({ title: 'Hapus Dokumen', message: 'Hapus dokumen PDF ini?', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Menghapus...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      _dedReloadDetail();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+      .hapusDEDFile(_dedWO.noWO, kode, fileId);
+  } });
+}
+
+// ── Review (Lead) — loading inline per item ─────────────────────
+function _dedReview(kode, keputusan) {
+  if (_dedBusy[kode]) return;
+  var noteEl = document.getElementById('ded-note-' + kode);
+  var catatan = noteEl ? noteEl.value.trim() : '';
+  if (keputusan === 'Rejected' && !catatan) { showNotification('Catatan revisi wajib diisi untuk menolak.', 'error'); if (noteEl) noteEl.focus(); return; }
+  _dedBusy[kode] = 'review';
+  _dedRerenderItem(kode);
+  google.script.run.withSuccessHandler(function(res) {
+    delete _dedBusy[kode];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _dedRerenderItem(kode); return; }
+    var it = _dedFindItem(kode);
+    if (it) { it.status = keputusan; it.catatanReview = (keputusan === 'Rejected') ? catatan : ''; it.reviewedBy = _dedUserNama(); }
+    _dedRerenderItem(kode);
+    _dedRefreshHead();
+    showNotification('Dokumen ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.');
+  }).withFailureHandler(function(err) { delete _dedBusy[kode]; _dedRerenderItem(kode); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .reviewDEDItem(_dedWO.noWO, kode, keputusan, catatan, _dedUserNama());
+}
+function _dedCancelApprove(kode) {
+  if (_dedBusy[kode]) return;
+  showConfirm({ title: 'Batalkan Approve', message: 'Kembalikan dokumen ini ke Pending untuk direview ulang?', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+    _dedBusy[kode] = 'review'; _dedRerenderItem(kode);
+    google.script.run.withSuccessHandler(function(res) {
+      delete _dedBusy[kode];
+      if (res && res.success === false) { showNotification(res.message, 'error'); _dedRerenderItem(kode); return; }
+      var it = _dedFindItem(kode);
+      if (it) { it.status = (it.files && it.files.length) ? 'Pending' : 'Belum Upload'; it.catatanReview = ''; }
+      _dedRerenderItem(kode); _dedRefreshHead();
+      showNotification('Persetujuan dibatalkan.');
+    }).withFailureHandler(function(err) { delete _dedBusy[kode]; _dedRerenderItem(kode); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .cancelDEDApproval(_dedWO.noWO, kode, _dedUserNama());
+  } });
+}
+function _dedToggleNA(kode, isNA) {
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success === false) { showNotification(res.message, 'error'); }
+    var it = _dedFindItem(kode);
+    if (it) it.status = isNA ? 'NA' : ((it.files && it.files.length) ? 'Pending' : 'Belum Upload');
+    _dedRerenderItem(kode); _dedRefreshHead();
+  }).withFailureHandler(function(err) { showNotification((err && err.message) || 'Gagal.', 'error'); _dedReloadDetail(); })
+    .setDEDItemNA(_dedWO.noWO, kode, isNA, _dedUserNama());
+}
+
+// ── Tandai selesai manual ───────────────────────────────────────
+function _dedTandaiSelesai() {
+  if (!_dedWO || !_dedCanAssign()) return;
+  showConfirm({ title: 'Tandai DED Selesai', message: 'Tandai DED ' + _dedWO.noWO + ' selesai secara manual? WO akan pindah ke tab "Selesai".', confirmText: 'Ya, Tandai Selesai', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai selesai...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { if (_dedWO) _dedWO.selesaiManual = true; _dedReloadDetail(); }
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .tandaiDEDSelesai(_dedWO.noWO, _dedUserNama());
+  } });
+}
+function _dedBatalkanSelesai() {
+  if (!_dedWO || !_dedCanAssign()) return;
+  showConfirm({ title: 'Batalkan Tanda Selesai', message: 'Batalkan tanda selesai DED ' + _dedWO.noWO + '?', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Membatalkan...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { if (_dedWO) _dedWO.selesaiManual = false; _dedReloadDetail(); }
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .batalkanDEDSelesai(_dedWO.noWO, _dedUserNama());
+  } });
+}
+
+// ── Penugasan Site Engineer (panel) ─────────────────────────────
+function _dedToggleAssign(e) {
+  if (e) e.stopPropagation();
+  var panel = document.getElementById('ded-assign-panel');
+  if (!panel) return;
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  if (!window._dedAssignDocBound) {
+    window._dedAssignDocBound = true;
+    document.addEventListener('click', function(ev) {
+      var actions = document.getElementById('ded-detail-actions');
+      var p = document.getElementById('ded-assign-panel');
+      if (!p || p.classList.contains('hidden')) return;
+      if (actions && actions.contains(ev.target)) return;
+      p.classList.add('hidden');
+    });
+  }
+  panel.innerHTML = '<div class="text-xs text-slate-400 py-1"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat...</div>';
+  var render = function() {
+    var assignedIds = (_dedWO.assigned || []).map(function(a) { return a.id; });
+    var rows = (_dedSiteEngineers || []).map(function(u) {
+      return '<label class="flex items-center gap-2 py-1.5 cursor-pointer"><input type="checkbox" value="' + _dedEsc(u.id) + '" ' + (assignedIds.indexOf(u.id) !== -1 ? 'checked' : '') + ' class="ded-assign-cb w-4 h-4 accent-teal-600"><span class="text-sm text-slate-700">' + _dedEsc(u.nama) + '</span></label>';
+    }).join('') || '<div class="text-xs text-slate-400 py-2">Belum ada Site Engineer.</div>';
+    panel.innerHTML = '<div class="text-[11px] font-bold text-slate-400 uppercase mb-2">Tugaskan Site Engineer</div><div class="max-h-56 overflow-y-auto">' + rows + '</div>'
+      + '<button onclick="_dedSaveAssign()" class="w-full mt-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold py-2 rounded-lg">Simpan</button>';
+  };
+  if (_dedSiteEngineers) render();
+  else google.script.run.withSuccessHandler(function(res) { _dedSiteEngineers = (res && res.success) ? (res.list || []) : []; render(); }).withFailureHandler(function() { _dedSiteEngineers = []; render(); }).getSiteEngineerList();
+}
+function _dedSaveAssign() {
+  var ids = Array.prototype.slice.call(document.querySelectorAll('.ded-assign-cb:checked')).map(function(cb) { return cb.value; });
+  toggleLoader(true, 'Menyimpan penugasan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Tersimpan.');
+    var p = document.getElementById('ded-assign-panel'); if (p) p.classList.add('hidden');
+    _dedReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .setDEDAssignment(_dedWO.noWO, ids, _dedUserNama());
+}
+
+// ── Tambah Project ke DED ───────────────────────────────────────
+function _dedOpenAddProject() {
+  document.getElementById('modal-ded-project').classList.remove('hidden');
+  var woSel = document.getElementById('ded-project-wo');
+  woSel.innerHTML = '<option value="">Memuat WO...</option>';
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    woSel.innerHTML = list.length ? (['<option value="">-- Pilih Work Order --</option>'].concat(list.map(function(w) { return '<option value="' + _dedEsc(w.noWO) + '">' + _dedEsc(w.noWO) + ' — ' + _dedEsc(w.namaProject || '-') + (w.namaKlien ? ' (' + _dedEsc(w.namaKlien) + ')' : '') + '</option>'; })).join('')) : '<option value="">Semua WO sudah ada di DED</option>';
+  }).withFailureHandler(function() { woSel.innerHTML = '<option value="">Gagal memuat</option>'; }).getAvailableWOForDED();
+
+  var seWrap = document.getElementById('ded-project-se');
+  seWrap.innerHTML = 'Memuat...';
+  var render = function() {
+    seWrap.innerHTML = (_dedSiteEngineers || []).length
+      ? _dedSiteEngineers.map(function(u) { return '<label class="flex items-center gap-2 py-1 px-1 cursor-pointer"><input type="checkbox" value="' + _dedEsc(u.id) + '" class="ded-proj-cb w-4 h-4 accent-teal-600"><span class="text-sm text-slate-700">' + _dedEsc(u.nama) + '</span></label>'; }).join('')
+      : '<div class="text-xs text-slate-400 px-1">Belum ada Site Engineer.</div>';
+  };
+  if (_dedSiteEngineers) render();
+  else google.script.run.withSuccessHandler(function(res) { _dedSiteEngineers = (res && res.success) ? (res.list || []) : []; render(); }).withFailureHandler(function() { _dedSiteEngineers = []; render(); }).getSiteEngineerList();
+}
+function _dedCloseAddProject() { document.getElementById('modal-ded-project').classList.add('hidden'); }
+function _dedSaveAddProject() {
+  var noWO = document.getElementById('ded-project-wo').value;
+  if (!noWO) return showNotification('Pilih Work Order dulu.', 'error');
+  var ids = Array.prototype.slice.call(document.querySelectorAll('.ded-proj-cb:checked')).map(function(cb) { return cb.value; });
+  _dedCloseAddProject();
+  toggleLoader(true, 'Menambahkan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Ditambahkan.');
+    loadDED();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .addDEDProject(noWO, ids, _dedUserNama());
+}
+function _dedRemoveProject(noWO) {
+  showConfirm({ title: 'Keluarkan dari DED', message: 'Keluarkan WO ' + noWO + ' dari daftar DED? Dokumen tidak dihapus.', confirmText: 'Ya, Keluarkan', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Memproses...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      showNotification(res && res.message ? res.message : 'Dikeluarkan.');
+      loadDED();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .removeDEDProject(noWO);
+  } });
+}
+
+// ── Kelola Checklist (datar) ────────────────────────────────────
+function bukaDEDManage() {
+  document.getElementById('ded-home').classList.add('hidden');
+  document.getElementById('ded-detail').classList.add('hidden');
+  document.getElementById('ded-manage').classList.remove('hidden');
+  _dedRenderManage();
+}
+function _dedRenderManage() {
+  var body = document.getElementById('ded-manage-body');
+  body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    _dedMasterList = list;
+    if (!list.length) { body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Belum ada jenis dokumen. Klik <b>Tambah Dokumen</b>.</div>'; return; }
+    body.innerHTML = list.map(function(it) {
+      var wajibChip = '<label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 cursor-pointer select-none"><input type="checkbox" ' + (it.wajib ? 'checked' : '') + ' onchange="_dedToggleWajib(\'' + it.kode + '\', this.checked)" class="accent-teal-600"> Wajib</label>';
+      return '<div class="bg-white rounded-2xl border border-slate-150 p-4 flex items-start justify-between gap-3">'
+        + '<div class="min-w-0"><div class="flex items-center gap-2 flex-wrap"><span class="font-mono text-[10px] font-bold text-slate-400">' + it.kode + '</span><span class="text-sm font-semibold text-slate-700">' + _dedEsc(it.label) + '</span>' + (it.wajib ? '<span class="text-[9px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">WAJIB</span>' : '') + '</div>'
+        +   (it.instruksi ? '<div class="text-[11px] text-slate-400 mt-1 whitespace-pre-line">' + _dedEsc(it.instruksi) + '</div>' : '') + '</div>'
+        + '<div class="flex items-center gap-2 shrink-0">' + wajibChip
+        +   '<button onclick="_dedEditItem(\'' + it.kode + '\')" class="text-teal-600 hover:bg-teal-50 h-8 w-8 rounded-lg flex items-center justify-center" title="Edit"><i class="fa-solid fa-pen text-xs"></i></button>'
+        +   '<button onclick="_dedDelItem(\'' + it.kode + '\')" class="text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center" title="Hapus"><i class="fa-regular fa-trash-can text-xs"></i></button>'
+        + '</div></div>';
+    }).join('');
+  }).withFailureHandler(function() { body.innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat.</div>'; }).getDEDChecklist();
+}
+
+function _dedAddItem() {
+  document.getElementById('ded-item-modal-title').innerText = 'Tambah Dokumen';
+  document.getElementById('ded-item-modal-kode').value = '';
+  document.getElementById('ded-item-modal-input').value = '';
+  document.getElementById('ded-item-modal-wajib').checked = true;
+  document.getElementById('ded-item-modal-instr').value = '';
+  document.getElementById('modal-ded-item').classList.remove('hidden');
+  setTimeout(function() { document.getElementById('ded-item-modal-input').focus(); }, 50);
+}
+function _dedEditItem(kode) {
+  var it = _dedMasterList.filter(function(x) { return x.kode === kode; })[0];
+  if (!it) return;
+  document.getElementById('ded-item-modal-title').innerText = 'Edit Dokumen';
+  document.getElementById('ded-item-modal-kode').value = it.kode || '';
+  document.getElementById('ded-item-modal-input').value = it.label || '';
+  document.getElementById('ded-item-modal-wajib').checked = !!it.wajib;
+  document.getElementById('ded-item-modal-instr').value = it.instruksi || '';
+  document.getElementById('modal-ded-item').classList.remove('hidden');
+}
+function _dedCloseItemModal() { document.getElementById('modal-ded-item').classList.add('hidden'); }
+function _dedSaveItemModal(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  var kode = document.getElementById('ded-item-modal-kode').value;
+  var label = document.getElementById('ded-item-modal-input').value.trim();
+  var wajib = document.getElementById('ded-item-modal-wajib').checked;
+  var instr = document.getElementById('ded-item-modal-instr').value.trim();
+  if (!label) return showNotification('Nama dokumen wajib diisi.', 'error');
+  _dedCloseItemModal();
+  toggleLoader(true, 'Menyimpan...');
+  var handler = function(res) {
+    toggleLoader(false);
+    if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+    showNotification(res && res.message ? res.message : 'Tersimpan.');
+    _dedRenderManage();
+  };
+  var fail = function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); };
+  if (kode) google.script.run.withSuccessHandler(handler).withFailureHandler(fail).updateDEDItem(kode, label, wajib, instr);
+  else google.script.run.withSuccessHandler(handler).withFailureHandler(fail).tambahDEDItem(label, wajib, instr);
+}
+function _dedToggleWajib(kode, wajib) {
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success === false) showNotification(res.message, 'error');
+  }).withFailureHandler(function() {}).setDEDWajib(kode, wajib);
+}
+function _dedDelItem(kode) {
+  var it = _dedMasterList.filter(function(x) { return x.kode === kode; })[0];
+  var label = it ? it.label : kode;
+  showConfirm({ title: 'Hapus Dokumen', message: 'Hapus jenis dokumen "' + label + '" dari checklist? (Dokumen terupload di WO tidak terhapus.)', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Menghapus...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      if (res && res.success === false) { showNotification(res.message, 'error'); return; }
+      showNotification(res && res.message ? res.message : 'Dihapus.');
+      _dedRenderManage();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .hapusDEDItem(kode);
+  } });
+}
 </script>
