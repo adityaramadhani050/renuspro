@@ -161,7 +161,9 @@ function _pgRenderSiteSurvey(data) {
       : '';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition cursor-pointer" onclick="bukaDetailSiteSurvey(\'' + s.id + '\')">'
       + '<td class="p-4 font-mono text-xs font-bold text-slate-500" data-label="ID">' + s.id + '</td>'
-      + '<td class="p-4 font-semibold text-slate-800 max-w-[200px] truncate" data-label="Nama Site">' + _ssEsc(s.namaSite || '-') + '</td>'
+      + '<td class="p-4 max-w-[220px]" data-label="Nama Site"><div class="font-semibold text-slate-800 truncate">' + _ssEsc(s.namaSite || '-') + '</div>'
+      +   (s.noWO ? '<div class="mt-1"><span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 whitespace-nowrap" title="Site survey ini sudah tertaut ke Work Order"><i class="fa-solid fa-link text-[9px]"></i> Tertaut WO ' + _ssEsc(s.noWO) + '</span></div>' : '')
+      + '</td>'
       + '<td class="p-4" data-label="PIC / Telepon"><p class="text-slate-700">' + _ssEsc(s.namaPIC || '-') + '</p><p class="text-[11px] text-slate-400">' + _ssEsc(s.telepon || '') + '</p></td>'
       + '<td class="p-4 max-w-[220px] truncate text-slate-500" data-label="Alamat">' + _ssEsc(s.alamat || '-') + '</td>'
       + '<td class="p-4 whitespace-nowrap text-slate-500" data-label="Tanggal">' + _ssEsc(s.tanggalSurvey || '') + '</td>'
