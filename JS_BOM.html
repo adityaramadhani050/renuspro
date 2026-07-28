@@ -95,7 +95,7 @@ function _bomRenderWOList() {
   var box = document.getElementById('bom-wo-list');
   if (!list.length) {
     var emptyMsg = q ? 'Tidak ada WO cocok.'
-      : (_bomRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project BOM. Klik <b>Tambah Project ke BOM</b>.');
+      : (_bomRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project BOM. Klik <b>Tambah Project</b>.');
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
