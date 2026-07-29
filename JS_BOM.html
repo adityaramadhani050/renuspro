@@ -342,8 +342,7 @@ function _bomBeliRecalc() {
   if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }
   if (qty < 0) { qty = 0; qtyEl.value = 0; }
   var sisaBeli = Math.max(0, sisa - qty);
-  document.getElementById('bom-beli-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Sisa masih perlu dibeli: <b class="text-amber-700">' + _bomRp(sisaBeli) + '</b>'
-    + (sel.value && tersedia < sisa ? ' <span class="text-amber-600">(stok tersedia ' + _bomRp(tersedia) + ')</span>' : '');
+  document.getElementById('bom-beli-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Sisa masih perlu dibeli: <b class="text-amber-700">' + _bomRp(sisaBeli) + '</b>';
 }
 function _bomSubmitBeli() {
   var id = document.getElementById('bom-beli-id').value;
@@ -569,8 +568,7 @@ function _bomProcRecalc() {
   if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }
   if (qty < 0) { qty = 0; qtyEl.value = 0; }
   var beli = Math.max(0, Q - qty);
-  document.getElementById('bom-proc-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Perlu dibeli: <b class="text-amber-700">' + _bomRp(beli) + '</b>'
-    + (sel.value && tersedia < Q ? ' <span class="text-amber-600">(stok tersedia ' + _bomRp(tersedia) + ')</span>' : '');
+  document.getElementById('bom-proc-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Perlu dibeli: <b class="text-amber-700">' + _bomRp(beli) + '</b>';
 }
 function _bomSubmitProcure() {
   var id = document.getElementById('bom-proc-id').value;
