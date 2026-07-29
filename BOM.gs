@@ -790,7 +790,13 @@ function prosesBOMProcurement(id, payload) {
     var newMutasi = '';
     if (qtyReserved > 0) {
       if (!idStok) return { success: false, message: 'Pilih item stok untuk qty yang di-reserve.' };
-      var res = gunakanStok(noWO, idStok, qtyReserved, '', 'Reserve BOM ' + id + ' — ' + (row[4] || ''), oleh);
+      // Keterangan mutasi: bedakan reserve baru vs reserve ulang (top-up dari belanja).
+      var oldQty = Number(row[18]) || 0;
+      var namaMat = (row[4] || '').toString();
+      var ketReserve = (oldMutasi && oldQty !== qtyReserved)
+        ? 'Reserve ulang ' + id + ' (' + oldQty + '→' + qtyReserved + ') WO ' + noWO + ' — ' + namaMat
+        : 'Reserve ' + id + ' WO ' + noWO + ' — ' + namaMat;
+      var res = gunakanStok(noWO, idStok, qtyReserved, '', ketReserve, oleh);
       if (!res || res.success === false) {
         // Reserve gagal (mis. stok kurang). Reset field procurement material ini.
         _bomWriteProcRow(sheet, rowIdx, '', '', 0, '', 0, '', '');
