@@ -213,7 +213,7 @@ function _bomStokStatusBadge(it) {
   var butuh = Number(it.qtyBeli) || 0;
   if (tersedia === null) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap"><i class="fa-regular fa-hand-pointer text-[9px] mr-0.5"></i>Pilih stok manual</span>';
   if (tersedia >= butuh) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Siap reserve (' + _bomRp(tersedia) + ')</span>';
-  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Menunggu stok (' + _bomRp(tersedia) + '/' + _bomRp(butuh) + ')</span>';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Tunggu stok (' + _bomRp(tersedia) + '/' + _bomRp(butuh) + ')</span>';
 }
 
 function _bomRenderNeedPurchase() {
