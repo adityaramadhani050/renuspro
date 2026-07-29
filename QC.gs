@@ -933,7 +933,7 @@ function tandaiQCSelesai(noWO, oleh) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO) {
         sheet.getRange(i + 1, 6, 1, 3).setValues([['Ya', (oleh || '').toString(), when]]);
-        return { success: true, message: 'QC ' + noWO + ' ditandai selesai.' };
+        return { success: true, message: 'QC ' + noWO + ' ditandai Approved.' };
       }
     }
     return { success: false, message: 'WO tidak terdaftar di QC.' };
@@ -951,7 +951,7 @@ function batalkanQCSelesai(noWO, oleh) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO) {
         sheet.getRange(i + 1, 6, 1, 3).setValues([['', '', '']]);
-        return { success: true, message: 'Tanda selesai QC dibatalkan.' };
+        return { success: true, message: 'Status Approved QC dibatalkan.' };
       }
     }
     return { success: false, message: 'WO tidak terdaftar di QC.' };

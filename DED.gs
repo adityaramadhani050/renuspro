@@ -607,7 +607,7 @@ function tandaiDEDSelesai(noWO, oleh) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO) {
         sheet.getRange(i + 1, 6, 1, 3).setValues([['Ya', (oleh || '').toString(), when]]);
-        return { success: true, message: 'DED ' + noWO + ' ditandai selesai.' };
+        return { success: true, message: 'DED ' + noWO + ' ditandai Approved.' };
       }
     }
     return { success: false, message: 'WO tidak terdaftar di DED.' };
@@ -625,7 +625,7 @@ function batalkanDEDSelesai(noWO, oleh) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO) {
         sheet.getRange(i + 1, 6, 1, 3).setValues([['', '', '']]);
-        return { success: true, message: 'Tanda selesai DED dibatalkan.' };
+        return { success: true, message: 'Status Approved DED dibatalkan.' };
       }
     }
     return { success: false, message: 'WO tidak terdaftar di DED.' };

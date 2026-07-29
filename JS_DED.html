@@ -129,7 +129,7 @@ function _dedRenderWOList() {
   var shown = (_dedTab === 'selesai') ? selesai : proses;
   if (!shown.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
-      : (_dedTab === 'selesai' ? 'Belum ada DED yang selesai.'
+      : (_dedTab === 'selesai' ? 'Belum ada DED yang Approved.'
       : (_dedRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project DED. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-file-pen mr-2"></i>' + emptyMsg + '</div>';
     return;
@@ -202,8 +202,8 @@ function _dedRenderDetail(summary) {
     var btns = '';
     if (_dedCanAssign()) {
       var selesaiBtn = (_dedWO && _dedWO.selesaiManual)
-        ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan tanda selesai" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Selesai</span></button>'
-        : '<button onclick="_dedTandaiSelesai()" title="Tandai DED selesai" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Selesai</span></button>';
+        ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Approved</span></button>'
+        : '<button onclick="_dedTandaiSelesai()" title="Tandai DED Approved" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Approved</span></button>';
       btns += selesaiBtn
         + '<div class="relative"><button onclick="_dedToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
         + '<div id="ded-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
@@ -489,8 +489,8 @@ function _dedToggleNA(kode, isNA) {
 // ── Tandai selesai manual ───────────────────────────────────────
 function _dedTandaiSelesai() {
   if (!_dedWO || !_dedCanAssign()) return;
-  showConfirm({ title: 'Tandai DED Selesai', message: 'Tandai DED ' + _dedWO.noWO + ' selesai secara manual? WO akan pindah ke tab "Selesai".', confirmText: 'Ya, Tandai Selesai', icon: 'fa-circle-check', onConfirm: function() {
-    toggleLoader(true, 'Menandai selesai...');
+  showConfirm({ title: 'Tandai DED Approved', message: 'Tandai DED ' + _dedWO.noWO + ' sebagai Approved secara manual? WO akan pindah ke tab "Approved".', confirmText: 'Ya, Tandai Approved', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai Approved...');
     google.script.run.withSuccessHandler(function(res) {
       toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
       if (res && res.success) { if (_dedWO) _dedWO.selesaiManual = true; _dedReloadDetail(); }
@@ -500,7 +500,7 @@ function _dedTandaiSelesai() {
 }
 function _dedBatalkanSelesai() {
   if (!_dedWO || !_dedCanAssign()) return;
-  showConfirm({ title: 'Batalkan Tanda Selesai', message: 'Batalkan tanda selesai DED ' + _dedWO.noWO + '?', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+  showConfirm({ title: 'Batalkan Approved', message: 'Batalkan status Approved DED ' + _dedWO.noWO + '?', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
     toggleLoader(true, 'Membatalkan...');
     google.script.run.withSuccessHandler(function(res) {
       toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');

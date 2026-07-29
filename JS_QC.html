@@ -289,7 +289,7 @@ function _qcRenderWOList() {
   var shown = (_qcTab === 'selesai') ? selesai : proses;
   if (!shown.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
-      : (_qcTab === 'selesai' ? 'Belum ada QC yang selesai (100%).'
+      : (_qcTab === 'selesai' ? 'Belum ada QC yang Approved (100%).'
       : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
@@ -378,8 +378,8 @@ function _qcCloseDraftMenu() { var m = document.getElementById('qc-draft-menu');
 // ── Tandai / batalkan QC selesai manual (Lead/Admin) ─────────────
 function _qcTandaiSelesai() {
   if (!_qcWO || !_qcCanAssign()) return;
-  showConfirm({ title: 'Tandai QC Selesai', message: 'Tandai QC ' + _qcWO.noWO + ' sebagai selesai secara manual? WO akan pindah ke tab "Selesai".', confirmText: 'Ya, Tandai Selesai', icon: 'fa-circle-check', onConfirm: function() {
-    toggleLoader(true, 'Menandai selesai...');
+  showConfirm({ title: 'Tandai QC Approved', message: 'Tandai QC ' + _qcWO.noWO + ' sebagai Approved secara manual? WO akan pindah ke tab "Approved".', confirmText: 'Ya, Tandai Approved', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai Approved...');
     google.script.run.withSuccessHandler(function(res) {
       toggleLoader(false);
       showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
@@ -390,7 +390,7 @@ function _qcTandaiSelesai() {
 }
 function _qcBatalkanSelesai() {
   if (!_qcWO || !_qcCanAssign()) return;
-  showConfirm({ title: 'Batalkan Tanda Selesai', message: 'Batalkan tanda selesai QC ' + _qcWO.noWO + '? WO kembali ke tab "Sedang Proses".', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+  showConfirm({ title: 'Batalkan Approved', message: 'Batalkan status Approved QC ' + _qcWO.noWO + '? WO kembali ke tab "Proses".', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
     toggleLoader(true, 'Membatalkan...');
     google.script.run.withSuccessHandler(function(res) {
       toggleLoader(false);
@@ -561,8 +561,8 @@ function _qcRenderDetail(summary) {
     if (_qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
     // Tandai/Batalkan QC selesai manual (Lead/Admin) — independen dari progress %.
     var selesaiBtn = (_qcWO && _qcWO.selesaiManual)
-      ? '<button onclick="_qcBatalkanSelesai()" title="Batalkan tanda selesai" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> QC Selesai</span></button>'
-      : '<button onclick="_qcTandaiSelesai()" title="Tandai QC selesai secara manual" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Selesai</span></button>';
+      ? '<button onclick="_qcBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> QC Approved</span></button>'
+      : '<button onclick="_qcTandaiSelesai()" title="Tandai QC Approved secara manual" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-regular fa-circle-check"></i><span> Tandai Approved</span></button>';
     var manageBtns = canManage
       ? selesaiBtn
         + '<button onclick="_qcExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>'
