@@ -27,13 +27,6 @@ function onPOSupplierChange() {
 function onPOItemSelect(idx, sel) {
   if (!_poItems[idx]) return;
   var val = sel.value;
-  if (val === '__manual__') {
-    _poItems[idx]._manual = true;
-    _poItems[idx].produkId = '';
-    _poItems[idx].namaItem = '';
-    renderItemsPO();
-    return;
-  }
   if (!val) { _poItems[idx].produkId = ''; _poItems[idx].namaItem = ''; hitungTotalPO(); return; }
   var opt = sel.options[sel.selectedIndex];
   _poItems[idx].produkId = val;
@@ -362,7 +355,7 @@ function renderItemsPO() {
     var pakaiDropdown = supplierAda && !item._manual && (!item.produkId || inCatalog);
     var namaCell;
     if (pakaiDropdown) {
-      var opts = '<option value="">— Pilih item —</option><option value="__manual__">✏️ Ketik manual…</option>';
+      var opts = '<option value="">— Pilih item —</option>';
       _poSupplierProduk.forEach(function(p) {
         var selAttr = (item.produkId && item.produkId === p.id) ? ' selected' : '';
         opts += '<option value="' + p.id + '" data-nama="' + _escHtml(p.nama) + '" data-unit="' + _escHtml(p.unit || '') + '" data-harga="' + (p.hargaBeli || 0) + '"' + selAttr + '>' + _escHtml(p.nama) + '</option>';
