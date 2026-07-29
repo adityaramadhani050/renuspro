@@ -96,14 +96,6 @@ function _bomCountHtml(nMat, nKat) {
     + '</div>';
 }
 
-// Indikator procurement pada kartu WO (untuk procurement/lead/admin).
-function _bomWOProcBadge(w) {
-  if (!(_bomCanProcure() || _bomCanManage())) return '';
-  if ((w.procPending || 0) > 0) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-solid fa-cart-shopping text-[9px] mr-0.5"></i>' + w.procPending + ' perlu diproses</span>';
-  if ((w.procDone || 0) > 0) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 whitespace-nowrap"><i class="fa-solid fa-clipboard-check text-[9px] mr-0.5"></i>Procurement selesai</span>';
-  return '';
-}
-
 function _bomRenderWOList() {
   var q = (document.getElementById('bom-search').value || '').toLowerCase().trim();
   // Hitung jumlah per tab & set badge.
@@ -133,7 +125,7 @@ function _bomRenderWOList() {
       : '';
     return '<div onclick="bukaBOMDetail(\'' + _bomEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-indigo-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
-      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + _bomWOProcBadge(w) + '</div>'
+      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + '</div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _bomEsc(w.namaProject || '-') + '</div>'
       +   '<div class="text-[11px] text-slate-400 truncate">' + _bomEsc(w.namaKlien || '') + '</div>'
       + '</div>'
