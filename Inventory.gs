@@ -846,14 +846,6 @@ function terimaPOItems(payload) {
     var noWOPO       = (poData[poRowIdx][5] || '').toString().trim();
     var namaSupplier = (poData[poRowIdx][3] || '').toString();
 
-    // Biaya tambahan penerimaan (ongkir, handling, manpower, dll) dibagi rata per unit
-    var biayaTambahan = Number(payload.biayaTambahan) || 0;
-    var totalQtyDiterima = 0;
-    for (var iq = 0; iq < items.length; iq++) {
-      totalQtyDiterima += Number(items[iq].qty) || 0;
-    }
-    var biayaPerUnit = (biayaTambahan > 0 && totalQtyDiterima > 0) ? (biayaTambahan / totalQtyDiterima) : 0;
-
     var itData = itSheet.getDataRange().getValues();
     var itRowMap = {}; // idItem → rowIndex di itData
     for (var j = 1; j < itData.length; j++) {
@@ -907,8 +899,7 @@ function terimaPOItems(payload) {
       var it2      = items[ii2];
       var qtyTerima2 = Number(it2.qty) || 0;
       if (qtyTerima2 <= 0) continue;
-      var hargaAsli2 = Number(it2.hargaBeli) || 0;
-      var harga2   = Math.round(hargaAsli2 + biayaPerUnit); // harga DPP (exclude PPN) + biaya tambahan per unit
+      var harga2   = Math.round(Number(it2.hargaBeli) || 0); // harga DPP (exclude PPN)
 
       // Cari info produk untuk nama & satuan
       var namaProduk = it2.namaItem;
@@ -936,8 +927,7 @@ function terimaPOItems(payload) {
       if (idStokItem) {
         var saldoBaru = _updateStokEntry(ss, idStokItem, namaProduk, satuanProduk, qtyTerima2, harga2, qtyTerima2 * harga2);
         var idMutasi  = _generateIdMutasi(mSheet);
-        var keteranganMutasi = 'Penerimaan dari PO ' + noPO +
-          ' (harga DPP excl. PPN' + (biayaPerUnit > 0 ? ' + biaya tambahan' : '') + ')';
+        var keteranganMutasi = 'Penerimaan dari PO ' + noPO + ' (harga DPP excl. PPN)';
         mSheet.appendRow([
           idMutasi, tglStr, idStokItem, namaProduk,
           'Penerimaan PO', noPO,
@@ -996,29 +986,8 @@ function terimaPOItems(payload) {
       });
     }
 
-    // Hook Pengeluaran: catat biaya tambahan penerimaan (ongkir/handling/dll) jika PO terikat Work Order
-    if (biayaTambahan > 0 && noWOPO) {
-      try {
-        _buatPengeluaranOtomatis({
-          noWO:        noWOPO,
-          tanggal:     tglStr,
-          sumber:      'Biaya Penerimaan',
-          noPO:        noPO,
-          idReferensi: 'BTP-' + noPO + '-' + now.getTime(),
-          idAkun:      payload.idAkunBiaya   ? payload.idAkunBiaya.toString()   : '',
-          namaAkun:    payload.namaAkunBiaya ? payload.namaAkunBiaya.toString() : '',
-          deskripsi:   'Biaya tambahan penerimaan PO ' + noPO + ' — ' + namaSupplier,
-          qty:         1,
-          satuan:      '',
-          hargaSatuan: biayaTambahan,
-          total:       biayaTambahan,
-          catatan:     payload.keteranganBiaya ? payload.keteranganBiaya.toString() : '',
-          dibuatOleh:  namaUser
-        });
-      } catch(eHookBiaya) {
-        Logger.log('Hook pengeluaran biaya penerimaan gagal: ' + eHookBiaya.toString());
-      }
-    }
+    // Biaya tambahan penerimaan (ongkir/handling/dll) TIDAK lagi dicatat di sini —
+    // diinput manual oleh Finance sebagai pengeluaran project (menu Cash Manager).
 
     SpreadsheetApp.flush();
     invalidateStokCache();
