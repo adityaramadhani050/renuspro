@@ -426,9 +426,9 @@ function _bomRenderBody() {
 // ── Tampilan read-only + approve/reject (Lead Engineer) ─────────
 // Badge status procurement per material (Reserved / Need Purchase / Sebagian).
 function _bomProcBadge(it) {
-  if (it.procStatus === 'Reserved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-warehouse mr-0.5"></i>Reserved ' + _bomRp(it.qtyReserved) + '</span>';
-  if (it.procStatus === 'Need Purchase') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-solid fa-cart-shopping mr-0.5"></i>Beli ' + _bomRp(it.qtyBeli) + '</span>';
-  if (it.procStatus === 'Sebagian') return '<div class="flex flex-col gap-0.5 items-center"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved ' + _bomRp(it.qtyReserved) + '</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli ' + _bomRp(it.qtyBeli) + '</span></div>';
+  if (it.procStatus === 'Reserved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span>';
+  if (it.procStatus === 'Need Purchase') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span>';
+  if (it.procStatus === 'Sebagian') return '<div class="flex flex-col gap-0.5 items-center"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span></div>';
   return '<span class="text-[10px] text-slate-300">—</span>';
 }
 
