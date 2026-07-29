@@ -167,14 +167,14 @@ function _bomShowHomeTab(tab) {
   var isNeed = (tab === 'need');
   document.getElementById('bom-tab-projects').classList.toggle('hidden', isNeed);
   document.getElementById('bom-tab-need').classList.toggle('hidden', !isNeed);
-  var base = 'whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 -mb-px ';
-  var off = 'border-transparent text-slate-400 hover:text-slate-600';
+  var on  = 'whitespace-nowrap px-4 py-2 text-sm font-bold border-b-2 border-indigo-500 text-indigo-600 -mb-px transition';
+  var off = 'whitespace-nowrap px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 -mb-px transition';
   var bpr = document.getElementById('bom-tabbtn-proses');
   var bap = document.getElementById('bom-tabbtn-approved');
   var bn  = document.getElementById('bom-tabbtn-need');
-  if (bpr) bpr.className = base + (tab === 'proses' ? 'border-indigo-600 text-indigo-600' : off);
-  if (bap) bap.className = base + (tab === 'approved' ? 'border-emerald-600 text-emerald-600' : off);
-  if (bn) bn.className = base + (isNeed ? 'border-amber-600 text-amber-600' : off) + (_bomCanProcure() ? '' : ' hidden');
+  if (bpr) bpr.className = (tab === 'proses') ? on : off;
+  if (bap) bap.className = (tab === 'approved') ? on : off;
+  if (bn) bn.className = (isNeed ? on : off) + (_bomCanProcure() ? '' : ' hidden');
   if (isNeed) { if (_bomNeedList === null) _bomLoadNeedPurchase(); }
   else _bomRenderWOList();
 }
@@ -193,6 +193,7 @@ function _bomLoadNeedPurchase() {
 
 function _bomRenderNeedPurchase() {
   var box = document.getElementById('bom-need-list');
+  var cnEl = document.getElementById('bom-tabcount-need'); if (cnEl) cnEl.textContent = (_bomNeedList || []).length;
   var q = (document.getElementById('bom-need-search').value || '').toLowerCase().trim();
   var list = (_bomNeedList || []).filter(function(it) {
     return !q || ((it.namaMaterial + ' ' + it.merek + ' ' + it.noWO + ' ' + it.namaProject + ' ' + it.supplier).toLowerCase().indexOf(q) !== -1);
