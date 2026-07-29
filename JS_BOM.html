@@ -213,11 +213,16 @@ function _bomRenderNeedPurchase() {
   order.sort();
   box.innerHTML = order.map(function(sup) {
     var rows = groups[sup].map(function(it) {
+      var linkedBadge = it.idStok ? '<i class="fa-solid fa-link text-[9px] text-emerald-500 ml-1" title="Tertaut item stok ' + _bomEsc(it.idStok) + '"></i>' : '';
+      var aksi = _bomCanProcure()
+        ? '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Sudah dibeli & stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
+        : '<span class="text-slate-300 text-xs">—</span>';
       return '<tr class="border-t border-slate-100">'
         + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
-        + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
+        + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + linkedBadge + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
         + '<td class="px-3 py-2 text-slate-600">' + _bomEsc(it.merek || '-') + '</td>'
         + '<td class="px-3 py-2 text-center font-bold text-amber-700 whitespace-nowrap">' + _bomRp(it.qtyBeli) + ' ' + _bomEsc(it.satuan || '') + '</td>'
+        + '<td class="px-3 py-2 text-center" id="bom-beliact-' + _bomEsc(it.id) + '">' + aksi + '</td>'
         + '</tr>';
     }).join('');
     // Resolusi idSupplier grup (dari tautan pricelist) untuk tombol "Buat PO".
@@ -238,7 +243,7 @@ function _bomRenderNeedPurchase() {
       +   buatPOBtn
       + '</div>'
       + '<div class="overflow-x-auto"><table class="w-full text-sm">'
-      +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th></tr></thead>'
+      +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th><th class="px-3 py-2 text-center font-bold">Aksi</th></tr></thead>'
       +   '<tbody>' + rows + '</tbody>'
       + '</table></div></div>';
   }).join('');
@@ -310,6 +315,96 @@ function _bomBuatPO(idSupplier) {
   if (typeof navigate === 'function') navigate('purchaseorder');
   bukaFormPOPrefill(prefill);
   showNotification('Form PO ter-prefill dari belanja ' + supName + ' (peruntukan default Stok). Periksa & simpan.');
+}
+
+// ── Reserve dari stok untuk item Perlu Dibelanjakan (stok sudah diterima) ──
+// Hybrid: 1 klik bila material sudah tertaut item stok & stok cukup; selain itu buka modal pilih stok.
+function _bomBeliSetBusy(id) {
+  var el = document.getElementById('bom-beliact-' + id);
+  if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin text-slate-400"></i>';
+}
+function _bomReserveBeli(id) {
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === id; })[0];
+  if (!it) return;
+  _bomLoadStok(function() {
+    var stok = (_bomStokList || []).filter(function(s) { return s.idStok === it.idStok; })[0];
+    var tersedia = stok ? (Number(stok.qtyTersedia) || 0) : 0;
+    if (it.idStok && (Number(it.qtyBeli) || 0) > 0 && tersedia >= (Number(it.qtyBeli) || 0)) {
+      // 1 klik: material tertaut stok & stok cukup untuk sisa beli → reserve penuh.
+      showConfirm({ title: 'Reserve dari Stok', message: 'Reserve sisa ' + _bomRp(it.qtyBeli) + ' ' + (it.satuan || '') + ' "' + it.namaMaterial + '" dari stok ' + it.idStok + '? Stok berkurang & material jadi Reserved penuh.', confirmText: 'Ya, Reserve', icon: 'fa-warehouse', onConfirm: function() {
+        _bomDoReserveBeli(id, it.idStok, (Number(it.qtyReserved) || 0) + (Number(it.qtyBeli) || 0));
+      } });
+    } else {
+      _bomOpenBeliModal(id);
+    }
+  });
+}
+function _bomDoReserveBeli(id, idStok, qtyReservedNew) {
+  _bomBeliSetBusy(id);
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success === false) { showNotification(res.message, 'error'); _bomLoadNeedPurchase(); return; }
+    showNotification((res && res.message) || 'Ter-reserve dari stok.');
+    _bomLoadNeedPurchase();
+  }).withFailureHandler(function(err) { showNotification((err && err.message) || 'Gagal.', 'error'); _bomLoadNeedPurchase(); })
+    .prosesBOMProcurement(id, { idStok: idStok, qtyReserved: qtyReservedNew, oleh: _bomUserNama() });
+}
+function _bomOpenBeliModal(id) {
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === id; })[0];
+  if (!it) return;
+  _bomLoadStok(function() {
+    document.getElementById('bom-beli-id').value = id;
+    document.getElementById('bom-beli-nama').innerText = it.namaMaterial;
+    document.getElementById('bom-beli-info').innerText = it.noWO + (it.namaProject ? ' · ' + it.namaProject : '') + ' · Sisa beli ' + _bomRp(it.qtyBeli) + ' ' + (it.satuan || '');
+    var sel = document.getElementById('bom-beli-stok');
+    var opts = '<option value="">— Pilih item stok —</option>';
+    (_bomStokList || []).forEach(function(s) {
+      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyTersedia || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyTersedia || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
+    });
+    sel.innerHTML = opts;
+    if (it.idStok) sel.value = it.idStok;
+    var qtyEl = document.getElementById('bom-beli-qty');
+    var tersedia = sel.value ? (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) : 0;
+    qtyEl.value = Math.min(Number(it.qtyBeli) || 0, tersedia);
+    qtyEl.disabled = !sel.value;
+    document.getElementById('bom-modal-beli').classList.remove('hidden');
+    _bomBeliRecalc();
+  });
+}
+function _bomCloseBeli() { document.getElementById('bom-modal-beli').classList.add('hidden'); }
+function _bomBeliStokChange() {
+  var sel = document.getElementById('bom-beli-stok');
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === document.getElementById('bom-beli-id').value; })[0] || { qtyBeli: 0 };
+  var qtyEl = document.getElementById('bom-beli-qty');
+  if (sel.value) {
+    var tersedia = Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0;
+    qtyEl.disabled = false;
+    qtyEl.value = Math.min(Number(it.qtyBeli) || 0, tersedia);
+  } else { qtyEl.disabled = true; qtyEl.value = 0; }
+  _bomBeliRecalc();
+}
+function _bomBeliRecalc() {
+  var sel = document.getElementById('bom-beli-stok');
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === document.getElementById('bom-beli-id').value; })[0] || { qtyBeli: 0 };
+  var sisa = Number(it.qtyBeli) || 0;
+  var qtyEl = document.getElementById('bom-beli-qty');
+  var tersedia = sel.value ? (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) : 0;
+  var qty = Number(qtyEl.value) || 0;
+  var maxAmbil = sel.value ? Math.min(sisa, tersedia) : 0;
+  if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }
+  if (qty < 0) { qty = 0; qtyEl.value = 0; }
+  var sisaBeli = Math.max(0, sisa - qty);
+  document.getElementById('bom-beli-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Sisa masih perlu dibeli: <b class="text-amber-700">' + _bomRp(sisaBeli) + '</b>'
+    + (sel.value && tersedia < sisa ? ' <span class="text-amber-600">(stok tersedia ' + _bomRp(tersedia) + ')</span>' : '');
+}
+function _bomSubmitBeli() {
+  var id = document.getElementById('bom-beli-id').value;
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === id; })[0];
+  if (!it) { _bomCloseBeli(); return; }
+  var idStok = document.getElementById('bom-beli-stok').value || '';
+  var ambil = Number(document.getElementById('bom-beli-qty').value) || 0;
+  if (!idStok || ambil <= 0) return showNotification('Pilih item stok dan qty lebih dari 0.', 'error');
+  _bomCloseBeli();
+  _bomDoReserveBeli(id, idStok, (Number(it.qtyReserved) || 0) + ambil);
 }
 
 // ── DETAIL ──────────────────────────────────────────────────────
