@@ -69,4 +69,26 @@
           </div>
         </div>
 
+        <!-- MODAL: Proses procurement (reserve stok / need purchase) -->
+        <div id="bom-modal-proc" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-teal-100 text-teal-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-clipboard-check text-sm"></i></span>
+              <h3 class="text-base font-extrabold text-slate-800">Proses Material</h3>
+            </div>
+            <input type="hidden" id="bom-proc-id">
+            <p class="text-sm font-bold text-slate-700" id="bom-proc-nama"></p>
+            <p class="text-xs text-slate-400 mb-4" id="bom-proc-info"></p>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ambil dari Stok (opsional)</label>
+            <select id="bom-proc-stok" onchange="_bomProcStokChange()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3"><option value="">— Tidak dari stok (semua dibeli) —</option></select>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Qty Reserve dari Stok</label>
+            <input type="number" id="bom-proc-qty" min="0" step="any" oninput="_bomProcRecalc()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" value="0">
+            <div id="bom-proc-summary" class="text-xs bg-slate-50 border border-slate-150 rounded-xl px-3 py-2.5 mb-4 text-slate-600"></div>
+            <div class="flex justify-end gap-2">
+              <button onclick="_bomCloseProc()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_bomSubmitProcure()" class="px-5 py-2.5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Simpan</button>
+            </div>
+          </div>
+        </div>
+
       </section>

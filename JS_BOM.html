@@ -15,15 +15,18 @@ let _bomPricelist = null; // cache katalog pricelist
 let _bomKategori = null;  // cache master kategori (untuk dropdown blok)
 let _bomSiteEngineers = null;
 let _bomPlInited = false;
-let _bomBusyIds = {};     // id material yang sedang di-approve/reject (loading inline)
+let _bomBusyIds = {};     // id material yang sedang di-approve/reject/proses (loading inline)
 let _bomFinalizedBy = ''; // pemfinalisasi (saat semua material Approved)
 let _bomFinalizedAt = '';
+let _bomStokList = null;   // cache getStokList untuk modal procurement
+let _bomNeedList = null;   // cache daftar "Perlu Dibelanjakan"
 
 function _bomRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _bomUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _bomUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _bomCanManage(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // assign site engineer
 function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // approve/reject material
+function _bomCanProcure(){ var r = _bomRole(); return r === 'procurement' || r === 'admin'; }  // tandai reserved / need purchase
 function _bomIsAssigned(){ var id = _bomUserId(); return (_bomAssigned || []).some(function(a){ return a.id === id; }); }
 // Hanya Site Engineer yang di-assign (& Admin) yang bisa tambah/edit/hapus material.
 function _bomCanEdit()  {
@@ -45,7 +48,7 @@ window.loadBOM = function() {
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
-  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : 'Lihat');
+  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat'));
   var addBtn = document.getElementById('bom-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_bomCanManage());
 
@@ -222,9 +225,19 @@ function _bomRenderBody() {
 }
 
 // ── Tampilan read-only + approve/reject (Lead Engineer) ─────────
+// Badge status procurement per material (Reserved / Need Purchase / Sebagian).
+function _bomProcBadge(it) {
+  if (it.procStatus === 'Reserved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-warehouse mr-0.5"></i>Reserved ' + _bomRp(it.qtyReserved) + '</span>';
+  if (it.procStatus === 'Need Purchase') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-solid fa-cart-shopping mr-0.5"></i>Beli ' + _bomRp(it.qtyBeli) + '</span>';
+  if (it.procStatus === 'Sebagian') return '<div class="flex flex-col gap-0.5 items-center"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved ' + _bomRp(it.qtyReserved) + '</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli ' + _bomRp(it.qtyBeli) + '</span></div>';
+  return '<span class="text-[10px] text-slate-300">—</span>';
+}
+
 function _bomRenderReview() {
   var body = document.getElementById('bom-detail-body');
   var canReview = _bomCanReview();
+  var canProcure = _bomCanProcure();
+  var showAksi = canReview || canProcure;
   if (!_bomItems.length) {
     body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked text-2xl mb-2 block opacity-40"></i>Belum ada material.</div>';
     return;
@@ -235,17 +248,24 @@ function _bomRenderReview() {
     var rows = groups[kat].map(function(it, i) {
       var cat = it.catatan ? '<div class="text-[10px] text-slate-400 italic mt-0.5">' + _bomEsc(it.catatan) + '</div>' : '';
       var rej = (it.status === 'Rejected' && it.catatanReview) ? '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(it.catatanReview) + '</div>' : '';
+      var procCell = canProcure ? ('<td class="p-2 text-center col-status" data-label="Procurement">' + _bomProcBadge(it) + '</td>') : '';
       var aksi = '';
-      if (canReview) {
-        var inner;
+      if (showAksi) {
+        var inner = '';
         if (_bomBusyIds[it.id]) {
           inner = '<i class="fas fa-spinner fa-spin text-slate-400 text-sm"></i>';
-        } else if (it.status === 'Approved') {
-          inner = '<button onclick="_bomCancelApprove(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan Approve"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
         } else {
-          inner = '<button onclick="_bomApprove(\'' + _bomEsc(it.id) + '\')" class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-md" title="Approve"><i class="fa-solid fa-check text-sm"></i></button>'
-            + '<button onclick="_bomOpenReject(\'' + _bomEsc(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md" title="Reject"><i class="fa-solid fa-xmark text-sm"></i></button>';
+          if (canReview) {
+            if (it.status === 'Approved') inner += '<button onclick="_bomCancelApprove(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan Approve"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
+            else inner += '<button onclick="_bomApprove(\'' + _bomEsc(it.id) + '\')" class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-md" title="Approve"><i class="fa-solid fa-check text-sm"></i></button>'
+              + '<button onclick="_bomOpenReject(\'' + _bomEsc(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md" title="Reject"><i class="fa-solid fa-xmark text-sm"></i></button>';
+          }
+          if (canProcure && it.status === 'Approved') {
+            if (it.procStatus) inner += '<button onclick="_bomBatalProcure(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan proses procurement"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
+            else inner += '<button onclick="_bomOpenProcure(\'' + _bomEsc(it.id) + '\')" class="text-teal-600 hover:bg-teal-50 p-1.5 rounded-md" title="Proses (reserve / need purchase)"><i class="fa-solid fa-clipboard-check text-sm"></i></button>';
+          }
         }
+        if (!inner) inner = '<span class="text-slate-300 text-xs">—</span>';
         aksi = '<td class="p-2 text-center col-aksi" data-label="Aksi" id="bom-act-' + _bomEsc(it.id) + '"><div class="flex items-center justify-center gap-0.5">' + inner + '</div></td>';
       }
       return '<tr class="border-b border-slate-100 baris-kartu">'
@@ -256,15 +276,102 @@ function _bomRenderReview() {
         + '<td class="p-2 text-center col-satuan" data-label="Satuan"><span class="text-xs text-slate-500">' + (_bomEsc(it.satuan) || '-') + '</span></td>'
         + '<td class="p-2 text-center col-qty" data-label="Qty"><span class="text-sm font-extrabold text-indigo-700">' + _bomRp(it.qty) + '</span></td>'
         + '<td class="p-2 text-center col-status" data-label="Status">' + _bomStatusItemBadge(it.status) + '</td>'
+        + procCell
         + aksi
         + '</tr>';
     }).join('');
-    var aksiHead = canReview ? '<th class="p-2 w-24 text-center">Aksi</th>' : '';
+    var procHead = canProcure ? '<th class="p-2 w-28 text-center">Procurement</th>' : '';
+    var aksiHead = showAksi ? '<th class="p-2 w-24 text-center">Aksi</th>' : '';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2"><span class="font-extrabold text-sm text-slate-700 truncate"><i class="fa-solid fa-layer-group text-slate-400 mr-1.5"></i>' + _bomEsc(kat) + '</span><span class="text-[10px] font-bold text-slate-400">' + groups[kat].length + ' item</span></div>'
-      + '<div class="overflow-x-auto tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Nama Material</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-16 text-center">Qty</th><th class="p-2 w-24 text-center">Status</th>' + aksiHead + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="overflow-x-auto tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Nama Material</th><th class="p-2 w-28">Merek</th><th class="p-2 w-32">Supplier</th><th class="p-2 w-20 text-center">Satuan</th><th class="p-2 w-16 text-center">Qty</th><th class="p-2 w-24 text-center">Status</th>' + procHead + aksiHead + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
   }).join('');
+}
+
+// ── Procurement: proses (reserve/need purchase) & batalkan ──────
+function _bomLoadStok(cb) {
+  if (_bomStokList) { cb(); return; }
+  google.script.run.withSuccessHandler(function(list) { _bomStokList = list || []; cb(); })
+    .withFailureHandler(function() { _bomStokList = []; cb(); }).getStokList();
+}
+function _bomOpenProcure(id) {
+  var it = _bomItems.filter(function(x) { return x.id === id; })[0];
+  if (!it) return;
+  _bomLoadStok(function() {
+    document.getElementById('bom-proc-id').value = id;
+    document.getElementById('bom-proc-nama').innerText = it.namaMaterial;
+    document.getElementById('bom-proc-info').innerText = (it.merek ? it.merek + ' · ' : '') + (it.supplier || '-') + ' · Qty ' + _bomRp(it.qty) + ' ' + (it.satuan || '');
+    var sel = document.getElementById('bom-proc-stok');
+    var opts = '<option value="">— Tidak dari stok (semua dibeli) —</option>';
+    (_bomStokList || []).forEach(function(s) {
+      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyTersedia || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyTersedia || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
+    });
+    sel.innerHTML = opts;
+    if (it.idStok) sel.value = it.idStok;
+    var qtyEl = document.getElementById('bom-proc-qty');
+    qtyEl.value = it.qtyReserved || 0;
+    qtyEl.disabled = !sel.value;
+    document.getElementById('bom-modal-proc').classList.remove('hidden');
+    _bomProcRecalc();
+  });
+}
+function _bomCloseProc() { document.getElementById('bom-modal-proc').classList.add('hidden'); }
+function _bomProcStokChange() {
+  var sel = document.getElementById('bom-proc-stok');
+  var it = _bomItems.filter(function(x) { return x.id === document.getElementById('bom-proc-id').value; })[0] || { qty: 0 };
+  var Q = Number(it.qty) || 0;
+  var qtyEl = document.getElementById('bom-proc-qty');
+  if (sel.value) {
+    var tersedia = Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0;
+    qtyEl.disabled = false;
+    qtyEl.value = Math.min(Q, tersedia);   // saran: reserve sebanyak yang tersedia
+  } else { qtyEl.disabled = true; qtyEl.value = 0; }
+  _bomProcRecalc();
+}
+function _bomProcRecalc() {
+  var sel = document.getElementById('bom-proc-stok');
+  var it = _bomItems.filter(function(x) { return x.id === document.getElementById('bom-proc-id').value; })[0] || { qty: 0 };
+  var Q = Number(it.qty) || 0;
+  var qtyEl = document.getElementById('bom-proc-qty');
+  var tersedia = sel.value ? (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) : 0;
+  var qty = Number(qtyEl.value) || 0;
+  var maxAmbil = sel.value ? Math.min(Q, tersedia) : 0;
+  if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }
+  if (qty < 0) { qty = 0; qtyEl.value = 0; }
+  var beli = Math.max(0, Q - qty);
+  document.getElementById('bom-proc-summary').innerHTML = 'Reserve dari stok: <b class="text-emerald-700">' + _bomRp(qty) + '</b> · Perlu dibeli: <b class="text-amber-700">' + _bomRp(beli) + '</b>'
+    + (sel.value && tersedia < Q ? ' <span class="text-amber-600">(stok tersedia ' + _bomRp(tersedia) + ')</span>' : '');
+}
+function _bomSubmitProcure() {
+  var id = document.getElementById('bom-proc-id').value;
+  var sel = document.getElementById('bom-proc-stok');
+  var idStok = sel.value || '';
+  var qty = Number(document.getElementById('bom-proc-qty').value) || 0;
+  if (!idStok || qty <= 0) { idStok = ''; qty = 0; }   // tidak dari stok → semua dibeli
+  _bomCloseProc();
+  if (_bomBusyIds[id]) return;
+  _bomBusyIds[id] = true; _bomSetActBusy(id);
+  google.script.run.withSuccessHandler(function(res) {
+    delete _bomBusyIds[id];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _bomReloadDetail(); return; }
+    showNotification((res && res.message) || 'Diproses.');
+    _bomReloadDetail();
+  }).withFailureHandler(function(err) { delete _bomBusyIds[id]; showNotification((err && err.message) || 'Gagal.', 'error'); _bomReloadDetail(); })
+    .prosesBOMProcurement(id, { idStok: idStok, qtyReserved: qty, oleh: _bomUserNama() });
+}
+function _bomBatalProcure(id) {
+  showConfirm({ title: 'Batalkan Proses Procurement', message: 'Batalkan proses material ini? Bila ada reserve, stok akan dikembalikan & pengeluaran otomatis dihapus.', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+    if (_bomBusyIds[id]) return;
+    _bomBusyIds[id] = true; _bomSetActBusy(id);
+    google.script.run.withSuccessHandler(function(res) {
+      delete _bomBusyIds[id];
+      if (res && res.success === false) { showNotification(res.message, 'error'); _bomReloadDetail(); return; }
+      showNotification((res && res.message) || 'Dibatalkan.');
+      _bomReloadDetail();
+    }).withFailureHandler(function(err) { delete _bomBusyIds[id]; showNotification((err && err.message) || 'Gagal.', 'error'); _bomReloadDetail(); })
+      .batalkanBOMProcurement(id, _bomUserNama());
+  } });
 }
 
 // ── Editable per-kategori (blok "sub-paket", pola form penawaran) ──
