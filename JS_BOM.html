@@ -460,6 +460,8 @@ function _bomRenderReview() {
   var body = document.getElementById('bom-detail-body');
   var canReview = _bomCanReview();
   var canProcure = _bomCanProcure();
+  // Project Coordinator boleh melihat status procurement (read-only), tanpa aksi.
+  var canViewProc = canProcure || _bomRole() === 'projectcoordinator';
   var showAksi = canReview || canProcure;
   if (!_bomItems.length) {
     body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked text-2xl mb-2 block opacity-40"></i>Belum ada material.</div>';
@@ -471,7 +473,7 @@ function _bomRenderReview() {
     var rows = groups[kat].map(function(it, i) {
       var cat = it.catatan ? '<div class="text-[10px] text-slate-400 italic mt-0.5">' + _bomEsc(it.catatan) + '</div>' : '';
       var rej = (it.status === 'Rejected' && it.catatanReview) ? '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(it.catatanReview) + '</div>' : '';
-      var procCell = canProcure ? ('<td class="p-2 text-center col-status" data-label="Procurement">' + _bomProcBadge(it) + '</td>') : '';
+      var procCell = canViewProc ? ('<td class="p-2 text-center col-status" data-label="Procurement">' + _bomProcBadge(it) + '</td>') : '';
       var aksi = '';
       if (showAksi) {
         var inner = '';
@@ -503,7 +505,7 @@ function _bomRenderReview() {
         + aksi
         + '</tr>';
     }).join('');
-    var procHead = canProcure ? '<th class="p-2 w-28 text-center">Procurement</th>' : '';
+    var procHead = canViewProc ? '<th class="p-2 w-28 text-center">Procurement</th>' : '';
     var aksiHead = showAksi ? '<th class="p-2 w-24 text-center">Aksi</th>' : '';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2"><span class="font-extrabold text-sm text-slate-700 truncate"><i class="fa-solid fa-layer-group text-slate-400 mr-1.5"></i>' + _bomEsc(kat) + '</span><span class="text-[10px] font-bold text-slate-400">' + groups[kat].length + ' item</span></div>'
