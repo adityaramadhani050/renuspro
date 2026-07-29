@@ -266,9 +266,16 @@ function _bomBeliSetBusy(id) {
   if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin text-slate-400"></i>';
 }
 function _bomReserveBeli(id) {
+  if (_bomBusyIds[id]) return;               // cegah klik ganda saat memuat
   var it = (_bomNeedList || []).filter(function(x) { return x.id === id; })[0];
   if (!it) return;
+  var cell = document.getElementById('bom-beliact-' + id);
+  var saved = cell ? cell.innerHTML : null;  // simpan tombol untuk dipulihkan
+  _bomBusyIds[id] = true;
+  _bomBeliSetBusy(id);                        // ganti tombol dengan spinner
   _bomLoadStok(function() {
+    delete _bomBusyIds[id];
+    if (cell && saved != null) cell.innerHTML = saved;
     var stok = (_bomStokList || []).filter(function(s) { return s.idStok === it.idStok; })[0];
     var tersedia = stok ? (Number(stok.qtyTersedia) || 0) : 0;
     if (it.idStok && (Number(it.qtyBeli) || 0) > 0 && tersedia >= (Number(it.qtyBeli) || 0)) {
@@ -511,9 +518,16 @@ function _bomLoadStok(cb) {
     .withFailureHandler(function() { _bomStokList = []; cb(); }).getStokList();
 }
 function _bomOpenProcure(id) {
+  if (_bomBusyIds[id]) return;               // cegah klik ganda saat memuat
   var it = _bomItems.filter(function(x) { return x.id === id; })[0];
   if (!it) return;
+  var cell = document.getElementById('bom-act-' + id);
+  var saved = cell ? cell.innerHTML : null;  // simpan tombol untuk dipulihkan
+  _bomBusyIds[id] = true;
+  _bomSetActBusy(id);                         // ganti tombol dengan spinner
   _bomLoadStok(function() {
+    delete _bomBusyIds[id];
+    if (cell && saved != null) cell.innerHTML = saved;
     document.getElementById('bom-proc-id').value = id;
     document.getElementById('bom-proc-nama').innerText = it.namaMaterial;
     document.getElementById('bom-proc-info').innerText = (it.merek ? it.merek + ' · ' : '') + (it.supplier || '-') + ' · Qty ' + _bomRp(it.qty) + ' ' + (it.satuan || '');
