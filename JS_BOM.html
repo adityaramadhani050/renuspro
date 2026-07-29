@@ -225,96 +225,17 @@ function _bomRenderNeedPurchase() {
         + '<td class="px-3 py-2 text-center" id="bom-beliact-' + _bomEsc(it.id) + '">' + aksi + '</td>'
         + '</tr>';
     }).join('');
-    // Resolusi idSupplier grup (dari tautan pricelist) untuk tombol "Buat PO".
-    var gidSup = '';
-    groups[sup].forEach(function(it) { if (!gidSup && it.idSupplier) gidSup = it.idSupplier; });
-    var linked = groups[sup].filter(function(it) { return it.idSupplier === gidSup; }).length;
-    var buatPOBtn = '';
-    if (_bomCanProcure()) {
-      buatPOBtn = gidSup
-        ? '<button onclick="_bomBuatPO(\'' + _bomEsc(gidSup) + '\')" class="ml-auto inline-flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-invoice"></i> Buat PO' + (linked < groups[sup].length ? ' (' + linked + ')' : '') + '</button>'
-        : '<span class="ml-auto text-[10px] font-bold text-slate-400" title="Material tanpa tautan pricelist tidak bisa dibuat PO otomatis"><i class="fa-solid fa-link-slash mr-1"></i>Tanpa tautan pricelist</span>';
-    }
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<div class="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-150">'
       +   '<span class="bg-amber-100 text-amber-600 h-7 w-7 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-truck-field text-xs"></i></span>'
       +   '<span class="font-extrabold text-slate-700">' + _bomEsc(sup) + '</span>'
       +   '<span class="text-[11px] font-bold text-slate-400">' + groups[sup].length + ' item</span>'
-      +   buatPOBtn
       + '</div>'
       + '<div class="overflow-x-auto"><table class="w-full text-sm">'
       +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th><th class="px-3 py-2 text-center font-bold">Aksi</th></tr></thead>'
       +   '<tbody>' + rows + '</tbody>'
       + '</table></div></div>';
   }).join('');
-}
-
-function _bomExportNeedPurchasePDF() {
-  if (!window.jspdf || !window.jspdf.jsPDF) return showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error');
-  var list = _bomNeedList || [];
-  if (!list.length) return showNotification('Tidak ada material untuk diekspor.', 'error');
-  try {
-    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    var PW = 210, ML = 12, MR = 12;
-    var DARK = [30, 41, 59], SLATE = [100, 116, 139], AMBER = [180, 83, 9];
-    doc.setFillColor(DARK[0], DARK[1], DARK[2]); doc.rect(0, 0, PW, 22, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-    doc.text('DAFTAR BELANJA MATERIAL', ML, 11);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(190, 200, 220);
-    doc.text('DOKUMEN INTERNAL — MATERIAL PERLU DIBELANJAKAN (PROCUREMENT)', ML, 17);
-    var y = 30;
-    var groups = {}, order = [];
-    list.forEach(function(it) { var k = it.supplier || '(tanpa supplier)'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
-    order.sort();
-    order.forEach(function(sup) {
-      var bodyRows = groups[sup].map(function(it, i) {
-        return [String(i + 1), it.noWO || '', it.namaMaterial || '', it.merek || '-', it.satuan || '-', _bomRp(it.qtyBeli)];
-      });
-      doc.autoTable({
-        startY: y,
-        head: [[{ content: 'SUPPLIER: ' + sup.toUpperCase() + '  (' + groups[sup].length + ' item)', colSpan: 6, styles: { halign: 'left', fillColor: [254, 243, 199], textColor: AMBER, fontStyle: 'bold' } }],
-               ['No', 'No WO', 'Nama Material', 'Merek', 'Satuan', 'Qty Beli']],
-        body: bodyRows, theme: 'grid',
-        margin: { left: ML, right: MR },
-        headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
-        bodyStyles: { fontSize: 8, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 26 }, 2: { cellWidth: 'auto' }, 3: { cellWidth: 30 }, 4: { cellWidth: 18, halign: 'center' }, 5: { cellWidth: 20, halign: 'center', fontStyle: 'bold' } },
-        styles: { overflow: 'linebreak' }
-      });
-      y = doc.lastAutoTable.finalY + 5;
-    });
-    doc.setFontSize(7); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
-    doc.text('Dokumen internal PT. Renus Global Indonesia — daftar material perlu dibelanjakan.', ML, 290);
-    var fname = 'Daftar_Belanja_BOM.pdf';
-    doc.save(fname);
-    showNotification('PDF daftar belanja diunduh: ' + fname);
-  } catch (err) {
-    showNotification('Gagal membuat PDF: ' + (err && err.message ? err.message : err), 'error');
-  }
-}
-
-// Buat PO dari daftar belanja: agregasi item satu supplier (lintas WO) → prefill form PO.
-function _bomBuatPO(idSupplier) {
-  var items = (_bomNeedList || []).filter(function(it) { return it.idSupplier && it.idSupplier === idSupplier; });
-  if (!items.length) return showNotification('Tidak ada item bertautan pricelist untuk supplier ini.', 'error');
-  var supName = items[0].supplier || '';
-  // Agregasi per produk (pricelistId): jumlahkan qty beli lintas WO agar tidak jadi baris ganda.
-  var agg = {}, ids = [];
-  items.forEach(function(it) {
-    var k = it.pricelistId || it.namaMaterial;
-    if (!agg[k]) { agg[k] = { produkId: it.pricelistId || '', namaItem: it.namaMaterial || '', satuan: it.satuan || '', hargaBeli: it.hargaBeli || 0, qty: 0 }; ids.push(k); }
-    agg[k].qty += Number(it.qtyBeli) || 0;
-  });
-  var prefill = {
-    idSupplier: idSupplier,
-    peruntukan: 'Stok - Belanja BOM',
-    noWO: '',
-    items: ids.map(function(k) { return agg[k]; })
-  };
-  if (typeof bukaFormPOPrefill !== 'function') return showNotification('Modul Purchase Order belum siap. Muat ulang halaman.', 'error');
-  if (typeof navigate === 'function') navigate('purchaseorder');
-  bukaFormPOPrefill(prefill);
-  showNotification('Form PO ter-prefill dari belanja ' + supName + ' (peruntukan default Stok). Periksa & simpan.');
 }
 
 // ── Reserve dari stok untuk item Perlu Dibelanjakan (stok sudah diterima) ──
