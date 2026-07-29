@@ -1038,6 +1038,7 @@ window.batalkanPO = function(noPO) {
 
 var _terimaPOMode    = 'langsung'; // 'langsung' | 'gudang'
 var _terimaPOItems   = [];
+var _terimaBOMLinks  = [];   // material BOM "Tunggu Beli" untuk supplier PO ini
 
 function _setTerimaPOMode(mode) {
   _terimaPOMode = mode;
@@ -1083,6 +1084,7 @@ function bukaFormTerimaPO() {
       _terimaPOItems = res.items || [];
       _renderFormTerimaLangsung(tbodyL, _terimaPOItems);
       _renderFormTerimaGudang(tbodyG, _terimaPOItems);
+      _loadTerimaBOMLinks();
       formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     })
     .withFailureHandler(function(err) {
@@ -1131,6 +1133,42 @@ function _renderFormTerimaGudang(tbody, items) {
   }).join('');
 }
 
+// Muat material BOM "Tunggu Beli" untuk supplier PO ini (link opsional).
+function _loadTerimaBOMLinks() {
+  var wrap = document.getElementById('form-terima-bom-wrap');
+  _terimaBOMLinks = [];
+  if (wrap) wrap.classList.add('hidden');
+  var idSup = (_currentPODetail && _currentPODetail.idSupplier) || '';
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    _terimaBOMLinks = list;
+    if (!wrap) return;
+    if (!list.length) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    _renderFormBOMLinks(list);
+  }).withFailureHandler(function() { if (wrap) wrap.classList.add('hidden'); })
+    .getBOMMenungguBL({ idSupplier: idSup });
+}
+function _renderFormBOMLinks(list) {
+  var tb = document.getElementById('form-terima-bom-links');
+  if (!tb) return;
+  tb.innerHTML = list.map(function(m) {
+    return '<tr class="border-b border-violet-50" data-bom-id="' + _escHtml(m.id) + '" data-menunggu="' + m.qtyMenunggu + '" data-plid="' + _escHtml(m.pricelistId) + '">' +
+      '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _escHtml(m.noWO) + '</td>' +
+      '<td class="px-3 py-2"><div class="font-semibold text-slate-700 text-sm">' + _escHtml(m.namaMaterial) + '</div><div class="text-[11px] text-slate-400">' + _escHtml(m.namaProject || '') + (m.merek ? ' · ' + _escHtml(m.merek) : '') + '</div></td>' +
+      '<td class="px-3 py-2 text-center font-bold text-violet-700 whitespace-nowrap">' + m.qtyMenunggu + ' ' + _escHtml(m.satuan || '') + '</td>' +
+      '<td class="px-3 py-2 text-center"><input type="number" class="terima-bom-qty w-24 px-2 py-1 text-sm border border-violet-300 rounded-lg text-center focus:outline-none focus:border-violet-500" min="0" max="' + m.qtyMenunggu + '" value="0"></td>' +
+    '</tr>';
+  }).join('');
+}
+// Harga satuan (net) untuk material BOM: cocokkan pricelistId ke item PO; fallback pricelist.
+function _terimaBOMHarga(plid) {
+  var m = (_terimaPOItems || []).filter(function(it) { return (it.idProduk || '') === plid; })[0];
+  if (m) return Number(m.hargaBeli) || 0;
+  var b = (_terimaBOMLinks || []).filter(function(x) { return (x.pricelistId || '') === plid; })[0];
+  return b ? (Number(b.hargaBeli) || 0) : 0;
+}
+
 function submitTerimaPOKirimLangsung() {
   if (!_currentPODetail) return;
   var noPO = _currentPODetail.noPO;
@@ -1162,17 +1200,40 @@ function submitTerimaPOKirimLangsung() {
   var buktiFileId   = document.getElementById('terima-langsung-bukti-file-id').value;
   var buktiFileName = document.getElementById('terima-langsung-bukti-file-name').value;
 
+  // Kumpulkan link "Penuhi Material BOM" (opsional).
+  var bomLinks = [];
+  document.querySelectorAll('#form-terima-bom-links tr[data-bom-id]').forEach(function(row) {
+    var q = parseFloat((row.querySelector('.terima-bom-qty') || {}).value) || 0;
+    if (q <= 0) return;
+    var menunggu = parseFloat(row.getAttribute('data-menunggu')) || 0;
+    if (q > menunggu) q = menunggu;
+    var plid = row.getAttribute('data-plid');
+    bomLinks.push({ bomItemId: row.getAttribute('data-bom-id'), qty: q, hargaSatuan: _terimaBOMHarga(plid) });
+  });
+  var totalTerima = items.reduce(function(s, it) { return s + (it.qty || 0); }, 0);
+  var totalLink   = bomLinks.reduce(function(s, l) { return s + l.qty; }, 0);
+  if (totalLink > totalTerima) return showNotification('Total "Penuhi Qty" (' + totalLink + ') melebihi total qty diterima (' + totalTerima + ').', 'error');
+
+  var namaUser = (_currentUser && _currentUser.nama) || '';
+  function _selesai(msgExtra) {
+    toggleLoader(false);
+    showNotification('Penerimaan langsung tersimpan.' + (msgExtra || ''), 'success');
+    document.getElementById('form-terima-po').classList.add('hidden');
+    bukaPODetail(noPO);
+  }
   toggleLoader(true, 'Menyimpan penerimaan langsung...');
   google.script.run
     .withSuccessHandler(function(res) {
-      toggleLoader(false);
-      if (res.success) {
-        showNotification(res.message, 'success');
-        document.getElementById('form-terima-po').classList.add('hidden');
-        bukaPODetail(noPO);
-      } else {
-        showNotification(res.message, 'error');
-      }
+      if (!res || !res.success) { toggleLoader(false); showNotification((res && res.message) || 'Gagal.', 'error'); return; }
+      if (!bomLinks.length) { _selesai(''); return; }
+      // Tautkan ke material BOM (Beli Langsung) + bukukan HPP per material.
+      google.script.run
+        .withSuccessHandler(function(r2) {
+          var ok = r2 && r2.success ? (r2.hasil || []).filter(function(x){ return x.success; }).length : 0;
+          _selesai(ok ? ' ' + ok + ' material BOM ditandai Beli Langsung.' : '');
+        })
+        .withFailureHandler(function(err) { toggleLoader(false); showNotification('Penerimaan tersimpan, tapi gagal link BOM: ' + err.message, 'error'); document.getElementById('form-terima-po').classList.add('hidden'); bukaPODetail(noPO); })
+        .linkBeliLangsung(bomLinks, noPO, namaUser);
     })
     .withFailureHandler(function(err) {
       toggleLoader(false);
@@ -1181,7 +1242,7 @@ function submitTerimaPOKirimLangsung() {
     .terimaPOKirimLangsung({
       noPO: noPO,
       items: items,
-      namaUser: (_currentUser && _currentUser.nama) || '',
+      namaUser: namaUser,
       buktiFileId: buktiFileId,
       buktiFileUrl: buktiFileUrl,
       buktiFileName: buktiFileName
