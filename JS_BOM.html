@@ -235,16 +235,26 @@ function _bomRenderNeedPurchase() {
   order.sort();
   box.innerHTML = order.map(function(sup) {
     var rows = groups[sup].map(function(it) {
-      var linkedBadge = it.idStok ? '<i class="fa-solid fa-link text-[9px] text-emerald-500 ml-1" title="Tertaut item stok ' + _bomEsc(it.idStok) + '"></i>' : '';
-      var aksi = _bomCanProcure()
-        ? '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Sudah dibeli & stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
-        : '<span class="text-slate-300 text-xs">—</span>';
+      var isTunggu = (Number(it.qtyMenunggu) || 0) > 0;   // sudah ditandai beli langsung
+      var qtyShow = isTunggu ? it.qtyMenunggu : it.qtyBeli;
+      var linkedBadge = (!isTunggu && it.idStok) ? '<i class="fa-solid fa-link text-[9px] text-emerald-500 ml-1" title="Tertaut item stok ' + _bomEsc(it.idStok) + '"></i>' : '';
+      // Kolom status stok: undecided → kesiapan stok; tunggu beli → badge ungu.
+      var statusStok = isTunggu
+        ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Tunggu Beli</span>'
+        : _bomStokStatusBadge(it);
+      var aksi;
+      if (!_bomCanProcure()) aksi = '<span class="text-slate-300 text-xs">—</span>';
+      else if (isTunggu) aksi = '<button onclick="_bomBatalBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Batalkan tanda beli langsung"><i class="fa-solid fa-rotate-left"></i> Batal</button>';
+      else aksi = '<div class="flex items-center justify-center gap-1.5">'
+        + '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
+        + '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Beli Langsung</button>'
+        + '</div>';
       return '<tr class="border-t border-slate-100">'
         + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
         + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + linkedBadge + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
         + '<td class="px-3 py-2 text-slate-600">' + _bomEsc(it.merek || '-') + '</td>'
-        + '<td class="px-3 py-2 text-center font-bold text-amber-700 whitespace-nowrap">' + _bomRp(it.qtyBeli) + ' ' + _bomEsc(it.satuan || '') + '</td>'
-        + '<td class="px-3 py-2 text-center">' + _bomStokStatusBadge(it) + '</td>'
+        + '<td class="px-3 py-2 text-center font-bold text-amber-700 whitespace-nowrap">' + _bomRp(qtyShow) + ' ' + _bomEsc(it.satuan || '') + '</td>'
+        + '<td class="px-3 py-2 text-center">' + statusStok + '</td>'
         + '<td class="px-3 py-2 text-center" id="bom-beliact-' + _bomEsc(it.id) + '">' + aksi + '</td>'
         + '</tr>';
     }).join('');
@@ -357,6 +367,31 @@ function _bomSubmitBeli() {
   _bomDoReserveBeli(id, idStok, (Number(it.qtyReserved) || 0) + ambil);
 }
 
+// Tandai item "perlu dibeli" menjadi "beli langsung" (menunggu penerimaan PO).
+function _bomBeliLangsung(id) {
+  if (_bomBusyIds[id]) return;
+  _bomBusyIds[id] = true; _bomBeliSetBusy(id);
+  google.script.run.withSuccessHandler(function(res) {
+    delete _bomBusyIds[id];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _bomLoadNeedPurchase(); return; }
+    showNotification((res && res.message) || 'Ditandai beli langsung.');
+    _bomLoadNeedPurchase();
+  }).withFailureHandler(function(err) { delete _bomBusyIds[id]; showNotification((err && err.message) || 'Gagal.', 'error'); _bomLoadNeedPurchase(); })
+    .tandaiBeliLangsung(id, _bomUserNama());
+}
+// Batalkan tanda beli langsung (belum diterima) → kembali "perlu dibeli".
+function _bomBatalBeliLangsung(id) {
+  if (_bomBusyIds[id]) return;
+  _bomBusyIds[id] = true; _bomBeliSetBusy(id);
+  google.script.run.withSuccessHandler(function(res) {
+    delete _bomBusyIds[id];
+    if (res && res.success === false) { showNotification(res.message, 'error'); _bomLoadNeedPurchase(); return; }
+    showNotification((res && res.message) || 'Dibatalkan.');
+    _bomLoadNeedPurchase();
+  }).withFailureHandler(function(err) { delete _bomBusyIds[id]; showNotification((err && err.message) || 'Gagal.', 'error'); _bomLoadNeedPurchase(); })
+    .batalTandaiBeliLangsung(id, _bomUserNama());
+}
+
 // ── DETAIL ──────────────────────────────────────────────────────
 function bukaBOMDetail(noWO) {
   _bomWO = _bomWOList.filter(function(w){ return w.noWO === noWO; })[0] || { noWO: noWO, namaProject: '', namaKlien: '', status: 'Draft' };
@@ -446,14 +481,19 @@ function _bomRenderBody() {
 }
 
 // ── Tampilan read-only + approve/reject (Lead Engineer) ─────────
-// Badge status procurement per material (Reserved / Need Purchase / Sebagian).
+// Badge status procurement per material — komposisi dari 4 bucket qty.
 function _bomProcBadge(it) {
-  if (it.procStatus === 'Reserved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span>';
-  if (it.procStatus === 'Need Purchase') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span>';
-  if (it.procStatus === 'Sebagian') return '<div class="flex flex-col gap-0.5 items-center"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span></div>';
-  // Material Approved yang belum disentuh procurement → worklist.
-  if (it.status === 'Approved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Perlu diproses</span>';
-  return '<span class="text-[10px] text-slate-300">—</span>';
+  var parts = [];
+  if ((it.qtyReserved || 0) > 0)     parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span>');
+  if ((it.qtyBeli || 0) > 0)         parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span>');
+  if ((it.qtyMenungguBL || 0) > 0)   parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Tunggu Beli (' + _bomRp(it.qtyMenungguBL) + ')</span>');
+  if ((it.qtyBeliLangsung || 0) > 0) parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-600 text-white whitespace-nowrap"><i class="fa-solid fa-truck-fast text-[9px] mr-0.5"></i>Beli Langsung (' + _bomRp(it.qtyBeliLangsung) + ')</span>');
+  if (!parts.length) {
+    if (it.status === 'Approved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Perlu diproses</span>';
+    return '<span class="text-[10px] text-slate-300">—</span>';
+  }
+  if (parts.length === 1) return parts[0];
+  return '<div class="flex flex-col gap-0.5 items-center">' + parts.join('') + '</div>';
 }
 
 function _bomRenderReview() {
