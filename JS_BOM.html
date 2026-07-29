@@ -45,12 +45,17 @@ window.loadBOM = function() {
   // material yang baru dibuat di menu Pricelist langsung muncul (tanpa reload).
   _bomPricelist = null;
   _bomKategori = null;
+  _bomNeedList = null;   // paksa muat ulang daftar belanja saat masuk menu
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
   if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat'));
   var addBtn = document.getElementById('bom-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_bomCanManage());
+  // Tab "Perlu Dibelanjakan" hanya untuk procurement / lead / admin.
+  var needBtn = document.getElementById('bom-tabbtn-need');
+  if (needBtn) needBtn.classList.toggle('hidden', !(_bomCanProcure() || _bomCanManage()));
+  _bomShowHomeTab('projects');
 
   document.getElementById('bom-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
   var arg = (_bomRole() === 'siteengineer') ? { siteUserId: _bomUserId() } : {};
@@ -138,6 +143,113 @@ function _bomRemoveProject(noWO) {
     }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
       .removeBOMProject(noWO);
   }});
+}
+
+// ── TAB: PERLU DIBELANJAKAN ─────────────────────────────────────
+function _bomShowHomeTab(tab) {
+  var isNeed = (tab === 'need');
+  document.getElementById('bom-tab-projects').classList.toggle('hidden', isNeed);
+  document.getElementById('bom-tab-need').classList.toggle('hidden', !isNeed);
+  var bp = document.getElementById('bom-tabbtn-projects');
+  var bn = document.getElementById('bom-tabbtn-need');
+  var base = 'px-4 py-2.5 text-sm font-bold border-b-2 -mb-px ';
+  var off = 'border-transparent text-slate-400 hover:text-slate-600';
+  var canNeed = _bomCanProcure() || _bomCanManage();
+  if (bp) bp.className = base + (isNeed ? off : 'border-indigo-600 text-indigo-600');
+  if (bn) bn.className = base + (isNeed ? 'border-amber-600 text-amber-600' : off) + (canNeed ? '' : ' hidden');
+  if (isNeed && _bomNeedList === null) _bomLoadNeedPurchase();
+}
+
+function _bomLoadNeedPurchase() {
+  var box = document.getElementById('bom-need-list');
+  box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  google.script.run.withSuccessHandler(function(res) {
+    _bomNeedList = (res && res.success) ? (res.list || []) : [];
+    _bomRenderNeedPurchase();
+  }).withFailureHandler(function() {
+    _bomNeedList = [];
+    box.innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat daftar belanja.</div>';
+  }).getBOMNeedPurchase();
+}
+
+function _bomRenderNeedPurchase() {
+  var box = document.getElementById('bom-need-list');
+  var q = (document.getElementById('bom-need-search').value || '').toLowerCase().trim();
+  var list = (_bomNeedList || []).filter(function(it) {
+    return !q || ((it.namaMaterial + ' ' + it.merek + ' ' + it.noWO + ' ' + it.namaProject + ' ' + it.supplier).toLowerCase().indexOf(q) !== -1);
+  });
+  if (!list.length) {
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cart-shopping mr-2"></i>' + (q ? 'Tidak ada material cocok.' : 'Tidak ada material yang perlu dibelanjakan.') + '</div>';
+    return;
+  }
+  // Kelompokkan per supplier
+  var groups = {}, order = [];
+  list.forEach(function(it) { var k = it.supplier || '(tanpa supplier)'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
+  order.sort();
+  box.innerHTML = order.map(function(sup) {
+    var rows = groups[sup].map(function(it) {
+      return '<tr class="border-t border-slate-100">'
+        + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
+        + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
+        + '<td class="px-3 py-2 text-slate-600">' + _bomEsc(it.merek || '-') + '</td>'
+        + '<td class="px-3 py-2 text-center font-bold text-amber-700 whitespace-nowrap">' + _bomRp(it.qtyBeli) + ' ' + _bomEsc(it.satuan || '') + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
+      + '<div class="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-150">'
+      +   '<span class="bg-amber-100 text-amber-600 h-7 w-7 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-truck-field text-xs"></i></span>'
+      +   '<span class="font-extrabold text-slate-700">' + _bomEsc(sup) + '</span>'
+      +   '<span class="text-[11px] font-bold text-slate-400">' + groups[sup].length + ' item</span>'
+      + '</div>'
+      + '<div class="overflow-x-auto"><table class="w-full text-sm">'
+      +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th></tr></thead>'
+      +   '<tbody>' + rows + '</tbody>'
+      + '</table></div></div>';
+  }).join('');
+}
+
+function _bomExportNeedPurchasePDF() {
+  if (!window.jspdf || !window.jspdf.jsPDF) return showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error');
+  var list = _bomNeedList || [];
+  if (!list.length) return showNotification('Tidak ada material untuk diekspor.', 'error');
+  try {
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var PW = 210, ML = 12, MR = 12;
+    var DARK = [30, 41, 59], SLATE = [100, 116, 139], AMBER = [180, 83, 9];
+    doc.setFillColor(DARK[0], DARK[1], DARK[2]); doc.rect(0, 0, PW, 22, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+    doc.text('DAFTAR BELANJA MATERIAL', ML, 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(190, 200, 220);
+    doc.text('DOKUMEN INTERNAL — MATERIAL PERLU DIBELANJAKAN (PROCUREMENT)', ML, 17);
+    var y = 30;
+    var groups = {}, order = [];
+    list.forEach(function(it) { var k = it.supplier || '(tanpa supplier)'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
+    order.sort();
+    order.forEach(function(sup) {
+      var bodyRows = groups[sup].map(function(it, i) {
+        return [String(i + 1), it.noWO || '', it.namaMaterial || '', it.merek || '-', it.satuan || '-', _bomRp(it.qtyBeli)];
+      });
+      doc.autoTable({
+        startY: y,
+        head: [[{ content: 'SUPPLIER: ' + sup.toUpperCase() + '  (' + groups[sup].length + ' item)', colSpan: 6, styles: { halign: 'left', fillColor: [254, 243, 199], textColor: AMBER, fontStyle: 'bold' } }],
+               ['No', 'No WO', 'Nama Material', 'Merek', 'Satuan', 'Qty Beli']],
+        body: bodyRows, theme: 'grid',
+        margin: { left: ML, right: MR },
+        headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        bodyStyles: { fontSize: 8, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 26 }, 2: { cellWidth: 'auto' }, 3: { cellWidth: 30 }, 4: { cellWidth: 18, halign: 'center' }, 5: { cellWidth: 20, halign: 'center', fontStyle: 'bold' } },
+        styles: { overflow: 'linebreak' }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    });
+    doc.setFontSize(7); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+    doc.text('Dokumen internal PT. Renus Global Indonesia — daftar material perlu dibelanjakan.', ML, 290);
+    var fname = 'Daftar_Belanja_BOM.pdf';
+    doc.save(fname);
+    showNotification('PDF daftar belanja diunduh: ' + fname);
+  } catch (err) {
+    showNotification('Gagal membuat PDF: ' + (err && err.message ? err.message : err), 'error');
+  }
 }
 
 // ── DETAIL ──────────────────────────────────────────────────────
