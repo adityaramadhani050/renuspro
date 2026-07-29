@@ -96,6 +96,17 @@ function _bomCountHtml(nMat, nKat) {
     + '</div>';
 }
 
+// Progres procurement per WO (untuk procurement/lead/admin): berapa material
+// Approved yang sudah diproses dari total Approved.
+function _bomWOProcProgress(w) {
+  if (!(_bomCanProcure() || _bomCanManage())) return '';
+  var total = w.approved || 0;
+  if (total <= 0) return '';
+  var done = w.procDone || 0;
+  var cls = (done >= total) ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap" title="Material Approved yang diproses procurement"><i class="fa-solid fa-clipboard-check text-[9px] mr-0.5"></i>Proc ' + done + '/' + total + '</span>';
+}
+
 function _bomRenderWOList() {
   var q = (document.getElementById('bom-search').value || '').toLowerCase().trim();
   // Hitung jumlah per tab & set badge.
@@ -125,7 +136,7 @@ function _bomRenderWOList() {
       : '';
     return '<div onclick="bukaBOMDetail(\'' + _bomEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-indigo-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
-      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + '</div>'
+      +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + _bomWOProcProgress(w) + '</div>'
       +   '<div class="font-bold text-slate-800 truncate">' + _bomEsc(w.namaProject || '-') + '</div>'
       +   '<div class="text-[11px] text-slate-400 truncate">' + _bomEsc(w.namaKlien || '') + '</div>'
       + '</div>'
@@ -172,20 +183,37 @@ function _bomShowHomeTab(tab) {
   if (bpr) bpr.className = (tab === 'proses') ? on : off;
   if (bap) bap.className = (tab === 'approved') ? on : off;
   if (bn) bn.className = (isNeed ? on : off) + (_bomCanProcure() ? '' : ' hidden');
-  if (isNeed) { if (_bomNeedList === null) _bomLoadNeedPurchase(); }
+  if (isNeed) _bomLoadNeedPurchase();   // selalu muat ulang agar status stok terkini
   else _bomRenderWOList();
 }
 
 function _bomLoadNeedPurchase() {
   var box = document.getElementById('bom-need-list');
   box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  _bomStokList = null;   // paksa stok terbaru agar status "Siap reserve" akurat
   google.script.run.withSuccessHandler(function(res) {
     _bomNeedList = (res && res.success) ? (res.list || []) : [];
-    _bomRenderNeedPurchase();
+    // Muat stok agar bisa tampil status "Siap reserve / Menunggu stok".
+    _bomLoadStok(function() { _bomRenderNeedPurchase(); });
   }).withFailureHandler(function() {
     _bomNeedList = [];
     box.innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat daftar belanja.</div>';
   }).getBOMNeedPurchase();
+}
+
+// Stok tersedia untuk item stok tertaut; null bila material belum tertaut stok.
+function _bomStokTersedia(idStok) {
+  if (!idStok) return null;
+  var s = (_bomStokList || []).filter(function(x) { return x.idStok === idStok; })[0];
+  return s ? (Number(s.qtyTersedia) || 0) : 0;
+}
+// Badge kesiapan stok untuk item Perlu Dibelanjakan.
+function _bomStokStatusBadge(it) {
+  var tersedia = _bomStokTersedia(it.idStok);
+  var butuh = Number(it.qtyBeli) || 0;
+  if (tersedia === null) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap"><i class="fa-regular fa-hand-pointer text-[9px] mr-0.5"></i>Pilih stok manual</span>';
+  if (tersedia >= butuh) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Siap reserve (tersedia ' + _bomRp(tersedia) + ')</span>';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Menunggu stok (' + _bomRp(tersedia) + '/' + _bomRp(butuh) + ')</span>';
 }
 
 function _bomRenderNeedPurchase() {
@@ -214,6 +242,7 @@ function _bomRenderNeedPurchase() {
         + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + linkedBadge + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
         + '<td class="px-3 py-2 text-slate-600">' + _bomEsc(it.merek || '-') + '</td>'
         + '<td class="px-3 py-2 text-center font-bold text-amber-700 whitespace-nowrap">' + _bomRp(it.qtyBeli) + ' ' + _bomEsc(it.satuan || '') + '</td>'
+        + '<td class="px-3 py-2 text-center">' + _bomStokStatusBadge(it) + '</td>'
         + '<td class="px-3 py-2 text-center" id="bom-beliact-' + _bomEsc(it.id) + '">' + aksi + '</td>'
         + '</tr>';
     }).join('');
@@ -224,7 +253,7 @@ function _bomRenderNeedPurchase() {
       +   '<span class="text-[11px] font-bold text-slate-400">' + groups[sup].length + ' item</span>'
       + '</div>'
       + '<div class="overflow-x-auto"><table class="w-full text-sm">'
-      +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th><th class="px-3 py-2 text-center font-bold">Aksi</th></tr></thead>'
+      +   '<thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="px-3 py-2 text-left font-bold">No WO</th><th class="px-3 py-2 text-left font-bold">Material</th><th class="px-3 py-2 text-left font-bold">Merek</th><th class="px-3 py-2 text-center font-bold">Qty Beli</th><th class="px-3 py-2 text-center font-bold">Status Stok</th><th class="px-3 py-2 text-center font-bold">Aksi</th></tr></thead>'
       +   '<tbody>' + rows + '</tbody>'
       + '</table></div></div>';
   }).join('');
@@ -414,6 +443,8 @@ function _bomProcBadge(it) {
   if (it.procStatus === 'Reserved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span>';
   if (it.procStatus === 'Need Purchase') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span>';
   if (it.procStatus === 'Sebagian') return '<div class="flex flex-col gap-0.5 items-center"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(it.qtyReserved) + ')</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Beli (' + _bomRp(it.qtyBeli) + ')</span></div>';
+  // Material Approved yang belum disentuh procurement → worklist.
+  if (it.status === 'Approved') return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Perlu diproses</span>';
   return '<span class="text-[10px] text-slate-300">—</span>';
 }
 
