@@ -99,7 +99,9 @@ function _bomCountHtml(nMat, nKat) {
 // Progres procurement per WO (untuk procurement/lead/admin): berapa material
 // Approved yang sudah diproses dari total Approved.
 function _bomWOProcProgress(w) {
-  if (!(_bomCanProcure() || _bomCanManage())) return '';
+  // Hanya untuk Procurement & Project Coordinator (juga admin) — bukan Lead Engineer.
+  var r = _bomRole();
+  if (!(r === 'procurement' || r === 'projectcoordinator' || r === 'admin')) return '';
   var total = w.approved || 0;
   if (total <= 0) return '';
   var done = w.procDone || 0;
