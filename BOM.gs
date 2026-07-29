@@ -139,6 +139,20 @@ function _bomNextId(sheet) {
 
 function _bomNow() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'); }
 
+// Normalkan nilai tanggal/waktu dari sheet agar tampil rapi.
+// Data lama bisa berupa objek Date (toString-nya "Wed Jul 29 2026 ... GMT+0700");
+// data baru sudah string "dd/MM/yyyy HH:mm". Keduanya diseragamkan ke dd/MM/yyyy HH:mm.
+function _bomFmtWhen(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  var s = (v || '').toString();
+  // Data lama tersimpan sebagai string hasil Date.toString() (mengandung "GMT") → parse ulang.
+  if (s && s.indexOf('GMT') !== -1) {
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  }
+  return s;
+}
+
 // ── Registry (WO yang masuk BOM + status Draft/Final) ───────────────────────
 function _bomRegisteredWOs() {
   var out = [];
@@ -313,7 +327,7 @@ function getBOMDashboard(opts) {
     // Hitung jumlah item, kategori, & approved per WO dari BOM_Item.
     var itemSheet = _ensureBOMItemSheet(ss);
     var data = itemSheet.getDataRange().getValues();
-    var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {};
+    var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {}, procPend = {}, procDone = {};
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][1] || '').toString().trim();
       if (!w || !visible[w]) continue;
@@ -322,7 +336,12 @@ function getBOMDashboard(opts) {
       if (!katSet[w]) katSet[w] = {};
       katSet[w][kat] = true;
       var st = (data[i][12] || '').toString().trim() || 'Pending';
-      if (st === 'Approved') appr[w] = (appr[w] || 0) + 1;
+      if (st === 'Approved') {
+        appr[w] = (appr[w] || 0) + 1;
+        // Ringkasan procurement: material Approved yang belum/telah diproses.
+        if ((data[i][16] || '').toString().trim()) procDone[w] = (procDone[w] || 0) + 1;
+        else procPend[w] = (procPend[w] || 0) + 1;
+      }
       else if (st === 'Rejected') rej[w] = (rej[w] || 0) + 1;
       else pend[w] = (pend[w] || 0) + 1;
     }
@@ -335,6 +354,7 @@ function getBOMDashboard(opts) {
         jumlahItem: total,
         jumlahKategori: katSet[r.noWO] ? Object.keys(katSet[r.noWO]).length : 0,
         approved: a, pending: pend[r.noWO] || 0, rejected: rej[r.noWO] || 0,
+        procPending: procPend[r.noWO] || 0, procDone: procDone[r.noWO] || 0,
         assigned: assignedMap[r.noWO] || []
       };
     });
@@ -399,7 +419,7 @@ function getBOMByWO(noWO) {
     try {
       var pd = _ensureBOMProjectSheet(ss).getDataRange().getValues();
       for (var p = 1; p < pd.length; p++) {
-        if ((pd[p][0] || '').toString().trim() === noWO) { finalizedBy = (pd[p][6] || '').toString(); finalizedAt = (pd[p][7] || '').toString(); break; }
+        if ((pd[p][0] || '').toString().trim() === noWO) { finalizedBy = (pd[p][6] || '').toString(); finalizedAt = _bomFmtWhen(pd[p][7]); break; }
       }
     } catch (e) {}
     return {
@@ -831,12 +851,20 @@ function getBOMNeedPurchase() {
     var data = sheet.getDataRange().getValues();
     var projMap = {};
     _bomRegisteredWOs().forEach(function (r) { projMap[r.noWO] = { namaProject: r.namaProject, namaKlien: r.namaKlien }; });
+    // Peta pricelistId → { idSupplier, hargaBeli } untuk prefill "Buat PO".
+    var priceMap = {};
+    try {
+      var pr = getPricelistAll();
+      if (pr && pr.success) pr.list.forEach(function (p) { priceMap[(p.id || '').toString()] = { idSupplier: (p.idSupplier || '').toString(), hargaBeli: Number(p.hargaBeli) || 0 }; });
+    } catch (ePr) {}
     var list = [];
     for (var i = 1; i < data.length; i++) {
       var qtyBeli = Number(data[i][20]) || 0;
       if (qtyBeli <= 0) continue;
       var noWO = (data[i][1] || '').toString().trim();
       var pj = projMap[noWO] || {};
+      var plId = (data[i][3] || '').toString();
+      var pmatch = priceMap[plId] || {};
       list.push({
         id:           (data[i][0] || '').toString(),
         noWO:         noWO,
@@ -848,7 +876,9 @@ function getBOMNeedPurchase() {
         supplier:     (data[i][6] || '').toString() || '(tanpa supplier)',
         satuan:       (data[i][7] || '').toString(),
         qtyBeli:      qtyBeli,
-        pricelistId:  (data[i][3] || '').toString()
+        pricelistId:  plId,
+        idSupplier:   pmatch.idSupplier || '',
+        hargaBeli:    pmatch.hargaBeli || 0
       });
     }
     return { success: true, list: list };

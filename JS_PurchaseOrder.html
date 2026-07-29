@@ -205,6 +205,54 @@ function bukaFormPO() {
   document.getElementById('po-list-section').classList.add('hidden');
 }
 
+// Buka form PO baru dengan data ter-prefill (dipakai "Buat PO" dari daftar belanja BOM).
+// prefill = { idSupplier, peruntukan, noWO, items:[{ produkId, namaItem, qty, satuan, hargaBeli, catatan }] }
+function bukaFormPOPrefill(prefill) {
+  prefill = prefill || {};
+  _poFormMode = 'new';
+  _poItems    = [];
+  _poSupplierProduk = [];
+  document.getElementById('form-po-title').innerText = 'Buat Purchase Order Baru';
+  document.getElementById('po-no-field').value       = 'Auto-generate...';
+  if (document.getElementById('po-edit-nopo')) document.getElementById('po-edit-nopo').value = '';
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('po-tanggal').value    = today;
+  document.getElementById('po-peruntukan').value = prefill.peruntukan || '';
+  document.getElementById('po-ppn-persen').value = '11';
+  if (document.getElementById('po-diskon-persen'))  document.getElementById('po-diskon-persen').value  = '0';
+  if (document.getElementById('po-diskon-nominal')) document.getElementById('po-diskon-nominal').value = '';
+  document.getElementById('po-catatan').value    = '';
+  if (document.getElementById('po-quot-no'))      document.getElementById('po-quot-no').value      = '';
+  if (document.getElementById('po-quot-tanggal')) document.getElementById('po-quot-tanggal').value = '';
+  _resetPOQuotFileField();
+  renderItemsPO();
+  hitungTotalPO();
+
+  document.getElementById('form-po-section').classList.remove('hidden');
+  document.getElementById('panel-po-detail').classList.add('hidden');
+  document.getElementById('po-list-section').classList.add('hidden');
+
+  var _poLoadingEl = document.getElementById('po-form-loading');
+  if (_poLoadingEl) _poLoadingEl.classList.remove('hidden');
+  var pending = 3;
+  function done() { if (--pending <= 0 && _poLoadingEl) _poLoadingEl.classList.add('hidden'); }
+
+  // Supplier ter-preselect → muat katalog supplier → isi item dari prefill.
+  _loadSupplierOptions('sel-supplier-po', prefill.idSupplier || '', function() {
+    _loadPOSupplierKatalog(prefill.idSupplier || '', function() {
+      _poItems = (prefill.items || []).map(function(it) {
+        return { namaItem: it.namaItem || '', qty: it.qty || 1, satuan: it.satuan || '', hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '', produkId: it.produkId || '' };
+      });
+      if (!_poItems.length) _poItems = [{ namaItem: '', qty: 1, satuan: '', hargaBeli: 0, catatan: '', produkId: '' }];
+      renderItemsPO();
+      hitungTotalPO();
+      done();
+    });
+  });
+  _loadWOOptions('sel-wo-po', prefill.noWO || '', done);
+  _loadPOTCDropdowns({}, done);
+}
+
 // ── Dropzone file-upload field (dipakai oleh File Penawaran Supplier & Invoice Supplier) ──
 function _renderFileFieldState(prefix, state, data, accent) {
   accent = accent || 'orange';
