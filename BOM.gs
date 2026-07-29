@@ -43,14 +43,19 @@ function _ensureBOMItemSheet(ss) {
   var sheet = ss.getSheetByName('BOM_Item');
   if (!sheet) {
     sheet = ss.insertSheet('BOM_Item');
-    sheet.appendRow(['ID', 'No WO', 'Kategori', 'Pricelist ID', 'Nama Material', 'Merek', 'Supplier', 'Satuan', 'Qty', 'Catatan', 'Dibuat Oleh', 'Dibuat Pada', 'Status', 'Catatan Review', 'Direview Oleh', 'Direview Pada']);
-    sheet.getRange(1, 1, 1, 16).setFontWeight('bold');
+    sheet.appendRow(['ID', 'No WO', 'Kategori', 'Pricelist ID', 'Nama Material', 'Merek', 'Supplier', 'Satuan', 'Qty', 'Catatan', 'Dibuat Oleh', 'Dibuat Pada', 'Status', 'Catatan Review', 'Direview Oleh', 'Direview Pada',
+      'Proc Status', 'Stok ID', 'Qty Reserved', 'Mutasi Reserved', 'Qty Beli', 'Diproses Oleh', 'Diproses Pada']);
+    sheet.getRange(1, 1, 1, 23).setFontWeight('bold');
     return sheet;
   }
   // Migrasi kolom review (approve/reject) untuk sheet lama.
   try {
     if (sheet.getLastColumn() < 16) {
       sheet.getRange(1, 13, 1, 4).setValues([['Status', 'Catatan Review', 'Direview Oleh', 'Direview Pada']]).setFontWeight('bold');
+    }
+    // Migrasi kolom procurement (Reserved/Need Purchase) untuk sheet lama.
+    if (sheet.getLastColumn() < 23) {
+      sheet.getRange(1, 17, 1, 7).setValues([['Proc Status', 'Stok ID', 'Qty Reserved', 'Mutasi Reserved', 'Qty Beli', 'Diproses Oleh', 'Diproses Pada']]).setFontWeight('bold');
     }
   } catch (e) {}
   return sheet;
@@ -377,7 +382,14 @@ function getBOMByWO(noWO) {
         status:       st,
         catatanReview:(data[i][13] || '').toString(),
         reviewedBy:   (data[i][14] || '').toString(),
-        reviewedAt:   (data[i][15] || '').toString()
+        reviewedAt:   (data[i][15] || '').toString(),
+        procStatus:   (data[i][16] || '').toString(),
+        idStok:       (data[i][17] || '').toString(),
+        qtyReserved:  Number(data[i][18]) || 0,
+        mutasiReserved:(data[i][19] || '').toString(),
+        qtyBeli:      Number(data[i][20]) || 0,
+        diprosesOleh: (data[i][21] || '').toString(),
+        diprosesPada: (data[i][22] || '').toString()
       });
     }
     var woStatus = '';
@@ -687,6 +699,9 @@ function cancelBOMApproval(id, oleh) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === id) {
         if ((data[i][12] || '').toString().trim() !== 'Approved') return { success: false, message: 'Material belum di-Approve.' };
+        if ((Number(data[i][18]) || 0) > 0 || (data[i][16] || '').toString().trim()) {
+          return { success: false, message: 'Material sudah diproses procurement — batalkan proses procurement dulu.' };
+        }
         sheet.getRange(i + 1, 13, 1, 4).setValues([['Pending', '', '', '']]);
         _bomComposeAndWrite(data, (data[i][1] || '').toString().trim(), oleh, i, 'Pending');   // pakai data di memori
         return { success: true, message: 'Approve dibatalkan (Pending).' };
@@ -697,5 +712,147 @@ function cancelBOMApproval(id, oleh) {
     return { success: false, message: e.toString() };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PROCUREMENT — tandai material Reserved (dari stok) / Need Purchase (dibeli).
+//  Kolom BOM_Item (1-based): 17 Proc Status | 18 Stok ID | 19 Qty Reserved |
+//  20 Mutasi Reserved | 21 Qty Beli | 22 Diproses Oleh | 23 Diproses Pada.
+//  Reserve memakai ulang gunakanStok/batalkanPenggunaanStok (Inventory.gs).
+// ════════════════════════════════════════════════════════════════════════════
+function _bomWriteProcRow(sheet, rowIdx, procStatus, idStok, qtyReserved, mutasi, qtyBeli, oleh, when) {
+  sheet.getRange(rowIdx + 1, 17, 1, 7).setValues([[procStatus, idStok, qtyReserved, mutasi, qtyBeli, oleh, when]]);
+}
+
+// payload: { idStok, qtyReserved, oleh }. qtyReserved = qty diambil dari stok
+// (0..qty material); sisa (qty - reserved) otomatis jadi "perlu dibeli".
+// Tidak memegang LockService sendiri agar tak bentrok dgn lock internal
+// gunakanStok/batalkanPenggunaanStok.
+function prosesBOMProcurement(id, payload) {
+  try {
+    id = (id || '').toString().trim();
+    payload = payload || {};
+    if (!id) return { success: false, message: 'ID material wajib.' };
+    var oleh = (payload.oleh || '').toString();
+    var idStok = (payload.idStok || '').toString().trim();
+
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    var rowIdx = -1, row = null;
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === id) { rowIdx = i; row = data[i]; break; }
+    }
+    if (rowIdx < 0) return { success: false, message: 'Material tidak ditemukan.' };
+
+    var noWO = (row[1] || '').toString().trim();
+    if ((row[12] || '').toString().trim() !== 'Approved') {
+      return { success: false, message: 'Hanya material yang sudah di-Approve Lead yang bisa diproses procurement.' };
+    }
+    var guard = _bomEditGuard(noWO);   // WO ada & belum Closed
+    if (!guard.ok) return { success: false, message: guard.message };
+
+    var Q = Number(row[8]) || 0;
+    var qtyReserved = Number(payload.qtyReserved) || 0;
+    if (qtyReserved < 0) qtyReserved = 0;
+    if (qtyReserved > Q) qtyReserved = Q;
+
+    // Bila material sudah pernah reserve, kembalikan stok lama dulu (proses ulang bersih).
+    var oldMutasi = (row[19] || '').toString().trim();
+    if (oldMutasi) {
+      var bat = batalkanPenggunaanStok(oldMutasi, oleh);
+      if (bat && bat.success) { _hapusPengeluaranByReferensi(oldMutasi); }
+      // Bila reversal lama gagal (mis. sudah dibatalkan di tempat lain) — lanjut saja;
+      // status baru akan menimpa referensi lama.
+    }
+
+    var newMutasi = '';
+    if (qtyReserved > 0) {
+      if (!idStok) return { success: false, message: 'Pilih item stok untuk qty yang di-reserve.' };
+      var res = gunakanStok(noWO, idStok, qtyReserved, '', 'Reserve BOM ' + id + ' — ' + (row[4] || ''), oleh);
+      if (!res || res.success === false) {
+        // Reserve gagal (mis. stok kurang). Reset field procurement material ini.
+        _bomWriteProcRow(sheet, rowIdx, '', '', 0, '', 0, '', '');
+        return { success: false, message: (res && res.message) || 'Gagal reserve stok.' };
+      }
+      newMutasi = (res.idMutasi || '').toString();
+    }
+
+    var qtyBeli = Math.max(0, Q - qtyReserved);
+    var procStatus = (qtyReserved > 0 && qtyBeli > 0) ? 'Sebagian' : (qtyReserved > 0 ? 'Reserved' : 'Need Purchase');
+    _bomWriteProcRow(sheet, rowIdx, procStatus, (qtyReserved > 0 ? idStok : ''), qtyReserved, newMutasi, qtyBeli, oleh, _bomNow());
+    return {
+      success: true,
+      message: 'Diproses: ' + procStatus + (qtyReserved ? (' · reserve ' + qtyReserved) : '') + (qtyBeli ? (' · perlu beli ' + qtyBeli) : '') + '.',
+      procStatus: procStatus, qtyReserved: qtyReserved, qtyBeli: qtyBeli, idStok: (qtyReserved > 0 ? idStok : '')
+    };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// Batalkan proses procurement: kembalikan stok (bila ada reserve) + hapus
+// pengeluaran otomatis, lalu kosongkan field procurement material.
+function batalkanBOMProcurement(id, oleh) {
+  try {
+    id = (id || '').toString().trim();
+    if (!id) return { success: false, message: 'ID material wajib.' };
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === id) {
+        if (!(data[i][16] || '').toString().trim() && !(Number(data[i][18]) || 0)) {
+          return { success: false, message: 'Material belum diproses procurement.' };
+        }
+        var mutasi = (data[i][19] || '').toString().trim();
+        if (mutasi) {
+          var bat = batalkanPenggunaanStok(mutasi, (oleh || '').toString());
+          if (bat && bat.success) { _hapusPengeluaranByReferensi(mutasi); }
+          else return { success: false, message: 'Gagal mengembalikan stok: ' + ((bat && bat.message) || '') + '. Batal dibatalkan.' };
+        }
+        _bomWriteProcRow(sheet, i, '', '', 0, '', 0, '', '');
+        return { success: true, message: 'Proses procurement dibatalkan' + (mutasi ? ' & stok dikembalikan' : '') + '.' };
+      }
+    }
+    return { success: false, message: 'Material tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// Daftar material "perlu dibelanjakan" lintas WO (qty beli > 0). Frontend
+// mengelompokkan per supplier.
+function getBOMNeedPurchase() {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = _ensureBOMItemSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    var projMap = {};
+    _bomRegisteredWOs().forEach(function (r) { projMap[r.noWO] = { namaProject: r.namaProject, namaKlien: r.namaKlien }; });
+    var list = [];
+    for (var i = 1; i < data.length; i++) {
+      var qtyBeli = Number(data[i][20]) || 0;
+      if (qtyBeli <= 0) continue;
+      var noWO = (data[i][1] || '').toString().trim();
+      var pj = projMap[noWO] || {};
+      list.push({
+        id:           (data[i][0] || '').toString(),
+        noWO:         noWO,
+        namaProject:  pj.namaProject || '',
+        namaKlien:    pj.namaKlien || '',
+        kategori:     (data[i][2] || 'Lainnya').toString(),
+        namaMaterial: (data[i][4] || '').toString(),
+        merek:        (data[i][5] || '').toString(),
+        supplier:     (data[i][6] || '').toString() || '(tanpa supplier)',
+        satuan:       (data[i][7] || '').toString(),
+        qtyBeli:      qtyBeli,
+        pricelistId:  (data[i][3] || '').toString()
+      });
+    }
+    return { success: true, list: list };
+  } catch (e) {
+    return { success: false, list: [], message: e.toString() };
   }
 }
