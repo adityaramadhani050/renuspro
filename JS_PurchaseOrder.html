@@ -1082,9 +1082,9 @@ function bukaFormTerimaPO() {
         return;
       }
       _terimaPOItems = res.items || [];
-      _renderFormTerimaLangsung(tbodyL, _terimaPOItems);
       _renderFormTerimaGudang(tbodyG, _terimaPOItems);
-      _loadTerimaBOMLinks();
+      // Muat kandidat material BOM (Tunggu Beli) lalu render tabel langsung (dgn dropdown).
+      _loadTerimaBOMThenRender(tbodyL);
       formDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     })
     .withFailureHandler(function(err) {
@@ -1095,11 +1095,22 @@ function bukaFormTerimaPO() {
 
 function _renderFormTerimaLangsung(tbody, items) {
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">Tidak ada item yang bisa diterima.</td></tr>';
     return;
   }
   tbody.innerHTML = items.map(function(it) {
     var sisaClass = it.qtySisa <= 0 ? 'text-slate-300' : 'text-slate-700';
+    // Kandidat material BOM "Tunggu Beli" yang produknya cocok dgn item PO ini.
+    var cands = (_terimaBOMLinks || []).filter(function(m) { return (m.pricelistId || '') === (it.idProduk || '') && (it.idProduk || ''); });
+    var bomCell;
+    if (it.qtySisa <= 0) bomCell = '<span class="text-xs text-slate-300">—</span>';
+    else if (!cands.length) bomCell = '<span class="text-[11px] text-slate-300 italic">tidak untuk BOM</span>';
+    else {
+      var opts = '<option value="">— tidak untuk BOM —</option>' + cands.map(function(m) {
+        return '<option value="' + _escHtml(m.id) + '" data-menunggu="' + m.qtyMenunggu + '">' + _escHtml(m.noWO) + ' · ' + _escHtml(m.namaMaterial) + ' (mnggu ' + m.qtyMenunggu + ')</option>';
+      }).join('');
+      bomCell = '<select class="terima-bom-select w-full px-2 py-1 text-xs border border-violet-200 rounded-lg focus:outline-none focus:border-violet-400 bg-white">' + opts + '</select>';
+    }
     return '<tr class="border-b border-teal-50" data-id-item="' + _escHtml(it.idItem) + '">' +
       '<td class="px-3 py-2 text-sm font-medium text-slate-800">' + _escHtml(it.namaItem) + '</td>' +
       '<td class="px-3 py-2 text-center text-sm">' + it.qtyPesan + '</td>' +
@@ -1110,6 +1121,7 @@ function _renderFormTerimaLangsung(tbody, items) {
           ? '<input type="number" class="terima-langsung-qty w-24 px-2 py-1 text-sm border border-teal-300 rounded-lg text-center focus:outline-none focus:border-teal-500" min="0" max="' + it.qtySisa + '" value="0" data-sisa="' + it.qtySisa + '">'
           : '<span class="text-xs text-slate-300">Penuh</span>') +
       '</td>' +
+      '<td class="px-3 py-2">' + bomCell + '</td>' +
       '<td class="px-3 py-2">' +
         '<input type="text" class="terima-langsung-catatan w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-rose-400" placeholder="cth: 1 unit rusak, retur ke supplier">' +
       '</td>' +
@@ -1133,40 +1145,23 @@ function _renderFormTerimaGudang(tbody, items) {
   }).join('');
 }
 
-// Muat material BOM "Tunggu Beli" untuk supplier PO ini (link opsional).
-function _loadTerimaBOMLinks() {
-  var wrap = document.getElementById('form-terima-bom-wrap');
+// Muat material BOM "Tunggu Beli" untuk supplier PO ini, lalu render tabel langsung
+// (dropdown pemenuhan BOM per item disaring by produk yang cocok).
+function _loadTerimaBOMThenRender(tbodyL) {
   _terimaBOMLinks = [];
-  if (wrap) wrap.classList.add('hidden');
   var idSup = (_currentPODetail && _currentPODetail.idSupplier) || '';
   google.script.run.withSuccessHandler(function(res) {
-    var list = (res && res.success) ? (res.list || []) : [];
-    _terimaBOMLinks = list;
-    if (!wrap) return;
-    if (!list.length) { wrap.classList.add('hidden'); return; }
-    wrap.classList.remove('hidden');
-    _renderFormBOMLinks(list);
-  }).withFailureHandler(function() { if (wrap) wrap.classList.add('hidden'); })
-    .getBOMMenungguBL({ idSupplier: idSup });
+    _terimaBOMLinks = (res && res.success) ? (res.list || []) : [];
+    _renderFormTerimaLangsung(tbodyL, _terimaPOItems);
+  }).withFailureHandler(function() {
+    _terimaBOMLinks = [];
+    _renderFormTerimaLangsung(tbodyL, _terimaPOItems);
+  }).getBOMMenungguBL({ idSupplier: idSup });
 }
-function _renderFormBOMLinks(list) {
-  var tb = document.getElementById('form-terima-bom-links');
-  if (!tb) return;
-  tb.innerHTML = list.map(function(m) {
-    return '<tr class="border-b border-violet-50" data-bom-id="' + _escHtml(m.id) + '" data-menunggu="' + m.qtyMenunggu + '" data-plid="' + _escHtml(m.pricelistId) + '">' +
-      '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _escHtml(m.noWO) + '</td>' +
-      '<td class="px-3 py-2"><div class="font-semibold text-slate-700 text-sm">' + _escHtml(m.namaMaterial) + '</div><div class="text-[11px] text-slate-400">' + _escHtml(m.namaProject || '') + (m.merek ? ' · ' + _escHtml(m.merek) : '') + '</div></td>' +
-      '<td class="px-3 py-2 text-center font-bold text-violet-700 whitespace-nowrap">' + m.qtyMenunggu + ' ' + _escHtml(m.satuan || '') + '</td>' +
-      '<td class="px-3 py-2 text-center"><input type="number" class="terima-bom-qty w-24 px-2 py-1 text-sm border border-violet-300 rounded-lg text-center focus:outline-none focus:border-violet-500" min="0" max="' + m.qtyMenunggu + '" value="0"></td>' +
-    '</tr>';
-  }).join('');
-}
-// Harga satuan (net) untuk material BOM: cocokkan pricelistId ke item PO; fallback pricelist.
-function _terimaBOMHarga(plid) {
-  var m = (_terimaPOItems || []).filter(function(it) { return (it.idProduk || '') === plid; })[0];
-  if (m) return Number(m.hargaBeli) || 0;
-  var b = (_terimaBOMLinks || []).filter(function(x) { return (x.pricelistId || '') === plid; })[0];
-  return b ? (Number(b.hargaBeli) || 0) : 0;
+// Harga satuan (net) item PO by idItem.
+function _terimaPOHarga(idItem) {
+  var m = (_terimaPOItems || []).filter(function(it) { return (it.idItem || '') === idItem; })[0];
+  return m ? (Number(m.hargaBeli) || 0) : 0;
 }
 
 function submitTerimaPOKirimLangsung() {
@@ -1174,23 +1169,34 @@ function submitTerimaPOKirimLangsung() {
   var noPO = _currentPODetail.noPO;
   var rows = document.querySelectorAll('#form-terima-items-langsung tr[data-id-item]');
   var items = [];
+  var bomLinks = [];
   var hasError = false;
   rows.forEach(function(row) {
     if (hasError) return;
     var idItem      = row.getAttribute('data-id-item');
     var qtyInput    = row.querySelector('.terima-langsung-qty');
     var catatanInput = row.querySelector('.terima-langsung-catatan');
+    var bomSelect   = row.querySelector('.terima-bom-select');
     if (!qtyInput) return;
     var qty     = parseFloat(qtyInput.value) || 0;
     var catatan = (catatanInput && catatanInput.value.trim()) || '';
-    if (qty <= 0 && !catatan) return;
+    var bomId   = (bomSelect && bomSelect.value) || '';
     var namaItem = (row.querySelector('td:first-child') || {}).innerText || idItem;
+    // Jika baris ini diarahkan ke material BOM, qty terima = qty yang dipenuhi.
+    if (bomId) {
+      if (qty <= 0) { showNotification('Isi Qty Terima untuk item "' + namaItem + '" yang dipilih memenuhi BOM.', 'error'); hasError = true; return; }
+      var opt = bomSelect.options[bomSelect.selectedIndex];
+      var menunggu = parseFloat(opt.getAttribute('data-menunggu')) || 0;
+      if (qty > menunggu) { showNotification('Qty (' + qty + ') melebihi kebutuhan material BOM (menunggu ' + menunggu + ') untuk "' + namaItem + '".', 'error'); hasError = true; return; }
+    }
+    if (qty <= 0 && !catatan) return;
     var sisa = parseFloat(qtyInput.getAttribute('data-sisa')) || 0;
     if (qty > sisa) {
       showNotification('Qty melebihi sisa untuk item "' + namaItem + '".', 'error');
       hasError = true; return;
     }
     items.push({ idItem: idItem, namaItem: namaItem, qty: qty, catatan: catatan });
+    if (bomId && qty > 0) bomLinks.push({ bomItemId: bomId, qty: qty, hargaSatuan: _terimaPOHarga(idItem) });
   });
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
@@ -1199,20 +1205,6 @@ function submitTerimaPOKirimLangsung() {
   if (!buktiFileUrl) return showNotification('Bukti barang diterima klien wajib dilampirkan.', 'error');
   var buktiFileId   = document.getElementById('terima-langsung-bukti-file-id').value;
   var buktiFileName = document.getElementById('terima-langsung-bukti-file-name').value;
-
-  // Kumpulkan link "Penuhi Material BOM" (opsional).
-  var bomLinks = [];
-  document.querySelectorAll('#form-terima-bom-links tr[data-bom-id]').forEach(function(row) {
-    var q = parseFloat((row.querySelector('.terima-bom-qty') || {}).value) || 0;
-    if (q <= 0) return;
-    var menunggu = parseFloat(row.getAttribute('data-menunggu')) || 0;
-    if (q > menunggu) q = menunggu;
-    var plid = row.getAttribute('data-plid');
-    bomLinks.push({ bomItemId: row.getAttribute('data-bom-id'), qty: q, hargaSatuan: _terimaBOMHarga(plid) });
-  });
-  var totalTerima = items.reduce(function(s, it) { return s + (it.qty || 0); }, 0);
-  var totalLink   = bomLinks.reduce(function(s, l) { return s + l.qty; }, 0);
-  if (totalLink > totalTerima) return showNotification('Total "Penuhi Qty" (' + totalLink + ') melebihi total qty diterima (' + totalTerima + ').', 'error');
 
   var namaUser = (_currentUser && _currentUser.nama) || '';
   function _selesai(msgExtra) {
