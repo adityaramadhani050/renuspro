@@ -167,6 +167,11 @@ function _bomShowHomeTab(tab) {
   var isNeed = (tab === 'need');
   document.getElementById('bom-tab-projects').classList.toggle('hidden', isNeed);
   document.getElementById('bom-tab-need').classList.toggle('hidden', !isNeed);
+  // Baris pencarian/tombol yang sesuai (di atas tab) ikut ditampilkan/disembunyikan.
+  var pc = document.getElementById('bom-proj-controls');
+  var nc = document.getElementById('bom-need-controls');
+  if (pc) { pc.classList.toggle('hidden', isNeed); pc.classList.toggle('flex', !isNeed); }
+  if (nc) { nc.classList.toggle('hidden', !isNeed); nc.classList.toggle('flex', isNeed); }
   var on  = 'whitespace-nowrap px-4 py-2 text-sm font-bold border-b-2 border-indigo-500 text-indigo-600 -mb-px transition';
   var off = 'whitespace-nowrap px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 -mb-px transition';
   var bpr = document.getElementById('bom-tabbtn-proses');
