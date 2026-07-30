@@ -446,6 +446,7 @@ function getBOMByWO(noWO) {
       assigned: _bomAssignedMap()[noWO] || [],
       finalizedBy: finalizedBy,
       finalizedAt: finalizedAt,
+      kirimRequest: (function () { try { return _kirimReqStatus(noWO); } catch (e) { return ''; } })(),
       items: items
     };
   } catch (e) {
