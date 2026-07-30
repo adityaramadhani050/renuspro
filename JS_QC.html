@@ -308,7 +308,7 @@ function _qcRenderWOList() {
     var selesaiBtn = (_qcCanAssign() && !(w.selesaiManual || w.pct === 100))
       ? '<button onclick="event.stopPropagation();_qcCardTandaiSelesai(\'' + _qcEsc(w.noWO) + '\')" class="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Tandai QC Approved"><i class="fa-regular fa-circle-check text-sm"></i></button>'
       : '';
-    var remindBtn = (_qcCanAssign() || _qcCanUpload())
+    var remindBtn = ((_qcCanAssign() || _qcCanUpload()) && !(w.selesaiManual || w.pct === 100))
       ? '<button onclick="event.stopPropagation();_qcCardRemind(\'' + _qcEsc(w.noWO) + '\')" class="text-amber-500 hover:text-amber-700 hover:bg-amber-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Kirim reminder WhatsApp"><i class="fa-regular fa-bell text-sm"></i></button>'
       : '';
     return '<div onclick="bukaQCDetail(\'' + _qcEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
@@ -589,9 +589,11 @@ function _qcRenderDetail(summary) {
       +   '</div>'
       + '</div>';
     // Reminder WA: Lead → Site (lengkapi upload/reject); Site → Lead (review Pending).
+    // Sembunyikan bila QC sudah selesai (ditandai Approved manual atau 100%).
+    var _qcDone = (_qcWO && _qcWO.selesaiManual) || pct === 100;
     var remindBtns = '';
-    if (_qcCanReview()) remindBtns += '<button onclick="_qcRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
-    if (_qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
+    if (!_qcDone && _qcCanReview()) remindBtns += '<button onclick="_qcRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
+    if (!_qcDone && _qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
     // Tandai/Batalkan QC selesai manual (Lead/Admin) — independen dari progress %.
     var selesaiBtn = (_qcWO && _qcWO.selesaiManual)
       ? '<button onclick="_qcBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> QC Approved</span></button>'
