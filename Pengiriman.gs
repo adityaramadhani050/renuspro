@@ -52,6 +52,22 @@ function _kirimAlamatByWO(noWO) {
   } catch (e) { return ''; }
 }
 
+// Normalkan nilai tanggal → dd/MM/yyyy (Date object, string "…GMT…", atau ISO).
+function _sjFmtTgl(v) {
+  try {
+    if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    var s = (v || '').toString();
+    if (!s) return '';
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[3] + '/' + iso[2] + '/' + iso[1];
+    if (s.indexOf('GMT') !== -1) {
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    }
+    return s;
+  } catch (e) { return (v || '').toString(); }
+}
+
 function _generateNoSuratJalan(sheet) {
   SpreadsheetApp.flush();
   var now = new Date();
@@ -211,7 +227,7 @@ function prosesKirim(payload) {
     var pSheet = _ensurePengirimanSheet(ss);
     var itemSheet = _ensureBOMItemSheet(ss);
     var noSJ = _generateNoSuratJalan(pSheet);
-    var tanggal = (payload.tanggal || '').toString() || _fmtTgl(new Date());
+    var tanggal = _sjFmtTgl((payload.tanggal || '').toString() || _fmtTgl(new Date()));
 
     var lines = [];
     for (var k = 0; k < reqItems.length; k++) {
@@ -339,7 +355,7 @@ function getPengirimanList(params) {
         noWO: noWO,
         namaProject: pj.namaProject || '',
         namaKlien: pj.namaKlien || '',
-        tanggalKirim: (data[i][3] || '').toString(),
+        tanggalKirim: _sjFmtTgl(data[i][3]),
         status: st,
         dikirimOleh: (data[i][5] || '').toString(),
         alamat: (data[i][7] || '').toString(),
