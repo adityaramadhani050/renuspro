@@ -5,7 +5,8 @@ let _schWO = null;
 let _schTasks = [];
 let _schSummary = {};
 let _schWOStatus = '';
-let _schZoom = 'minggu';   // hari | minggu | bulan
+let _schZoom = 'minggu';   // hari | minggu | bulan (detail)
+let _schHomeZoom = 'minggu'; // hari | minggu | bulan (home gabungan)
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _schRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -44,27 +45,101 @@ window.loadSchedule = function() {
   }).getScheduleWOList();
 };
 
-// Mini-gantt ringkasan: bar tiap tugas proporsional terhadap rentang proyek.
-function _schMiniGantt(w) {
-  var s = w.summary || {};
-  var tasks = w.tasks || [];
-  if (!tasks.length || !s.tanggalMulai || !s.tanggalSelesai) return '<div class="text-[11px] text-slate-400 italic px-1 py-2">Belum ada tugas.</div>';
-  var start = s.tanggalMulai, end = s.tanggalSelesai;
-  var total = _schDays(start, end) + 1; if (total < 1) total = 1;
+function _schSetHomeZoom(z){ _schHomeZoom = z; _schRenderWOList(); }
+
+// Bangun header ticks + garis vertikal untuk rentang tertentu (dipakai home & bisa detail).
+function _schBuildTicks(start, totalDays, ppd, zoom) {
+  var ticks = '';
+  if (zoom === 'bulan') {
+    for (var d = 0; d <= totalDays; d++) {
+      var di = _schShiftIso(start, d);
+      var dd = _schD(di);
+      if (dd.getDate() === 1 || d === 0) {
+        var lx = d * ppd;
+        ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-500 whitespace-nowrap" style="left:' + (lx+3) + 'px">' + _schMonLbl(dd) + '</div>';
+      }
+    }
+  } else {
+    var step = zoom === 'hari' ? 1 : 7;
+    for (var t = 0; t <= totalDays; t += step) {
+      var ti = _schShiftIso(start, t);
+      var lxx = t * ppd;
+      var lbl = zoom === 'hari' ? (''+_schD(ti).getDate()) : _schFmt(ti).slice(0,5);
+      ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lxx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-400 whitespace-nowrap" style="left:' + (lxx+2) + 'px">' + lbl + '</div>';
+    }
+  }
+  return ticks;
+}
+
+// Home = SATU gantt gabungan: tiap baris = 1 WO (rentang ringkasan proyek), timeline
+// bersama agar bentrok jadwal antar-WO mudah terlihat. Klik baris → detail per-tugas.
+function _schRenderHomeGantt(list) {
+  // Rentang global dari seluruh WO yang sudah punya jadwal
+  var starts = [], ends = [];
+  list.forEach(function(w){ var s = w.summary || {}; if (s.tanggalMulai) starts.push(s.tanggalMulai); if (s.tanggalSelesai) ends.push(s.tanggalSelesai); });
+  var hasDates = starts.length > 0;
+  var start, end;
+  if (hasDates) {
+    start = starts.reduce(function(a,b){ return a<b?a:b; });
+    end   = ends.reduce(function(a,b){ return a>b?a:b; });
+  } else {
+    var td = _schTodayIso(); start = _schShiftIso(td, -7); end = _schShiftIso(td, 21);
+  }
+  start = _schShiftIso(start, -2); end = _schShiftIso(end, 2);
+  var totalDays = _schDays(start, end) + 1; if (totalDays < 1) totalDays = 1;
+  var ppd = _schHomeZoom === 'hari' ? 34 : (_schHomeZoom === 'bulan' ? 6 : 15);
+  var totalPx = totalDays * ppd;
+  var leftW = 210;
   var todayIso = _schTodayIso();
-  var todayPct = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) / total * 100) : -1;
-  var rows = tasks.slice(0, 8).map(function(t){
-    var b = _schBar(t.warna);
-    var left = _schDays(start, t.mulai) / total * 100;
-    var wid = (_schDays(t.mulai, t.selesai) + 1) / total * 100; if (wid < 1.5) wid = 1.5;
-    return '<div class="relative h-2 my-1 rounded bg-slate-50">'
-      + '<div class="absolute top-0 h-2 rounded ' + b[0] + '" style="left:' + left + '%;width:' + wid + '%">'
-      +   '<div class="h-2 rounded ' + b[1] + '" style="width:' + (Number(t.progress)||0) + '%"></div>'
-      + '</div></div>';
+  var todayPx = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) * ppd) : -1;
+  var todayLine = todayPx >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-20" style="left:' + todayPx + 'px"></div>' : '';
+  var ticks = _schBuildTicks(start, totalDays, ppd, _schHomeZoom);
+
+  var palette = ['indigo','emerald','amber','sky','rose','violet'];
+  var rows = list.map(function(w, idx){
+    var s = w.summary || {};
+    var pct = Number(s.progress)||0;
+    var hasR = s.tanggalMulai && s.tanggalSelesai;
+    var b = _schBar(palette[idx % palette.length]);
+    var removeBtn = _schCanEdit()
+      ? '<button onclick="event.stopPropagation();_schRemoveProject(\'' + _schEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 shrink-0" title="Keluarkan dari Schedule"><i class="fa-regular fa-trash-can text-xs"></i></button>'
+      : '';
+    var bar;
+    if (hasR) {
+      var leftPx = _schDays(start, s.tanggalMulai) * ppd;
+      var wPx = (_schDays(s.tanggalMulai, s.tanggalSelesai) + 1) * ppd; if (wPx < 6) wPx = 6;
+      bar = '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + '">'
+          +   '<div class="h-full ' + b[1] + '" style="width:' + pct + '%"></div>'
+          +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-slate-700 truncate">' + (wPx > 64 ? _schEsc(w.noWO) : '') + '</span>'
+          + '</div>';
+    } else {
+      bar = '<div class="absolute text-[10px] text-slate-300 italic" style="left:4px;top:13px">Belum ada jadwal</div>';
+    }
+    return '<div onclick="bukaScheduleDetail(\'' + _schEsc(w.noWO) + '\')" class="flex border-b border-slate-100 items-stretch hover:bg-indigo-50/40 cursor-pointer">'
+      + '<div class="shrink-0 sticky left-0 bg-white z-10 px-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
+      +   '<div class="flex items-center gap-1.5"><span class="font-mono text-xs font-extrabold text-slate-700 truncate">' + _schEsc(w.noWO) + '</span>' + removeBtn + '</div>'
+      +   '<div class="text-[11px] text-slate-600 font-semibold truncate">' + _schEsc(w.namaProject || '-') + '</div>'
+      +   '<div class="text-[10px] text-slate-400 truncate">' + pct + '% · ' + (s.jumlahTugas||0) + ' tugas</div>'
+      + '</div>'
+      + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:54px">' + todayLine + bar + '</div>'
+      + '</div>';
   }).join('');
-  var more = tasks.length > 8 ? '<div class="text-[10px] text-slate-400">+' + (tasks.length - 8) + ' tugas lain</div>' : '';
-  var todayLine = todayPct >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-10" style="left:' + todayPct + '%"></div>' : '';
-  return '<div class="relative mt-2 pt-1">' + todayLine + rows + '</div>' + more;
+
+  var zoomBtn = function(z, lbl){ return '<button onclick="_schSetHomeZoom(\'' + z + '\')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition ' + (_schHomeZoom===z ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-500 border border-slate-200 hover:text-slate-700') + '">' + lbl + '</button>'; };
+
+  return '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">'
+    +   '<div class="text-xs text-slate-500"><i class="fa-solid fa-circle-info mr-1 text-slate-400"></i>Tiap baris = 1 WO. Bandingkan timeline untuk hindari jadwal bentrok.</div>'
+    +   '<div class="flex items-center gap-1.5">' + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + '</div>'
+    + '</div>'
+    + '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
+    +   '<div class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
+    +     '<div class="flex bg-slate-50 border-b border-slate-200">'
+    +       '<div class="shrink-0 sticky left-0 bg-slate-50 z-10 px-3 py-2 text-[11px] font-bold text-slate-500 uppercase border-r border-slate-200" style="width:' + leftW + 'px">Work Order</div>'
+    +       '<div class="relative" style="width:' + totalPx + 'px;height:24px">' + ticks + '</div>'
+    +     '</div>'
+    +     rows
+    +   '</div></div>'
+    + '</div>';
 }
 
 function _schRenderWOList() {
@@ -75,29 +150,7 @@ function _schRenderWOList() {
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-diagram-project mr-2"></i>' + (q ? 'Tidak ada project cocok.' : 'Belum ada project. Klik <b>Tambah Project</b>.') + '</div>';
     return;
   }
-  box.innerHTML = list.map(function(w){
-    var s = w.summary || {};
-    var pct = Number(s.progress)||0;
-    var pctCls = pct >= 100 ? 'bg-emerald-100 text-emerald-700' : (pct > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500');
-    var range = (s.tanggalMulai ? _schFmt(s.tanggalMulai) + ' → ' + _schFmt(s.tanggalSelesai) : 'Belum ada jadwal');
-    var removeBtn = _schCanEdit()
-      ? '<button onclick="event.stopPropagation();_schRemoveProject(\'' + _schEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari Schedule"><i class="fa-regular fa-trash-can text-sm"></i></button>'
-      : '';
-    return '<div onclick="bukaScheduleDetail(\'' + _schEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-indigo-300 hover:shadow-sm transition p-4 cursor-pointer">'
-      + '<div class="flex items-start gap-3">'
-      +   '<div class="flex-1 min-w-0">'
-      +     '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _schEsc(w.noWO) + '</span>'
-      +       '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + pctCls + '">' + pct + '%</span>'
-      +       '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">' + (s.jumlahTugas||0) + ' tugas</span></div>'
-      +     '<div class="font-bold text-slate-800 truncate">' + _schEsc(w.namaProject || '-') + '</div>'
-      +     '<div class="text-[11px] text-slate-400 truncate">' + _schEsc(w.namaKlien || '') + ' · ' + range + '</div>'
-      +   '</div>'
-      +   removeBtn
-      +   '<i class="fa-solid fa-chevron-right text-slate-300 mt-1"></i>'
-      + '</div>'
-      + _schMiniGantt(w)
-      + '</div>';
-  }).join('');
+  box.innerHTML = _schRenderHomeGantt(list);
 }
 
 // ── Tambah / keluarkan project ──
@@ -198,28 +251,8 @@ function _schRenderGantt() {
   var todayPx = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) * ppd) : -1;
   var todayLine = todayPx >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-20" style="left:' + todayPx + 'px"></div>' : '';
 
-  // Header ticks
-  var step = _schZoom === 'hari' ? 1 : (_schZoom === 'bulan' ? 0 : 7);
-  var ticks = '';
-  if (_schZoom === 'bulan') {
-    // tick tiap awal bulan
-    var cur = _schD(start);
-    for (var d = 0; d <= totalDays; d++) {
-      var di = _schShiftIso(start, d);
-      var dd = _schD(di);
-      if (dd.getDate() === 1 || d === 0) {
-        var lx = d * ppd;
-        ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-500 whitespace-nowrap" style="left:' + (lx+3) + 'px">' + _schMonLbl(dd) + '</div>';
-      }
-    }
-  } else {
-    for (var t = 0; t <= totalDays; t += step) {
-      var ti = _schShiftIso(start, t);
-      var lxx = t * ppd;
-      var lbl = _schZoom === 'hari' ? (''+_schD(ti).getDate()) : _schFmt(ti).slice(0,5);
-      ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lxx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-400 whitespace-nowrap" style="left:' + (lxx+2) + 'px">' + lbl + '</div>';
-    }
-  }
+  // Header ticks (helper bersama dengan home)
+  var ticks = _schBuildTicks(start, totalDays, ppd, _schZoom);
 
   var rows = _schTasks.map(function(t){
     var b = _schBar(t.warna);
