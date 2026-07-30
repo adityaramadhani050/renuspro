@@ -863,7 +863,7 @@ var _kirimOpen = {};   // accordion: noWO → terbuka? (tampilkan surat jalan)
 function _kirimToggleDetail(noWO) { _kirimOpen[noWO] = !_kirimOpen[noWO]; _kirimRenderBoard(); }
 window.loadPengirimanBarang = function() {
   var box = document.getElementById('kirim-board-body');
-  if (box) box.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  if (box) box.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   var done = 0;
   function ready() { if (++done >= 2) _kirimRenderBoard(); }
   google.script.run.withSuccessHandler(function(res) { _kirimReqs = (res && res.success) ? (res.list || []) : []; ready(); })
@@ -902,6 +902,11 @@ function _kirimBuildBoard() {
     else if (!allDiterima) { w.status = 'Dikirim'; w.tab = 'proses'; }
     else { w.status = 'Diterima'; w.tab = 'selesai'; }
     w.hasSisa = hasSisa;
+    // Jumlah material terlibat pengiriman (distinct bomItemId dari sisa + surat jalan).
+    var ids = {};
+    (w.sisaItems || []).forEach(function(m) { if (m.id) ids[m.id] = 1; });
+    sjs.forEach(function(s) { (s.items || []).forEach(function(it) { if (it.bomItemId) ids[it.bomItemId] = 1; }); });
+    w.jumlahMaterial = Object.keys(ids).length;
     return w;
   });
 }
@@ -925,7 +930,7 @@ function _kirimRenderBoard() {
   if (badge) { var np = proses.filter(function(w) { return w.status === 'Perlu Diproses' || w.status === 'Sebagian Dikirim'; }).length; if (np) { badge.textContent = np; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
   var list = (_kirimBoardTab === 'selesai') ? selesai : proses;
   if (!list.length) {
-    box.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fa-solid fa-truck-arrow-right mr-2"></i>' + (_kirimBoardTab === 'selesai' ? 'Belum ada pengiriman selesai.' : 'Tidak ada pengiriman yang perlu diproses.') + '</td></tr>';
+    box.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fa-solid fa-truck-arrow-right mr-2"></i>' + (_kirimBoardTab === 'selesai' ? 'Belum ada pengiriman selesai.' : 'Tidak ada pengiriman yang perlu diproses.') + '</td></tr>';
     return;
   }
   box.innerHTML = list.map(function(w) {
@@ -955,13 +960,14 @@ function _kirimRenderBoard() {
     var mainRow = '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
       '<td class="p-4 font-mono font-bold text-slate-700 whitespace-nowrap" data-label="No WO">' + _escHtml(w.noWO) + '</td>' +
       '<td class="p-4" data-label="Project / Klien"><div class="font-semibold text-slate-800">' + _escHtml(w.namaProject || '-') + '</div>' + (w.namaKlien ? '<div class="text-xs text-slate-400">' + _escHtml(w.namaKlien) + '</div>' : '') + '</td>' +
+      '<td class="p-4 text-xs text-slate-500 max-w-[220px]" data-label="Alamat">' + (w.alamat ? _escHtml(w.alamat) : '<span class="text-slate-300">-</span>') + '</td>' +
+      '<td class="p-4 text-center" data-label="Material"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap">' + (w.jumlahMaterial || 0) + ' item</span></td>' +
       '<td class="p-4 text-center" data-label="Status"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(w.status) + '">' + _escHtml(w.status) + '</span></td>' +
       '<td class="p-4" data-label="Surat Jalan">' + sjCell + '</td>' +
       '<td class="p-4 text-center rp-actions" data-label="Aksi">' + aksiCell + '</td>' +
     '</tr>';
     var detailRow = (sjArr.length > 1 && isOpen)
-      ? '<tr class="bg-slate-50"><td colspan="5" class="px-4 pb-4 pt-1"><div class="rounded-xl border border-slate-150 overflow-hidden bg-white">' +
-          (w.alamat ? '<div class="px-3 py-2 text-[11px] text-slate-400 border-b border-slate-100"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') +
+      ? '<tr class="bg-slate-50"><td colspan="7" class="px-4 pb-4 pt-1"><div class="rounded-xl border border-slate-150 overflow-hidden bg-white">' +
           sjRows + '</div></td></tr>'
       : '';
     return mainRow + detailRow;
