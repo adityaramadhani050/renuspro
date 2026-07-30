@@ -73,8 +73,8 @@ function _pgRenderPurchaseOrder(data) {
       '<div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">' +
         // Kolom 1: No PO / tanggal
         '<div class="sm:w-52 shrink-0">' +
-          '<span class="inline-flex items-center bg-orange-50 text-orange-700 font-extrabold px-2.5 py-1 rounded-lg border border-orange-100 text-sm font-mono"><i class="fa-solid fa-file-invoice mr-1.5 text-xs"></i>' + _escHtml(po.noPO || '') + '</span>' +
-          '<p class="text-[10px] text-slate-400 mt-1.5">' + _escHtml(po.tanggal || '') + '</p>' +
+          '<div class="font-mono font-extrabold text-slate-700">' + _escHtml(po.noPO || '') + '</div>' +
+          '<p class="text-[10px] text-slate-400 mt-0.5">' + _escHtml(po.tanggal || '') + '</p>' +
         '</div>' +
         // Kolom 2: Nama order / supplier + badge status sebaris dgn nama order
         '<div class="flex-1 min-w-0">' +
