@@ -41,16 +41,16 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded'],
+  admin:       ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
   sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer'],
   leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer'],
   procurement: ['workorder','purchaseorder','supplier','pricelist','bom'],
   warehouse:   ['workorder','inventory'],
   siteengineer:['qc','bom','ded'],
-  leadengineer:['workorder','qc','bom','ded'],
-  projectcoordinator:['workorder','qc','bom','ded'],   // read-only (gating fitur di masing-masing modul)
-  owner:       ['dashboard','workorder','qc','bom','ded','laporanfinance','laporanprofitabilitas','laporankeuangan']
+  leadengineer:['workorder','qc','bom','ded','schedule'],
+  projectcoordinator:['workorder','qc','bom','ded','schedule'],   // read-only di modul lain; Schedule bisa edit
+  owner:       ['dashboard','workorder','qc','bom','ded','schedule','laporanfinance','laporanprofitabilitas','laporankeuangan']
 };
 const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',
@@ -85,7 +85,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded']
+  ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
@@ -96,7 +96,7 @@ function _renderUserSidebar(user) {
     'nav-group-penjualan':  ['sitesurvey','penawaran','workorder','invoice','kwitansi','customer'],
     'nav-group-masterdata': ['produk','template','supplier'],
     'nav-group-pembelian':  ['purchaseorder','inventory'],
-    'nav-group-lapangan':   ['qc','bom','ded'],
+    'nav-group-lapangan':   ['qc','bom','ded','schedule'],
     'nav-group-keuangan':   ['pengeluaran','laporanfinance','laporanprofitabilitas','laporankeuangan'],
     'nav-group-administrasi': ['users','settings']
   };

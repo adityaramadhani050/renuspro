@@ -186,6 +186,7 @@
       if(pageId === 'qc') loadQC();
       if(pageId === 'bom' && typeof loadBOM === 'function') loadBOM();
       if(pageId === 'ded' && typeof loadDED === 'function') loadDED();
+      if(pageId === 'schedule' && typeof loadSchedule === 'function') loadSchedule();
   if(pageId === 'inventory') {
         var listInv = document.getElementById('inv-list-section');
         if (listInv) listInv.classList.remove('hidden');

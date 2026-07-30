@@ -1,0 +1,88 @@
+      <section id="page-schedule" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Project Schedule</h2>
+          <span id="sch-role-hint" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500"></span>
+        </div>
+
+        <!-- HOME: daftar project + mini-gantt ringkasan -->
+        <div id="sch-home">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+            <div class="relative w-full sm:w-72">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="sch-search" oninput="_schRenderWOList()" placeholder="Cari No WO / project / klien..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white">
+            </div>
+            <div class="flex items-center gap-2 sm:ml-auto">
+              <button id="sch-add-project-btn" onclick="_schOpenAddProject()" class="hidden flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Project</button>
+            </div>
+          </div>
+          <div id="sch-wo-list" class="space-y-3">
+            <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>
+          </div>
+        </div>
+
+        <!-- DETAIL: gantt penuh proyek -->
+        <div id="sch-detail" class="hidden">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <button onclick="kembaliScheduleHome()" class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar</button>
+            <div id="sch-detail-actions"></div>
+          </div>
+          <div id="sch-detail-head" class="bg-white rounded-2xl border border-slate-150 p-5 mb-4"></div>
+          <div id="sch-gantt" class="bg-white rounded-2xl border border-slate-150 overflow-hidden"></div>
+        </div>
+
+        <!-- MODAL: Tambah Project -->
+        <div id="sch-modal-project" class="hidden fixed inset-0 z-[310] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-diagram-project text-sm"></i></span>
+              <h3 class="text-base font-extrabold text-slate-800">Tambah Project ke Schedule</h3>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Work Order</label>
+            <select id="sch-proj-wo" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-4"><option value="">Memuat WO...</option></select>
+            <div class="flex justify-end gap-2">
+              <button onclick="_schCloseAddProject()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_schSubmitAddProject()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambahkan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL: Tambah / Edit Tugas -->
+        <div id="sch-modal-task" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-bars-staggered text-sm"></i></span>
+              <h3 id="sch-task-title" class="text-base font-extrabold text-slate-800">Tambah Tugas</h3>
+            </div>
+            <input type="hidden" id="sch-task-id">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Tugas <span class="text-rose-400">*</span></label>
+            <input type="text" id="sch-task-nama" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="cth: Instalasi struktur panel">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fase</label><input type="text" id="sch-task-fase" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="cth: Instalasi"></div>
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Warna</label>
+                <select id="sch-task-warna" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white">
+                  <option value="indigo">Indigo</option><option value="emerald">Hijau</option><option value="amber">Kuning</option><option value="sky">Biru</option><option value="rose">Merah</option><option value="violet">Ungu</option><option value="slate">Abu</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Mulai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-mulai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Selesai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-selesai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Progress (%)</label><input type="number" id="sch-task-progress" min="0" max="100" value="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Urutan</label><input type="number" id="sch-task-urutan" min="0" value="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan</label>
+            <input type="text" id="sch-task-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4" placeholder="opsional">
+            <div class="flex justify-between gap-2">
+              <button id="sch-task-del" onclick="_schDeleteTask()" class="hidden px-4 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl"><i class="fa-regular fa-trash-can mr-1"></i> Hapus</button>
+              <div class="flex gap-2 ml-auto">
+                <button onclick="_schCloseTask()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+                <button onclick="_schSubmitTask()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Simpan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
