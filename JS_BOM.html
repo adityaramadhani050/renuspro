@@ -203,15 +203,17 @@ function _bomLoadNeedPurchase() {
   }).getBOMNeedPurchase();
 }
 
-// Stok tersedia untuk item stok tertaut; null bila material belum tertaut stok.
+// Stok yang bisa dialokasikan (available = saldo − hold); null bila belum tertaut.
 function _bomStokTersedia(idStok) {
   if (!idStok) return null;
   var s = (_bomStokList || []).filter(function(x) { return x.idStok === idStok; })[0];
-  return s ? (Number(s.qtyTersedia) || 0) : 0;
+  return s ? (Number(s.qtyAvailable) || 0) : 0;
 }
 // Badge kesiapan stok untuk item Perlu Dibelanjakan.
 function _bomStokStatusBadge(it) {
-  var tersedia = _bomStokTersedia(it.idStok);
+  var av = _bomStokTersedia(it.idStok);
+  // Hold material ini sendiri boleh dipakai untuk top-up reserve-nya.
+  var tersedia = (av === null) ? null : (av + (Number(it.qtyReserved) || 0));
   var butuh = Number(it.qtyBeli) || 0;
   if (tersedia === null) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap"><i class="fa-regular fa-hand-pointer text-[9px] mr-0.5"></i>Pilih stok manual</span>';
   if (tersedia >= butuh) return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap"><i class="fa-solid fa-circle-check text-[9px] mr-0.5"></i>Siap reserve (' + _bomRp(tersedia) + ')</span>';
@@ -289,10 +291,11 @@ function _bomReserveBeli(id) {
     delete _bomBusyIds[id];
     if (cell && saved != null) cell.innerHTML = saved;
     var stok = (_bomStokList || []).filter(function(s) { return s.idStok === it.idStok; })[0];
-    var tersedia = stok ? (Number(stok.qtyTersedia) || 0) : 0;
+    // Available + hold material ini sendiri (top-up boleh pakai hold-nya).
+    var tersedia = (stok ? (Number(stok.qtyAvailable) || 0) : 0) + (Number(it.qtyReserved) || 0);
     if (it.idStok && (Number(it.qtyBeli) || 0) > 0 && tersedia >= (Number(it.qtyBeli) || 0)) {
-      // 1 klik: material tertaut stok & stok cukup untuk sisa beli → reserve penuh.
-      showConfirm({ title: 'Reserve dari Stok', message: 'Reserve sisa ' + _bomRp(it.qtyBeli) + ' ' + (it.satuan || '') + ' "' + it.namaMaterial + '" dari stok ' + it.idStok + '? Stok berkurang & material jadi Reserved penuh.', confirmText: 'Ya, Reserve', icon: 'fa-warehouse', onConfirm: function() {
+      // 1 klik: material tertaut stok & stok cukup untuk sisa beli → alokasikan penuh.
+      showConfirm({ title: 'Reserve dari Stok', message: 'Alokasikan sisa ' + _bomRp(it.qtyBeli) + ' ' + (it.satuan || '') + ' "' + it.namaMaterial + '" dari stok ' + it.idStok + '? Material jadi Reserved penuh (stok keluar saat dikirim).', confirmText: 'Ya, Reserve', icon: 'fa-warehouse', onConfirm: function() {
         _bomDoReserveBeli(id, it.idStok, (Number(it.qtyReserved) || 0) + (Number(it.qtyBeli) || 0));
       } });
     } else {
@@ -319,7 +322,7 @@ function _bomOpenBeliModal(id) {
     var sel = document.getElementById('bom-beli-stok');
     var opts = '<option value="">— Pilih item stok —</option>';
     (_bomStokList || []).forEach(function(s) {
-      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyTersedia || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyTersedia || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
+      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyAvailable || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyAvailable || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
     });
     sel.innerHTML = opts;
     if (it.idStok) sel.value = it.idStok;
@@ -337,7 +340,7 @@ function _bomBeliStokChange() {
   var it = (_bomNeedList || []).filter(function(x) { return x.id === document.getElementById('bom-beli-id').value; })[0] || { qtyBeli: 0 };
   var qtyEl = document.getElementById('bom-beli-qty');
   if (sel.value) {
-    var tersedia = Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0;
+    var tersedia = (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) + ((sel.value === it.idStok) ? (Number(it.qtyReserved) || 0) : 0);
     qtyEl.disabled = false;
     qtyEl.value = Math.min(Number(it.qtyBeli) || 0, tersedia);
   } else { qtyEl.disabled = true; qtyEl.value = 0; }
@@ -348,7 +351,7 @@ function _bomBeliRecalc() {
   var it = (_bomNeedList || []).filter(function(x) { return x.id === document.getElementById('bom-beli-id').value; })[0] || { qtyBeli: 0 };
   var sisa = Number(it.qtyBeli) || 0;
   var qtyEl = document.getElementById('bom-beli-qty');
-  var tersedia = sel.value ? (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) : 0;
+  var tersedia = sel.value ? ((Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) + ((sel.value === it.idStok) ? (Number(it.qtyReserved) || 0) : 0)) : 0;
   var qty = Number(qtyEl.value) || 0;
   var maxAmbil = sel.value ? Math.min(sisa, tersedia) : 0;
   if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }
@@ -577,7 +580,7 @@ function _bomOpenProcure(id) {
     var sel = document.getElementById('bom-proc-stok');
     var opts = '<option value="">— Tidak dari stok (semua dibeli) —</option>';
     (_bomStokList || []).forEach(function(s) {
-      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyTersedia || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyTersedia || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
+      opts += '<option value="' + _bomEsc(s.idStok) + '" data-tersedia="' + (s.qtyAvailable || 0) + '">' + _bomEsc(s.idStok) + ' — ' + _bomEsc(s.namaProduk) + ' (tersedia ' + _bomRp(s.qtyAvailable || 0) + ' ' + _bomEsc(s.satuan || '') + ')</option>';
     });
     sel.innerHTML = opts;
     if (it.idStok) sel.value = it.idStok;
@@ -595,7 +598,7 @@ function _bomProcStokChange() {
   var Q = Number(it.qty) || 0;
   var qtyEl = document.getElementById('bom-proc-qty');
   if (sel.value) {
-    var tersedia = Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0;
+    var tersedia = (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) + ((sel.value === it.idStok) ? (Number(it.qtyReserved) || 0) : 0);
     qtyEl.disabled = false;
     qtyEl.value = Math.min(Q, tersedia);   // saran: reserve sebanyak yang tersedia
   } else { qtyEl.disabled = true; qtyEl.value = 0; }
@@ -606,7 +609,7 @@ function _bomProcRecalc() {
   var it = _bomItems.filter(function(x) { return x.id === document.getElementById('bom-proc-id').value; })[0] || { qty: 0 };
   var Q = Number(it.qty) || 0;
   var qtyEl = document.getElementById('bom-proc-qty');
-  var tersedia = sel.value ? (Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) : 0;
+  var tersedia = sel.value ? ((Number(sel.options[sel.selectedIndex].getAttribute('data-tersedia')) || 0) + ((sel.value === it.idStok) ? (Number(it.qtyReserved) || 0) : 0)) : 0;
   var qty = Number(qtyEl.value) || 0;
   var maxAmbil = sel.value ? Math.min(Q, tersedia) : 0;
   if (qty > maxAmbil) { qty = maxAmbil; qtyEl.value = maxAmbil; }

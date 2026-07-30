@@ -543,17 +543,23 @@ function getStokList() {
   try {
     _ensureStokSheet();
     var data = _cachedStok();
+    // Peta hold BOM (reserve soft-hold yang belum dikirim) untuk hitung ketersediaan.
+    var holdMap = {};
+    try { holdMap = getBOMHoldMap(); } catch (eH) {}
     var list = [];
     for (var i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
-      var qty    = Number(data[i][3]) || 0;
+      var qty    = Number(data[i][3]) || 0;   // saldo fisik
       var harga  = Number(data[i][4]) || 0;
+      var hold   = Number(holdMap[data[i][0].toString()]) || 0;
       list.push({
         idStok:          data[i][0].toString(),
         idProduk:        data[i][0].toString(),
         namaProduk:      data[i][1].toString(),
         satuan:          data[i][2].toString(),
-        qtyTersedia:     qty,
+        qtyTersedia:     qty,                              // saldo fisik gudang
+        qtyHold:         hold,                             // dialokasikan (reserve belum dikirim)
+        qtyAvailable:    Math.max(0, qty - hold),          // bisa dialokasikan reserve baru
         hargaBeliTerakhir: harga,
         nilaiStok:       Number(data[i][5]) || 0,
         terakhirDiubah:  data[i][6] ? data[i][6].toString() : ''
