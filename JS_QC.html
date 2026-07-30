@@ -305,6 +305,12 @@ function _qcRenderWOList() {
     var removeBtn = _qcCanAssign()
       ? '<button onclick="event.stopPropagation();_qcRemoveProject(\'' + _qcEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari QC"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
+    var selesaiBtn = (_qcCanAssign() && !(w.selesaiManual || w.pct === 100))
+      ? '<button onclick="event.stopPropagation();_qcCardTandaiSelesai(\'' + _qcEsc(w.noWO) + '\')" class="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Tandai QC Approved"><i class="fa-regular fa-circle-check text-sm"></i></button>'
+      : '';
+    var remindBtn = (_qcCanAssign() || _qcCanUpload())
+      ? '<button onclick="event.stopPropagation();_qcCardRemind(\'' + _qcEsc(w.noWO) + '\')" class="text-amber-500 hover:text-amber-700 hover:bg-amber-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Kirim reminder WhatsApp"><i class="fa-regular fa-bell text-sm"></i></button>'
+      : '';
     return '<div onclick="bukaQCDetail(\'' + _qcEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
       +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _qcEsc(w.noWO) + '</span>'
@@ -321,10 +327,37 @@ function _qcRenderWOList() {
       +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">' + _qcCountChips(w.approved, w.pending, w.rejected, w.belum) + '</div>'
       +     '</div>'
       +   '</div>'
-      +   removeBtn
+      +   selesaiBtn + remindBtn + removeBtn
       +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
       + '</div></div>';
   }).join('');
+}
+
+// Aksi cepat dari kartu list (per WO, tanpa membuka detail).
+function _qcCardTandaiSelesai(noWO) {
+  showConfirm({ title: 'Tandai QC Approved', message: 'Tandai QC ' + noWO + ' sebagai Approved secara manual? WO pindah ke tab "Approved".', confirmText: 'Ya, Tandai Approved', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai Approved...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) loadQC();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .tandaiQCSelesai(noWO, _qcUserNama());
+  } });
+}
+function _qcCardRemind(noWO) {
+  var isLead = _qcCanAssign();
+  var msg = isLead
+    ? 'Kirim reminder WhatsApp ke Site Engineer WO ' + noWO + ' untuk melengkapi QC yang belum upload / ditolak?'
+    : 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview QC WO ' + noWO + ' (Pending)?';
+  showConfirm({ title: 'Kirim Reminder', message: msg, confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+    toggleLoader(true, 'Mengirim reminder...');
+    var run = google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim reminder.', 'error'); });
+    if (isLead) run.qcRemindSiteEngineer(noWO, _qcUserNama());
+    else run.qcRemindLeadEngineer(noWO, _qcUserNama());
+  } });
 }
 
 // ── Detail per WO ─────────────────────────────────────────────────
