@@ -482,8 +482,7 @@ function _bomRenderDetail() {
       btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Request Pengiriman</button>';
     }
   }
-  var kirimNote = (_bomKirimReq === 'Diminta') ? '<div class="w-full text-right"><span class="text-[11px] font-bold text-indigo-600"><i class="fa-solid fa-truck-arrow-right mr-1"></i>Request pengiriman aktif — menunggu warehouse</span></div>' : '';
-  actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>' + kirimNote;
+  actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 
   // Head — judul + status; badge Site Engineer di kanan; ringkasan review di bawah.
   var assignedHtml = (_bomAssigned || []).length
