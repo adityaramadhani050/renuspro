@@ -859,6 +859,8 @@ function _kirimFmtTgl(raw) {
 }
 
 var _kirimBoardTab = 'proses';
+var _kirimOpen = {};   // accordion: noWO → terbuka? (tampilkan surat jalan)
+function _kirimToggleDetail(noWO) { _kirimOpen[noWO] = !_kirimOpen[noWO]; _kirimRenderBoard(); }
 window.loadPengirimanBarang = function() {
   var box = document.getElementById('kirim-board-list');
   if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
@@ -933,16 +935,22 @@ function _kirimRenderBoard() {
       else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
       return '<div class="flex items-center gap-2 px-4 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="ml-auto">' + act + '</span></div>';
     }).join('');
-    var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="ml-auto inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
+    var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
+    var isOpen = !!_kirimOpen[w.noWO];
+    var detailBtn = (w.sjs || []).length
+      ? '<button onclick="_kirimToggleDetail(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-1.5 px-2" title="Lihat surat jalan"><i class="fa-solid fa-chevron-' + (isOpen ? 'up' : 'down') + ' text-[10px]"></i> Detail (' + (w.sjs || []).length + ')</button>'
+      : '';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' +
       '<div class="flex items-center gap-2 px-4 py-3 flex-wrap">' +
         '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(w.noWO) + '</span>' +
         '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(w.status) + '">' + _escHtml(w.status) + '</span>' +
         '<div class="text-[11px] text-slate-400 truncate flex-1 min-w-0">' + _escHtml(w.namaProject || '') + (w.namaKlien ? ' · ' + _escHtml(w.namaKlien) : '') + '</div>' +
-        prosesBtn +
+        '<div class="flex items-center gap-1.5 ml-auto">' + prosesBtn + detailBtn + '</div>' +
       '</div>' +
-      (w.alamat ? '<div class="px-4 pb-1 text-[11px] text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') +
-      sjRows +
+      (isOpen ? (
+        (w.alamat ? '<div class="px-4 pb-1 text-[11px] text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') +
+        sjRows
+      ) : '') +
     '</div>';
   }).join('');
 }
