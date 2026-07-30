@@ -849,6 +849,14 @@ function submitPenggunaanStok() {
 var _kirimReqs = [], _kirimSJs = [];
 function _kirimUser() { return (_currentUser && _currentUser.nama) || ''; }
 function _kirimRp(n) { return (Number(n) || 0).toLocaleString('id-ID'); }
+// Format tanggal → dd/MM/yyyy (dari ISO YYYY-MM-DD atau string apa adanya).
+function _kirimFmtTgl(raw) {
+  if (!raw) return '-';
+  var s = raw.toString();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  return s;
+}
 
 window.loadPengirimanBarang = function() {
   var reqBox = document.getElementById('kirim-req-list');
@@ -898,7 +906,7 @@ function _kirimRenderSJ() {
     return '<div class="bg-white rounded-2xl border border-slate-150 p-4 flex flex-col sm:flex-row sm:items-center gap-3">' +
       '<div class="flex-1 min-w-0">' +
         '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700 text-sm">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + stCls + '">' + _escHtml(s.status) + '</span></div>' +
-        '<div class="text-[11px] text-slate-400 truncate mt-0.5">' + _escHtml(s.noWO) + ' · ' + _escHtml(s.namaProject || '') + ' · ' + _escHtml(s.tanggalKirim || '') + ' · ' + (s.items || []).length + ' item</div>' +
+        '<div class="text-[11px] text-slate-400 truncate mt-0.5">' + _escHtml(s.noWO) + ' · ' + _escHtml(s.namaProject || '') + ' · ' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</div>' +
       '</div>' +
       '<div class="flex items-center gap-2">' +
         '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Surat Jalan</button>' +
@@ -1012,7 +1020,7 @@ function _kirimExportPDF(idKirim) {
     var y = 30;
     doc.setFontSize(9); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
     function baris(label, val, yy) { doc.setFont('helvetica', 'bold'); doc.text(label, ML, yy); doc.setFont('helvetica', 'normal'); doc.text(': ' + (val || '-'), ML + 28, yy); }
-    baris('Tanggal', s.tanggalKirim, y);
+    baris('Tanggal', _kirimFmtTgl(s.tanggalKirim), y);
     baris('No. Work Order', s.noWO, y + 5);
     baris('Project', s.namaProject, y + 10);
     baris('Klien', s.namaKlien, y + 15);
