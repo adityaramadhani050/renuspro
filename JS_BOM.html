@@ -247,7 +247,7 @@ function _bomRenderNeedPurchase() {
       else if (isTunggu) aksi = '<button onclick="_bomBatalBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Batalkan tanda beli langsung"><i class="fa-solid fa-rotate-left"></i> Batal</button>';
       else aksi = '<div class="flex items-center justify-center gap-1.5">'
         + '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
-        + '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Beli Langsung</button>'
+        + '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Direct</button>'
         + '</div>';
       return '<tr class="border-t border-slate-100">'
         + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
