@@ -36,16 +36,17 @@ function switchInvTab(tab) {
   document.getElementById('tab-stok').classList.toggle('hidden', tab !== 'stok');
   document.getElementById('tab-penerimaan').classList.toggle('hidden', tab !== 'penerimaan');
   document.getElementById('tab-mutasi').classList.toggle('hidden', tab !== 'mutasi');
+  var tp = document.getElementById('tab-pengiriman'); if (tp) tp.classList.toggle('hidden', tab !== 'pengiriman');
 
   var active   = 'px-5 py-2 rounded-lg text-sm font-bold transition bg-white text-teal-700 shadow-sm';
   var inactive = 'px-5 py-2 rounded-lg text-sm font-bold transition text-slate-500 hover:text-slate-700';
   document.getElementById('tab-btn-stok').className        = tab === 'stok'        ? active : inactive;
   document.getElementById('tab-btn-penerimaan').className  = tab === 'penerimaan'  ? active : inactive;
   document.getElementById('tab-btn-mutasi').className      = tab === 'mutasi'      ? active : inactive;
+  var tpb = document.getElementById('tab-btn-pengiriman'); if (tpb) tpb.className = tab === 'pengiriman' ? active : inactive;
 
-  if (tab === 'penerimaan') {
-    loadPenerimaanBarang();
-  }
+  if (tab === 'penerimaan') loadPenerimaanBarang();
+  if (tab === 'pengiriman') loadPengirimanBarang();
 }
 
 // ── Visibility helpers ─────────────────────────────────────────
@@ -842,5 +843,209 @@ function submitPenggunaanStok() {
     })
     .gunakanStok(noWO, idStok, qty, tanggal, keterangan,
       (_currentUser && _currentUser.nama) || '');
+}
+
+// ══ Pengiriman Barang (warehouse) ══════════════════════════════════════════
+var _kirimReqs = [], _kirimSJs = [];
+function _kirimUser() { return (_currentUser && _currentUser.nama) || ''; }
+function _kirimRp(n) { return (Number(n) || 0).toLocaleString('id-ID'); }
+
+window.loadPengirimanBarang = function() {
+  var reqBox = document.getElementById('kirim-req-list');
+  var sjBox = document.getElementById('kirim-sj-list');
+  if (reqBox) reqBox.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  google.script.run.withSuccessHandler(function(res) {
+    _kirimReqs = (res && res.success) ? (res.list || []) : [];
+    _kirimRenderRequests();
+    var b = document.getElementById('inv-pengiriman-badge');
+    if (b) { if (_kirimReqs.length) { b.textContent = _kirimReqs.length; b.classList.remove('hidden'); } else b.classList.add('hidden'); }
+  }).withFailureHandler(function() { if (reqBox) reqBox.innerHTML = '<div class="p-4 text-center text-rose-400">Gagal memuat request.</div>'; }).getPengirimanRequests();
+  if (sjBox) sjBox.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  google.script.run.withSuccessHandler(function(res) {
+    _kirimSJs = (res && res.success) ? (res.list || []) : [];
+    _kirimRenderSJ();
+  }).withFailureHandler(function() { if (sjBox) sjBox.innerHTML = '<div class="p-4 text-center text-rose-400">Gagal memuat surat jalan.</div>'; }).getPengirimanList({});
+};
+
+function _kirimRenderRequests() {
+  var box = document.getElementById('kirim-req-list');
+  if (!_kirimReqs.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400 text-sm">Tidak ada permintaan pengiriman.</div>'; return; }
+  box.innerHTML = _kirimReqs.map(function(r) {
+    var rows = (r.items || []).map(function(m) {
+      return '<tr class="border-t border-slate-100"><td class="px-3 py-1.5 text-slate-700">' + _escHtml(m.namaMaterial) + (m.merek ? ' <span class="text-slate-400">· ' + _escHtml(m.merek) + '</span>' : '') + '</td><td class="px-3 py-1.5 text-center font-bold text-indigo-700 whitespace-nowrap">' + _kirimRp(m.qtySisa) + ' ' + _escHtml(m.satuan || '') + '</td></tr>';
+    }).join('');
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' +
+      '<div class="flex items-center gap-2 px-4 py-3 bg-indigo-50/60 border-b border-slate-150 flex-wrap">' +
+        '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(r.noWO) + '</span>' +
+        '<span class="text-sm font-bold text-slate-700">' + _escHtml(r.namaProject || '') + '</span>' +
+        '<span class="text-[11px] text-slate-400">' + _escHtml(r.namaKlien || '') + (r.dimintaOleh ? ' · diminta ' + _escHtml(r.dimintaOleh) : '') + '</span>' +
+        '<button onclick="_kirimOpenModal(\'' + _escHtml(r.noWO) + '\')" class="ml-auto inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' +
+      '</div>' +
+      '<div class="px-4 py-1 text-[11px] text-slate-400">' + _escHtml(r.alamat || 'Alamat belum tersedia') + '</div>' +
+      '<div class="overflow-x-auto"><table class="w-full text-sm"><tbody>' + rows + '</tbody></table></div>' +
+    '</div>';
+  }).join('');
+}
+
+function _kirimRenderSJ() {
+  var box = document.getElementById('kirim-sj-list');
+  if (!_kirimSJs.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400 text-sm">Belum ada surat jalan.</div>'; return; }
+  box.innerHTML = _kirimSJs.map(function(s) {
+    var stCls = s.status === 'Diterima' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700';
+    var terimaBtn = (s.status === 'Dikirim')
+      ? '<button onclick="_kirimOpenTerima(\'' + _escHtml(s.idKirim) + '\',\'' + _escHtml(s.noSuratJalan) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-box-open"></i> Barang Diterima</button>'
+      : (s.buktiFileUrl ? '<a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline"><i class="fa-solid fa-image mr-1"></i>Bukti</a>' : '');
+    return '<div class="bg-white rounded-2xl border border-slate-150 p-4 flex flex-col sm:flex-row sm:items-center gap-3">' +
+      '<div class="flex-1 min-w-0">' +
+        '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700 text-sm">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + stCls + '">' + _escHtml(s.status) + '</span></div>' +
+        '<div class="text-[11px] text-slate-400 truncate mt-0.5">' + _escHtml(s.noWO) + ' · ' + _escHtml(s.namaProject || '') + ' · ' + _escHtml(s.tanggalKirim || '') + ' · ' + (s.items || []).length + ' item</div>' +
+      '</div>' +
+      '<div class="flex items-center gap-2">' +
+        '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Surat Jalan</button>' +
+        terimaBtn +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function _kirimOpenModal(noWO) {
+  var r = _kirimReqs.filter(function(x) { return x.noWO === noWO; })[0];
+  if (!r) return;
+  document.getElementById('kirim-modal-nowo').value = noWO;
+  document.getElementById('kirim-modal-sub').innerText = noWO + ' · ' + (r.namaProject || '');
+  document.getElementById('kirim-tanggal').value = new Date().toISOString().split('T')[0];
+  document.getElementById('kirim-kendaraan').value = '';
+  document.getElementById('kirim-driver').value = '';
+  document.getElementById('kirim-catatan').value = '';
+  document.getElementById('kirim-alamat').value = r.alamat || '';
+  document.getElementById('kirim-modal-items').innerHTML = (r.items || []).map(function(m) {
+    return '<tr class="border-t border-slate-100" data-bom-id="' + _escHtml(m.id) + '" data-sisa="' + m.qtySisa + '">' +
+      '<td class="px-3 py-2 text-slate-700">' + _escHtml(m.namaMaterial) + '</td>' +
+      '<td class="px-3 py-2 text-center text-slate-500">' + _kirimRp(m.qtySisa) + ' ' + _escHtml(m.satuan || '') + '</td>' +
+      '<td class="px-3 py-2 text-center"><input type="number" class="kirim-qty w-24 px-2 py-1 text-sm border border-indigo-300 rounded-lg text-center" min="0" max="' + m.qtySisa + '" value="' + m.qtySisa + '"></td>' +
+    '</tr>';
+  }).join('');
+  document.getElementById('modal-kirim').classList.remove('hidden');
+}
+function _kirimCloseModal() { document.getElementById('modal-kirim').classList.add('hidden'); }
+function _kirimSubmit() {
+  var noWO = document.getElementById('kirim-modal-nowo').value;
+  var items = [];
+  document.querySelectorAll('#kirim-modal-items tr[data-bom-id]').forEach(function(row) {
+    var q = parseFloat((row.querySelector('.kirim-qty') || {}).value) || 0;
+    if (q <= 0) return;
+    var sisa = parseFloat(row.getAttribute('data-sisa')) || 0;
+    if (q > sisa) q = sisa;
+    items.push({ bomItemId: row.getAttribute('data-bom-id'), qty: q });
+  });
+  if (!items.length) return showNotification('Isi qty kirim minimal 1 item.', 'error');
+  _kirimCloseModal();
+  toggleLoader(true, 'Memproses pengiriman...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    loadPengirimanBarang();
+    _loadStok && _loadStok();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .prosesKirim({
+      noWO: noWO,
+      items: items,
+      tanggal: document.getElementById('kirim-tanggal').value,
+      kendaraan: document.getElementById('kirim-kendaraan').value,
+      driver: document.getElementById('kirim-driver').value,
+      alamat: document.getElementById('kirim-alamat').value,
+      catatan: document.getElementById('kirim-catatan').value,
+      oleh: _kirimUser()
+    });
+}
+
+function _kirimOpenTerima(idKirim, noSJ) {
+  document.getElementById('terima-kirim-id').value = idKirim;
+  document.getElementById('terima-kirim-sj').innerText = noSJ;
+  document.getElementById('kirim-bukti-file-id').value = '';
+  document.getElementById('kirim-bukti-file-url').value = '';
+  document.getElementById('kirim-bukti-file-name').value = '';
+  var st = document.getElementById('kirim-bukti-file-status'); if (st) { st.classList.add('hidden'); st.innerHTML = ''; }
+  var dp = document.getElementById('kirim-bukti-file-drop'); if (dp) dp.classList.remove('hidden');
+  document.getElementById('modal-kirim-terima').classList.remove('hidden');
+}
+function _kirimCloseTerima() { document.getElementById('modal-kirim-terima').classList.add('hidden'); }
+function _kirimBuktiChange(input) { _uploadSupplierFile('kirim-bukti-file', input, 'uploadFileBuktiPenerimaanPO', 'emerald'); }
+function _kirimSubmitTerima() {
+  var id = document.getElementById('terima-kirim-id').value;
+  var url = document.getElementById('kirim-bukti-file-url').value;
+  if (!url) return showNotification('Lampirkan bukti barang diterima.', 'error');
+  _kirimCloseTerima();
+  toggleLoader(true, 'Menyimpan...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    loadPengirimanBarang();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .terimaPengiriman({
+      idKirim: id, oleh: _kirimUser(),
+      buktiFileId: document.getElementById('kirim-bukti-file-id').value,
+      buktiFileUrl: url,
+      buktiFileName: document.getElementById('kirim-bukti-file-name').value
+    });
+}
+
+// Export PDF Surat Jalan.
+function _kirimExportPDF(idKirim) {
+  var s = _kirimSJs.filter(function(x) { return x.idKirim === idKirim; })[0];
+  if (!s) return;
+  if (!window.jspdf || !window.jspdf.jsPDF) return showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error');
+  try {
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var PW = 210, ML = 14, MR = 14;
+    var DARK = [30, 41, 59], SLATE = [100, 116, 139];
+    doc.setFillColor(DARK[0], DARK[1], DARK[2]); doc.rect(0, 0, PW, 22, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+    doc.text('SURAT JALAN', ML, 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(190, 200, 220);
+    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(170, 195, 255);
+    doc.text('NO. SURAT JALAN', PW - MR, 9, { align: 'right' });
+    doc.setFontSize(13); doc.setTextColor(255, 255, 255);
+    doc.text(String(s.noSuratJalan), PW - MR, 16, { align: 'right' });
+
+    var y = 30;
+    doc.setFontSize(9); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    function baris(label, val, yy) { doc.setFont('helvetica', 'bold'); doc.text(label, ML, yy); doc.setFont('helvetica', 'normal'); doc.text(': ' + (val || '-'), ML + 28, yy); }
+    baris('Tanggal', s.tanggalKirim, y);
+    baris('No. Work Order', s.noWO, y + 5);
+    baris('Project', s.namaProject, y + 10);
+    baris('Klien', s.namaKlien, y + 15);
+    var alamatLines = doc.splitTextToSize(': ' + (s.alamat || '-'), PW - MR - (ML + 28));
+    doc.setFont('helvetica', 'bold'); doc.text('Alamat Kirim', ML, y + 20); doc.setFont('helvetica', 'normal'); doc.text(alamatLines, ML + 28, y + 20);
+    y += 24 + (alamatLines.length - 1) * 4.2;
+    if (s.kendaraan || s.driver) { baris('Kendaraan', (s.kendaraan || '-') + (s.driver ? '  ·  Driver: ' + s.driver : ''), y); y += 6; }
+
+    doc.autoTable({
+      startY: y + 2,
+      head: [['No', 'Nama Material', 'Merek', 'Satuan', 'Qty']],
+      body: (s.items || []).map(function(it, i) { return [String(i + 1), it.namaMaterial || '', it.merek || '-', it.satuan || '-', _kirimRp(it.qty)]; }),
+      theme: 'grid', margin: { left: ML, right: MR },
+      headStyles: { fillColor: [67, 56, 202], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 8, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.8 },
+      columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 34 }, 3: { cellWidth: 20, halign: 'center' }, 4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' } }
+    });
+    var afterY = doc.lastAutoTable.finalY + 18;
+    if (afterY > 250) { doc.addPage(); afterY = 40; }
+    var colW = (PW - ML - MR) / 3;
+    ['Disiapkan (Gudang)', 'Pengirim / Driver', 'Penerima'].forEach(function(lbl, i) {
+      var cx = ML + colW * i + colW / 2;
+      doc.setDrawColor(150, 150, 150); doc.line(cx - 25, afterY + 16, cx + 25, afterY + 16);
+      doc.setFontSize(8); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.setFont('helvetica', 'normal');
+      doc.text(lbl, cx, afterY + 21, { align: 'center' });
+    });
+    doc.setFontSize(7); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]);
+    doc.text('Dokumen surat jalan — PT. Renus Global Indonesia.', ML, 290);
+    var fname = 'SuratJalan_' + String(s.noSuratJalan).replace(/[\\/]/g, '-') + '.pdf';
+    doc.save(fname);
+    showNotification('Surat Jalan diunduh: ' + fname);
+  } catch (err) {
+    showNotification('Gagal membuat PDF: ' + (err && err.message ? err.message : err), 'error');
+  }
 }
 </script>
