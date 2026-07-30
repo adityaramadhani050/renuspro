@@ -67,30 +67,33 @@ function _pgRenderPurchaseOrder(data) {
   box.innerHTML = data.map(function(po) {
     var sc = statusPOClass[po.statusPO] || 'bg-slate-100 text-slate-500';
     var bc = statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-500';
-    var isAktif = po.statusPO === 'Aktif';
     var noPOesc = (po.noPO || '').replace(/'/g, "\\'");
-    var woLine = po.noWO ? ('<span class="font-mono text-teal-700">' + _escHtml(po.noWO) + '</span>' + (po.namaProject ? ' · ' + _escHtml(po.namaProject) : '')) : '';
-    var actBtns =
-      '<button onclick="event.stopPropagation();exportPOPDF(\'' + noPOesc + '\')" class="text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
-      (isAktif ? '<button onclick="event.stopPropagation();bukaEditPO(\'' + noPOesc + '\')" class="text-blue-500 hover:bg-blue-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' : '') +
-      (isAktif ? '<button onclick="event.stopPropagation();konfirmasiHapus(\'po\',\'' + noPOesc + '\',\'' + noPOesc + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '');
-    return '<div onclick="bukaPODetail(\'' + noPOesc + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">' +
-      '<div class="flex-1 min-w-0">' +
-        '<div class="flex items-center gap-2 flex-wrap">' +
-          '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(po.noPO || '') + '</span>' +
-          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + sc + '">' + _poStatusLabel(po.statusPO) + '</span>' +
-          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + bc + '">' + (po.statusBayar || '—') + '</span>' +
+    var woLine = po.noWO ? (' · <span class="font-mono text-teal-700">' + _escHtml(po.noWO) + '</span>' + (po.namaProject ? ' ' + _escHtml(po.namaProject) : '')) : '';
+    return '<div onclick="bukaPODetail(\'' + noPOesc + '\')" class="bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-md transition p-4 sm:p-5 cursor-pointer">' +
+      '<div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">' +
+        // Kolom 1: No PO / tanggal
+        '<div class="sm:w-52 shrink-0">' +
+          '<span class="inline-flex items-center bg-orange-50 text-orange-700 font-extrabold px-2.5 py-1 rounded-lg border border-orange-100 text-sm font-mono"><i class="fa-solid fa-file-invoice mr-1.5 text-xs"></i>' + _escHtml(po.noPO || '') + '</span>' +
+          '<p class="text-[10px] text-slate-400 mt-1.5">' + _escHtml(po.tanggal || '') + '</p>' +
         '</div>' +
-        '<div class="font-bold text-slate-800 truncate">' + (_escHtml(po.peruntukan) || _escHtml(po.namaSupplier || po.idSupplier || '—')) + '</div>' +
-        '<div class="text-[11px] text-slate-400 truncate">' + _escHtml(po.namaSupplier || po.idSupplier || '') + ' · ' + _escHtml(po.tanggal || '') + (woLine ? ' · ' + woLine : '') + '</div>' +
-      '</div>' +
-      '<div class="flex items-center gap-3 w-full sm:w-auto">' +
-        '<div class="text-left sm:text-right whitespace-nowrap">' +
-          '<p class="font-extrabold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
-          ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
+        // Kolom 2: Nama order / supplier + badge status sebaris dgn nama order
+        '<div class="flex-1 min-w-0">' +
+          '<div class="flex items-center gap-2 flex-wrap">' +
+            '<p class="font-bold text-slate-800 truncate">' + (_escHtml(po.peruntukan) || _escHtml(po.namaSupplier || po.idSupplier || '—')) + '</p>' +
+            '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + sc + '">' + _poStatusLabel(po.statusPO) + '</span>' +
+            '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + bc + '">' + (po.statusBayar || '—') + '</span>' +
+          '</div>' +
+          '<p class="text-[11px] text-slate-400 truncate mt-0.5">' + _escHtml(po.namaSupplier || po.idSupplier || '') + woLine + '</p>' +
         '</div>' +
-        '<div class="flex items-center gap-1">' + actBtns + '</div>' +
-        '<i class="fa-solid fa-chevron-right text-slate-300"></i>' +
+        // Kanan: nilai order + tombol PDF
+        '<div class="flex items-center justify-between sm:justify-end gap-3 shrink-0">' +
+          '<div class="text-left sm:text-right whitespace-nowrap">' +
+            '<p class="font-extrabold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
+            ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
+          '</div>' +
+          '<button onclick="event.stopPropagation();exportPOPDF(\'' + noPOesc + '\')" class="text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
+          '<i class="fa-solid fa-chevron-right text-slate-300"></i>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }).join('');
