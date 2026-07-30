@@ -39,6 +39,9 @@ function onPOItemSelect(idx, sel) {
   hitungTotalPO();
 }
 
+// Label tampilan status PO (nilai tersimpan tetap, hanya teks yang diringkas).
+function _poStatusLabel(s) { return s === 'Menunggu Gudang' ? 'Tunggu Gudang' : (s || ''); }
+
 // ── Render tabel daftar PO ──────────────────────────────────────────────────
 function _pgRenderPurchaseOrder(data) {
   var tbody = document.getElementById('table-purchaseorder');
@@ -79,7 +82,7 @@ function _pgRenderPurchaseOrder(data) {
             (po.namaProject ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaProject) + '</div>' : '')
           : '<span class="text-slate-400">—</span>') +
       '</td>' +
-      '<td class="p-4 text-center" data-label="Status PO"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + (po.statusPO || '') + '</span></td>' +
+      '<td class="p-4 text-center" data-label="Status PO"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + _poStatusLabel(po.statusPO) + '</span></td>' +
       '<td class="p-4 text-center" data-label="Status Bayar"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
       '<td class="p-4 text-right whitespace-nowrap" data-label="Nilai PO (DPP)">' +
         '<p class="font-bold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
@@ -604,7 +607,7 @@ function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
   document.getElementById('po-detail-nopo').innerText         = po.noPO || '';
   var badge = document.getElementById('po-detail-status-badge');
   badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full ' + (statusPOClass[po.statusPO] || 'bg-slate-100 text-slate-600');
-  badge.innerText = po.statusPO || '';
+  badge.innerText = _poStatusLabel(po.statusPO);
 
   document.getElementById('po-detail-subtitle').innerText    = 'Dibuat oleh ' + (po.dibuatOleh || '—') + ' pada ' + (po.dibuatPada || '—');
   document.getElementById('po-detail-tanggal').innerText     = po.tanggal || '—';
