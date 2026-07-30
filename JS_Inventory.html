@@ -858,60 +858,91 @@ function _kirimFmtTgl(raw) {
   return s;
 }
 
+var _kirimBoardTab = 'proses';
 window.loadPengirimanBarang = function() {
-  var reqBox = document.getElementById('kirim-req-list');
-  var sjBox = document.getElementById('kirim-sj-list');
-  if (reqBox) reqBox.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
-  google.script.run.withSuccessHandler(function(res) {
-    _kirimReqs = (res && res.success) ? (res.list || []) : [];
-    _kirimRenderRequests();
-    var b = document.getElementById('inv-pengiriman-badge');
-    if (b) { if (_kirimReqs.length) { b.textContent = _kirimReqs.length; b.classList.remove('hidden'); } else b.classList.add('hidden'); }
-  }).withFailureHandler(function() { if (reqBox) reqBox.innerHTML = '<div class="p-4 text-center text-rose-400">Gagal memuat request.</div>'; }).getPengirimanRequests();
-  if (sjBox) sjBox.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
-  google.script.run.withSuccessHandler(function(res) {
-    _kirimSJs = (res && res.success) ? (res.list || []) : [];
-    _kirimRenderSJ();
-  }).withFailureHandler(function() { if (sjBox) sjBox.innerHTML = '<div class="p-4 text-center text-rose-400">Gagal memuat surat jalan.</div>'; }).getPengirimanList({});
+  var box = document.getElementById('kirim-board-list');
+  if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  var done = 0;
+  function ready() { if (++done >= 2) _kirimRenderBoard(); }
+  google.script.run.withSuccessHandler(function(res) { _kirimReqs = (res && res.success) ? (res.list || []) : []; ready(); })
+    .withFailureHandler(function() { _kirimReqs = []; ready(); }).getPengirimanRequests();
+  google.script.run.withSuccessHandler(function(res) { _kirimSJs = (res && res.success) ? (res.list || []) : []; ready(); })
+    .withFailureHandler(function() { _kirimSJs = []; ready(); }).getPengirimanList({});
 };
 
-function _kirimRenderRequests() {
-  var box = document.getElementById('kirim-req-list');
-  if (!_kirimReqs.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400 text-sm">Tidak ada permintaan pengiriman.</div>'; return; }
-  box.innerHTML = _kirimReqs.map(function(r) {
-    var rows = (r.items || []).map(function(m) {
-      return '<tr class="border-t border-slate-100"><td class="px-3 py-1.5 text-slate-700">' + _escHtml(m.namaMaterial) + (m.merek ? ' <span class="text-slate-400">· ' + _escHtml(m.merek) + '</span>' : '') + '</td><td class="px-3 py-1.5 text-center font-bold text-indigo-700 whitespace-nowrap">' + _kirimRp(m.qtySisa) + ' ' + _escHtml(m.satuan || '') + '</td></tr>';
-    }).join('');
-    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' +
-      '<div class="flex items-center gap-2 px-4 py-3 bg-indigo-50/60 border-b border-slate-150 flex-wrap">' +
-        '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(r.noWO) + '</span>' +
-        '<span class="text-sm font-bold text-slate-700">' + _escHtml(r.namaProject || '') + '</span>' +
-        '<span class="text-[11px] text-slate-400">' + _escHtml(r.namaKlien || '') + (r.dimintaOleh ? ' · diminta ' + _escHtml(r.dimintaOleh) : '') + '</span>' +
-        '<button onclick="_kirimOpenModal(\'' + _escHtml(r.noWO) + '\')" class="ml-auto inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' +
-      '</div>' +
-      '<div class="px-4 py-1 text-[11px] text-slate-400">' + _escHtml(r.alamat || 'Alamat belum tersedia') + '</div>' +
-      '<div class="overflow-x-auto"><table class="w-full text-sm"><tbody>' + rows + '</tbody></table></div>' +
-    '</div>';
-  }).join('');
+function _kirimShowTab(tab) {
+  _kirimBoardTab = tab;
+  var on = 'px-4 py-2 text-sm font-bold border-b-2 border-indigo-500 text-indigo-600 -mb-px transition';
+  var off = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 -mb-px transition';
+  var p = document.getElementById('kirim-tab-proses-btn'), s = document.getElementById('kirim-tab-selesai-btn');
+  if (p) p.className = (tab === 'proses') ? on : off;
+  if (s) s.className = (tab === 'selesai') ? on : off;
+  _kirimRenderBoard();
 }
 
-function _kirimRenderSJ() {
-  var box = document.getElementById('kirim-sj-list');
-  if (!_kirimSJs.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400 text-sm">Belum ada surat jalan.</div>'; return; }
-  box.innerHTML = _kirimSJs.map(function(s) {
-    var stCls = s.status === 'Diterima' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700';
-    var terimaBtn = (s.status === 'Dikirim')
-      ? '<button onclick="_kirimOpenTerima(\'' + _escHtml(s.idKirim) + '\',\'' + _escHtml(s.noSuratJalan) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-box-open"></i> Barang Diterima</button>'
-      : (s.buktiFileUrl ? '<a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline"><i class="fa-solid fa-image mr-1"></i>Bukti</a>' : '');
-    return '<div class="bg-white rounded-2xl border border-slate-150 p-4 flex flex-col sm:flex-row sm:items-center gap-3">' +
-      '<div class="flex-1 min-w-0">' +
-        '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700 text-sm">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + stCls + '">' + _escHtml(s.status) + '</span></div>' +
-        '<div class="text-[11px] text-slate-400 truncate mt-0.5">' + _escHtml(s.noWO) + ' · ' + _escHtml(s.namaProject || '') + ' · ' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</div>' +
+// Gabung request + surat jalan → kartu per WO.
+function _kirimBuildBoard() {
+  var map = {}, order = [];
+  function ensure(noWO, info) {
+    if (!map[noWO]) { map[noWO] = { noWO: noWO, namaProject: '', namaKlien: '', alamat: '', sisaItems: [], sjs: [] }; order.push(noWO); }
+    if (info) { var w = map[noWO]; w.namaProject = w.namaProject || info.namaProject || ''; w.namaKlien = w.namaKlien || info.namaKlien || ''; w.alamat = w.alamat || info.alamat || ''; }
+    return map[noWO];
+  }
+  (_kirimReqs || []).forEach(function(r) { var w = ensure(r.noWO, r); w.sisaItems = r.items || []; });
+  (_kirimSJs || []).forEach(function(s) { var w = ensure(s.noWO, s); w.sjs.push(s); });
+  return order.map(function(noWO) {
+    var w = map[noWO];
+    var hasSisa = (w.sisaItems || []).length > 0;
+    var sjs = w.sjs || [];
+    var allDiterima = sjs.length > 0 && sjs.every(function(x) { return x.status === 'Diterima'; });
+    if (!sjs.length) { w.status = 'Perlu Diproses'; w.tab = 'proses'; }
+    else if (hasSisa) { w.status = 'Sebagian Dikirim'; w.tab = 'proses'; }
+    else if (!allDiterima) { w.status = 'Dikirim'; w.tab = 'proses'; }
+    else { w.status = 'Diterima'; w.tab = 'selesai'; }
+    w.hasSisa = hasSisa;
+    return w;
+  });
+}
+
+function _kirimStatusCls(st) {
+  if (st === 'Diterima') return 'bg-emerald-100 text-emerald-700';
+  if (st === 'Dikirim') return 'bg-sky-100 text-sky-700';
+  if (st === 'Sebagian Dikirim') return 'bg-amber-100 text-amber-700';
+  return 'bg-orange-100 text-orange-600';
+}
+
+function _kirimRenderBoard() {
+  var box = document.getElementById('kirim-board-list');
+  if (!box) return;
+  var board = _kirimBuildBoard();
+  var proses = board.filter(function(w) { return w.tab === 'proses'; });
+  var selesai = board.filter(function(w) { return w.tab === 'selesai'; });
+  var pb = document.getElementById('kirim-tab-proses-badge'); if (pb) pb.textContent = proses.length;
+  var sb = document.getElementById('kirim-tab-selesai-badge'); if (sb) sb.textContent = selesai.length;
+  var badge = document.getElementById('inv-pengiriman-badge');
+  if (badge) { var np = proses.filter(function(w) { return w.status === 'Perlu Diproses' || w.status === 'Sebagian Dikirim'; }).length; if (np) { badge.textContent = np; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
+  var list = (_kirimBoardTab === 'selesai') ? selesai : proses;
+  if (!list.length) {
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-truck-arrow-right mr-2"></i>' + (_kirimBoardTab === 'selesai' ? 'Belum ada pengiriman selesai.' : 'Tidak ada pengiriman yang perlu diproses.') + '</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(w) {
+    var sjRows = (w.sjs || []).map(function(s) {
+      var act = '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-800" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> PDF</button>';
+      if (s.status === 'Dikirim') act += ' <button onclick="_kirimOpenTerima(\'' + _escHtml(s.idKirim) + '\',\'' + _escHtml(s.noSuratJalan) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 ml-2" title="Barang Diterima"><i class="fa-solid fa-box-open"></i> Terima</button>';
+      else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
+      return '<div class="flex items-center gap-2 px-4 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="ml-auto">' + act + '</span></div>';
+    }).join('');
+    var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="ml-auto inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
+    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' +
+      '<div class="flex items-center gap-2 px-4 py-3 flex-wrap">' +
+        '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(w.noWO) + '</span>' +
+        '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(w.status) + '">' + _escHtml(w.status) + '</span>' +
+        '<div class="text-[11px] text-slate-400 truncate flex-1 min-w-0">' + _escHtml(w.namaProject || '') + (w.namaKlien ? ' · ' + _escHtml(w.namaKlien) : '') + '</div>' +
+        prosesBtn +
       '</div>' +
-      '<div class="flex items-center gap-2">' +
-        '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i> Surat Jalan</button>' +
-        terimaBtn +
-      '</div>' +
+      (w.alamat ? '<div class="px-4 pb-1 text-[11px] text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') +
+      sjRows +
     '</div>';
   }).join('');
 }
