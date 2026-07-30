@@ -61,27 +61,8 @@
 
           </div>
 
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse rp-table">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <th class="p-4">No PO / Tanggal</th>
-                    <th class="p-4">Nama Order / Supplier</th>
-                    <th class="p-4">No WO / Proyek</th>
-                    <th class="p-4 text-center">Status PO</th>
-                    <th class="p-4 text-center">Status Bayar</th>
-                    <th class="p-4 text-right">Nilai PO (DPP)</th>
-                    <th class="p-4 text-center" style="width:100px">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="table-purchaseorder" class="text-sm">
-                  <tr><td colspan="7" class="p-8 text-center text-slate-500">
-                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data purchase order...
-                  </td></tr>
-                </tbody>
-              </table>
-            </div>
+          <div id="po-card-list" class="space-y-2">
+            <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data purchase order...</div>
           </div>
         </div>
 
@@ -298,11 +279,14 @@
         </div>
 
         <!-- ── Modal Detail PO ── -->
-        <div id="panel-po-detail" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 px-4 py-6">
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col border border-slate-100" style="max-height:92vh">
+        <div id="panel-po-detail" class="hidden">
+          <div class="mb-4">
+            <button onclick="tutupPanelPO()" class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar</button>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-150 flex flex-col">
 
-            <!-- Header modal -->
-            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <!-- Header -->
+            <div class="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
               <span class="bg-orange-50 text-orange-500 h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
                 <i class="fa-solid fa-file-invoice"></i>
               </span>
@@ -318,8 +302,8 @@
               </button>
             </div>
 
-            <!-- Body modal -->
-            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            <!-- Body -->
+            <div class="flex-1 px-6 py-5 space-y-5">
 
               <!-- Info Grid -->
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -636,8 +620,8 @@
 
             </div>
 
-            <!-- Footer modal -->
-            <div class="flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-2xl flex-wrap">
+            <!-- Footer -->
+            <div class="flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-slate-100 bg-white rounded-b-2xl flex-wrap">
               <div class="flex gap-2 flex-wrap">
                 <button id="po-detail-btn-edit" onclick="bukaEditPO(_currentPODetail && _currentPODetail.noPO)"
                   class="hidden px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold transition flex items-center gap-2">

@@ -42,11 +42,12 @@ function onPOItemSelect(idx, sel) {
 // Label tampilan status PO (nilai tersimpan tetap, hanya teks yang diringkas).
 function _poStatusLabel(s) { return s === 'Menunggu Gudang' ? 'Tunggu Gudang' : (s || ''); }
 
-// ── Render tabel daftar PO ──────────────────────────────────────────────────
+// ── Render daftar PO sebagai kartu (pola QC/BOM) ─────────────────────────────
 function _pgRenderPurchaseOrder(data) {
-  var tbody = document.getElementById('table-purchaseorder');
+  var box = document.getElementById('po-card-list');
+  if (!box) return;
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-inbox mr-2"></i>Belum ada data Purchase Order.</td></tr>';
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-inbox mr-2"></i>Belum ada data Purchase Order.</div>';
     return;
   }
   var statusPOClass = {
@@ -63,40 +64,35 @@ function _pgRenderPurchaseOrder(data) {
     'Dibayar Sebagian': 'bg-amber-100 text-amber-700',
     'Lunas': 'bg-emerald-100 text-emerald-700'
   };
-  tbody.innerHTML = data.map(function(po) {
+  box.innerHTML = data.map(function(po) {
     var sc = statusPOClass[po.statusPO] || 'bg-slate-100 text-slate-500';
     var bc = statusBayarClass[po.statusBayar] || 'bg-slate-100 text-slate-500';
     var isAktif = po.statusPO === 'Aktif';
-    return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">' +
-      '<td class="p-4" data-label="No PO / Tanggal">' +
-        '<div class="font-mono font-bold text-slate-700">' + (po.noPO || '') + '</div>' +
-        '<div class="text-xs text-slate-400 mt-0.5">' + (po.tanggal || '') + '</div>' +
-      '</td>' +
-      '<td class="p-4" data-label="Nama Order / Supplier">' +
-        '<div class="font-medium text-slate-800">' + (_escHtml(po.peruntukan) || (po.namaSupplier || po.idSupplier || '—')) + '</div>' +
-        '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaSupplier || po.idSupplier || '') + '</div>' +
-      '</td>' +
-      '<td class="p-4" data-label="No WO / Proyek">' +
-        (po.noWO
-          ? '<div class="font-mono text-sm text-teal-700">' + _escHtml(po.noWO) + '</div>' +
-            (po.namaProject ? '<div class="text-xs text-slate-400 mt-0.5">' + _escHtml(po.namaProject) + '</div>' : '')
-          : '<span class="text-slate-400">—</span>') +
-      '</td>' +
-      '<td class="p-4 text-center" data-label="Status PO"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + sc + '">' + _poStatusLabel(po.statusPO) + '</span></td>' +
-      '<td class="p-4 text-center" data-label="Status Bayar"><span class="text-xs font-extrabold px-2 py-1 rounded-lg ' + bc + '">' + (po.statusBayar || '—') + '</span></td>' +
-      '<td class="p-4 text-right whitespace-nowrap" data-label="Nilai PO (DPP)">' +
-        '<p class="font-bold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
-        ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
-      '</td>' +
-      '<td class="p-4 text-center rp-actions">' +
-        '<div class="flex items-center justify-center gap-1">' +
-          '<button onclick="bukaPODetail(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detail"><i class="fa-solid fa-eye text-sm"></i></button>' +
-          (isAktif ? '<button onclick="bukaEditPO(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' : '') +
-          '<button onclick="exportPOPDF(\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
-          (isAktif ? '<button onclick="konfirmasiHapus(\'po\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\',\'' + (po.noPO || '').replace(/'/g, "\\'") + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '') +
+    var noPOesc = (po.noPO || '').replace(/'/g, "\\'");
+    var woLine = po.noWO ? ('<span class="font-mono text-teal-700">' + _escHtml(po.noWO) + '</span>' + (po.namaProject ? ' · ' + _escHtml(po.namaProject) : '')) : '';
+    var actBtns =
+      '<button onclick="event.stopPropagation();exportPOPDF(\'' + noPOesc + '\')" class="text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Export PDF"><i class="fa-solid fa-file-pdf text-sm"></i></button>' +
+      (isAktif ? '<button onclick="event.stopPropagation();bukaEditPO(\'' + noPOesc + '\')" class="text-blue-500 hover:bg-blue-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Edit"><i class="fa-solid fa-pen-to-square text-sm"></i></button>' : '') +
+      (isAktif ? '<button onclick="event.stopPropagation();konfirmasiHapus(\'po\',\'' + noPOesc + '\',\'' + noPOesc + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Hapus"><i class="fa-regular fa-trash-can text-sm"></i></button>' : '');
+    return '<div onclick="bukaPODetail(\'' + noPOesc + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-orange-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">' +
+      '<div class="flex-1 min-w-0">' +
+        '<div class="flex items-center gap-2 flex-wrap">' +
+          '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(po.noPO || '') + '</span>' +
+          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + sc + '">' + _poStatusLabel(po.statusPO) + '</span>' +
+          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + bc + '">' + (po.statusBayar || '—') + '</span>' +
         '</div>' +
-      '</td>' +
-    '</tr>';
+        '<div class="font-bold text-slate-800 truncate">' + (_escHtml(po.peruntukan) || _escHtml(po.namaSupplier || po.idSupplier || '—')) + '</div>' +
+        '<div class="text-[11px] text-slate-400 truncate">' + _escHtml(po.namaSupplier || po.idSupplier || '') + ' · ' + _escHtml(po.tanggal || '') + (woLine ? ' · ' + woLine : '') + '</div>' +
+      '</div>' +
+      '<div class="flex items-center gap-3 w-full sm:w-auto">' +
+        '<div class="text-left sm:text-right whitespace-nowrap">' +
+          '<p class="font-extrabold text-slate-800">Rp ' + ((po.nilaiDPP || 0).toLocaleString('id-ID')) + '</p>' +
+          ((po.ppnPersen > 0) ? '<p class="text-[10px] text-slate-400">Incl. PPN Rp ' + ((po.grandTotal || 0).toLocaleString('id-ID')) + '</p>' : '') +
+        '</div>' +
+        '<div class="flex items-center gap-1">' + actBtns + '</div>' +
+        '<i class="fa-solid fa-chevron-right text-slate-300"></i>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 
@@ -104,11 +100,7 @@ function _pgRenderPurchaseOrder(data) {
 window.loadPurchaseOrder = function(fromNav) {
   var render = function(data) {
     _cachedPOData = (data || []).slice().reverse();
-    _pgState.purchaseorder.data = _cachedPOData;
-    _pgState.purchaseorder.page = 1;
-    _injectPgBar('purchaseorder', '#table-purchaseorder');
-    _pgRender('purchaseorder');
-    _renderPOKPI(_cachedPOData);
+    filterPO();   // render kartu + KPI sesuai filter/pencarian aktif
   };
   var c = fromNav ? navCacheGet('purchaseorder') : null;
   if (c) { render(c); return; }
@@ -116,8 +108,8 @@ window.loadPurchaseOrder = function(fromNav) {
   google.script.run
     .withSuccessHandler(function(data) { navCacheSet('purchaseorder', data); render(data); })
     .withFailureHandler(function() {
-      document.getElementById('table-purchaseorder').innerHTML =
-        '<tr><td colspan="7" class="p-6 text-center text-rose-400">Gagal memuat data PO.</td></tr>';
+      var b = document.getElementById('po-card-list');
+      if (b) b.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-rose-400">Gagal memuat data PO.</div>';
     })
     .getPOList();
 };
@@ -134,9 +126,7 @@ window.filterPO = function() {
     if (status && po.statusPO !== status) return false;
     return true;
   });
-  _pgState.purchaseorder.data = filtered;
-  _pgState.purchaseorder.page = 1;
-  _pgRender('purchaseorder');
+  _pgRenderPurchaseOrder(filtered);
   _renderPOKPI(filtered);
 };
 
@@ -572,7 +562,11 @@ function bukaPODetail(noPO) {
       _renderPODetail(res.po, res.items || [], res.paymentRequests || [], res.riwayatPenerimaan || []);
       document.getElementById('form-terima-po').classList.add('hidden');
       document.getElementById('form-request-bayar-po').classList.add('hidden');
+      // Detail full-page: sembunyikan daftar & form, tampilkan panel detail.
+      document.getElementById('po-list-section').classList.add('hidden');
+      document.getElementById('form-po-section').classList.add('hidden');
       document.getElementById('panel-po-detail').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     })
     .withFailureHandler(function(err) {
       toggleLoader(false);
@@ -586,6 +580,9 @@ function tutupPanelPO() {
   document.getElementById('panel-po-detail').classList.add('hidden');
   document.getElementById('form-terima-po').classList.add('hidden');
   document.getElementById('form-request-bayar-po').classList.add('hidden');
+  // Kembali ke daftar PO (kartu).
+  document.getElementById('po-list-section').classList.remove('hidden');
+  loadPurchaseOrder(true);
 }
 
 function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
