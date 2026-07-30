@@ -136,8 +136,7 @@ function _schRenderHomeGantt(list) {
 
   var zoomBtn = function(z, lbl){ return '<button onclick="_schSetHomeZoom(\'' + z + '\')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition ' + (_schHomeZoom===z ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-500 border border-slate-200 hover:text-slate-700') + '">' + lbl + '</button>'; };
 
-  return '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">'
-    +   '<div class="text-xs text-slate-500"><i class="fa-solid fa-circle-info mr-1 text-slate-400"></i>Tiap baris = 1 WO. Bandingkan timeline untuk hindari jadwal bentrok.</div>'
+  return '<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">'
     +   '<div class="flex items-center gap-1.5">' + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + '</div>'
     + '</div>'
     + '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
