@@ -3,7 +3,7 @@
  * Disusun manual oleh Project Coordinator / Lead Engineer / Admin.
  * Registrasi WO manual (pola BOM/QC/DED).
  *
- * Sheet Schedule_Project: No WO | Nama Project | Nama Klien | Ditambahkan Oleh | Ditambahkan Pada
+ * Sheet Schedule_Project: No WO | Nama Project | Nama Klien | Ditambahkan Oleh | Ditambahkan Pada | Site Engineer
  * Sheet Schedule_Task:    ID | No WO | Nama Tugas | Fase | Tanggal Mulai | Tanggal Selesai |
  *                         Progress | Warna | Urutan | Catatan | Dibuat Oleh | Dibuat Pada
  */
@@ -11,10 +11,14 @@
 function _ensureScheduleProjectSheet(ss) {
   ss = ss || getSpreadsheet();
   var sheet = ss.getSheetByName('Schedule_Project');
-  if (sheet) return sheet;
+  if (sheet) {
+    // Migrasi: pastikan kolom Site Engineer (kolom 6) ada pada sheet lama.
+    if (sheet.getLastColumn() < 6) sheet.getRange(1, 6).setValue('Site Engineer').setFontWeight('bold');
+    return sheet;
+  }
   sheet = ss.insertSheet('Schedule_Project');
-  sheet.appendRow(['No WO', 'Nama Project', 'Nama Klien', 'Ditambahkan Oleh', 'Ditambahkan Pada']);
-  sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+  sheet.appendRow(['No WO', 'Nama Project', 'Nama Klien', 'Ditambahkan Oleh', 'Ditambahkan Pada', 'Site Engineer']);
+  sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
   return sheet;
 }
 
@@ -106,7 +110,7 @@ function _schSummary(tasks) {
 }
 
 // ── Registrasi WO ke Schedule (pola BOM) ──────────────────────────
-function addScheduleProject(noWO, addedBy) {
+function addScheduleProject(noWO, addedBy, siteEngineer) {
   var lock = LockService.getScriptLock();
   try {
     noWO = (noWO || '').toString().trim();
@@ -123,7 +127,7 @@ function addScheduleProject(noWO, addedBy) {
       var wo = (getWorkOrderList() || []).filter(function (w) { return w.noWO === noWO; })[0];
       if (wo) { proj = wo.namaProject || ''; klien = wo.namaKlien || ''; }
     } catch (e) {}
-    sheet.appendRow([noWO, proj, klien, (addedBy || '').toString(), _schNow()]);
+    sheet.appendRow([noWO, proj, klien, (addedBy || '').toString(), _schNow(), (siteEngineer || '').toString()]);
     return { success: true, message: 'Work Order ditambahkan ke Schedule.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -148,6 +152,27 @@ function removeScheduleProject(noWO) {
   } finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
+// Ubah Site Engineer yang ditugaskan pada sebuah WO.
+function updateScheduleSiteEngineer(noWO, siteEngineer) {
+  var lock = LockService.getScriptLock();
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    lock.waitLock(15000);
+    var sheet = _ensureScheduleProjectSheet(getSpreadsheet());
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() === noWO) {
+        sheet.getRange(i + 1, 6).setValue((siteEngineer || '').toString());
+        return { success: true, message: 'Site Engineer diperbarui.' };
+      }
+    }
+    return { success: false, message: 'WO tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
 // Home: daftar WO terdaftar + tugas + ringkasan (untuk mini-Gantt).
 function getScheduleWOList() {
   try {
@@ -165,6 +190,7 @@ function getScheduleWOList() {
         namaProject: (pData[i][1] || '').toString(),
         namaKlien: (pData[i][2] || '').toString(),
         tambahOleh: (pData[i][3] || '').toString(),
+        siteEngineer: (pData[i][5] || '').toString(),
         tasks: tasks,
         summary: _schSummary(tasks)
       });
@@ -181,7 +207,7 @@ function getScheduleByWO(noWO) {
     var pData = _ensureScheduleProjectSheet(ss).getDataRange().getValues();
     var proj = null;
     for (var i = 1; i < pData.length; i++) {
-      if ((pData[i][0] || '').toString().trim() === noWO) { proj = { noWO: noWO, namaProject: (pData[i][1] || '').toString(), namaKlien: (pData[i][2] || '').toString() }; break; }
+      if ((pData[i][0] || '').toString().trim() === noWO) { proj = { noWO: noWO, namaProject: (pData[i][1] || '').toString(), namaKlien: (pData[i][2] || '').toString(), siteEngineer: (pData[i][5] || '').toString() }; break; }
     }
     if (!proj) return { success: false, message: 'Proyek belum terdaftar di Schedule.' };
     var tasks = (_schTasksMap(ss)[noWO]) || [];

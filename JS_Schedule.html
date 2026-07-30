@@ -7,6 +7,7 @@ let _schSummary = {};
 let _schWOStatus = '';
 let _schZoom = 'minggu';   // hari | minggu | bulan (detail)
 let _schHomeZoom = 'minggu'; // hari | minggu | bulan (home gabungan)
+let _schSEList = [];         // cache daftar Site Engineer
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _schRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -43,6 +44,8 @@ window.loadSchedule = function() {
   }).withFailureHandler(function(){
     document.getElementById('sch-wo-list').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat data schedule.</div>';
   }).getScheduleWOList();
+  // Warm daftar Site Engineer untuk dropdown penugasan.
+  google.script.run.withSuccessHandler(function(res){ _schSEList = (res && res.success) ? (res.list || []) : []; }).getSiteEngineerList();
 };
 
 function _schSetHomeZoom(z){ _schHomeZoom = z; _schRenderWOList(); }
@@ -110,7 +113,7 @@ function _schRenderHomeGantt(list) {
       var wPx = (_schDays(s.tanggalMulai, s.tanggalSelesai) + 1) * ppd; if (wPx < 6) wPx = 6;
       bar = '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + '">'
           +   '<div class="h-full ' + b[1] + '" style="width:' + pct + '%"></div>'
-          +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-slate-700 truncate">' + (wPx > 64 ? _schEsc(w.noWO) : '') + '</span>'
+          +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-white drop-shadow-sm truncate">' + (wPx > 64 ? _schEsc(w.noWO) : '') + '</span>'
           + '</div>';
     } else {
       bar = '<div class="absolute text-[10px] text-slate-300 italic" style="left:4px;top:13px">Belum ada jadwal</div>';
@@ -119,9 +122,10 @@ function _schRenderHomeGantt(list) {
       + '<div class="shrink-0 sticky left-0 bg-white z-10 px-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
       +   '<div class="flex items-center gap-1.5"><span class="font-mono text-xs font-extrabold text-slate-700 truncate">' + _schEsc(w.noWO) + '</span>' + removeBtn + '</div>'
       +   '<div class="text-[11px] text-slate-600 font-semibold truncate">' + _schEsc(w.namaProject || '-') + '</div>'
+      +   '<div class="text-[10px] text-slate-400 truncate"><i class="fa-solid fa-helmet-safety mr-0.5 text-slate-300"></i>' + (w.siteEngineer ? _schEsc(w.siteEngineer) : 'Belum ada SE') + '</div>'
       +   '<div class="text-[10px] text-slate-400 truncate">' + pct + '% · ' + (s.jumlahTugas||0) + ' tugas</div>'
       + '</div>'
-      + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:54px">' + todayLine + bar + '</div>'
+      + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:62px">' + todayLine + bar + '</div>'
       + '</div>';
   }).join('');
 
@@ -154,9 +158,19 @@ function _schRenderWOList() {
 }
 
 // ── Tambah / keluarkan project ──
+function _schSEOptions(selected){
+  var opts = '<option value="">— Belum ditugaskan —</option>';
+  (_schSEList || []).forEach(function(u){
+    var nm = u.nama || u.username || '';
+    opts += '<option value="' + _schEsc(nm) + '"' + (nm === selected ? ' selected' : '') + '>' + _schEsc(nm) + '</option>';
+  });
+  return opts;
+}
 function _schOpenAddProject() {
   var sel = document.getElementById('sch-proj-wo');
+  var selSE = document.getElementById('sch-proj-se');
   sel.innerHTML = '<option value="">Memuat WO...</option>';
+  selSE.innerHTML = '<option value="">Memuat...</option>';
   document.getElementById('sch-modal-project').classList.remove('hidden');
   google.script.run.withSuccessHandler(function(data){
     var reg = {}; _schWOList.forEach(function(w){ reg[w.noWO] = 1; });
@@ -166,10 +180,15 @@ function _schOpenAddProject() {
     });
     sel.innerHTML = opts;
   }).withFailureHandler(function(){ sel.innerHTML = '<option value="">Gagal memuat WO</option>'; }).getWorkOrderList();
+  google.script.run.withSuccessHandler(function(res){
+    _schSEList = (res && res.success) ? (res.list || []) : [];
+    selSE.innerHTML = _schSEOptions('');
+  }).withFailureHandler(function(){ selSE.innerHTML = '<option value="">Gagal memuat SE</option>'; }).getSiteEngineerList();
 }
 function _schCloseAddProject(){ document.getElementById('sch-modal-project').classList.add('hidden'); }
 function _schSubmitAddProject() {
   var noWO = document.getElementById('sch-proj-wo').value;
+  var se = document.getElementById('sch-proj-se').value;
   if (!noWO) return showNotification('Pilih Work Order dulu.', 'error');
   _schCloseAddProject();
   toggleLoader(true, 'Menambahkan...');
@@ -177,7 +196,7 @@ function _schSubmitAddProject() {
     toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
     if (res && res.success) loadSchedule();
   }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
-    .addScheduleProject(noWO, _schUserNama());
+    .addScheduleProject(noWO, _schUserNama(), se);
 }
 function _schRemoveProject(noWO) {
   showConfirm({ title: 'Keluarkan dari Schedule', message: 'Keluarkan WO ' + noWO + ' dari Schedule? Tugas tidak dihapus (bisa ditambahkan lagi).', confirmText: 'Ya, Keluarkan', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
@@ -205,7 +224,7 @@ function _schReloadDetail() {
     _schTasks = res.tasks || [];
     _schSummary = res.summary || {};
     _schWOStatus = res.woStatus || '';
-    if (res.project) { _schWO.namaProject = res.project.namaProject; _schWO.namaKlien = res.project.namaKlien; }
+    if (res.project) { _schWO.namaProject = res.project.namaProject; _schWO.namaKlien = res.project.namaKlien; _schWO.siteEngineer = res.project.siteEngineer || ''; }
     _schRenderDetail();
   }).withFailureHandler(function(){ document.getElementById('sch-gantt').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat.</div>'; })
     .getScheduleByWO(_schWO.noWO);
@@ -225,7 +244,9 @@ function _schRenderDetail() {
     +   '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + (pct>=100?'bg-emerald-100 text-emerald-700':(pct>0?'bg-indigo-100 text-indigo-700':'bg-slate-100 text-slate-500')) + '">' + pct + '% selesai</span>'
     +   (_schWOStatus==='Closed' ? '<span class="text-[10px] font-bold text-rose-600"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>WO Closed</span>' : '') + '</div>'
     +   '<div class="font-bold text-slate-800">' + _schEsc(_schWO.namaProject || '-') + '</div>'
-    +   '<div class="text-xs text-slate-400">' + _schEsc(_schWO.namaKlien || '') + '</div></div>'
+    +   '<div class="text-xs text-slate-400">' + _schEsc(_schWO.namaKlien || '') + '</div>'
+    +   _schSEBlock()
+    +   '</div>'
     + '<div class="text-right text-xs text-slate-500"><div class="font-bold text-slate-700">' + (s.jumlahTugas||0) + ' tugas</div>'
     +   '<div>' + (s.tanggalMulai ? _schFmt(s.tanggalMulai) + ' → ' + _schFmt(s.tanggalSelesai) : 'Belum ada jadwal') + '</div></div>'
     + '</div>';
@@ -234,6 +255,27 @@ function _schRenderDetail() {
 }
 
 function _schSetZoom(z){ _schZoom = z; _schRenderDetail(); }
+
+// Blok Site Engineer di header detail: dropdown reassign (bila boleh edit) atau teks.
+function _schSEBlock() {
+  var se = _schWO.siteEngineer || '';
+  if (_schCanEdit() && _schWOStatus !== 'Closed') {
+    return '<div class="flex items-center gap-1.5 mt-1.5">'
+      + '<i class="fa-solid fa-helmet-safety text-slate-400 text-xs"></i>'
+      + '<select onchange="_schSaveSE(this.value)" class="text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white max-w-[200px]">' + _schSEOptions(se) + '</select>'
+      + '</div>';
+  }
+  return '<div class="text-xs text-slate-500 mt-1.5"><i class="fa-solid fa-helmet-safety text-slate-400 mr-1"></i>' + (se ? _schEsc(se) : 'Belum ada Site Engineer') + '</div>';
+}
+function _schSaveSE(nama) {
+  if (!_schWO) return;
+  toggleLoader(true, 'Menyimpan...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _schWO.siteEngineer = nama; }
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .updateScheduleSiteEngineer(_schWO.noWO, nama);
+}
 
 function _schRenderGantt() {
   var box = document.getElementById('sch-gantt');
