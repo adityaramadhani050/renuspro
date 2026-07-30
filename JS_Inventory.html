@@ -862,8 +862,8 @@ var _kirimBoardTab = 'proses';
 var _kirimOpen = {};   // accordion: noWO → terbuka? (tampilkan surat jalan)
 function _kirimToggleDetail(noWO) { _kirimOpen[noWO] = !_kirimOpen[noWO]; _kirimRenderBoard(); }
 window.loadPengirimanBarang = function() {
-  var box = document.getElementById('kirim-board-list');
-  if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  var box = document.getElementById('kirim-board-body');
+  if (box) box.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
   var done = 0;
   function ready() { if (++done >= 2) _kirimRenderBoard(); }
   google.script.run.withSuccessHandler(function(res) { _kirimReqs = (res && res.success) ? (res.list || []) : []; ready(); })
@@ -914,7 +914,7 @@ function _kirimStatusCls(st) {
 }
 
 function _kirimRenderBoard() {
-  var box = document.getElementById('kirim-board-list');
+  var box = document.getElementById('kirim-board-body');
   if (!box) return;
   var board = _kirimBuildBoard();
   var proses = board.filter(function(w) { return w.tab === 'proses'; });
@@ -925,42 +925,46 @@ function _kirimRenderBoard() {
   if (badge) { var np = proses.filter(function(w) { return w.status === 'Perlu Diproses' || w.status === 'Sebagian Dikirim'; }).length; if (np) { badge.textContent = np; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
   var list = (_kirimBoardTab === 'selesai') ? selesai : proses;
   if (!list.length) {
-    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-truck-arrow-right mr-2"></i>' + (_kirimBoardTab === 'selesai' ? 'Belum ada pengiriman selesai.' : 'Tidak ada pengiriman yang perlu diproses.') + '</div>';
+    box.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fa-solid fa-truck-arrow-right mr-2"></i>' + (_kirimBoardTab === 'selesai' ? 'Belum ada pengiriman selesai.' : 'Tidak ada pengiriman yang perlu diproses.') + '</td></tr>';
     return;
   }
   box.innerHTML = list.map(function(w) {
-    var sjRows = (w.sjs || []).map(function(s) {
+    var sjArr = w.sjs || [];
+    var isOpen = !!_kirimOpen[w.noWO];
+    // Baris detail surat jalan (accordion, dipakai saat >1 SJ).
+    var sjRows = sjArr.map(function(s) {
       var act = '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-800" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> PDF</button>';
       if (s.status === 'Dikirim') act += ' <button onclick="_kirimOpenTerima(\'' + _escHtml(s.idKirim) + '\',\'' + _escHtml(s.noSuratJalan) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 ml-2" title="Barang Diterima"><i class="fa-solid fa-box-open"></i> Terima</button>';
       else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
-      return '<div class="flex items-center gap-2 px-4 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="ml-auto">' + act + '</span></div>';
+      return '<div class="flex items-center gap-2 px-3 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="ml-auto">' + act + '</span></div>';
     }).join('');
-    var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
-    var isOpen = !!_kirimOpen[w.noWO];
-    var sjArr = w.sjs || [];
-    var headerExtra = '', accordionBody = '';
-    if (sjArr.length === 1) {
-      // 1 surat jalan → tampil langsung: tombol PDF (label = No SJ) + Terima/Bukti.
+    // Kolom "Surat Jalan": 0 → —, 1 → tombol PDF (label No SJ), >1 → chevron Detail.
+    var sjCell, aksiExtra = '';
+    if (!sjArr.length) sjCell = '<span class="text-slate-300">—</span>';
+    else if (sjArr.length === 1) {
       var s0 = sjArr[0];
-      headerExtra = '<button onclick="_kirimExportPDF(\'' + _escHtml(s0.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> ' + _escHtml(s0.noSuratJalan) + '</button>';
-      if (s0.status === 'Dikirim') headerExtra += '<button onclick="_kirimOpenTerima(\'' + _escHtml(s0.idKirim) + '\',\'' + _escHtml(s0.noSuratJalan) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-box-open"></i> Terima</button>';
-      else if (s0.buktiFileUrl) headerExtra += '<a href="' + _escHtml(s0.buktiFileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline px-1"><i class="fa-solid fa-image"></i> Bukti</a>';
-    } else if (sjArr.length > 1) {
-      // >1 surat jalan → accordion chevron Detail.
-      headerExtra = '<button onclick="_kirimToggleDetail(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-1.5 px-2" title="Lihat surat jalan"><i class="fa-solid fa-chevron-' + (isOpen ? 'up' : 'down') + ' text-[10px]"></i> Detail (' + sjArr.length + ')</button>';
-      accordionBody = isOpen ? (
-        (w.alamat ? '<div class="px-4 pb-1 text-[11px] text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') + sjRows
-      ) : '';
+      sjCell = '<button onclick="_kirimExportPDF(\'' + _escHtml(s0.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> ' + _escHtml(s0.noSuratJalan) + '</button>';
+      if (s0.status === 'Dikirim') aksiExtra = '<button onclick="_kirimOpenTerima(\'' + _escHtml(s0.idKirim) + '\',\'' + _escHtml(s0.noSuratJalan) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-box-open"></i> Terima</button>';
+      else if (s0.buktiFileUrl) aksiExtra = '<a href="' + _escHtml(s0.buktiFileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline px-1"><i class="fa-solid fa-image"></i> Bukti</a>';
+    } else {
+      sjCell = '<button onclick="_kirimToggleDetail(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-1.5 px-2" title="Lihat surat jalan"><i class="fa-solid fa-chevron-' + (isOpen ? 'up' : 'down') + ' text-[10px]"></i> Detail (' + sjArr.length + ')</button>';
     }
-    return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' +
-      '<div class="flex items-center gap-2 px-4 py-3 flex-wrap">' +
-        '<span class="font-mono font-extrabold text-slate-700">' + _escHtml(w.noWO) + '</span>' +
-        '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(w.status) + '">' + _escHtml(w.status) + '</span>' +
-        '<div class="text-[11px] text-slate-400 truncate flex-1 min-w-0">' + _escHtml(w.namaProject || '') + (w.namaKlien ? ' · ' + _escHtml(w.namaKlien) : '') + '</div>' +
-        '<div class="flex items-center gap-1.5 ml-auto">' + prosesBtn + headerExtra + '</div>' +
-      '</div>' +
-      accordionBody +
-    '</div>';
+    var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
+    var aksiInner = prosesBtn + aksiExtra;
+    var aksiCell = aksiInner ? ('<div class="flex items-center justify-center gap-1.5 flex-wrap">' + aksiInner + '</div>') : '<span class="text-slate-300 text-xs">—</span>';
+    var mainRow = '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
+      '<td class="p-4 font-mono font-bold text-slate-700 whitespace-nowrap" data-label="No WO">' + _escHtml(w.noWO) + '</td>' +
+      '<td class="p-4" data-label="Project / Klien"><div class="font-semibold text-slate-800">' + _escHtml(w.namaProject || '-') + '</div>' + (w.namaKlien ? '<div class="text-xs text-slate-400">' + _escHtml(w.namaKlien) + '</div>' : '') + '</td>' +
+      '<td class="p-4 text-center" data-label="Status"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(w.status) + '">' + _escHtml(w.status) + '</span></td>' +
+      '<td class="p-4" data-label="Surat Jalan">' + sjCell + '</td>' +
+      '<td class="p-4 text-center rp-actions" data-label="Aksi">' + aksiCell + '</td>' +
+    '</tr>';
+    var detailRow = (sjArr.length > 1 && isOpen)
+      ? '<tr class="bg-slate-50"><td colspan="5" class="px-4 pb-4 pt-1"><div class="rounded-xl border border-slate-150 overflow-hidden bg-white">' +
+          (w.alamat ? '<div class="px-3 py-2 text-[11px] text-slate-400 border-b border-slate-100"><i class="fa-solid fa-location-dot mr-1"></i>' + _escHtml(w.alamat) + '</div>' : '') +
+          sjRows + '</div></td></tr>'
+      : '';
+    return mainRow + detailRow;
   }).join('');
 }
 
