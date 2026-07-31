@@ -338,17 +338,17 @@ function _schRenderGantt() {
   // Header ticks (helper bersama dengan home)
   var ticks = _schBuildTicks(start, totalDays, ppd, _schZoom);
 
-  var rows = _schTasks.map(function(t){
+  // Satu baris tugas (dipakai di dalam grup fase).
+  function _schTaskRow(t){
     var b = _schBar(t.warna);
     var leftPx = _schDays(start, t.mulai) * ppd;
     var wPx = (_schDays(t.mulai, t.selesai) + 1) * ppd; if (wPx < 6) wPx = 6;
     var prog = Number(t.progress)||0;
     var clickable = _schCanEdit() ? ' cursor-pointer' : '';
     var onclk = _schCanEdit() ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
-    var faseTxt = t.fase ? '<span class="text-[10px] text-slate-400"> · ' + _schEsc(t.fase) + '</span>' : '';
     return '<div class="flex border-b border-slate-100 items-stretch">'
-      + '<div class="shrink-0 sticky left-0 bg-white z-10 px-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
-      +   '<div class="text-xs font-bold text-slate-700 truncate' + clickable + '"' + onclk + '>' + _schEsc(t.namaTugas) + faseTxt + '</div>'
+      + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
+      +   '<div class="text-xs font-bold text-slate-700 truncate' + clickable + '"' + onclk + '>' + _schEsc(t.namaTugas) + '</div>'
       +   '<div class="text-[10px] text-slate-400">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + prog + '%</div>'
       + '</div>'
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:42px">'
@@ -359,6 +359,44 @@ function _schRenderGantt() {
       +   '</div>'
       + '</div>'
       + '</div>';
+  }
+
+  // Kelompokkan tugas berdasarkan Fase (urutan kanonik → fase lain → tanpa fase).
+  var FASE_ORDER = ['Hand Over','Engineering','Pengadaan','Pengiriman','Kontruksi','Finishing'];
+  var groups = {};
+  _schTasks.forEach(function(t){ var f = (t.fase || '').trim(); (groups[f] = groups[f] || []).push(t); });
+  var faseKeys = Object.keys(groups).sort(function(a, b){
+    var ia = (a === '') ? 999 : (FASE_ORDER.indexOf(a) === -1 ? 500 : FASE_ORDER.indexOf(a));
+    var ib = (b === '') ? 999 : (FASE_ORDER.indexOf(b) === -1 ? 500 : FASE_ORDER.indexOf(b));
+    return ia - ib;
+  });
+
+  var rows = faseKeys.map(function(f){
+    var gtasks = groups[f];
+    var gmin = '', gmax = '', gdur = 0, gwp = 0;
+    gtasks.forEach(function(t){
+      if (t.mulai && (!gmin || t.mulai < gmin)) gmin = t.mulai;
+      if (t.selesai && (!gmax || t.selesai > gmax)) gmax = t.selesai;
+      var d = _schDays(t.mulai, t.selesai) + 1; if (d < 1) d = 1;
+      gdur += d; gwp += (Number(t.progress)||0) * d;
+    });
+    var gpct = gdur ? Math.round(gwp / gdur) : 0;
+    var spanBar = '';
+    if (gmin && gmax) {
+      var gl = _schDays(start, gmin) * ppd;
+      var gw = (_schDays(gmin, gmax) + 1) * ppd; if (gw < 6) gw = 6;
+      spanBar = '<div class="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-slate-300/70" style="left:' + gl + 'px;width:' + gw + 'px"></div>';
+    }
+    var header = '<div class="flex bg-slate-50 border-b border-slate-200 items-stretch">'
+      + '<div class="shrink-0 sticky left-0 bg-slate-50 z-10 px-3 py-1.5 border-r border-slate-200 flex items-center gap-1.5" style="width:' + leftW + 'px">'
+      +   '<i class="fa-solid fa-layer-group text-[10px] text-slate-400"></i>'
+      +   '<span class="text-[11px] font-extrabold text-slate-600 uppercase tracking-wide truncate">' + _schEsc(f || 'Tanpa Fase') + '</span>'
+      +   '<span class="text-[10px] font-bold text-slate-400">(' + gtasks.length + ')</span>'
+      +   '<span class="ml-auto text-[10px] font-bold text-slate-400">' + gpct + '%</span>'
+      + '</div>'
+      + '<div class="relative bg-slate-50" style="width:' + totalPx + 'px;min-height:28px">' + todayLine + spanBar + '</div>'
+      + '</div>';
+    return header + gtasks.map(_schTaskRow).join('');
   }).join('');
 
   box.innerHTML = '<div class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
