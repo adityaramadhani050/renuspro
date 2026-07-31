@@ -260,21 +260,20 @@ function bukaReserveDetail(idStok, namaProduk) {
       box.innerHTML = '<p class="text-sm text-slate-400 italic text-center py-6">Tidak ada reserve aktif untuk stok ini.</p>';
       return;
     }
+    var satuan = '';
+    list.forEach(function(w) { (w.items || []).forEach(function(m) { if (!satuan && m.satuan) satuan = m.satuan; }); });
+    var sat = satuan ? (' ' + _escHtml(satuan)) : '';
     box.innerHTML = list.map(function(w) {
-      var mats = (w.items || []).map(function(m) {
-        return '<div class="flex items-center justify-between text-[11px] text-slate-500 pl-1"><span class="truncate">' + _escHtml(m.namaMaterial) + '</span><span class="font-semibold text-slate-600 whitespace-nowrap ml-2">' + (Number(m.qty)||0).toLocaleString('id-ID') + ' ' + _escHtml(m.satuan || '') + '</span></div>';
-      }).join('');
       return '<div class="border border-slate-150 rounded-xl px-3 py-2.5">'
         + '<div class="flex items-center justify-between gap-2">'
         +   '<div class="min-w-0"><div class="font-mono text-xs font-bold text-slate-700">' + _escHtml(w.noWO || '-') + '</div>'
         +     '<div class="text-[11px] text-slate-400 truncate">' + _escHtml(w.namaProject || '-') + (w.namaKlien ? ' · ' + _escHtml(w.namaKlien) : '') + '</div></div>'
-        +   '<span class="text-xs font-extrabold text-indigo-600 whitespace-nowrap shrink-0">' + (Number(w.qty)||0).toLocaleString('id-ID') + '</span>'
+        +   '<span class="text-xs font-extrabold text-indigo-600 whitespace-nowrap shrink-0">' + (Number(w.qty)||0).toLocaleString('id-ID') + sat + '</span>'
         + '</div>'
-        + (mats ? '<div class="mt-1.5 pt-1.5 border-t border-slate-100 space-y-0.5">' + mats + '</div>' : '')
         + '</div>';
     }).join('');
     document.getElementById('reserve-detail-total').innerHTML =
-      '<span>Total Reserved</span><span class="text-indigo-600">' + (Number(res.total)||0).toLocaleString('id-ID') + '</span>';
+      '<span>Total Reserved</span><span class="text-indigo-600">' + (Number(res.total)||0).toLocaleString('id-ID') + sat + '</span>';
   }).withFailureHandler(function() {
     document.getElementById('reserve-detail-list').innerHTML = '<p class="text-sm text-rose-400 text-center py-6">Gagal memuat detail reserve.</p>';
   }).getReserveDetailByStok(idStok);
