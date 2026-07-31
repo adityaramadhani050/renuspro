@@ -19,6 +19,7 @@ let _bomBusyIds = {};     // id material yang sedang di-approve/reject/proses (l
 let _bomFinalizedBy = ''; // pemfinalisasi (saat semua material Approved)
 let _bomFinalizedAt = '';
 let _bomKirimReq = '';    // status request pengiriman WO ('Diminta'/'Selesai'/'')
+let _bomKirimReqIds = []; // bomItemId yang sudah masuk request aktif ('Diminta')
 let _bomStokList = null;   // cache getStokList untuk modal procurement
 let _bomNeedList = null;   // cache daftar "Perlu Dibelanjakan"
 let _bomHomeTab = 'proses';// tab home: 'proses' | 'approved' | 'need'
@@ -400,8 +401,16 @@ function _bomBatalBeliLangsung(id) {
 // ── Request Pengiriman (Project Coordinator) — pilih material (parsial) ────────
 function _bomRequestKirim() {
   if (!_bomWO) return;
-  var reserved = (_bomItems || []).filter(function(it) { return it.status === 'Approved' && ((Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0)) > 0; });
-  if (!reserved.length) return showNotification('Belum ada material Reserved untuk dikirim.', 'error');
+  var tambahMode = (_bomKirimReq === 'Diminta');
+  var reqIdSet = {}; (_bomKirimReqIds || []).forEach(function(id) { reqIdSet[id] = 1; });
+  // Mode tambah: hanya material yang belum ada di request aktif.
+  var reserved = (_bomItems || []).filter(function(it) {
+    if (it.status !== 'Approved' || ((Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0)) <= 0) return false;
+    return tambahMode ? !reqIdSet[it.id] : true;
+  });
+  if (!reserved.length) return showNotification(tambahMode ? 'Tidak ada material baru untuk ditambahkan.' : 'Belum ada material Reserved untuk dikirim.', 'error');
+  var titleEl = document.getElementById('bom-kirim-title');
+  if (titleEl) titleEl.innerText = tambahMode ? 'Tambah Material Kirim' : 'Request Pengiriman';
   var box = document.getElementById('bom-kirim-list');
   box.innerHTML = reserved.map(function(it) {
     var sisa = (Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0);
@@ -486,6 +495,7 @@ function _bomReloadDetail() {
     _bomFinalizedBy = res.finalizedBy || '';
     _bomFinalizedAt = res.finalizedAt || '';
     _bomKirimReq = res.kirimRequest || '';
+    _bomKirimReqIds = res.kirimReqItemIds || [];
     if (_bomWO) _bomWO.status = _bomStatus;
     _bomRenderDetail();
   }).withFailureHandler(function() {
@@ -502,19 +512,22 @@ function _bomRenderDetail() {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
       + '<div id="bom-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
   }
-  // Request Pengiriman (Project Coordinator/Admin) — PARSIAL: cukup ada material
-  // Reserved, tak perlu menunggu seluruh material BoM selesai diproses.
+  // Request Pengiriman (Project Coordinator/Admin) — PARSIAL: pilih material Reserved.
+  // Selama request masih aktif ('Diminta'), material baru bisa ditambah (digabung).
   if (_bomCanRequestKirim()) {
-    var anyReserved = false, adaApproved = false, anyDikirim = false;
+    var anyReserved = false, adaApproved = false, anyDikirim = false, adaTambah = false;
+    var reqIdSet = {}; (_bomKirimReqIds || []).forEach(function(id) { reqIdSet[id] = 1; });
     _bomItems.forEach(function(it) {
       if (it.status !== 'Approved') return;
       adaApproved = true;
-      if (((it.qtyReserved || 0) - (it.qtyDikirim || 0)) > 0) anyReserved = true;
+      var sisa = (it.qtyReserved || 0) - (it.qtyDikirim || 0);
+      if (sisa > 0) { anyReserved = true; if (!reqIdSet[it.id]) adaTambah = true; }
       if ((it.qtyDikirim || 0) > 0) anyDikirim = true;
     });
-    if (_bomKirimReq === 'Diminta' && !anyDikirim) {
-      btns += '<button onclick="_bomBatalRequestKirim()" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-rotate-left"></i><span class="hidden sm:inline"> Batalkan Req. Kirim</span></button>';
-    } else if (_bomKirimReq !== 'Diminta' && adaApproved && anyReserved) {
+    if (_bomKirimReq === 'Diminta') {
+      if (adaTambah) btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Material Kirim</button>';
+      if (!anyDikirim) btns += '<button onclick="_bomBatalRequestKirim()" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-rotate-left"></i><span class="hidden sm:inline"> Batalkan Req. Kirim</span></button>';
+    } else if (adaApproved && anyReserved) {
       btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Request Pengiriman</button>';
     }
   }

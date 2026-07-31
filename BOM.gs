@@ -447,6 +447,7 @@ function getBOMByWO(noWO) {
       finalizedBy: finalizedBy,
       finalizedAt: finalizedAt,
       kirimRequest: (function () { try { return _kirimReqStatus(noWO); } catch (e) { return ''; } })(),
+      kirimReqItemIds: (function () { try { return _kirimReqActiveItemIds(noWO); } catch (e) { return []; } })(),
       items: items
     };
   } catch (e) {
