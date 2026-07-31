@@ -398,6 +398,7 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-role').value      = 'sales';
   document.getElementById('modal-user-target').value    = '';
   var waAdd = document.getElementById('modal-user-wa'); if (waAdd) waAdd.value = '';
+  var emAdd = document.getElementById('modal-user-email'); if (emAdd) emAdd.value = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
   var leadWrap = document.getElementById('modal-user-lead-wrap');
@@ -417,6 +418,7 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-aktif').checked         = u.aktif;
   document.getElementById('modal-user-target').value          = u.targetBulanan || '';
   var waEdit = document.getElementById('modal-user-wa'); if (waEdit) waEdit.value = u.noWa || '';
+  var emEdit = document.getElementById('modal-user-email'); if (emEdit) emEdit.value = u.email || '';
   var leadWrap = document.getElementById('modal-user-lead-wrap');
   if (leadWrap) {
     if (u.role === 'sales') {
@@ -445,6 +447,8 @@ function simpanUserModal() {
   const leadId   = (leadSel && role === 'sales') ? (leadSel.value || '') : '';
   const waEl     = document.getElementById('modal-user-wa');
   const noWa     = waEl ? waEl.value.trim() : '';
+  const emEl     = document.getElementById('modal-user-email');
+  const email    = emEl ? emEl.value.trim() : '';
 
   if (!nama || !username) return showNotification('Nama dan username wajib diisi.', 'error');
   if (!id && !password)   return showNotification('Password wajib diisi untuk user baru.', 'error');
@@ -455,8 +459,8 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif, target, leadId, noWa]
-      : [nama, username, password, role, leadId, noWa];
+      ? [id, nama, username, password, role, aktif, target, leadId, noWa, email]
+      : [nama, username, password, role, leadId, noWa, email];
 
     google.script.run
       .withSuccessHandler(function(res) {

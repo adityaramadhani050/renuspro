@@ -100,9 +100,61 @@ function _hoRequireSelesai(noWO) {
 function getHOUserOptions() {
   try {
     var users = (getUserList() || []).filter(function (u) { return u.aktif; })
-      .map(function (u) { return { id: u.id, nama: u.nama, role: u.role }; });
+      .map(function (u) { return { id: u.id, nama: u.nama, role: u.role, email: u.email || '' }; });
     return { success: true, list: users };
   } catch (e) { return { success: false, list: [], message: e.toString() }; }
+}
+
+// Peta nama user → objek user (untuk resolve peserta → email/noWa).
+function _hoUserMapByNama() {
+  var map = {};
+  try { (getUserList() || []).forEach(function (u) { map[(u.nama || '').toString().trim()] = u; }); } catch (e) {}
+  return map;
+}
+function _hoWOProject(noWO) {
+  try {
+    var wo = (getWorkOrderList() || []).filter(function (w) { return w.noWO === noWO; })[0];
+    return wo ? { namaProject: wo.namaProject || '', namaKlien: wo.namaKlien || '' } : { namaProject: '', namaKlien: '' };
+  } catch (e) { return { namaProject: '', namaKlien: '' }; }
+}
+
+// Undang peserta ke event Calendar (Meet) → Google kirim undangan otomatis.
+function _hoInviteCalendar(eventId, emails) {
+  try {
+    if (!eventId || typeof Calendar === 'undefined' || !Calendar.Events) return;
+    var att = (emails || []).filter(function (e) { return e && e.indexOf('@') !== -1; }).map(function (e) { return { email: e }; });
+    if (!att.length) return;
+    Calendar.Events.patch({ attendees: att }, 'primary', eventId, { conferenceDataVersion: 1, sendUpdates: 'all' });
+  } catch (e) { Logger.log('HO calendar invite error: ' + e); }
+}
+
+// WA ke Project Coordinator saat sales request HO.
+function _hoNotifRequest(noWO, oleh) {
+  try {
+    if (typeof _waSendTo !== 'function' || typeof _qcPhonesByRole !== 'function') return;
+    var proj = _hoWOProject(noWO);
+    var msg = '🤝 *Request Hand Over*\nWO: ' + noWO + (proj.namaProject ? ' — ' + proj.namaProject : '') +
+      '\nDiminta oleh: ' + (oleh || '-') + '\nMohon dijadwalkan oleh Project Coordinator.';
+    (_qcPhonesByRole('projectcoordinator') || []).forEach(function (pc) { _waSendTo(pc.phone, msg); });
+  } catch (e) {}
+}
+
+// WA ke seluruh peserta saat HO dijadwalkan.
+function _hoNotifSchedule(noWO, payload, names, umap) {
+  try {
+    if (typeof _waSendTo !== 'function') return;
+    var proj = _hoWOProject(noWO);
+    var tgl = _hoIso(payload.tanggal);
+    var tglTxt = tgl ? tgl.split('-').reverse().join('/') : '-';
+    var lokasiLink = payload.mode === 'Online' ? ('Link: ' + (payload.link || '-')) : ('Lokasi: ' + (payload.lokasi || '-'));
+    var msg = '📅 *Hand Over Dijadwalkan*\nWO: ' + noWO + (proj.namaProject ? ' — ' + proj.namaProject : '') +
+      '\nTanggal: ' + tglTxt + (payload.waktu ? ' ' + payload.waktu : '') +
+      '\nMode: ' + payload.mode + '\n' + lokasiLink;
+    (names || []).forEach(function (n) {
+      var u = umap[n];
+      if (u && u.aktif && u.noWa) _waSendTo(_normalizePhone(u.noWa), msg);
+    });
+  } catch (e) {}
 }
 
 // Record HO lengkap sebuah WO (untuk panel di detail Work Order).
@@ -155,6 +207,7 @@ function requestHandOver(noWO, oleh) {
     } else {
       sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _hoNow(), '', '', '', '', '', '', '', '', '', '', '', '', '']);
     }
+    try { _hoNotifRequest(noWO, oleh); } catch (eN) {}
     return { success: true, message: 'Request Hand Over WO ' + noWO + ' dikirim ke Project Coordinator.' };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }
@@ -228,6 +281,16 @@ function scheduleHandOver(payload) {
     sheet.getRange(rIdx, 5, 1, 7).setValues([[tanggal, (payload.waktu || '').toString(), mode, (mode === 'Online' ? link : ''), (mode === 'Offline' ? lokasi : ''), (payload.peserta || '').toString(), (payload.catatan || '').toString()]]);
     sheet.getRange(rIdx, 12, 1, 2).setValues([[(payload.oleh || '').toString(), _hoNow()]]);
     if (payload.meetEventId) sheet.getRange(rIdx, 17).setValue((payload.meetEventId || '').toString());
+    // Undangan Calendar (peserta) + notifikasi WA ke peserta.
+    try {
+      var umap = _hoUserMapByNama();
+      var names = (payload.peserta || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (mode === 'Online' && payload.meetEventId) {
+        var emails = names.map(function (n) { return umap[n] ? (umap[n].email || '') : ''; }).filter(function (e) { return e; });
+        _hoInviteCalendar((payload.meetEventId || '').toString(), emails);
+      }
+      _hoNotifSchedule(noWO, payload, names, umap);
+    } catch (eN) {}
     return { success: true, message: 'Hand Over WO ' + noWO + ' dijadwalkan.' };
   } catch (e) { return { success: false, message: e.toString() }; }
   finally { try { lock.releaseLock(); } catch (e) {} }

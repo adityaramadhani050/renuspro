@@ -35,6 +35,10 @@ function _getOrCreateMasterUser(ss) {
     if (sheet.getLastColumn() < 9 || !sheet.getRange(1, 9).getValue()) {
       sheet.getRange(1, 9).setValue('No WhatsApp').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
     }
+    // Migrasi: kolom "Email" (kolom 10) untuk undangan Calendar / Hand Over.
+    if (sheet.getLastColumn() < 10 || !sheet.getRange(1, 10).getValue()) {
+      sheet.getRange(1, 10).setValue('Email').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+    }
   } catch (e) {}
   return sheet;
 }
@@ -111,7 +115,8 @@ function getUserList() {
         aktif:         data[i][5].toString().toUpperCase() !== 'FALSE',
         targetBulanan: parseFloat(data[i][6]) || 0,
         leadId:        data[i][7] ? data[i][7].toString().trim() : '',
-        noWa:          data[i][8] ? data[i][8].toString().trim() : ''
+        noWa:          data[i][8] ? data[i][8].toString().trim() : '',
+        email:         data[i][9] ? data[i][9].toString().trim() : ''
       });
     }
     return list;
@@ -119,7 +124,7 @@ function getUserList() {
 }
 
 // ── Tambah user baru (admin only) ─────────────────────────────────────────
-function simpanUser(nama, username, password, role, leadId, noWa) {
+function simpanUser(nama, username, password, role, leadId, noWa, email) {
   try {
     if (!nama || !username || !password || !role) {
       return { success: false, message: 'Semua field wajib diisi.' };
@@ -143,7 +148,7 @@ function simpanUser(nama, username, password, role, leadId, noWa) {
     }
     const nextId = 'U' + String(maxNum + 1).padStart(3, '0');
 
-    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || ''), _normalizePhone(noWa)]);
+    sheet.appendRow([nextId, nama, username.trim().toLowerCase(), password, role.toLowerCase(), 'TRUE', 0, (leadId || ''), _normalizePhone(noWa), (email || '').toString().trim()]);
     invalidateUserCache();
     return { success: true, message: 'User ' + nextId + ' (' + nama + ') berhasil ditambahkan!' };
   } catch(e) {
@@ -152,7 +157,7 @@ function simpanUser(nama, username, password, role, leadId, noWa) {
 }
 
 // ── Edit user (admin only) ────────────────────────────────────────────────
-function editUser(id, nama, username, password, role, aktif, targetBulanan, leadId, noWa) {
+function editUser(id, nama, username, password, role, aktif, targetBulanan, leadId, noWa, email) {
   try {
     if (!id || !nama || !username || !role) {
       return { success: false, message: 'Data tidak lengkap.' };
@@ -172,10 +177,11 @@ function editUser(id, nama, username, password, role, aktif, targetBulanan, lead
         const newPass = (password && password.trim()) ? password.trim() : data[i][3].toString();
         // Jika noWa tidak dikirim (undefined) → pertahankan nilai lama (kol 9)
         const noWaVal = (noWa === undefined || noWa === null) ? (data[i][8] ? data[i][8].toString() : '') : _normalizePhone(noWa);
-        sheet.getRange(i + 1, 2, 1, 8).setValues([[
+        const emailVal = (email === undefined || email === null) ? (data[i][9] ? data[i][9].toString() : '') : (email || '').toString().trim();
+        sheet.getRange(i + 1, 2, 1, 9).setValues([[
           nama, username.trim().toLowerCase(), newPass,
           role.toLowerCase(), aktif ? 'TRUE' : 'FALSE',
-          parseFloat(targetBulanan) || 0, (leadId || ''), noWaVal
+          parseFloat(targetBulanan) || 0, (leadId || ''), noWaVal, emailVal
         ]]);
         invalidateUserCache();
         return { success: true, message: 'User ' + id + ' berhasil diperbarui!' };
