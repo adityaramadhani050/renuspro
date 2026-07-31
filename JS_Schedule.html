@@ -111,9 +111,14 @@ function _schRenderHomeGantt(list) {
     if (hasR) {
       var leftPx = _schDays(start, s.tanggalMulai) * ppd;
       var wPx = (_schDays(s.tanggalMulai, s.tanggalSelesai) + 1) * ppd; if (wPx < 6) wPx = 6;
-      bar = '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + '">'
+      var jt = Number(s.jumlahTugas) || 0;
+      var barLbl = wPx > 150 ? (_schEsc(w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas')
+                 : wPx > 90  ? (pct + '% · ' + jt + ' tugas')
+                 : wPx > 44  ? (pct + '%')
+                 : '';
+      bar = '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas">'
           +   '<div class="h-full ' + b[1] + '" style="width:' + pct + '%"></div>'
-          +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-white drop-shadow-sm truncate">' + (wPx > 64 ? _schEsc(w.noWO) : '') + '</span>'
+          +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-white drop-shadow-sm truncate">' + barLbl + '</span>'
           + '</div>';
     } else {
       bar = '<div class="absolute text-[10px] text-slate-300 italic" style="left:4px;top:13px">Belum ada jadwal</div>';
