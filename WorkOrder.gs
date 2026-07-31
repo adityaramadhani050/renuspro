@@ -198,6 +198,7 @@ function getWorkOrderList() {
     var data = _cachedWorkOrder();
     if (!data || data.length < 2) return [];
     var catatanMap = _getCatatanWOMap();
+    var hoMap = (typeof _hoStatusMap === 'function') ? _hoStatusMap() : {};
     var list = [];
     for (var i = 1; i < data.length; i++) {
       var r = data[i];
@@ -223,6 +224,7 @@ function getWorkOrderList() {
         termConditions: (r[16] || '{}').toString(),
         items:          (r[17] || '[]').toString(),
         status:         (r[18] || '').toString(),
+        hoStatus:       hoMap[noWO] || '',
         catatanCustomer: catatanMap[noWO] || ''
       });
     }

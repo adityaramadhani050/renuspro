@@ -477,6 +477,12 @@ function simpanPO(payload) {
     if (!payload.items || payload.items.length === 0) {
       return { success: false, message: 'PO harus memiliki minimal 1 item.' };
     }
+    // Gating Hand Over: PO ber-peruntukan Work Order butuh HO WO tsb Selesai.
+    var _poNoWO = payload.noWO ? payload.noWO.toString().trim() : '';
+    if (_poNoWO && typeof _hoRequireSelesai === 'function') {
+      var _hoG = _hoRequireSelesai(_poNoWO);
+      if (!_hoG.ok) return { success: false, message: 'PO untuk WO ini belum bisa dibuat. ' + _hoG.message };
+    }
 
     var ss = getSpreadsheet();
     var poSheet    = _ensurePOSheet(ss);

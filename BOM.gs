@@ -207,7 +207,7 @@ function getAvailableWOForBOM() {
     _bomRegisteredWOs().forEach(function (w) { reg[w.noWO] = true; });
     var woList = [];
     try { woList = getWorkOrderList() || []; } catch (e) {}
-    var list = woList.filter(function (wo) { return !reg[wo.noWO]; })
+    var list = woList.filter(function (wo) { return !reg[wo.noWO] && wo.hoStatus === 'Selesai'; })
       .map(function (wo) { return { noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status }; });
     return { success: true, list: list };
   } catch (e) {
@@ -221,6 +221,8 @@ function addBOMProject(noWO, userIds, addedBy) {
   try {
     noWO = (noWO || '').toString().trim();
     if (!noWO) return { success: false, message: 'Pilih Work Order dulu.' };
+    var _hoG = (typeof _hoRequireSelesai === 'function') ? _hoRequireSelesai(noWO) : { ok: true };
+    if (!_hoG.ok) return { success: false, message: _hoG.message };
     lock.waitLock(15000);
     var ss = getSpreadsheet();
     var sheet = _ensureBOMProjectSheet(ss);

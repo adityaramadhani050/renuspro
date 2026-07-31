@@ -849,7 +849,7 @@ function _loadWOOptions(selId, selectedWO, onDone) {
       var sel = document.getElementById(selId);
       if (!sel) { if (onDone) onDone(); return; }
       sel.innerHTML = '<option value="">-- Tidak terikat WO --</option>';
-      (data || []).filter(function(w) { return w.status !== 'Closed'; }).forEach(function(w) {
+      (data || []).filter(function(w) { return w.status !== 'Closed' && (w.hoStatus === 'Selesai' || w.noWO === selectedWO); }).forEach(function(w) {
         var opt = document.createElement('option');
         opt.value = w.noWO;
         opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
