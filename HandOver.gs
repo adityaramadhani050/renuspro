@@ -57,6 +57,20 @@ function _hoTs(v) {
   } catch (e) { return (v || '').toString(); }
 }
 
+// Normalkan waktu → 'HH:mm' (sheet bisa auto-ubah '12:00' → Date/GMT).
+function _hoJam(v) {
+  try {
+    if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+    var s = (v || '').toString().trim();
+    if (!s) return '';
+    var m = s.match(/(\d{1,2}):(\d{2})/);
+    if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), 'HH:mm');
+    return s;
+  } catch (e) { return (v || '').toString(); }
+}
+
 function _hoFindRow(sheet, noWO) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -173,7 +187,7 @@ function getHandOverByWO(noWO) {
         dimintaOleh: (r[2] || '').toString(),
         dimintaPada: _hoTs(r[3]),
         tglJadwal: _hoIso(r[4]),
-        waktu: (r[5] || '').toString(),
+        waktu: _hoJam(r[5]),
         mode: (r[6] || '').toString(),
         linkMeet: (r[7] || '').toString(),
         lokasi: (r[8] || '').toString(),
