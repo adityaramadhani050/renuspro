@@ -11,7 +11,7 @@ let _schSEList = [];         // cache daftar Site Engineer
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _schRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
-function _schCanEdit(){ var r=_schRole(); return r==='projectcoordinator' || r==='leadengineer' || r==='admin'; }
+function _schCanEdit(){ var r=_schRole(); return r==='projectcoordinator' || r==='admin'; }  // Lead/Site Engineer read-only
 function _schUserNama(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _schRp(n){ return (Number(n)||0).toLocaleString('id-ID'); }
 
@@ -34,7 +34,7 @@ window.loadSchedule = function() {
   document.getElementById('sch-home').classList.remove('hidden');
   document.getElementById('sch-detail').classList.add('hidden');
   var hint = document.getElementById('sch-role-hint');
-  if (hint) hint.innerText = _schCanEdit() ? (_schRole()==='projectcoordinator' ? 'Project Coor' : (_schRole()==='leadengineer' ? 'Lead Engineer' : 'Admin')) : 'Lihat';
+  if (hint) hint.innerText = _schCanEdit() ? (_schRole()==='projectcoordinator' ? 'Project Coor' : 'Admin') : 'Lihat';
   var addBtn = document.getElementById('sch-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_schCanEdit());
   document.getElementById('sch-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
@@ -160,10 +160,16 @@ function _schRenderHomeGantt(list) {
 
 function _schRenderWOList() {
   var q = (document.getElementById('sch-search').value || '').toLowerCase().trim();
-  var list = _schWOList.filter(function(w){ return !q || ((w.noWO+' '+(w.namaProject||'')+' '+(w.namaKlien||'')).toLowerCase().indexOf(q)!==-1); });
+  // Site Engineer: hanya WO yang di-assign ke dirinya.
+  var isSE = _schRole() === 'siteengineer';
+  var me = _schUserNama();
+  var list = _schWOList.filter(function(w){
+    if (isSE && (w.siteEngineer || '') !== me) return false;
+    return !q || ((w.noWO+' '+(w.namaProject||'')+' '+(w.namaKlien||'')).toLowerCase().indexOf(q)!==-1);
+  });
   var box = document.getElementById('sch-wo-list');
   if (!list.length) {
-    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-diagram-project mr-2"></i>' + (q ? 'Tidak ada project cocok.' : 'Belum ada project. Klik <b>Tambah Project</b>.') + '</div>';
+    box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-diagram-project mr-2"></i>' + (q ? 'Tidak ada project cocok.' : (isSE ? 'Belum ada project yang ditugaskan ke Anda.' : 'Belum ada project. Klik <b>Tambah Project</b>.')) + '</div>';
     return;
   }
   box.innerHTML = _schRenderHomeGantt(list);
