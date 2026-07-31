@@ -102,19 +102,21 @@ function _kirimReqStatus(noWO) {
   } catch (e) { return ''; }
 }
 
-// bomItemId material yang sudah masuk request AKTIF ('Diminta') sebuah WO.
-function _kirimReqActiveItemIds(noWO) {
+// Peta bomItemId → target (batas dikirim absolut) di request AKTIF ('Diminta').
+function _kirimReqActiveMap(noWO) {
   try {
     var sheet = _ensurePengirimanReqSheet(getSpreadsheet());
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO && (data[i][1] || '').toString() === 'Diminta') {
         var arr = []; try { arr = JSON.parse((data[i][5] || '[]')); } catch (e) { arr = []; }
-        return arr.map(function (x) { return (x.bomItemId || '').toString(); });
+        var map = {};
+        arr.forEach(function (x) { map[(x.bomItemId || '').toString()] = Number(x.target) || 0; });
+        return map;
       }
     }
-    return [];
-  } catch (e) { return []; }
+    return {};
+  } catch (e) { return {}; }
 }
 
 // PC: request pengiriman untuk WO. Parsial (pilih material) & bisa ditambah
@@ -141,8 +143,10 @@ function requestPengiriman(noWO, oleh, reqItems) {
     items.forEach(function (it) {
       if (it.status !== 'Approved') return;
       adaApproved = true;
-      var sisa = (Number(it.qtyReserved) || 0) - (Number(it.qtyDikirim) || 0);
-      if (sisa > 0) sisaMap[(it.id || '').toString()] = { sisa: sisa, dikirim: Number(it.qtyDikirim) || 0 };
+      var reserved = Number(it.qtyReserved) || 0;
+      var dikirim = Number(it.qtyDikirim) || 0;
+      var sisa = reserved - dikirim;
+      if (sisa > 0) sisaMap[(it.id || '').toString()] = { sisa: sisa, dikirim: dikirim, reserved: reserved };
     });
     if (!adaApproved) return { success: false, message: 'Belum ada material Approved.' };
     var ids = Object.keys(sisaMap);
@@ -157,10 +161,10 @@ function requestPengiriman(noWO, oleh, reqItems) {
         if (!m) return;
         var qty = Number(r.qty) || 0;
         if (qty <= 0 || qty > m.sisa) qty = m.sisa;
-        chosen.push({ bomItemId: bid, qty: qty, target: m.dikirim + qty });
+        chosen.push({ bomItemId: bid, qty: qty, dikirim: m.dikirim, reserved: m.reserved });
       });
     } else {
-      ids.forEach(function (bid) { var m = sisaMap[bid]; chosen.push({ bomItemId: bid, qty: m.sisa, target: m.dikirim + m.sisa }); });
+      ids.forEach(function (bid) { var m = sisaMap[bid]; chosen.push({ bomItemId: bid, qty: m.sisa, dikirim: m.dikirim, reserved: m.reserved }); });
     }
     if (!chosen.length) return { success: false, message: 'Pilih minimal 1 material Reserved untuk dikirim.' };
 
@@ -169,7 +173,8 @@ function requestPengiriman(noWO, oleh, reqItems) {
     var rowIdx = -1;
     for (var i = 1; i < data.length; i++) { if ((data[i][0] || '').toString().trim() === noWO) { rowIdx = i; break; } }
     var alamat = _kirimAlamatByWO(noWO);
-    var itemsJson = JSON.stringify(chosen);
+    // target = batas dikirim absolut untuk material ini (di-cap pada reserved).
+    var freshJson = JSON.stringify(chosen.map(function (c) { return { bomItemId: c.bomItemId, qty: c.qty, target: c.dikirim + c.qty }; }));
     if (rowIdx >= 0 && (data[rowIdx][1] || '').toString() === 'Diminta') {
       // Request masih aktif → GABUNG material ke request yang sama (satu request).
       // Material yang menyusul akan dikirim warehouse dalam surat jalan berikutnya.
@@ -178,16 +183,22 @@ function requestPengiriman(noWO, oleh, reqItems) {
       var ditambah = 0;
       chosen.forEach(function (c) {
         var e = byId[c.bomItemId];
-        if (e) { e.target = Math.max(Number(e.target) || 0, c.target); }
-        else { existing.push(c); byId[c.bomItemId] = c; ditambah++; }
+        if (e) {
+          // Tambah qty ke target lama (naikkan jumlah yang diminta), di-cap pada reserved.
+          e.target = Math.min(c.reserved, (Number(e.target) || 0) + c.qty);
+          e.qty = e.target - c.dikirim;
+        } else {
+          existing.push({ bomItemId: c.bomItemId, qty: c.qty, target: c.dikirim + c.qty });
+          ditambah++;
+        }
       });
       sheet.getRange(rowIdx + 1, 6).setValue(JSON.stringify(existing));
       return { success: true, message: ditambah ? (ditambah + ' material ditambahkan ke request pengiriman aktif WO ' + noWO + '.') : ('Request pengiriman WO ' + noWO + ' diperbarui.') };
     } else if (rowIdx >= 0) {
       // Request lama sudah Selesai/Dibatalkan → request BARU (overwrite baris).
-      sheet.getRange(rowIdx + 1, 1, 1, 6).setValues([[noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, itemsJson]]);
+      sheet.getRange(rowIdx + 1, 1, 1, 6).setValues([[noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, freshJson]]);
     } else {
-      sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, itemsJson]);
+      sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, freshJson]);
     }
     return { success: true, message: 'Request pengiriman WO ' + noWO + ' (' + chosen.length + ' material) dikirim ke warehouse.' };
   } catch (e) { return { success: false, message: e.toString() }; }

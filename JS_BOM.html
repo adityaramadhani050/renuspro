@@ -19,7 +19,7 @@ let _bomBusyIds = {};     // id material yang sedang di-approve/reject/proses (l
 let _bomFinalizedBy = ''; // pemfinalisasi (saat semua material Approved)
 let _bomFinalizedAt = '';
 let _bomKirimReq = '';    // status request pengiriman WO ('Diminta'/'Selesai'/'')
-let _bomKirimReqIds = []; // bomItemId yang sudah masuk request aktif ('Diminta')
+let _bomKirimReqMap = {}; // bomItemId → target (batas dikirim absolut) request aktif
 let _bomStokList = null;   // cache getStokList untuk modal procurement
 let _bomNeedList = null;   // cache daftar "Perlu Dibelanjakan"
 let _bomHomeTab = 'proses';// tab home: 'proses' | 'approved' | 'need'
@@ -402,22 +402,20 @@ function _bomBatalBeliLangsung(id) {
 function _bomRequestKirim() {
   if (!_bomWO) return;
   var tambahMode = (_bomKirimReq === 'Diminta');
-  var reqIdSet = {}; (_bomKirimReqIds || []).forEach(function(id) { reqIdSet[id] = 1; });
-  // Mode tambah: hanya material yang belum ada di request aktif.
+  // Tampilkan material Approved yang masih punya reserved BELUM diminta kirim.
   var reserved = (_bomItems || []).filter(function(it) {
-    if (it.status !== 'Approved' || ((Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0)) <= 0) return false;
-    return tambahMode ? !reqIdSet[it.id] : true;
+    return it.status === 'Approved' && _bomAddable(it) > 0;
   });
-  if (!reserved.length) return showNotification(tambahMode ? 'Tidak ada material baru untuk ditambahkan.' : 'Belum ada material Reserved untuk dikirim.', 'error');
+  if (!reserved.length) return showNotification(tambahMode ? 'Tidak ada material untuk ditambahkan.' : 'Belum ada material Reserved untuk dikirim.', 'error');
   var titleEl = document.getElementById('bom-kirim-title');
   if (titleEl) titleEl.innerText = tambahMode ? 'Tambah Material Kirim' : 'Request Pengiriman';
   var box = document.getElementById('bom-kirim-list');
   box.innerHTML = reserved.map(function(it) {
-    var sisa = (Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0);
+    var sisa = _bomAddable(it);   // maksimum qty yang bisa diminta kirim sekarang
     return '<div class="flex items-center gap-3 border border-slate-150 rounded-xl px-3 py-2.5">'
       + '<input type="checkbox" checked class="bom-kirim-cb w-4 h-4 accent-indigo-600 shrink-0" data-sisa="' + sisa + '" onchange="_bomKirimToggleRow(this)">'
       + '<div class="min-w-0 flex-1"><div class="text-sm font-bold text-slate-700 truncate">' + _bomEsc(it.namaMaterial) + '</div>'
-      +   '<div class="text-[11px] text-slate-400 truncate">' + _bomEsc(it.merek || '-') + ' · Reserved ' + _bomRp(sisa) + ' ' + _bomEsc(it.satuan || '') + '</div></div>'
+      +   '<div class="text-[11px] text-slate-400 truncate">' + _bomEsc(it.merek || '-') + ' · Sisa reserve ' + _bomRp(sisa) + ' ' + _bomEsc(it.satuan || '') + '</div></div>'
       + '<input type="number" min="1" max="' + sisa + '" value="' + sisa + '" class="bom-kirim-qty w-20 px-2 py-1.5 text-sm text-center border border-slate-200 rounded-lg shrink-0" data-id="' + _bomEsc(it.id) + '">'
       + '</div>';
   }).join('');
@@ -495,7 +493,7 @@ function _bomReloadDetail() {
     _bomFinalizedBy = res.finalizedBy || '';
     _bomFinalizedAt = res.finalizedAt || '';
     _bomKirimReq = res.kirimRequest || '';
-    _bomKirimReqIds = res.kirimReqItemIds || [];
+    _bomKirimReqMap = res.kirimReqMap || {};
     if (_bomWO) _bomWO.status = _bomStatus;
     _bomRenderDetail();
   }).withFailureHandler(function() {
@@ -515,19 +513,17 @@ function _bomRenderDetail() {
   // Request Pengiriman (Project Coordinator/Admin) — PARSIAL: pilih material Reserved.
   // Selama request masih aktif ('Diminta'), material baru bisa ditambah (digabung).
   if (_bomCanRequestKirim()) {
-    var anyReserved = false, adaApproved = false, anyDikirim = false, adaTambah = false;
-    var reqIdSet = {}; (_bomKirimReqIds || []).forEach(function(id) { reqIdSet[id] = 1; });
+    var adaApproved = false, anyDikirim = false, adaKirim = false;
     _bomItems.forEach(function(it) {
       if (it.status !== 'Approved') return;
       adaApproved = true;
-      var sisa = (it.qtyReserved || 0) - (it.qtyDikirim || 0);
-      if (sisa > 0) { anyReserved = true; if (!reqIdSet[it.id]) adaTambah = true; }
+      if (_bomAddable(it) > 0) adaKirim = true;   // masih ada reserved yang belum diminta kirim
       if ((it.qtyDikirim || 0) > 0) anyDikirim = true;
     });
     if (_bomKirimReq === 'Diminta') {
-      if (adaTambah) btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Material Kirim</button>';
+      if (adaKirim) btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Material Kirim</button>';
       if (!anyDikirim) btns += '<button onclick="_bomBatalRequestKirim()" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-rotate-left"></i><span class="hidden sm:inline"> Batalkan Req. Kirim</span></button>';
-    } else if (adaApproved && anyReserved) {
+    } else if (adaApproved && adaKirim) {
       btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Request Pengiriman</button>';
     }
   }
@@ -577,18 +573,37 @@ function _bomRenderBody() {
   _bomRenderReview();
 }
 
+// Sisa reserved material yang BELUM di-request kirim (bisa ditambah ke request).
+function _bomAddable(it) {
+  var sisaReserved = (Number(it.qtyReserved) || 0) - (Number(it.qtyDikirim) || 0);
+  if (sisaReserved <= 0) return 0;
+  var dik = Number(it.qtyDikirim) || 0;
+  var target = Number(_bomKirimReqMap[it.id]) || 0;
+  var reqRem = target > dik ? Math.min(target - dik, sisaReserved) : 0;
+  return sisaReserved - reqRem;
+}
+
 // ── Tampilan read-only + approve/reject (Lead Engineer) ─────────
 // Badge status procurement per material — komposisi dari 4 bucket qty.
-// Sub-badge untuk porsi Reserved: cerminkan progres pengiriman gudang.
+// Sub-badge Reserved dipecah: Diterima / Dikirim / Req. Kirim (yang diminta) /
+// Reserved (masih dialokasi, belum diminta kirim).
 function _bomReservedBadge(it) {
   var r = Number(it.qtyReserved) || 0;
   var dik = Number(it.qtyDikirim) || 0;
   var dit = Number(it.qtyDiterima) || 0;
-  if (dit >= r) return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white whitespace-nowrap">Diterima (' + _bomRp(r) + ')</span>';
-  if (dik >= r) return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 whitespace-nowrap">Dikirim (' + _bomRp(dik) + ')</span>';
-  if (dik > 0)  return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 whitespace-nowrap">Dikirim (' + _bomRp(dik) + '/' + _bomRp(r) + ')</span>';
-  if (_bomKirimReq === 'Diminta') return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 whitespace-nowrap">Req. Kirim (' + _bomRp(r) + ')</span>';
-  return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(r) + ')</span>';
+  var parts = [];
+  if (dit > 0) parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white whitespace-nowrap">Diterima (' + _bomRp(dit) + ')</span>');
+  var dikirimBelum = dik - dit;
+  if (dikirimBelum > 0) parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 whitespace-nowrap">Dikirim (' + _bomRp(dikirimBelum) + ')</span>');
+  var sisaReserved = r - dik;
+  if (sisaReserved > 0) {
+    var target = Number(_bomKirimReqMap[it.id]) || 0;
+    var reqRem = target > dik ? Math.min(target - dik, sisaReserved) : 0;
+    if (reqRem > 0) parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 whitespace-nowrap">Req. Kirim (' + _bomRp(reqRem) + ')</span>');
+    var notReq = sisaReserved - reqRem;
+    if (notReq > 0) parts.push('<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">Reserved (' + _bomRp(notReq) + ')</span>');
+  }
+  return parts.join(' ');
 }
 function _bomProcBadge(it) {
   var parts = [];
