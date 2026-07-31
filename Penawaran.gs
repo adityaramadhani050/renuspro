@@ -21,6 +21,7 @@ function getPenawaranList() {
   try {
     const klienMap = _klienMap();            // Master_Klien (cached)
     const data = _cachedPenawaran();         // Penawaran_Main (cached; Date → ISO string)
+    const hoMap = (typeof _hoStatusMap === 'function') ? _hoStatusMap() : {};  // WO → status HO
 
     // Kumpulkan semua baris dulu, key = noPenawaran
     // Simpan baris dengan rev TERTINGGI per nomor, pertahankan urutan kemunculan pertama
@@ -64,6 +65,7 @@ function getPenawaranList() {
           items:          data[i][15] ? data[i][15].toString() : '[]',
           status:         data[i][16] ? data[i][16].toString() : 'On-Progress',
           noWO:              data[i][17] ? data[i][17].toString() : '',
+          hoStatus:          (data[i][17] ? (hoMap[data[i][17].toString()] || '') : ''),
           tanggalDeal:       _fmtTgl(data[i][18]),
           channelMarketing:  data[i][19] ? data[i][19].toString() : '',
           catatanFail:       data[i][20] ? data[i][20].toString() : '',
@@ -496,8 +498,8 @@ function editPenawaran(payload) {
         }
       }
     }
-    if (currentStatus === 'Deal' && !_isSameMonthDate(currentTanggalDeal)) {
-      return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah." };
+    if (currentStatus === 'Deal' && typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
+      return { success: false, message: "Penawaran Deal tidak dapat direvisi karena Hand Over WO " + currentNoWO + " sudah Selesai (project sudah diserahterimakan ke tim project)." };
     }
 
     const newRev = maxRevCheck + 1;
@@ -585,8 +587,8 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
       if (r.toString() === rev.toString()) targetRowIdx = i;
     }
     if (targetRowIdx === -1) return { success: false, message: "Revisi tidak ditemukan." };
-    if (currentStatus === 'Deal' && !_isSameMonthDate(currentTanggalDeal)) {
-      return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi/restore lagi, agar laporan deal bulan lalu tidak berubah." };
+    if (currentStatus === 'Deal' && typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
+      return { success: false, message: "Penawaran Deal tidak dapat direvisi/restore karena Hand Over WO " + currentNoWO + " sudah Selesai." };
     }
     if (parseInt(rev) === maxRev) {
       return { success: false, message: "Revisi ini sudah menjadi revisi terbaru." };
