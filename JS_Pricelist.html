@@ -11,6 +11,17 @@ let _pricelistKategori = [];    // master kategori (dropdown form + Kelola Kateg
 function _plParseRp(s) { return parseFloat((s || '').toString().replace(/[^\d]/g, '')) || 0; }
 function _plFmtRp(n) { return Math.round(parseFloat(n) || 0).toLocaleString('id-ID'); }
 function _plEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+// Tanggal/timestamp → dd/MM/yyyy [HH:mm] (tahan ISO-Z / Date / GMT); '-' bila kosong.
+function _plFmtTgl(v) {
+  if (!v) return '-';
+  var s = ('' + v).trim();
+  var d0 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);            // date-only → tanpa geser TZ
+  if (d0) return d0[3] + '/' + d0[2] + '/' + d0[1];
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) return s;
+  var dt = new Date(s);                                     // ISO/Z/GMT → waktu lokal
+  if (!isNaN(dt.getTime())) { var p = function(n){ return (n<10?'0':'')+n; }; return p(dt.getDate())+'/'+p(dt.getMonth()+1)+'/'+dt.getFullYear()+' '+p(dt.getHours())+':'+p(dt.getMinutes()); }
+  return s;
+}
 function formatPlHarga(el) { el.value = _plFmtRp(_plParseRp(el.value)); }
 
 // ── Load ──────────────────────────────────────────────────────────
@@ -67,7 +78,7 @@ function _pgRenderPricelist(data) {
       + '<td class="p-4" data-label="Material">' + merekHtml + '<div class="font-semibold text-slate-800">' + _plEsc(it.namaMaterial) + '</div>' + (it.spesifikasi ? '<div class="text-[10px] text-slate-400">' + _plEsc(it.spesifikasi) + '</div>' : '') + '</td>'
       + '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _plEsc(it.satuan || '-') + '</td>'
       + '<td class="p-4 text-right font-bold text-slate-800" data-label="Harga Beli">Rp ' + _plFmtRp(it.hargaBeli) + '</td>'
-      + '<td class="p-4 text-slate-500 text-[11px] whitespace-nowrap" data-label="Update Terakhir">' + _plEsc(it.updateTerakhir || '-') + '</td>'
+      + '<td class="p-4 text-slate-500 text-[11px] whitespace-nowrap" data-label="Update Terakhir">' + _plEsc(_plFmtTgl(it.updateTerakhir)) + '</td>'
       + '<td class="p-4 text-center" data-label="Status">'
       +   '<label class="inline-flex items-center gap-1 cursor-pointer select-none" title="Material ready">'
       +     '<input type="checkbox" ' + (it.ready ? 'checked' : '') + ' onchange="togglePricelistReady(\'' + it.id + '\', this.checked)" class="accent-emerald-500">'
