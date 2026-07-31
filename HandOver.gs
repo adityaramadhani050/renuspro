@@ -43,6 +43,20 @@ function _hoIso(v) {
   } catch (e) { return (v || '').toString(); }
 }
 
+// Normalkan timestamp → 'dd/MM/yyyy HH:mm' (sheet bisa auto-ubah string → Date).
+function _hoTs(v) {
+  try {
+    if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    var s = (v || '').toString().trim();
+    if (!s) return '';
+    if (s.indexOf('GMT') !== -1 || /^[A-Za-z]{3}\s/.test(s)) {
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    }
+    return s;
+  } catch (e) { return (v || '').toString(); }
+}
+
 function _hoFindRow(sheet, noWO) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -96,7 +110,7 @@ function getHandOverByWO(noWO) {
         noWO: noWO,
         status: (r[1] || '').toString(),
         dimintaOleh: (r[2] || '').toString(),
-        dimintaPada: (r[3] || '').toString(),
+        dimintaPada: _hoTs(r[3]),
         tglJadwal: _hoIso(r[4]),
         waktu: (r[5] || '').toString(),
         mode: (r[6] || '').toString(),
@@ -105,10 +119,10 @@ function getHandOverByWO(noWO) {
         peserta: (r[9] || '').toString(),
         catatanUndangan: (r[10] || '').toString(),
         dijadwalkanOleh: (r[11] || '').toString(),
-        dijadwalkanPada: (r[12] || '').toString(),
+        dijadwalkanPada: _hoTs(r[12]),
         mom: (r[13] || '').toString(),
         selesaiOleh: (r[14] || '').toString(),
-        selesaiPada: (r[15] || '').toString(),
+        selesaiPada: _hoTs(r[15]),
         meetEventId: (r[16] || '').toString()
       }
     };
