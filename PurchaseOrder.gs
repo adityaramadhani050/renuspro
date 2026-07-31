@@ -1195,7 +1195,46 @@ function _ensurePOPaymentRequestInvoiceCols(ss) {
   if (lastCol < 20) sheet.getRange(1, 20).setValue('Bukti Bayar File Id');
   if (lastCol < 21) sheet.getRange(1, 21).setValue('Bukti Bayar File Url');
   if (lastCol < 22) sheet.getRange(1, 22).setValue('Bukti Bayar File Nama');
+  if (lastCol < 23) sheet.getRange(1, 23).setValue('Kategori Non-PO');  // request tanpa PO → pengeluaran langsung
   return sheet;
+}
+
+// Request pembayaran/pembelian TANPA PO (dari home PO). Masuk antrian yang sama
+// (PO_PaymentRequest, No PO kosong); saat disetujui Finance → pengeluaran langsung.
+function requestPembayaranNonPO(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    payload = payload || {};
+    var keterangan = (payload.keterangan || '').toString().trim();
+    var jumlah     = parseFloat(payload.jumlah) || 0;
+    var noWO       = (payload.noWO || '').toString().trim();
+    var kategori   = (payload.kategori || '').toString().trim();
+    if (!keterangan) return { success: false, message: 'Keterangan/deskripsi wajib diisi.' };
+    if (jumlah <= 0) return { success: false, message: 'Nominal harus lebih dari 0.' };
+    if (!noWO && !kategori) return { success: false, message: 'Pilih kategori untuk pengeluaran non-project.' };
+
+    var ss = getSpreadsheet();
+    var prSheet = _ensurePOPaymentRequestInvoiceCols(ss);
+    var idReq = _generateIdPayReq(prSheet);
+    var now = new Date();
+    var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+    var tanggalReq = payload.tanggalRequest ? payload.tanggalRequest.toString() : _fmtTgl(now);
+    prSheet.appendRow([
+      idReq, '', noWO, keterangan, 0,
+      tanggalReq, jumlah, 0,
+      payload.catatan ? payload.catatan.toString() : '',
+      'Menunggu',
+      payload.dibuatOleh ? payload.dibuatOleh.toString() : '',
+      nowStr, '', '', '',
+      (payload.invoiceFileId || '').toString(), (payload.invoiceFileUrl || '').toString(), (payload.invoiceFileName || '').toString(),
+      '', '', '', '',
+      kategori
+    ]);
+    return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally { lock.releaseLock(); }
 }
 
 function uploadFileInvoiceSupplierPO(payload) {
@@ -1390,13 +1429,16 @@ function approvePembayaranPO(payload) {
     SpreadsheetApp.flush();
 
     var prData = prSheet.getDataRange().getValues();
-    var prRowIdx = -1, noPO = '', jumlah = 0, statusReq = '';
+    var prRowIdx = -1, noPO = '', jumlah = 0, statusReq = '', reqNoWO = '', reqKeterangan = '', reqKategori = '';
     for (var i = 1; i < prData.length; i++) {
       if ((prData[i][0] || '').toString() === idReq) {
         prRowIdx  = i + 1;
         noPO      = (prData[i][1] || '').toString();
+        reqNoWO   = (prData[i][2] || '').toString();
+        reqKeterangan = (prData[i][3] || '').toString();
         jumlah    = parseFloat(prData[i][6]) || 0;
         statusReq = (prData[i][9] || '').toString();
+        reqKategori = (prData[i][22] || '').toString();
         break;
       }
     }
@@ -1417,16 +1459,33 @@ function approvePembayaranPO(payload) {
     prSheet.getRange(prRowIdx, 21).setValue(buktiFileUrl);
     prSheet.getRange(prRowIdx, 22).setValue(buktiFileName);
 
-    // Buat catatan pembayaran PO otomatis
-    var bayarResult = simpanPembayaranPO({
-      noPO:        noPO,
-      tanggalBayar: payload.tanggalBayar ? payload.tanggalBayar.toString() : _fmtTgl(now),
-      idAkun:      payload.idAkun ? payload.idAkun.toString() : '',
-      namaAkun:    namaAkun,
-      jumlah:      jumlah,
-      catatan:     'Approved dari request ' + idReq + (payload.catatan ? ' — ' + payload.catatan : ''),
-      dibuatOleh:  payload.approvedBy ? payload.approvedBy.toString() : ''
-    });
+    // Catat pembayaran: PO → Pembayaran PO; tanpa PO → pengeluaran langsung.
+    var bayarResult;
+    if (!noPO) {
+      bayarResult = simpanPengeluaranLangsung({
+        noWO:        reqNoWO,
+        kategori:    reqKategori,
+        deskripsi:   reqKeterangan || ('Pembayaran tanpa PO ' + idReq),
+        idAkun:      payload.idAkun ? payload.idAkun.toString() : '',
+        namaAkun:    namaAkun,
+        qty:         1,
+        hargaSatuan: jumlah,
+        satuan:      'paket',
+        catatan:     'Approved dari request ' + idReq + (payload.catatan ? ' — ' + payload.catatan : ''),
+        tanggal:     payload.tanggalBayar ? payload.tanggalBayar.toString() : _fmtTgl(now),
+        dibuatOleh:  payload.approvedBy ? payload.approvedBy.toString() : ''
+      });
+    } else {
+      bayarResult = simpanPembayaranPO({
+        noPO:        noPO,
+        tanggalBayar: payload.tanggalBayar ? payload.tanggalBayar.toString() : _fmtTgl(now),
+        idAkun:      payload.idAkun ? payload.idAkun.toString() : '',
+        namaAkun:    namaAkun,
+        jumlah:      jumlah,
+        catatan:     'Approved dari request ' + idReq + (payload.catatan ? ' — ' + payload.catatan : ''),
+        dibuatOleh:  payload.approvedBy ? payload.approvedBy.toString() : ''
+      });
+    }
 
     if (!bayarResult.success) {
       // Rollback request
@@ -1440,7 +1499,7 @@ function approvePembayaranPO(payload) {
       return { success: false, message: 'Gagal mencatat pembayaran: ' + bayarResult.message };
     }
 
-    return { success: true, message: 'Pembayaran PO ' + noPO + ' sebesar Rp ' + jumlah.toLocaleString('id-ID') + ' berhasil disetujui dan dicatat.' };
+    return { success: true, message: (noPO ? ('Pembayaran PO ' + noPO) : 'Pembayaran (tanpa PO)') + ' sebesar Rp ' + jumlah.toLocaleString('id-ID') + ' berhasil disetujui dan dicatat.' };
   } catch (e) {
     return { success: false, message: e.toString() };
   } finally {

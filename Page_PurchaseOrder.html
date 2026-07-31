@@ -25,6 +25,10 @@
                 <option value="Selesai">Selesai</option>
                 <option value="Batal">Batal</option>
               </select>
+              <button onclick="bukaReqNonPO()"
+                class="bg-white hover:bg-violet-50 text-violet-700 border border-violet-200 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-hand-holding-dollar text-sm"></i> <span class="hidden sm:inline">Request Pembayaran</span>
+              </button>
               <button onclick="bukaFormPO()"
                 class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
                 <i class="fas fa-plus text-sm"></i> Buat PO Baru
@@ -649,6 +653,40 @@
 
             </div>
 
+          </div>
+        </div>
+
+        <!-- ── MODAL: Request Pembayaran / Pembelian Tanpa PO ── -->
+        <div id="modal-req-nonpo" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-violet-100 text-violet-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-hand-holding-dollar text-sm"></i></span>
+              <div><h3 class="text-base font-extrabold text-slate-800">Request Pembayaran (Tanpa PO)</h3><p class="text-xs text-slate-400">Permintaan pembayaran/pembelian tanpa PO. Disetujui Finance → tercatat sebagai pengeluaran langsung.</p></div>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Keterangan / Deskripsi <span class="text-rose-400">*</span></label>
+            <input type="text" id="reqnp-keterangan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="cth: Sewa alat, transport, jasa tukang...">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nominal (Rp) <span class="text-rose-400">*</span></label><input type="text" id="reqnp-jumlah" oninput="this.value=this.value.replace(/[^0-9]/g,'')" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="0"></div>
+              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Peruntukan WO</label><select id="reqnp-wo" onchange="_reqnpToggleKategori()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white"><option value="">— Non-project —</option></select></div>
+            </div>
+            <div id="reqnp-kategori-wrap" class="mb-3">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kategori <span class="text-rose-400">*</span></label>
+              <select id="reqnp-kategori" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white"><option value="">Memuat...</option></select>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan</label>
+            <input type="text" id="reqnp-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="opsional">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Invoice / Nota <span class="text-slate-400 normal-case font-semibold">(opsional)</span></label>
+            <input type="file" id="reqnp-file" accept=".pdf,image/*" onchange="handleReqNonPOFileChange(this)" class="hidden">
+            <input type="hidden" id="reqnp-file-id"><input type="hidden" id="reqnp-file-url"><input type="hidden" id="reqnp-file-name">
+            <div id="reqnp-file-drop" onclick="document.getElementById('reqnp-file').click()" class="cursor-pointer flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl hover:border-violet-300 hover:bg-violet-50/40 transition mb-4">
+              <div class="w-9 h-9 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+              <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-600">Klik untuk pilih file</p><p class="text-xs text-slate-400">PDF atau gambar</p></div>
+            </div>
+            <div id="reqnp-file-status" class="hidden"></div>
+            <div class="flex justify-end gap-2">
+              <button onclick="_tutupReqNonPO()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="submitReqNonPO()" class="px-5 py-2.5 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-paper-plane"></i> Kirim ke Finance</button>
+            </div>
           </div>
         </div>
 

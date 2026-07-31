@@ -893,6 +893,62 @@ function _loadAkunPembayaranOptions(selId) {
     .getAkunPembayaranList();
 }
 
+// ── Request Pembayaran / Pembelian Tanpa PO (dari home PO) ────────────────────
+function bukaReqNonPO() {
+  document.getElementById('reqnp-keterangan').value = '';
+  document.getElementById('reqnp-jumlah').value = '';
+  document.getElementById('reqnp-catatan').value = '';
+  ['reqnp-file-id','reqnp-file-url','reqnp-file-name'].forEach(function(id){ document.getElementById(id).value = ''; });
+  var st = document.getElementById('reqnp-file-status'); if (st) { st.classList.add('hidden'); st.innerHTML = ''; }
+  var drop = document.getElementById('reqnp-file-drop'); if (drop) drop.classList.remove('hidden');
+  // WO dropdown (non-closed)
+  var woSel = document.getElementById('reqnp-wo');
+  woSel.innerHTML = '<option value="">— Non-project —</option>';
+  google.script.run.withSuccessHandler(function(data){
+    (data || []).filter(function(w){ return w.status !== 'Closed'; }).forEach(function(w){
+      var o = document.createElement('option'); o.value = w.noWO; o.textContent = w.noWO + ' — ' + (w.namaProject || w.namaKlien || ''); woSel.appendChild(o);
+    });
+  }).getWorkOrderList();
+  // Kategori dropdown
+  var katSel = document.getElementById('reqnp-kategori');
+  katSel.innerHTML = '<option value="">Memuat...</option>';
+  google.script.run.withSuccessHandler(function(res){
+    var list = (res && res.list) ? res.list : [];
+    katSel.innerHTML = '<option value="">— Pilih kategori —</option>' + list.map(function(k){ return '<option value="' + _escHtml(k) + '">' + _escHtml(k) + '</option>'; }).join('');
+  }).withFailureHandler(function(){ katSel.innerHTML = '<option value="">Gagal memuat</option>'; }).getKategoriPengeluaran();
+  _reqnpToggleKategori();
+  document.getElementById('modal-req-nonpo').classList.remove('hidden');
+}
+function _reqnpToggleKategori() {
+  var wo = document.getElementById('reqnp-wo').value;
+  document.getElementById('reqnp-kategori-wrap').classList.toggle('hidden', !!wo);  // kategori hanya utk non-project
+}
+function _tutupReqNonPO() { document.getElementById('modal-req-nonpo').classList.add('hidden'); }
+function handleReqNonPOFileChange(input) { _uploadSupplierFile('reqnp-file', input, 'uploadFileInvoiceSupplierPO', 'violet'); }
+function submitReqNonPO() {
+  var keterangan = document.getElementById('reqnp-keterangan').value.trim();
+  var jumlah = parseFloat(document.getElementById('reqnp-jumlah').value) || 0;
+  var noWO = document.getElementById('reqnp-wo').value;
+  var kategori = document.getElementById('reqnp-kategori').value;
+  if (!keterangan) return showNotification('Keterangan/deskripsi wajib diisi.', 'error');
+  if (jumlah <= 0) return showNotification('Nominal harus lebih dari 0.', 'error');
+  if (!noWO && !kategori) return showNotification('Pilih kategori untuk pengeluaran non-project.', 'error');
+  var payload = {
+    keterangan: keterangan, jumlah: jumlah, noWO: noWO, kategori: kategori,
+    catatan: document.getElementById('reqnp-catatan').value.trim(),
+    invoiceFileId: document.getElementById('reqnp-file-id').value,
+    invoiceFileUrl: document.getElementById('reqnp-file-url').value,
+    invoiceFileName: document.getElementById('reqnp-file-name').value,
+    dibuatOleh: (_currentUser && _currentUser.nama) || ''
+  };
+  _tutupReqNonPO();
+  toggleLoader(true, 'Mengirim request...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .requestPembayaranNonPO(payload);
+}
+
 // ── Request Pembayaran PO ─────────────────────────────────────────────────────
 function bukaFormRequestBayarPO() {
   if (!_currentPODetail) return;

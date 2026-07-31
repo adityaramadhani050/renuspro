@@ -571,7 +571,8 @@ function _renderPaymentRequestList(list) {
       ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-rose-500 hover:text-rose-600 font-semibold" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i> Invoice</a>'
       : '<span class="text-slate-300">Tanpa invoice</span>';
     html += '<td class="p-4"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
-    html += '<td class="p-4"><div class="font-mono text-xs font-bold text-slate-700">' + _esc(r.noPO || '') + '</div><div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
+    var noPOCell = r.noPO ? '<div class="font-mono text-xs font-bold text-slate-700">' + _esc(r.noPO) + '</div>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Tanpa PO</span>';
+    html += '<td class="p-4">' + noPOCell + '<div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
     html += '<td class="p-4 text-xs font-mono text-teal-700">' + _esc(r.noWO || '—') + '</td>';
     html += '<td class="p-4 text-right text-xs text-slate-600">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
     html += '<td class="p-4 text-right font-bold text-slate-800 text-sm">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
