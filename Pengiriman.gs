@@ -111,16 +111,18 @@ function requestPengiriman(noWO, oleh) {
     if (!res || !res.success) return { success: false, message: 'Gagal memuat BoM.' };
     var items = res.items || [];
     if (!items.length) return { success: false, message: 'BoM belum ada material.' };
-    var adaBelum = false, anyReserved = false, adaApproved = false;
+    // Request parsial: cukup ada minimal 1 material Reserved dari gudang.
+    // Tak perlu menunggu seluruh material BoM selesai diproses procurement —
+    // material yang menyusul di-reserve akan otomatis masuk request yang aktif,
+    // atau bisa di-request lagi setelah batch sebelumnya selesai dikirim.
+    var anyReserved = false, adaApproved = false;
     items.forEach(function (it) {
-      if (it.status !== 'Approved') { if (it.status !== 'Rejected') adaBelum = true; return; }
+      if (it.status !== 'Approved') return;
       adaApproved = true;
-      if ((it.qtyBeli || 0) > 0 || (it.qtyMenungguBL || 0) > 0 || !it.procStatus) adaBelum = true;
       if (((it.qtyReserved || 0) - (it.qtyDikirim || 0)) > 0) anyReserved = true;
     });
     if (!adaApproved) return { success: false, message: 'Belum ada material Approved.' };
-    if (adaBelum) return { success: false, message: 'Masih ada material yang belum selesai diproses procurement (perlu diproses / perlu dibeli / tunggu beli).' };
-    if (!anyReserved) return { success: false, message: 'Tidak ada material Reserved dari gudang untuk dikirim.' };
+    if (!anyReserved) return { success: false, message: 'Belum ada material Reserved dari gudang untuk dikirim.' };
 
     var sheet = _ensurePengirimanReqSheet(getSpreadsheet());
     var data = sheet.getDataRange().getValues();
