@@ -1204,8 +1204,7 @@ function submitTerimaPOKirimLangsung() {
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
-  var buktiFileUrl  = document.getElementById('terima-langsung-bukti-file-url').value;
-  if (!buktiFileUrl) return showNotification('Bukti barang diterima klien wajib dilampirkan.', 'error');
+  var buktiFileUrl  = document.getElementById('terima-langsung-bukti-file-url').value;  // opsional
   var buktiFileId   = document.getElementById('terima-langsung-bukti-file-id').value;
   var buktiFileName = document.getElementById('terima-langsung-bukti-file-name').value;
 

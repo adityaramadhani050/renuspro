@@ -943,19 +943,16 @@ function _kirimRenderBoard() {
       else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
       return '<div class="flex items-center gap-2 px-3 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="ml-auto">' + act + '</span></div>';
     }).join('');
-    // Kolom "Surat Jalan": 0 → —, 1 → tombol PDF (label No SJ), >1 → chevron Detail.
-    var sjCell, aksiExtra = '';
-    if (!sjArr.length) sjCell = '<span class="text-slate-300">—</span>';
-    else if (sjArr.length === 1) {
-      var s0 = sjArr[0];
-      sjCell = '<button onclick="_kirimExportPDF(\'' + _escHtml(s0.idKirim) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> ' + _escHtml(s0.noSuratJalan) + '</button>';
-      if (s0.status === 'Dikirim') aksiExtra = '<button onclick="_kirimOpenTerima(\'' + _escHtml(s0.idKirim) + '\',\'' + _escHtml(s0.noSuratJalan) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-box-open"></i> Terima</button>';
-      else if (s0.buktiFileUrl) aksiExtra = '<a href="' + _escHtml(s0.buktiFileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:underline px-1"><i class="fa-solid fa-image"></i> Bukti</a>';
-    } else {
-      sjCell = '<button onclick="_kirimToggleDetail(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-1.5 px-2" title="Lihat surat jalan"><i class="fa-solid fa-chevron-' + (isOpen ? 'up' : 'down') + ' text-[10px]"></i> Detail (' + sjArr.length + ')</button>';
-    }
+    // Kolom "Surat Jalan": jumlah surat jalan ("N Surat Jalan").
+    var sjCell = sjArr.length
+      ? '<span class="text-sm font-semibold text-slate-600 whitespace-nowrap">' + sjArr.length + ' Surat Jalan</span>'
+      : '<span class="text-slate-300">—</span>';
+    // Tombol "Detail" (accordion surat jalan) ditaruh di kolom Aksi.
+    var detailBtn = sjArr.length
+      ? '<button onclick="_kirimToggleDetail(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 py-1.5 px-2" title="Lihat surat jalan"><i class="fa-solid fa-chevron-' + (isOpen ? 'up' : 'down') + ' text-[10px]"></i> Detail (' + sjArr.length + ')</button>'
+      : '';
     var prosesBtn = w.hasSisa ? '<button onclick="_kirimOpenModal(\'' + _escHtml(w.noWO) + '\')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Proses Kirim</button>' : '';
-    var aksiInner = prosesBtn + aksiExtra;
+    var aksiInner = prosesBtn + detailBtn;
     var aksiCell = aksiInner ? ('<div class="flex items-center justify-center gap-1.5 flex-wrap">' + aksiInner + '</div>') : '<span class="text-slate-300 text-xs">—</span>';
     var mainRow = '<tr class="border-b border-slate-100 hover:bg-slate-50 transition">' +
       '<td class="p-4 font-mono font-bold text-slate-700 whitespace-nowrap" data-label="No WO">' + _escHtml(w.noWO) + '</td>' +
@@ -966,7 +963,7 @@ function _kirimRenderBoard() {
       '<td class="p-4" data-label="Surat Jalan">' + sjCell + '</td>' +
       '<td class="p-4 text-center rp-actions" data-label="Aksi">' + aksiCell + '</td>' +
     '</tr>';
-    var detailRow = (sjArr.length > 1 && isOpen)
+    var detailRow = (sjArr.length && isOpen)
       ? '<tr class="bg-slate-50"><td colspan="7" class="px-4 pb-4 pt-1"><div class="rounded-xl border border-slate-150 overflow-hidden bg-white">' +
           sjRows + '</div></td></tr>'
       : '';
