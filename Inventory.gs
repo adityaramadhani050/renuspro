@@ -829,10 +829,7 @@ function terimaPOItems(payload) {
 
     if (!items.length) return { success: false, message: 'Tidak ada item yang diterima.' };
 
-    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();
-    if (!buktiFileUrl) {
-      return { success: false, message: 'Bukti barang diterima inventory wajib dilampirkan.' };
-    }
+    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();  // opsional
 
     // ── VALIDASI PENUH ──
     var poData   = poSheet.getDataRange().getValues();

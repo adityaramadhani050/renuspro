@@ -812,10 +812,7 @@ function terimaPOKirimLangsung(payload) {
       return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
     }
 
-    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();
-    if (!buktiFileUrl) {
-      return { success: false, message: 'Bukti barang diterima klien wajib dilampirkan.' };
-    }
+    var buktiFileUrl = (payload.buktiFileUrl || '').toString().trim();  // opsional
 
     var itData = itSheet.getDataRange().getValues();
     var itRowMap = {};

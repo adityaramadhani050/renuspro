@@ -795,8 +795,7 @@ function submitProsesTerimaPOGudang() {
   if (hasError) return;
   if (!items.length) return showNotification('Masukkan qty yang akan diterima.', 'error');
 
-  var buktiFileUrl = document.getElementById('terima-gudang-bukti-file-url').value;
-  if (!buktiFileUrl) return showNotification('Bukti barang diterima inventory wajib dilampirkan.', 'error');
+  var buktiFileUrl = document.getElementById('terima-gudang-bukti-file-url').value;  // opsional
   var buktiFileId   = document.getElementById('terima-gudang-bukti-file-id').value;
   var buktiFileName = document.getElementById('terima-gudang-bukti-file-name').value;
 
