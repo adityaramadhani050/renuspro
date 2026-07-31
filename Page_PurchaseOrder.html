@@ -36,6 +36,14 @@
             </div>
           </div>
 
+          <!-- ── Tabs ── -->
+          <div class="flex items-center gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+            <button id="po-tab-list-btn" onclick="_poSwitchTab('list')" class="px-4 py-2.5 text-sm font-bold border-b-2 border-orange-500 text-orange-600 whitespace-nowrap transition">Purchase Order</button>
+            <button id="po-tab-riwayat-btn" onclick="_poSwitchTab('riwayat')" class="px-4 py-2.5 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 whitespace-nowrap transition">Riwayat Request Pembayaran</button>
+          </div>
+
+          <!-- ── TAB: Daftar PO ── -->
+          <div id="po-tab-list">
           <!-- ── KPI Cards ── -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
 
@@ -67,6 +75,42 @@
 
           <div id="po-card-list" class="space-y-2">
             <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data purchase order...</div>
+          </div>
+          </div><!-- /po-tab-list -->
+
+          <!-- ── TAB: Riwayat Request Pembayaran ── -->
+          <div id="po-tab-riwayat" class="hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+              <div class="relative w-full sm:w-72">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="po-riwayat-search" oninput="_poRenderRiwayat()" placeholder="Cari ID / PO / keterangan / WO..." class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+              </div>
+              <select id="po-riwayat-status" onchange="_poRenderRiwayat()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
+                <option value="">Semua Status</option>
+                <option value="Menunggu">Menunggu</option>
+                <option value="Disetujui">Disetujui</option>
+                <option value="Ditolak">Ditolak</option>
+              </select>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th class="p-4 text-left">ID / Tanggal</th>
+                      <th class="p-4 text-left">PO / Keterangan</th>
+                      <th class="p-4 text-left">WO</th>
+                      <th class="p-4 text-right">Jumlah</th>
+                      <th class="p-4 text-center">Status</th>
+                      <th class="p-4 text-center">Dokumen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="po-riwayat-body" class="divide-y divide-slate-100">
+                    <tr><td colspan="6" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -661,7 +705,7 @@
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
             <div class="flex items-center gap-3 mb-4">
               <span class="bg-violet-100 text-violet-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-hand-holding-dollar text-sm"></i></span>
-              <div><h3 class="text-base font-extrabold text-slate-800">Request Pembayaran (Tanpa PO)</h3><p class="text-xs text-slate-400">Permintaan pembayaran/pembelian tanpa PO. Disetujui Finance → tercatat sebagai pengeluaran langsung.</p></div>
+              <h3 class="text-base font-extrabold text-slate-800">Request Pembayaran (Tanpa PO)</h3>
             </div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Keterangan / Deskripsi <span class="text-rose-400">*</span></label>
             <input type="text" id="reqnp-keterangan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="cth: Sewa alat, transport, jasa tukang...">

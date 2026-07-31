@@ -101,6 +101,7 @@ function _pgRenderPurchaseOrder(data) {
 
 // ── Load daftar PO ──────────────────────────────────────────────────────────
 window.loadPurchaseOrder = function(fromNav) {
+  if (typeof _poSwitchTab === 'function') _poSwitchTab('list');  // selalu mulai dari tab Daftar PO
   var render = function(data) {
     _cachedPOData = (data || []).slice().reverse();
     filterPO();   // render kartu + KPI sesuai filter/pencarian aktif
@@ -947,6 +948,54 @@ function submitReqNonPO() {
     toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
   }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
     .requestPembayaranNonPO(payload);
+}
+
+// ── Tab home PO: Daftar PO ↔ Riwayat Request Pembayaran ───────────────────────
+var _poRiwayatData = [];
+function _poSwitchTab(tab) {
+  var isList = tab !== 'riwayat';
+  document.getElementById('po-tab-list').classList.toggle('hidden', !isList);
+  document.getElementById('po-tab-riwayat').classList.toggle('hidden', isList);
+  var lb = document.getElementById('po-tab-list-btn'), rb = document.getElementById('po-tab-riwayat-btn');
+  var base = 'px-4 py-2.5 text-sm font-bold border-b-2 whitespace-nowrap transition ';
+  lb.className = base + (isList ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600');
+  rb.className = base + (isList ? 'border-transparent text-slate-400 hover:text-slate-600' : 'border-orange-500 text-orange-600');
+  if (!isList) loadPORiwayat();
+}
+function loadPORiwayat() {
+  var tb = document.getElementById('po-riwayat-body');
+  if (tb) tb.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  google.script.run.withSuccessHandler(function(res){
+    _poRiwayatData = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
+    _poRenderRiwayat();
+  }).withFailureHandler(function(){ if (tb) tb.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-rose-400">Gagal memuat.</td></tr>'; }).getPaymentRequestList({ status: '' });
+}
+function _poRenderRiwayat() {
+  var q = (document.getElementById('po-riwayat-search').value || '').toLowerCase().trim();
+  var st = document.getElementById('po-riwayat-status').value;
+  var list = (_poRiwayatData || []).filter(function(r){
+    if (st && r.status !== st) return false;
+    if (!q) return true;
+    return ((r.idReq||'')+' '+(r.noPO||'')+' '+(r.namaSupplier||'')+' '+(r.noWO||'')).toLowerCase().indexOf(q)!==-1;
+  });
+  var tb = document.getElementById('po-riwayat-body');
+  if (!tb) return;
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>'; return; }
+  var sc = { 'Menunggu':'bg-amber-100 text-amber-700','Disetujui':'bg-emerald-100 text-emerald-700','Ditolak':'bg-rose-100 text-rose-600' };
+  tb.innerHTML = list.map(function(r){
+    var poCell = r.noPO ? '<span class="font-mono text-xs font-bold text-slate-700">'+_escHtml(r.noPO)+'</span>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Tanpa PO</span>';
+    var inv = r.invoiceFileUrl ? '<a href="'+_escHtml(r.invoiceFileUrl)+'" target="_blank" rel="noopener" class="text-rose-500 hover:text-rose-600 text-xs font-semibold"><i class="fa-solid fa-file-invoice"></i> Invoice</a>' : '';
+    var bukti = r.buktiFileUrl ? '<a href="'+_escHtml(r.buktiFileUrl)+'" target="_blank" rel="noopener" class="text-emerald-600 hover:text-emerald-700 text-xs font-semibold ml-2"><i class="fa-solid fa-receipt"></i> Bukti</a>' : '';
+    var dok = (inv||bukti) ? (inv+bukti) : '<span class="text-slate-300 text-xs">—</span>';
+    return '<tr class="hover:bg-slate-50 transition-colors">'
+      + '<td class="p-4"><div class="font-mono text-xs text-slate-600">'+_escHtml(r.idReq||'')+'</div><div class="text-[11px] text-slate-400">'+_escHtml(r.tanggalRequest||'')+'</div></td>'
+      + '<td class="p-4">'+poCell+'<div class="text-[11px] text-slate-400 truncate max-w-[220px]">'+_escHtml(r.namaSupplier||'')+'</div></td>'
+      + '<td class="p-4 text-xs font-mono text-teal-700">'+_escHtml(r.noWO||'—')+'</td>'
+      + '<td class="p-4 text-right font-bold text-slate-800">Rp '+((r.jumlah||0).toLocaleString('id-ID'))+'</td>'
+      + '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full '+(sc[r.status]||'bg-slate-100 text-slate-600')+'">'+_escHtml(r.status||'')+'</span></td>'
+      + '<td class="p-4 text-center whitespace-nowrap">'+dok+'</td>'
+      + '</tr>';
+  }).join('');
 }
 
 // ── Request Pembayaran PO ─────────────────────────────────────────────────────
