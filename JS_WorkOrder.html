@@ -231,6 +231,7 @@
       _woLoadSurveys(item.noWO);
       _woLoadQC(item.noWO);
       _woLoadDokumen(item.noWO);
+      if (typeof _hoLoad === 'function') _hoLoad(item.noWO);
     };
 
     // Kembali dari detail WO (halaman penuh) ke daftar.

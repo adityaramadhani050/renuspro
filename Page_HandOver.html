@@ -1,0 +1,56 @@
+<!-- ═══════════ MODAL HAND OVER (dipakai di detail Work Order) ═══════════ -->
+
+<!-- Jadwalkan / Reschedule HO -->
+<div id="ho-modal-schedule" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-indigo-100 text-indigo-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-calendar-plus text-sm"></i></span>
+      <h3 class="text-base font-extrabold text-slate-800">Jadwalkan Hand Over</h3>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal <span class="text-rose-400">*</span></label><input type="date" id="ho-sch-tanggal" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+      <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Waktu</label><input type="time" id="ho-sch-waktu" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+    </div>
+    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mode</label>
+    <select id="ho-sch-mode" onchange="_hoModeToggle()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3">
+      <option value="Online">Online</option>
+      <option value="Offline">Offline</option>
+    </select>
+    <div id="ho-sch-online-wrap" class="mb-3">
+      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Link Meeting</label>
+      <div class="flex gap-2">
+        <input type="text" id="ho-sch-link" class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="Generate Meet atau tempel link manual">
+        <button id="ho-sch-genbtn" onclick="_hoGenerateMeet()" class="shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-xs font-bold px-3 py-2.5 rounded-xl transition whitespace-nowrap"><i class="fa-solid fa-video"></i> Generate Meet</button>
+      </div>
+      <input type="hidden" id="ho-sch-eventid">
+    </div>
+    <div id="ho-sch-offline-wrap" class="mb-3 hidden">
+      <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lokasi</label>
+      <input type="text" id="ho-sch-lokasi" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="cth: Kantor / lokasi project">
+    </div>
+    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Peserta</label>
+    <input type="text" id="ho-sch-peserta" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="Nama / email peserta (pisah koma)">
+    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan Undangan</label>
+    <input type="text" id="ho-sch-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4" placeholder="opsional">
+    <div class="flex justify-end gap-2">
+      <button onclick="_hoCloseSchedule()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+      <button onclick="_hoSubmitSchedule()" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Simpan Jadwal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Selesai HO (MoM) -->
+<div id="ho-modal-complete" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-emerald-100 text-emerald-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-file-lines text-sm"></i></span>
+      <div><h3 class="text-base font-extrabold text-slate-800">Selesai Hand Over</h3><p class="text-xs text-slate-400">Wajib isi catatan hasil meeting (MoM).</p></div>
+    </div>
+    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">MoM / Catatan Hasil <span class="text-rose-400">*</span></label>
+    <textarea id="ho-mom" rows="6" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4" placeholder="Poin-poin hasil hand over, kesepakatan, catatan penting untuk tim project..."></textarea>
+    <div class="flex justify-end gap-2">
+      <button onclick="_hoCloseComplete()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+      <button onclick="_hoSubmitComplete()" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Tandai Selesai</button>
+    </div>
+  </div>
+</div>

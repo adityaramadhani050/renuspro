@@ -1,0 +1,181 @@
+<script>
+// ════════════════ HAND OVER (panel di detail Work Order) ════════════════
+var _hoWO = '';       // No WO aktif
+var _hoRec = null;    // record HO
+
+function _hoEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function _hoRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _hoUserNama(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _hoCanRequest(){ var r=_hoRole(); return r==='sales' || r==='leadsales' || r==='admin'; }
+function _hoCanManage(){ var r=_hoRole(); return r==='projectcoordinator' || r==='admin'; }
+function _hoFmt(iso){ if(!iso) return '-'; var p=(''+iso).split('-'); return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : iso; }
+
+var _HO_BADGE = {
+  'Diminta':     'bg-amber-100 text-amber-700',
+  'Dijadwalkan': 'bg-indigo-100 text-indigo-700',
+  'Selesai':     'bg-emerald-100 text-emerald-700',
+  'Batal':       'bg-slate-100 text-slate-500'
+};
+
+function _hoLoad(noWO) {
+  _hoWO = (noWO || '').toString();
+  var panel = document.getElementById('wo-ho-panel');
+  if (!panel) return;
+  panel.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-5"><div class="text-sm text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat Hand Over...</div></div>';
+  google.script.run.withSuccessHandler(function(res){
+    _hoRec = (res && res.success) ? (res.record || null) : null;
+    _hoRenderPanel();
+  }).withFailureHandler(function(){
+    panel.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-5 text-sm text-rose-400">Gagal memuat Hand Over.</div>';
+  }).getHandOverByWO(_hoWO);
+}
+
+function _hoRenderPanel() {
+  var panel = document.getElementById('wo-ho-panel');
+  if (!panel) return;
+  var r = _hoRec;
+  var st = r ? (r.status || '') : '';
+  var badge = st ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + (_HO_BADGE[st] || 'bg-slate-100 text-slate-500') + '">' + _hoEsc(st) + ' HO</span>' : '';
+
+  var body = '', actions = '';
+
+  if (!st || st === 'Batal') {
+    body = '<p class="text-sm text-slate-400">' + (st === 'Batal' ? 'Hand Over dibatalkan.' : 'Belum ada Hand Over untuk WO ini.') + '</p>';
+    if (_hoCanRequest()) actions = '<button onclick="_hoRequest()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i> ' + (st === 'Batal' ? 'Request Ulang' : 'Request Hand Over') + '</button>';
+    else if (!st) body += '<p class="text-[11px] text-slate-400 mt-1">Menunggu Sales melakukan request.</p>';
+  } else if (st === 'Diminta') {
+    body = '<div class="text-xs text-slate-500">Diminta oleh <b class="text-slate-700">' + _hoEsc(r.dimintaOleh || '-') + '</b> · ' + _hoEsc(r.dimintaPada || '') + '</div>'
+         + '<p class="text-[11px] text-slate-400 mt-1">Menunggu Project Coordinator menjadwalkan.</p>';
+    if (_hoCanManage()) actions = '<button onclick="_hoOpenSchedule()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-calendar-plus"></i> Jadwalkan HO</button>';
+    if (_hoCanManage() || _hoCanRequest()) actions += ' <button onclick="_hoBatal()" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2 rounded-xl transition whitespace-nowrap"><i class="fa-solid fa-xmark"></i> Batalkan</button>';
+  } else if (st === 'Dijadwalkan') {
+    body = _hoJadwalInfo(r);
+    if (_hoCanManage()) actions = '<button onclick="_hoOpenComplete()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-check"></i> Selesai HO</button>'
+      + ' <button onclick="_hoOpenSchedule()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3.5 py-2 rounded-xl transition whitespace-nowrap"><i class="fa-solid fa-rotate"></i> Reschedule</button>'
+      + ' <button onclick="_hoBatal()" class="inline-flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold px-3.5 py-2 rounded-xl transition whitespace-nowrap"><i class="fa-solid fa-xmark"></i> Batalkan</button>';
+  } else if (st === 'Selesai') {
+    body = _hoJadwalInfo(r)
+      + '<div class="mt-3 pt-3 border-t border-slate-100"><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1"><i class="fa-solid fa-file-lines text-emerald-500 mr-1"></i>MoM / Catatan Hasil</p>'
+      +   '<p class="text-sm text-slate-700 whitespace-pre-line">' + _hoEsc(r.mom || '-') + '</p></div>'
+      + '<p class="text-[11px] text-emerald-700 font-semibold mt-2"><i class="fa-solid fa-circle-check mr-1"></i>Selesai oleh <b>' + _hoEsc(r.selesaiOleh || '-') + '</b>' + (r.selesaiPada ? ' · ' + _hoEsc(r.selesaiPada) : '') + '</p>';
+  }
+
+  panel.innerHTML =
+      '<div class="bg-white rounded-2xl border border-slate-150 p-5">'
+    + '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">'
+    +   '<p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-handshake text-indigo-400"></i> Hand Over ' + badge + '</p>'
+    +   '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + actions + '</div>'
+    + '</div>'
+    + body
+    + '</div>';
+}
+
+function _hoJadwalInfo(r) {
+  var isOnline = (r.mode === 'Online');
+  var tautan = isOnline
+    ? (r.linkMeet ? '<a href="' + _hoEsc(r.linkMeet) + '" target="_blank" rel="noopener" class="text-indigo-600 font-semibold hover:underline break-all"><i class="fa-solid fa-video mr-1"></i>' + _hoEsc(r.linkMeet) + '</a>' : '<span class="text-slate-400">-</span>')
+    : '<span class="text-slate-700 font-semibold"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>' + _hoEsc(r.lokasi || '-') + '</span>';
+  return '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">'
+    + '<div class="bg-slate-50 rounded-xl p-3"><p class="text-slate-400 mb-0.5">Jadwal</p><p class="font-bold text-slate-700">' + _hoFmt(r.tglJadwal) + (r.waktu ? ' · ' + _hoEsc(r.waktu) : '') + '</p></div>'
+    + '<div class="bg-slate-50 rounded-xl p-3"><p class="text-slate-400 mb-0.5">Mode</p><p class="font-bold text-slate-700">' + _hoEsc(r.mode || '-') + '</p></div>'
+    + '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">' + (isOnline ? 'Link Meeting' : 'Lokasi') + '</p><p>' + tautan + '</p></div>'
+    + (r.peserta ? '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">Peserta</p><p class="font-semibold text-slate-700">' + _hoEsc(r.peserta) + '</p></div>' : '')
+    + (r.catatanUndangan ? '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">Catatan Undangan</p><p class="text-slate-600">' + _hoEsc(r.catatanUndangan) + '</p></div>' : '')
+    + '</div>';
+}
+
+// ── Request ──
+function _hoRequest() {
+  if (!_hoWO) return;
+  showConfirm({ title: 'Request Hand Over', message: 'Kirim permintaan Hand Over WO ' + _hoWO + ' ke Project Coordinator?', confirmText: 'Ya, Request', icon: 'fa-paper-plane', type: 'info', onConfirm: function() {
+    toggleLoader(true, 'Mengirim...');
+    google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res&&res.message)||'Selesai.', (res&&res.success)?'success':'error'); if(res&&res.success) _hoLoad(_hoWO); })
+      .withFailureHandler(function(err){ toggleLoader(false); showNotification((err&&err.message)||'Gagal.', 'error'); })
+      .requestHandOver(_hoWO, _hoUserNama());
+  }});
+}
+function _hoBatal() {
+  if (!_hoWO) return;
+  showConfirm({ title: 'Batalkan Hand Over', message: 'Batalkan Hand Over WO ' + _hoWO + '?', confirmText: 'Ya, Batalkan', icon: 'fa-xmark', type: 'warning', onConfirm: function() {
+    toggleLoader(true, 'Memproses...');
+    google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res&&res.message)||'Selesai.', (res&&res.success)?'success':'error'); if(res&&res.success) _hoLoad(_hoWO); })
+      .withFailureHandler(function(err){ toggleLoader(false); showNotification((err&&err.message)||'Gagal.', 'error'); })
+      .batalHandOver(_hoWO, _hoUserNama());
+  }});
+}
+
+// ── Jadwalkan / Reschedule ──
+function _hoOpenSchedule() {
+  var r = _hoRec || {};
+  document.getElementById('ho-sch-tanggal').value = r.tglJadwal || '';
+  document.getElementById('ho-sch-waktu').value = r.waktu || '';
+  document.getElementById('ho-sch-mode').value = r.mode || 'Online';
+  document.getElementById('ho-sch-link').value = r.linkMeet || '';
+  document.getElementById('ho-sch-lokasi').value = r.lokasi || '';
+  document.getElementById('ho-sch-peserta').value = r.peserta || '';
+  document.getElementById('ho-sch-catatan').value = r.catatanUndangan || '';
+  document.getElementById('ho-sch-eventid').value = r.meetEventId || '';
+  _hoModeToggle();
+  document.getElementById('ho-modal-schedule').classList.remove('hidden');
+}
+function _hoCloseSchedule(){ document.getElementById('ho-modal-schedule').classList.add('hidden'); }
+function _hoModeToggle() {
+  var online = document.getElementById('ho-sch-mode').value === 'Online';
+  document.getElementById('ho-sch-online-wrap').classList.toggle('hidden', !online);
+  document.getElementById('ho-sch-offline-wrap').classList.toggle('hidden', online);
+}
+function _hoGenerateMeet() {
+  var tanggal = document.getElementById('ho-sch-tanggal').value;
+  var waktu = document.getElementById('ho-sch-waktu').value;
+  if (!tanggal) return showNotification('Isi tanggal jadwal dulu.', 'error');
+  var btn = document.getElementById('ho-sch-genbtn');
+  var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Membuat...';
+  google.script.run.withSuccessHandler(function(res){
+    btn.disabled = false; btn.innerHTML = old;
+    if (res && res.success) {
+      document.getElementById('ho-sch-link').value = res.link || '';
+      document.getElementById('ho-sch-eventid').value = res.eventId || '';
+      showNotification(res.message || 'Link Meet dibuat.', 'success');
+    } else { showNotification((res && res.message) || 'Gagal generate Meet.', 'error'); }
+  }).withFailureHandler(function(err){ btn.disabled = false; btn.innerHTML = old; showNotification((err && err.message) || 'Gagal generate Meet.', 'error'); })
+    .hoGenerateMeet({ noWO: _hoWO, tanggal: tanggal, waktu: waktu, emails: document.getElementById('ho-sch-peserta').value });
+}
+function _hoSubmitSchedule() {
+  var payload = {
+    noWO: _hoWO,
+    tanggal: document.getElementById('ho-sch-tanggal').value,
+    waktu: document.getElementById('ho-sch-waktu').value,
+    mode: document.getElementById('ho-sch-mode').value,
+    link: document.getElementById('ho-sch-link').value.trim(),
+    lokasi: document.getElementById('ho-sch-lokasi').value.trim(),
+    peserta: document.getElementById('ho-sch-peserta').value.trim(),
+    catatan: document.getElementById('ho-sch-catatan').value.trim(),
+    meetEventId: document.getElementById('ho-sch-eventid').value,
+    oleh: _hoUserNama()
+  };
+  if (!payload.tanggal) return showNotification('Tanggal jadwal wajib.', 'error');
+  if (payload.mode === 'Online' && !payload.link) return showNotification('Isi link meeting (generate Meet atau tempel manual).', 'error');
+  if (payload.mode === 'Offline' && !payload.lokasi) return showNotification('Isi lokasi hand over.', 'error');
+  _hoCloseSchedule();
+  toggleLoader(true, 'Menyimpan jadwal...');
+  google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res&&res.message)||'Selesai.', (res&&res.success)?'success':'error'); if(res&&res.success) _hoLoad(_hoWO); })
+    .withFailureHandler(function(err){ toggleLoader(false); showNotification((err&&err.message)||'Gagal.', 'error'); })
+    .scheduleHandOver(payload);
+}
+
+// ── Selesai (MoM) ──
+function _hoOpenComplete() {
+  document.getElementById('ho-mom').value = (_hoRec && _hoRec.mom) || '';
+  document.getElementById('ho-modal-complete').classList.remove('hidden');
+}
+function _hoCloseComplete(){ document.getElementById('ho-modal-complete').classList.add('hidden'); }
+function _hoSubmitComplete() {
+  var mom = document.getElementById('ho-mom').value.trim();
+  if (!mom) return showNotification('Catatan hasil meeting (MoM) wajib diisi.', 'error');
+  _hoCloseComplete();
+  toggleLoader(true, 'Menyimpan...');
+  google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res&&res.message)||'Selesai.', (res&&res.success)?'success':'error'); if(res&&res.success) _hoLoad(_hoWO); })
+    .withFailureHandler(function(err){ toggleLoader(false); showNotification((err&&err.message)||'Gagal.', 'error'); })
+    .completeHandOver(_hoWO, mom, _hoUserNama());
+}
+</script>
