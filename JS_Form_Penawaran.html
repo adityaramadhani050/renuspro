@@ -1210,7 +1210,7 @@
       // --- MUAT DATA PENAWARAN KE FORM UNTUK DIEDIT ---
     function muatPenawaranKeForm(item) {
       if (item.status === 'Deal' && !_isDealEditableBulanIni(item)) {
-        showNotification("Penawaran Deal tidak dapat direvisi — Hand Over WO sudah Selesai (project sudah diserahterimakan).", "error");
+        showNotification("Penawaran Deal tidak dapat direvisi — " + (typeof _dealLockReason === 'function' ? _dealLockReason(item) : 'terkunci') + ".", "error");
         return;
       }
       navigate('penawaran');

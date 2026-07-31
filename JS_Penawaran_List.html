@@ -2,11 +2,22 @@
     // ── Data cache untuk filter penawaran ──────────────────────────
     let _cachedPenawaranData = [];
 
-    // Penawaran Deal terkunci (tidak bisa direvisi) begitu Hand Over WO-nya Selesai —
-    // project sudah diserahterimakan ke tim project. Selama HO belum Selesai, bebas revisi.
+    // Penawaran Deal terkunci bila: (a) Hand Over WO sudah Selesai, ATAU
+    // (b) tanggal deal sudah lewat bulan ini (jaga laporan deal bulan lalu).
     function _isDealEditableBulanIni(item) {
       if (item.status !== 'Deal') return true;
-      return (item.hoStatus || '') !== 'Selesai';
+      if ((item.hoStatus || '') === 'Selesai') return false;
+      if (!item.tanggalDeal) return false;
+      const p = item.tanggalDeal.split('/'); // dd/MM/yyyy
+      if (p.length !== 3) return false;
+      const d = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+    // Alasan kunci (untuk tooltip & pesan).
+    function _dealLockReason(item) {
+      if ((item.hoStatus || '') === 'Selesai') return 'Hand Over WO sudah Selesai';
+      return 'Deal sudah melewati bulan ini';
     }
     function _isiDropdownFilterPenawaran(data) {
       const isAdmin = _currentUser && _currentUser.role === 'admin';      
@@ -122,12 +133,12 @@
                   <i class="fa-solid fa-file-pdf"></i>
                 </button>
                   ${i.status === 'Deal' && !_isDealEditableBulanIni(i)
-                    ? `<span class="text-slate-300 p-1.5 cursor-not-allowed" title="Tidak dapat direvisi — Hand Over WO sudah Selesai">
+                    ? `<span class="text-slate-300 p-1.5 cursor-not-allowed" title="Tidak dapat direvisi — ${_dealLockReason(i)}">
                         <i class="fa-solid fa-lock text-xs"></i>
                       </span>`
                     : `<button onclick='muatPenawaranKeForm(${JSON.stringify(i).replace(/'/g,"&#39;")})'
                         class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition"
-                        title="${i.status === 'Deal' ? 'Edit Revisi (Deal — HO belum Selesai)' : 'Edit / Revisi'}">
+                        title="${i.status === 'Deal' ? 'Edit Revisi (Deal — bulan ini & HO belum Selesai)' : 'Edit / Revisi'}">
                         <i class="fa-solid fa-pen-to-square"></i>
                       </button>`
                   }

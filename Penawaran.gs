@@ -498,8 +498,13 @@ function editPenawaran(payload) {
         }
       }
     }
-    if (currentStatus === 'Deal' && typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
-      return { success: false, message: "Penawaran Deal tidak dapat direvisi karena Hand Over WO " + currentNoWO + " sudah Selesai (project sudah diserahterimakan ke tim project)." };
+    if (currentStatus === 'Deal') {
+      if (!_isSameMonthDate(currentTanggalDeal)) {
+        return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah." };
+      }
+      if (typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
+        return { success: false, message: "Penawaran Deal tidak dapat direvisi karena Hand Over WO " + currentNoWO + " sudah Selesai (project sudah diserahterimakan ke tim project)." };
+      }
     }
 
     const newRev = maxRevCheck + 1;
@@ -587,8 +592,13 @@ function restoreRevisiPenawaran(noPenawaran, rev, namaUser) {
       if (r.toString() === rev.toString()) targetRowIdx = i;
     }
     if (targetRowIdx === -1) return { success: false, message: "Revisi tidak ditemukan." };
-    if (currentStatus === 'Deal' && typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
-      return { success: false, message: "Penawaran Deal tidak dapat direvisi/restore karena Hand Over WO " + currentNoWO + " sudah Selesai." };
+    if (currentStatus === 'Deal') {
+      if (!_isSameMonthDate(currentTanggalDeal)) {
+        return { success: false, message: "Penawaran Deal bulan sebelumnya tidak dapat direvisi/restore lagi, agar laporan deal bulan lalu tidak berubah." };
+      }
+      if (typeof _hoStatus === 'function' && _hoStatus(currentNoWO) === 'Selesai') {
+        return { success: false, message: "Penawaran Deal tidak dapat direvisi/restore karena Hand Over WO " + currentNoWO + " sudah Selesai." };
+      }
     }
     if (parseInt(rev) === maxRev) {
       return { success: false, message: "Revisi ini sudah menjadi revisi terbaru." };
