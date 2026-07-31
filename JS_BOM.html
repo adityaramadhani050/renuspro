@@ -512,6 +512,7 @@ function _bomRenderDetail() {
   // Actions bar — urutan: Export PDF · Atur Site Engineer · Finalkan
   var actions = document.getElementById('bom-detail-actions');
   var btns = '';
+  btns += '<button onclick="_engMuatUlang(\'_bomReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
   btns += '<button onclick="_bomExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>';
   if (_bomCanManage()) {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'

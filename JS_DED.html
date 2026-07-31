@@ -206,6 +206,7 @@ function _dedRenderDetail(summary) {
   var actions = document.getElementById('ded-detail-actions');
   if (actions) {
     var btns = '';
+    btns += '<button onclick="_engMuatUlang(\'_dedReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
     if (_dedCanAssign()) {
       var selesaiBtn = (_dedWO && _dedWO.selesaiManual)
         ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Approved</span></button>'
