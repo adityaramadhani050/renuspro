@@ -30,22 +30,30 @@ var _SCH_BAR = {
 function _schBar(warna){ return _SCH_BAR[warna] || _SCH_BAR.indigo; }
 
 // ── HOME ──────────────────────────────────────────────────
-window.loadSchedule = function() {
+window.loadSchedule = function(fromNav) {
   document.getElementById('sch-home').classList.remove('hidden');
   document.getElementById('sch-detail').classList.add('hidden');
   var hint = document.getElementById('sch-role-hint');
   if (hint) hint.innerText = _schCanEdit() ? (_schRole()==='projectcoordinator' ? 'Project Coor' : 'Admin') : 'Lihat';
   var addBtn = document.getElementById('sch-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_schCanEdit());
-  document.getElementById('sch-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
-  google.script.run.withSuccessHandler(function(res){
+  var render = function(res) {
     _schWOList = (res && res.success) ? (res.list || []) : [];
     _schRenderWOList();
+  };
+  // Warm daftar Site Engineer untuk dropdown penugasan (cache sesi).
+  if (!(_schSEList && _schSEList.length)) {
+    google.script.run.withSuccessHandler(function(res){ _schSEList = (res && res.success) ? (res.list || []) : []; }).getSiteEngineerList();
+  }
+  var c = fromNav ? navCacheGet('schedule') : null;
+  if (c) { render(c); return; }
+  document.getElementById('sch-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  google.script.run.withSuccessHandler(function(res){
+    navCacheSet('schedule', res);
+    render(res);
   }).withFailureHandler(function(){
     document.getElementById('sch-wo-list').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat data schedule.</div>';
   }).getScheduleWOList();
-  // Warm daftar Site Engineer untuk dropdown penugasan.
-  google.script.run.withSuccessHandler(function(res){ _schSEList = (res && res.success) ? (res.list || []) : []; }).getSiteEngineerList();
 };
 
 function _schSetHomeZoom(z){ _schHomeZoom = z; _schRenderWOList(); }

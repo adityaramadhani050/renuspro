@@ -25,7 +25,7 @@ function _dedCanAssign(){ var r = _dedRole(); return r === 'leadengineer' || r =
 function _dedEsc(s){ return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // ── HOME ────────────────────────────────────────────────────────
-window.loadDED = function() {
+window.loadDED = function(fromNav) {
   document.getElementById('ded-home').classList.remove('hidden');
   document.getElementById('ded-detail').classList.add('hidden');
   document.getElementById('ded-manage').classList.add('hidden');
@@ -34,15 +34,21 @@ window.loadDED = function() {
   var mbtn = document.getElementById('ded-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_dedCanAssign());
   var abtn = document.getElementById('ded-add-project-btn'); if (abtn) abtn.classList.toggle('hidden', !_dedCanAssign());
 
-  document.getElementById('ded-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
-  var arg = (_dedRole() === 'siteengineer') ? { siteUserId: _dedUserId() } : {};
-  google.script.run.withSuccessHandler(function(res) {
+  var render = function(res) {
     _dedDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _dedWOList = _dedDash.perWO || [];
     _dedRenderCards(_dedDash.global || {});
     _dedRenderReviewQueue(_dedDash.reviewQueue || []);
     _dedPopulateFilter();
     _dedRenderWOList();
+  };
+  var c = fromNav ? navCacheGet('ded') : null;
+  if (c) { render(c); return; }
+  document.getElementById('ded-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  var arg = (_dedRole() === 'siteengineer') ? { siteUserId: _dedUserId() } : {};
+  google.script.run.withSuccessHandler(function(res) {
+    navCacheSet('ded', res);
+    render(res);
   }).withFailureHandler(function() {
     document.getElementById('ded-wo-list').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat data DED.</div>';
   }).getDEDDashboard(arg);

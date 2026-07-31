@@ -24,6 +24,7 @@
               <option value="">Semua Site Engineer</option>
             </select>
             <div class="flex items-center gap-2 sm:ml-auto">
+              <button onclick="_engMuatUlang('loadQC', this)" title="Muat ulang data" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>
               <button id="qc-add-project-btn" onclick="_qcOpenAddProject()" class="hidden flex-1 sm:flex-none justify-center bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah Project</button>
               <button id="qc-manage-btn" onclick="bukaQCManage()" class="hidden flex-1 sm:flex-none justify-center bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-list-check"></i> Kelola Checklist</button>
             </div>

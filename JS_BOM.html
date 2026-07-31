@@ -44,7 +44,7 @@ function _bomEsc(s){ return (s == null ? '' : String(s)).replace(/&/g,'&amp;').r
 function _bomRp(n){ return (Number(n)||0).toLocaleString('id-ID'); }
 
 // ── HOME ────────────────────────────────────────────────────────
-window.loadBOM = function() {
+window.loadBOM = function(fromNav) {
   // Selalu ambil ulang katalog & kategori saat masuk menu BOM agar kategori/
   // material yang baru dibuat di menu Pricelist langsung muncul (tanpa reload).
   _bomPricelist = null;
@@ -61,12 +61,19 @@ window.loadBOM = function() {
   if (needBtn) needBtn.classList.toggle('hidden', !_bomCanProcure());
   _bomShowHomeTab(_bomHomeTab === 'need' ? 'proses' : _bomHomeTab);
 
-  document.getElementById('bom-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
-  var arg = (_bomRole() === 'siteengineer') ? { siteUserId: _bomUserId() } : {};
-  google.script.run.withSuccessHandler(function(res) {
+  var render = function(res) {
     _bomWOList = (res && res.success) ? (res.perWO || []) : [];
     _bomRenderCards((res && res.global) || {});
     _bomRenderWOList();
+  };
+  // Cache navigasi: pindah masuk menu instan; Muat Ulang / setelah aksi → fresh.
+  var c = fromNav ? navCacheGet('bom') : null;
+  if (c) { render(c); return; }
+  document.getElementById('bom-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  var arg = (_bomRole() === 'siteengineer') ? { siteUserId: _bomUserId() } : {};
+  google.script.run.withSuccessHandler(function(res) {
+    navCacheSet('bom', res);
+    render(res);
   }).withFailureHandler(function() {
     document.getElementById('bom-wo-list').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat data BOM.</div>';
   }).getBOMDashboard(arg);

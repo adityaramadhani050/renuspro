@@ -183,10 +183,10 @@
         if (listPO)   listPO.classList.remove('hidden');
         loadPurchaseOrder(true);
       }
-      if(pageId === 'qc') loadQC();
-      if(pageId === 'bom' && typeof loadBOM === 'function') loadBOM();
-      if(pageId === 'ded' && typeof loadDED === 'function') loadDED();
-      if(pageId === 'schedule' && typeof loadSchedule === 'function') loadSchedule();
+      if(pageId === 'qc') loadQC(true);
+      if(pageId === 'bom' && typeof loadBOM === 'function') loadBOM(true);
+      if(pageId === 'ded' && typeof loadDED === 'function') loadDED(true);
+      if(pageId === 'schedule' && typeof loadSchedule === 'function') loadSchedule(true);
   if(pageId === 'inventory') {
         var listInv = document.getElementById('inv-list-section');
         if (listInv) listInv.classList.remove('hidden');
@@ -203,4 +203,13 @@
     }
 
     function toggleFormUmum(formId) { document.getElementById(formId).classList.toggle('hidden'); }
+
+    // Muat ulang data 1 modul saja (tanpa reload halaman). loadX() tanpa fromNav
+    // → fetch fresh (bypass cache navigasi) + list tampilkan spinner inline.
+    function _engMuatUlang(fnName, btn) {
+      var ic = btn ? btn.querySelector('i') : null;
+      if (ic) ic.classList.add('fa-spin');
+      if (typeof window[fnName] === 'function') window[fnName]();
+      setTimeout(function() { if (ic) ic.classList.remove('fa-spin'); }, 900);
+    }
 </script>

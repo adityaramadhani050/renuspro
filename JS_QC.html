@@ -61,7 +61,7 @@ var _QC_STATUS = {
 function _qcBadge(st) { var m = _QC_STATUS[st] || _QC_STATUS['Belum Upload']; return '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg ' + m.c + '">' + m.t + '</span>'; }
 
 // ── Load ──────────────────────────────────────────────────────────
-window.loadQC = function() {
+window.loadQC = function(fromNav) {
   var hint = document.getElementById('qc-role-hint');
   if (hint) hint.innerText = (_qcCanUpload() && _qcCanReview()) ? 'Admin' : (_qcCanReview() ? 'Lead Engineer' : (_qcCanUpload() ? 'Site Engineer' : 'Lihat'));
   document.getElementById('qc-detail').classList.add('hidden');
@@ -69,11 +69,8 @@ window.loadQC = function() {
   document.getElementById('qc-home').classList.remove('hidden');
   var mbtn = document.getElementById('qc-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_qcCanAssign());
   var abtn = document.getElementById('qc-add-project-btn'); if (abtn) abtn.classList.toggle('hidden', !_qcCanAssign());
-  document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
   if (typeof google === 'undefined') return;
-  // Site engineer hanya melihat WO yang di-assign; admin/lead lihat semua.
-  var arg = (_qcRole() === 'siteengineer') ? { siteUserId: _qcUserId() } : {};
-  google.script.run.withSuccessHandler(function(res) {
+  var render = function(res) {
     _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _qcWOList = _qcDash.perWO || [];
     _qcRenderCards();
@@ -81,6 +78,15 @@ window.loadQC = function() {
     _qcRenderTeamStats();
     _qcPopulateFilter();
     _qcRenderWOList();
+  };
+  var c = fromNav ? navCacheGet('qc') : null;
+  if (c) { render(c); return; }
+  document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</div>';
+  // Site engineer hanya melihat WO yang di-assign; admin/lead lihat semua.
+  var arg = (_qcRole() === 'siteengineer') ? { siteUserId: _qcUserId() } : {};
+  google.script.run.withSuccessHandler(function(res) {
+    navCacheSet('qc', res);
+    render(res);
   }).withFailureHandler(function() {
     document.getElementById('qc-wo-list').innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-rose-400">Gagal memuat data QC.</div>';
   }).getQCDashboard(arg);
