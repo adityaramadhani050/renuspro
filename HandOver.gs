@@ -96,6 +96,15 @@ function _hoRequireSelesai(noWO) {
   return { ok: false, message: msg };
 }
 
+// Daftar user aktif untuk pilihan peserta hand over.
+function getHOUserOptions() {
+  try {
+    var users = (getUserList() || []).filter(function (u) { return u.aktif; })
+      .map(function (u) { return { id: u.id, nama: u.nama, role: u.role }; });
+    return { success: true, list: users };
+  } catch (e) { return { success: false, list: [], message: e.toString() }; }
+}
+
 // Record HO lengkap sebuah WO (untuk panel di detail Work Order).
 function getHandOverByWO(noWO) {
   try {

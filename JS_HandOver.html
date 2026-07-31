@@ -2,6 +2,7 @@
 // ════════════════ HAND OVER (panel di detail Work Order) ════════════════
 var _hoWO = '';       // No WO aktif
 var _hoRec = null;    // record HO
+var _hoUsers = null;  // cache daftar user (peserta)
 
 function _hoEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _hoRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -132,11 +133,28 @@ function _hoOpenSchedule() {
   document.getElementById('ho-sch-mode').value = r.mode || 'Online';
   document.getElementById('ho-sch-link').value = r.linkMeet || '';
   document.getElementById('ho-sch-lokasi').value = r.lokasi || '';
-  document.getElementById('ho-sch-peserta').value = r.peserta || '';
   document.getElementById('ho-sch-catatan').value = r.catatanUndangan || '';
   document.getElementById('ho-sch-eventid').value = r.meetEventId || '';
   _hoModeToggle();
+  _hoLoadPeserta(r.peserta || '');
   document.getElementById('ho-modal-schedule').classList.remove('hidden');
+}
+function _hoLoadPeserta(selectedCsv) {
+  var sel = {}; (selectedCsv || '').split(',').forEach(function(n){ n=n.trim(); if(n) sel[n]=1; });
+  var render = function() {
+    var box = document.getElementById('ho-sch-peserta-list');
+    if (!(_hoUsers || []).length) { box.innerHTML = '<div class="text-xs text-slate-400">Belum ada user.</div>'; return; }
+    box.innerHTML = _hoUsers.map(function(u){
+      var nm = u.nama || '';
+      return '<label class="flex items-center gap-2 py-0.5 cursor-pointer"><input type="checkbox" value="' + _hoEsc(nm) + '"' + (sel[nm] ? ' checked' : '') + ' class="ho-peserta-cb w-4 h-4 accent-indigo-600 shrink-0"><span class="text-sm text-slate-700 truncate">' + _hoEsc(nm) + (u.role ? ' <span class="text-[10px] text-slate-400">(' + _hoEsc(u.role) + ')</span>' : '') + '</span></label>';
+    }).join('');
+  };
+  if (_hoUsers) render();
+  else { document.getElementById('ho-sch-peserta-list').innerHTML = '<div class="text-xs text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i>Memuat...</div>';
+    google.script.run.withSuccessHandler(function(res){ _hoUsers = (res && res.success) ? (res.list || []) : []; render(); }).withFailureHandler(function(){ _hoUsers = []; render(); }).getHOUserOptions(); }
+}
+function _hoCollectPeserta() {
+  return Array.prototype.slice.call(document.querySelectorAll('#ho-sch-peserta-list .ho-peserta-cb:checked')).map(function(cb){ return cb.value; });
 }
 function _hoCloseSchedule(){ document.getElementById('ho-modal-schedule').classList.add('hidden'); }
 function _hoModeToggle() {
@@ -158,7 +176,7 @@ function _hoGenerateMeet() {
       showNotification(res.message || 'Link Meet dibuat.', 'success');
     } else { showNotification((res && res.message) || 'Gagal generate Meet.', 'error'); }
   }).withFailureHandler(function(err){ btn.disabled = false; btn.innerHTML = old; showNotification((err && err.message) || 'Gagal generate Meet.', 'error'); })
-    .hoGenerateMeet({ noWO: _hoWO, tanggal: tanggal, waktu: waktu, emails: document.getElementById('ho-sch-peserta').value });
+    .hoGenerateMeet({ noWO: _hoWO, tanggal: tanggal, waktu: waktu });
 }
 function _hoSubmitSchedule() {
   var payload = {
@@ -168,7 +186,7 @@ function _hoSubmitSchedule() {
     mode: document.getElementById('ho-sch-mode').value,
     link: document.getElementById('ho-sch-link').value.trim(),
     lokasi: document.getElementById('ho-sch-lokasi').value.trim(),
-    peserta: document.getElementById('ho-sch-peserta').value.trim(),
+    peserta: _hoCollectPeserta().join(', '),
     catatan: document.getElementById('ho-sch-catatan').value.trim(),
     meetEventId: document.getElementById('ho-sch-eventid').value,
     oleh: _hoUserNama()
