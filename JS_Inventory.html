@@ -1081,8 +1081,7 @@ function _kirimCloseTerima() { document.getElementById('modal-kirim-terima').cla
 function _kirimBuktiChange(input) { _uploadSupplierFile('kirim-bukti-file', input, 'uploadFileBuktiPenerimaanPO', 'emerald'); }
 function _kirimSubmitTerima() {
   var id = document.getElementById('terima-kirim-id').value;
-  var url = document.getElementById('kirim-bukti-file-url').value;
-  if (!url) return showNotification('Lampirkan bukti barang diterima.', 'error');
+  var url = document.getElementById('kirim-bukti-file-url').value;  // opsional
   _kirimCloseTerima();
   toggleLoader(true, 'Menyimpan...');
   google.script.run.withSuccessHandler(function(res) {

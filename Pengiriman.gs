@@ -417,8 +417,7 @@ function terimaPengiriman(payload) {
     payload = payload || {};
     var idKirim = (payload.idKirim || '').toString().trim();
     if (!idKirim) return { success: false, message: 'ID Kirim wajib.' };
-    var buktiUrl = (payload.buktiFileUrl || '').toString().trim();
-    if (!buktiUrl) return { success: false, message: 'Bukti barang diterima wajib dilampirkan.' };
+    var buktiUrl = (payload.buktiFileUrl || '').toString().trim();  // opsional
     var ss = getSpreadsheet();
     var pSheet = _ensurePengirimanSheet(ss);
     var data = pSheet.getDataRange().getValues();
