@@ -119,6 +119,26 @@ function _kirimReqActiveMap(noWO) {
   } catch (e) { return {}; }
 }
 
+// Info project WO untuk pesan notifikasi.
+function _kirimWOProject(noWO) {
+  try {
+    var regs = _bomRegisteredWOs();
+    for (var i = 0; i < regs.length; i++) { if (regs[i].noWO === noWO) return { namaProject: regs[i].namaProject || '', namaKlien: regs[i].namaKlien || '' }; }
+  } catch (e) {}
+  return { namaProject: '', namaKlien: '' };
+}
+
+// WA ke warehouse saat PC request pengiriman material.
+function _kirimNotifWarehouse(noWO, oleh, count) {
+  try {
+    if (typeof _waSendTo !== 'function' || typeof _qcPhonesByRole !== 'function') return;
+    var proj = _kirimWOProject(noWO);
+    var msg = '🚚 *Request Pengiriman Material*\nWO: ' + noWO + (proj.namaProject ? ' — ' + proj.namaProject : '') +
+      '\nDiminta oleh: ' + (oleh || '-') + '\n' + (count || 0) + ' material siap dikirim dari gudang.\nMohon diproses di menu Inventory → Pengiriman Barang.';
+    (_qcPhonesByRole('warehouse') || []).forEach(function (w) { _waSendTo(w.phone, msg); });
+  } catch (e) {}
+}
+
 // PC: request pengiriman untuk WO. Parsial (pilih material) & bisa ditambah
 // selama request masih aktif ('Diminta') → digabung jadi satu request.
 // requestPengiriman(noWO, oleh, reqItems)
@@ -193,6 +213,7 @@ function requestPengiriman(noWO, oleh, reqItems) {
         }
       });
       sheet.getRange(rowIdx + 1, 6).setValue(JSON.stringify(existing));
+      try { _kirimNotifWarehouse(noWO, oleh, chosen.length); } catch (eN) {}
       return { success: true, message: ditambah ? (ditambah + ' material ditambahkan ke request pengiriman aktif WO ' + noWO + '.') : ('Request pengiriman WO ' + noWO + ' diperbarui.') };
     } else if (rowIdx >= 0) {
       // Request lama sudah Selesai/Dibatalkan → request BARU (overwrite baris).
@@ -200,6 +221,7 @@ function requestPengiriman(noWO, oleh, reqItems) {
     } else {
       sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, freshJson]);
     }
+    try { _kirimNotifWarehouse(noWO, oleh, chosen.length); } catch (eN) {}
     return { success: true, message: 'Request pengiriman WO ' + noWO + ' (' + chosen.length + ' material) dikirim ke warehouse.' };
   } catch (e) { return { success: false, message: e.toString() }; }
 }
