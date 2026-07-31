@@ -397,18 +397,54 @@ function _bomBatalBeliLangsung(id) {
     .batalTandaiBeliLangsung(id, _bomUserNama());
 }
 
-// ── Request Pengiriman (Project Coordinator) ─────────────────────
+// ── Request Pengiriman (Project Coordinator) — pilih material (parsial) ────────
 function _bomRequestKirim() {
   if (!_bomWO) return;
-  showConfirm({ title: 'Request Pengiriman', message: 'Kirim permintaan pengiriman WO ' + _bomWO.noWO + ' ke warehouse? Material yang sudah Reserved akan dikirim dari gudang. Material lain bisa menyusul di request berikutnya (parsial).', confirmText: 'Ya, Request', icon: 'fa-truck-arrow-right', onConfirm: function() {
-    toggleLoader(true, 'Mengirim request...');
-    google.script.run.withSuccessHandler(function(res) {
-      toggleLoader(false);
-      showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
-      _bomReloadDetail();
-    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
-      .requestPengiriman(_bomWO.noWO, _bomUserNama());
-  } });
+  var reserved = (_bomItems || []).filter(function(it) { return it.status === 'Approved' && ((Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0)) > 0; });
+  if (!reserved.length) return showNotification('Belum ada material Reserved untuk dikirim.', 'error');
+  var box = document.getElementById('bom-kirim-list');
+  box.innerHTML = reserved.map(function(it) {
+    var sisa = (Number(it.qtyReserved)||0) - (Number(it.qtyDikirim)||0);
+    return '<div class="flex items-center gap-3 border border-slate-150 rounded-xl px-3 py-2.5">'
+      + '<input type="checkbox" checked class="bom-kirim-cb w-4 h-4 accent-indigo-600 shrink-0" data-sisa="' + sisa + '" onchange="_bomKirimToggleRow(this)">'
+      + '<div class="min-w-0 flex-1"><div class="text-sm font-bold text-slate-700 truncate">' + _bomEsc(it.namaMaterial) + '</div>'
+      +   '<div class="text-[11px] text-slate-400 truncate">' + _bomEsc(it.merek || '-') + ' · Reserved ' + _bomRp(sisa) + ' ' + _bomEsc(it.satuan || '') + '</div></div>'
+      + '<input type="number" min="1" max="' + sisa + '" value="' + sisa + '" class="bom-kirim-qty w-20 px-2 py-1.5 text-sm text-center border border-slate-200 rounded-lg shrink-0" data-id="' + _bomEsc(it.id) + '">'
+      + '</div>';
+  }).join('');
+  document.getElementById('bom-modal-kirim').classList.remove('hidden');
+}
+function _bomKirimToggleRow(cb) {
+  var q = cb.parentElement.querySelector('.bom-kirim-qty');
+  if (q) { q.disabled = !cb.checked; q.classList.toggle('opacity-40', !cb.checked); }
+}
+function _bomKirimSelectAll(on) {
+  Array.prototype.forEach.call(document.querySelectorAll('#bom-kirim-list .bom-kirim-cb'), function(cb) {
+    cb.checked = !!on; _bomKirimToggleRow(cb);
+  });
+}
+function _bomCloseKirim() { document.getElementById('bom-modal-kirim').classList.add('hidden'); }
+function _bomSubmitKirimRequest() {
+  var items = [];
+  Array.prototype.forEach.call(document.querySelectorAll('#bom-kirim-list .bom-kirim-cb'), function(cb) {
+    if (!cb.checked) return;
+    var sisa = Number(cb.getAttribute('data-sisa')) || 0;
+    var qEl = cb.parentElement.querySelector('.bom-kirim-qty');
+    var id = qEl ? qEl.getAttribute('data-id') : '';
+    var qty = qEl ? (Number(qEl.value) || 0) : sisa;
+    if (qty <= 0) qty = sisa;
+    if (qty > sisa) qty = sisa;
+    if (id) items.push({ bomItemId: id, qty: qty });
+  });
+  if (!items.length) return showNotification('Pilih minimal 1 material.', 'error');
+  _bomCloseKirim();
+  toggleLoader(true, 'Mengirim request...');
+  google.script.run.withSuccessHandler(function(res) {
+    toggleLoader(false);
+    showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    _bomReloadDetail();
+  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .requestPengiriman(_bomWO.noWO, _bomUserNama(), items);
 }
 function _bomBatalRequestKirim() {
   if (!_bomWO) return;

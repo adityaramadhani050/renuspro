@@ -1,6 +1,6 @@
 /**
  * Pengiriman Barang — surat jalan dari gudang berdasarkan BoM (Model B).
- * Alur: PC "Request Pengiriman" (semua material Reserved) → warehouse proses
+ * Alur: PC "Request Pengiriman" (pilih material Reserved, bisa parsial) → warehouse proses
  * kirim (stok keluar + HPP via gunakanStok, cetak surat jalan) → warehouse
  * konfirmasi barang diterima di lokasi (+ bukti).
  *
@@ -33,8 +33,11 @@ function _ensurePengirimanReqSheet(ss) {
   var sheet = ss.getSheetByName('Pengiriman_Request');
   if (!sheet) {
     sheet = ss.insertSheet('Pengiriman_Request');
-    sheet.appendRow(['No WO', 'Status', 'Diminta Oleh', 'Diminta Pada', 'Alamat']);
-    sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+    sheet.appendRow(['No WO', 'Status', 'Diminta Oleh', 'Diminta Pada', 'Alamat', 'Items JSON']);
+    sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+  } else if (sheet.getLastColumn() < 6) {
+    // Migrasi: kolom Items JSON (material terpilih per request parsial).
+    sheet.getRange(1, 6).setValue('Items JSON').setFontWeight('bold');
   }
   return sheet;
 }
@@ -101,7 +104,13 @@ function _kirimReqStatus(noWO) {
 
 // PC: request pengiriman untuk WO (syarat: semua material Approved sudah tuntas
 // diproses procurement & ada minimal 1 porsi Reserved dari gudang untuk dikirim).
-function requestPengiriman(noWO, oleh) {
+// requestPengiriman(noWO, oleh, reqItems)
+//   reqItems (opsional) = [{bomItemId, qty}] material terpilih PC untuk dikirim
+//   lebih dulu (parsial). Bila kosong → semua material Reserved yang tersisa.
+//   Disimpan sbg [{bomItemId, qty, target}] (target = dikirim absolut yg dituju),
+//   sehingga warehouse hanya melihat material terpilih & request auto-Selesai
+//   saat seluruh material terpilih terkirim penuh.
+function requestPengiriman(noWO, oleh, reqItems) {
   try {
     noWO = (noWO || '').toString().trim();
     if (!noWO) return { success: false, message: 'No WO wajib.' };
@@ -111,31 +120,48 @@ function requestPengiriman(noWO, oleh) {
     if (!res || !res.success) return { success: false, message: 'Gagal memuat BoM.' };
     var items = res.items || [];
     if (!items.length) return { success: false, message: 'BoM belum ada material.' };
-    // Request parsial: cukup ada minimal 1 material Reserved dari gudang.
-    // Tak perlu menunggu seluruh material BoM selesai diproses procurement —
-    // material yang menyusul di-reserve akan otomatis masuk request yang aktif,
-    // atau bisa di-request lagi setelah batch sebelumnya selesai dikirim.
-    var anyReserved = false, adaApproved = false;
+
+    // Peta material Approved dengan sisa Reserved (reserved − dikirim > 0).
+    var sisaMap = {}, adaApproved = false;
     items.forEach(function (it) {
       if (it.status !== 'Approved') return;
       adaApproved = true;
-      if (((it.qtyReserved || 0) - (it.qtyDikirim || 0)) > 0) anyReserved = true;
+      var sisa = (Number(it.qtyReserved) || 0) - (Number(it.qtyDikirim) || 0);
+      if (sisa > 0) sisaMap[(it.id || '').toString()] = { sisa: sisa, dikirim: Number(it.qtyDikirim) || 0 };
     });
     if (!adaApproved) return { success: false, message: 'Belum ada material Approved.' };
-    if (!anyReserved) return { success: false, message: 'Belum ada material Reserved dari gudang untuk dikirim.' };
+    var ids = Object.keys(sisaMap);
+    if (!ids.length) return { success: false, message: 'Belum ada material Reserved dari gudang untuk dikirim.' };
+
+    // Susun material yang di-request. PC memilih sebagian → hanya itu; kosong → semua sisa.
+    var chosen = [];
+    if (reqItems && reqItems.length) {
+      reqItems.forEach(function (r) {
+        var bid = (r.bomItemId || '').toString();
+        var m = sisaMap[bid];
+        if (!m) return;
+        var qty = Number(r.qty) || 0;
+        if (qty <= 0 || qty > m.sisa) qty = m.sisa;
+        chosen.push({ bomItemId: bid, qty: qty, target: m.dikirim + qty });
+      });
+    } else {
+      ids.forEach(function (bid) { var m = sisaMap[bid]; chosen.push({ bomItemId: bid, qty: m.sisa, target: m.dikirim + m.sisa }); });
+    }
+    if (!chosen.length) return { success: false, message: 'Pilih minimal 1 material Reserved untuk dikirim.' };
 
     var sheet = _ensurePengirimanReqSheet(getSpreadsheet());
     var data = sheet.getDataRange().getValues();
     var rowIdx = -1;
     for (var i = 1; i < data.length; i++) { if ((data[i][0] || '').toString().trim() === noWO) { rowIdx = i; break; } }
     var alamat = _kirimAlamatByWO(noWO);
+    var itemsJson = JSON.stringify(chosen);
     if (rowIdx >= 0) {
       if ((data[rowIdx][1] || '').toString() === 'Diminta') return { success: false, message: 'Request pengiriman untuk WO ini sudah aktif.' };
-      sheet.getRange(rowIdx + 1, 1, 1, 5).setValues([[noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat]]);
+      sheet.getRange(rowIdx + 1, 1, 1, 6).setValues([[noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, itemsJson]]);
     } else {
-      sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat]);
+      sheet.appendRow([noWO, 'Diminta', (oleh || '').toString(), _bomNow(), alamat, itemsJson]);
     }
-    return { success: true, message: 'Request pengiriman WO ' + noWO + ' dikirim ke warehouse.' };
+    return { success: true, message: 'Request pengiriman WO ' + noWO + ' (' + chosen.length + ' material) dikirim ke warehouse.' };
   } catch (e) { return { success: false, message: e.toString() }; }
 }
 
@@ -177,13 +203,24 @@ function getPengirimanRequests() {
       if ((reqData[i][1] || '').toString() !== 'Diminta') continue;
       var noWO = (reqData[i][0] || '').toString().trim();
       var pj = projMap[noWO] || {};
+      // Material terpilih PC (parsial). Legacy tanpa Items JSON → semua reserved.
+      var reqMap = null;
+      var reqRaw = (reqData[i][5] || '').toString();
+      if (reqRaw) { try { var arr = JSON.parse(reqRaw); reqMap = {}; arr.forEach(function (x) { reqMap[(x.bomItemId || '').toString()] = Number(x.target) || 0; }); } catch (e) { reqMap = null; } }
       var mats = [];
       for (var j = 1; j < iData.length; j++) {
         if ((iData[j][1] || '').toString().trim() !== noWO) continue;
+        var bid = (iData[j][0] || '').toString();
         var reserved = Number(iData[j][18]) || 0;
         var dikirim = Number(iData[j][26]) || 0;
         var sisa = reserved - dikirim;
         if (sisa <= 0) continue;
+        if (reqMap) {
+          if (!(bid in reqMap)) continue;               // material tak diminta di request ini
+          var byTarget = reqMap[bid] - dikirim;          // dibatasi qty yang diminta
+          if (byTarget <= 0) continue;
+          if (byTarget < sisa) sisa = byTarget;
+        }
         mats.push({
           id: (iData[j][0] || '').toString(),
           kategori: (iData[j][2] || '').toString(),
@@ -280,21 +317,36 @@ function prosesKirim(payload) {
 
 function _kirimCekRequestSelesai(ss, noWO) {
   try {
-    var iData = _ensureBOMItemSheet(ss).getDataRange().getValues();
-    var adaSisa = false;
-    for (var j = 1; j < iData.length; j++) {
-      if ((iData[j][1] || '').toString().trim() !== noWO) continue;
-      if (((Number(iData[j][18]) || 0) - (Number(iData[j][26]) || 0)) > 0) { adaSisa = true; break; }
-    }
-    if (adaSisa) return;
     var reqSheet = _ensurePengirimanReqSheet(ss);
     var rd = reqSheet.getDataRange().getValues();
+    var rowIdx = -1, reqRaw = '';
     for (var i = 1; i < rd.length; i++) {
-      if ((rd[i][0] || '').toString().trim() === noWO && (rd[i][1] || '').toString() === 'Diminta') {
-        reqSheet.getRange(i + 1, 2).setValue('Selesai');
-        break;
-      }
+      if ((rd[i][0] || '').toString().trim() === noWO && (rd[i][1] || '').toString() === 'Diminta') { rowIdx = i; reqRaw = (rd[i][5] || '').toString(); break; }
     }
+    if (rowIdx < 0) return;
+
+    var iData = _ensureBOMItemSheet(ss).getDataRange().getValues();
+    var mp = {};
+    for (var j = 1; j < iData.length; j++) {
+      if ((iData[j][1] || '').toString().trim() !== noWO) continue;
+      mp[(iData[j][0] || '').toString()] = { reserved: Number(iData[j][18]) || 0, dikirim: Number(iData[j][26]) || 0 };
+    }
+
+    var selesai = true, reqArr = null;
+    if (reqRaw) { try { reqArr = JSON.parse(reqRaw); } catch (e) { reqArr = null; } }
+    if (reqArr && reqArr.length) {
+      // Selesai bila tiap material terpilih sudah terpenuhi (dikirim ≥ target)
+      // atau tak ada lagi sisa reserved untuk material itu.
+      for (var k = 0; k < reqArr.length; k++) {
+        var m = mp[(reqArr[k].bomItemId || '').toString()] || { reserved: 0, dikirim: 0 };
+        var remain = Math.min((Number(reqArr[k].target) || 0) - m.dikirim, m.reserved - m.dikirim);
+        if (remain > 0) { selesai = false; break; }
+      }
+    } else {
+      // Legacy: seluruh reserved-unshipped WO sudah habis.
+      for (var bidk in mp) { if ((mp[bidk].reserved - mp[bidk].dikirim) > 0) { selesai = false; break; } }
+    }
+    if (selesai) reqSheet.getRange(rowIdx + 1, 2).setValue('Selesai');
   } catch (e) {}
 }
 
