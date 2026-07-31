@@ -784,6 +784,36 @@ function getBOMHoldMap() {
   } catch (e) { return {}; }
 }
 
+// Rincian reserve stok per WO/proyek untuk sebuah idStok (hold = Qty Reserved −
+// Qty Dikirim > 0). Dipakai modal "Detail Reserve" di Inventory → Daftar Stok.
+function getReserveDetailByStok(idStok) {
+  try {
+    idStok = (idStok || '').toString().trim();
+    if (!idStok) return { success: false, list: [], total: 0, message: 'ID Stok wajib.' };
+    var data = _ensureBOMItemSheet(getSpreadsheet()).getDataRange().getValues();
+    var projMap = {};
+    try { _bomRegisteredWOs().forEach(function (r) { projMap[r.noWO] = r; }); } catch (e) {}
+    var byWO = {};
+    for (var i = 1; i < data.length; i++) {
+      if ((data[i][17] || '').toString() !== idStok) continue;
+      var held = (Number(data[i][18]) || 0) - (Number(data[i][26]) || 0);
+      if (held <= 0) continue;
+      var noWO = (data[i][1] || '').toString().trim();
+      if (!byWO[noWO]) byWO[noWO] = { qty: 0, items: [] };
+      byWO[noWO].qty += held;
+      byWO[noWO].items.push({ namaMaterial: (data[i][4] || '').toString(), satuan: (data[i][7] || '').toString(), qty: held });
+    }
+    var list = [], total = 0;
+    Object.keys(byWO).forEach(function (w) {
+      var pj = projMap[w] || {};
+      list.push({ noWO: w, namaProject: pj.namaProject || '', namaKlien: pj.namaKlien || '', qty: byWO[w].qty, items: byWO[w].items });
+      total += byWO[w].qty;
+    });
+    list.sort(function (a, b) { return b.qty - a.qty; });
+    return { success: true, list: list, total: total };
+  } catch (e) { return { success: false, list: [], total: 0, message: e.toString() }; }
+}
+
 // Status procurement ringkas dari 4 bucket qty; 'Sebagian' bila >1 bucket aktif.
 function _bomDeriveProcStatus(qR, qBeli, qMenunggu, qBL) {
   var active = 0;

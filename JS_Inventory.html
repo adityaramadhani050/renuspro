@@ -118,20 +118,30 @@ function _populateMutasiProdukFilter(data) {
 function _pgRenderStok(data) {
   const tbody = document.getElementById('table-stok');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Tidak ada data stok.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400 italic">Tidak ada data stok.</td></tr>';
     return;
   }
   tbody.innerHTML = data.map(function(d) {
     var lowStock = d.qtyTersedia === 0;
     var qtyClass = lowStock ? 'text-red-600 font-extrabold' : (d.qtyTersedia <= 5 ? 'text-amber-600 font-bold' : 'font-bold text-slate-800');
     var idStok = d.idStok || d.idProduk;
-    var aksiBtn = '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
+    var hold = Number(d.qtyHold) || 0;
+    var reservedCell = hold > 0
+      ? '<span class="font-bold text-indigo-600">' + hold.toLocaleString('id-ID') + '</span>'
+      : '<span class="text-slate-300">0</span>';
+    var reserveBtn = hold > 0
+      ? '<button onclick=\'bukaReserveDetail(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
+        'class="text-indigo-600 hover:text-indigo-800 transition mr-2" title="Detail Reserve per WO/Proyek"><i class="fa-solid fa-list-check"></i></button>'
+      : '';
+    var aksiBtn = reserveBtn +
+      '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
       'class="text-teal-600 hover:text-teal-800 transition mr-2" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>' +
       '<button onclick=\'bukaRincianLot(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
       'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>';
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="p-4 font-mono text-xs font-bold text-slate-500" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
+      '<td class="p-4 text-right" data-label="Reserved">' + reservedCell + '</td>' +
       '<td class="p-4 text-right ' + qtyClass + '" data-label="Stok Tersedia">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
       '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _escHtml(d.satuan) + '</td>' +
@@ -234,6 +244,43 @@ function _renderRincianLot(res) {
 
 function tutupRincianLot() {
   document.getElementById('modal-rincian-lot').classList.add('hidden');
+}
+
+// ── Detail Reserve Stok per WO/Proyek ───────────────────────────
+function bukaReserveDetail(idStok, namaProduk) {
+  document.getElementById('reserve-detail-nama').innerText = idStok + ' — ' + (namaProduk || '');
+  document.getElementById('reserve-detail-list').innerHTML =
+    '<p class="text-xs text-slate-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuat...</p>';
+  document.getElementById('reserve-detail-total').innerHTML = '';
+  document.getElementById('modal-reserve-detail').classList.remove('hidden');
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    var box = document.getElementById('reserve-detail-list');
+    if (!list.length) {
+      box.innerHTML = '<p class="text-sm text-slate-400 italic text-center py-6">Tidak ada reserve aktif untuk stok ini.</p>';
+      return;
+    }
+    box.innerHTML = list.map(function(w) {
+      var mats = (w.items || []).map(function(m) {
+        return '<div class="flex items-center justify-between text-[11px] text-slate-500 pl-1"><span class="truncate">' + _escHtml(m.namaMaterial) + '</span><span class="font-semibold text-slate-600 whitespace-nowrap ml-2">' + (Number(m.qty)||0).toLocaleString('id-ID') + ' ' + _escHtml(m.satuan || '') + '</span></div>';
+      }).join('');
+      return '<div class="border border-slate-150 rounded-xl px-3 py-2.5">'
+        + '<div class="flex items-center justify-between gap-2">'
+        +   '<div class="min-w-0"><div class="font-mono text-xs font-bold text-slate-700">' + _escHtml(w.noWO || '-') + '</div>'
+        +     '<div class="text-[11px] text-slate-400 truncate">' + _escHtml(w.namaProject || '-') + (w.namaKlien ? ' · ' + _escHtml(w.namaKlien) : '') + '</div></div>'
+        +   '<span class="text-xs font-extrabold text-indigo-600 whitespace-nowrap shrink-0">' + (Number(w.qty)||0).toLocaleString('id-ID') + '</span>'
+        + '</div>'
+        + (mats ? '<div class="mt-1.5 pt-1.5 border-t border-slate-100 space-y-0.5">' + mats + '</div>' : '')
+        + '</div>';
+    }).join('');
+    document.getElementById('reserve-detail-total').innerHTML =
+      '<span>Total Reserved</span><span class="text-indigo-600">' + (Number(res.total)||0).toLocaleString('id-ID') + '</span>';
+  }).withFailureHandler(function() {
+    document.getElementById('reserve-detail-list').innerHTML = '<p class="text-sm text-rose-400 text-center py-6">Gagal memuat detail reserve.</p>';
+  }).getReserveDetailByStok(idStok);
+}
+function tutupReserveDetail() {
+  document.getElementById('modal-reserve-detail').classList.add('hidden');
 }
 
 function _pgRenderMutasi(data) {
