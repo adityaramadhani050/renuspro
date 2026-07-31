@@ -27,7 +27,8 @@ function _cacheChunkKeys(key, n) {
   return arr;
 }
 
-function _cacheGetSheet(key, sheetName) {
+function _cacheGetSheet(key, sheetName, ttl) {
+  ttl = ttl || CACHE_TTL;
   var cache = CacheService.getScriptCache();
   var metaKey = CACHE_VER + '_' + key + '_meta';
   // ── Coba cache-hit (gabung chunk) ──
@@ -65,7 +66,7 @@ function _cacheGetSheet(key, sheetName) {
       var obj = {}, cKeys = _cacheChunkKeys(key, chunks);
       for (var c = 0; c < chunks; c++) obj[cKeys[c]] = json.substring(c * CACHE_CHUNK, (c + 1) * CACHE_CHUNK);
       obj[metaKey] = String(chunks);
-      cache.putAll(obj, CACHE_TTL);
+      cache.putAll(obj, ttl);
     }
   } catch (e) {}
   return data;
@@ -86,6 +87,12 @@ function _cachedMutasiStok()   { return _cacheGetSheet('cache_mutasi_stok',   'M
 function _cachedPengeluaran()  { return _cacheGetSheet('cache_pengeluaran',   'Pengeluaran'); }
 function _cachedPemasukan()    { return _cacheGetSheet('cache_pemasukan',     'Pemasukan'); }
 function _cachedPricelist()    { return _cacheGetSheet('cache_pricelist',     'Pricelist_Supplier'); }
+// Sheet Engineering — sering berubah → TTL pendek (safety net di atas invalidation per-write).
+var CACHE_TTL_ENG = 30;
+function _cachedBOMItem()         { return _cacheGetSheet('cache_bom_item',    'BOM_Item',         CACHE_TTL_ENG); }
+function _cachedBOMProject()      { return _cacheGetSheet('cache_bom_project', 'BOM_Project',      CACHE_TTL_ENG); }
+function _cachedScheduleProject() { return _cacheGetSheet('cache_sch_proj',    'Schedule_Project', CACHE_TTL_ENG); }
+function _cachedScheduleTask()    { return _cacheGetSheet('cache_sch_task',    'Schedule_Task',    CACHE_TTL_ENG); }
 
 // ── Invalidasi cache ─────────────────────────────────────────────────────────
 
@@ -120,6 +127,8 @@ function invalidateMutasiStokCache()   { invalidateCache(['cache_mutasi_stok']);
 function invalidatePengeluaranCache()  { invalidateCache(['cache_pengeluaran']); }
 function invalidatePemasukanCache()    { invalidateCache(['cache_pemasukan']); }
 function invalidatePricelistCache()    { invalidateCache(['cache_pricelist']); }
+function invalidateBOMCache()          { invalidateCache(['cache_bom_item','cache_bom_project']); }
+function invalidateScheduleCache()     { invalidateCache(['cache_sch_proj','cache_sch_task']); }
 
 // ── Format tanggal dari cache (Date atau ISO string) → "dd/MM/yyyy" ──────────
 function _fmtTgl(raw) {

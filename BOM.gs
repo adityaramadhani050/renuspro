@@ -96,6 +96,7 @@ function _bomWriteProjectStatus(noWO, status, olehIfFinal) {
       }
       break;
     }
+    try { invalidateBOMCache(); } catch (e2) {}
   } catch (e) {}
 }
 
@@ -167,8 +168,8 @@ function _bomFmtWhen(v) {
 function _bomRegisteredWOs() {
   var out = [];
   try {
-    var sheet = _ensureBOMProjectSheet(getSpreadsheet());
-    var data = sheet.getDataRange().getValues();
+    _ensureBOMProjectSheet(getSpreadsheet());
+    var data = _cachedBOMProject();
     for (var i = 1; i < data.length; i++) {
       var w = (data[i][0] || '').toString().trim();
       if (!w) continue;
@@ -238,6 +239,7 @@ function addBOMProject(noWO, userIds, addedBy) {
     sheet.appendRow([noWO, proj, klien, 'Draft', (addedBy || '').toString(), _bomNow(), '', '']);
     try { lock.releaseLock(); } catch (e) {}
     if (userIds && userIds.length) setBOMAssignment(noWO, userIds, addedBy);
+    try { invalidateBOMCache(); } catch (e) {}
     return { success: true, message: 'Work Order ditambahkan ke BOM.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -259,6 +261,7 @@ function removeBOMProject(noWO) {
     for (var i = data.length - 1; i >= 1; i--) {
       if ((data[i][0] || '').toString().trim() === noWO) { sheet.deleteRow(i + 1); removed = true; }
     }
+    if (removed) { try { invalidateBOMCache(); } catch (e) {} }
     return { success: removed, message: removed ? 'Work Order dikeluarkan dari BOM.' : 'Work Order tidak ditemukan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -617,6 +620,7 @@ function saveBOMItems(payload) {
     _bomSyncProjectStatus(noWO, oleh);   // komposisi berubah → sinkronkan Status BOM
 
     var msg = 'BOM disimpan (' + updated + ' diperbarui, ' + added + ' baru' + (delRows.length ? ', ' + delRows.length + ' dihapus' : '') + ').';
+    try { invalidateBOMCache(); } catch (e) {}
     return { success: true, message: msg, updated: updated, added: added, deleted: delRows.length };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -715,6 +719,7 @@ function reviewBOMItem(id, keputusan, catatan, reviewer) {
         if (stWO === 'Closed') return { success: false, message: 'Work Order sudah Closed.' };
         sheet.getRange(i + 1, 13, 1, 4).setValues([[keputusan, (keputusan === 'Rejected' ? catatan : ''), (reviewer || '').toString(), _bomNow()]]);
         _bomComposeAndWrite(data, noWO, reviewer, i, keputusan);   // pakai data di memori, tanpa baca ulang
+        try { invalidateBOMCache(); } catch (e) {}
         return { success: true, message: 'Material ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
       }
     }
@@ -765,16 +770,19 @@ function cancelBOMApproval(id, oleh) {
 // ════════════════════════════════════════════════════════════════════════════
 function _bomWriteProcRow(sheet, rowIdx, procStatus, idStok, qtyReserved, mutasi, qtyBeli, oleh, when) {
   sheet.getRange(rowIdx + 1, 17, 1, 7).setValues([[procStatus, idStok, qtyReserved, mutasi, qtyBeli, oleh, when]]);
+  try { invalidateBOMCache(); } catch (e) {}
 }
 // Tulis kolom "Beli Langsung" (24-26): Qty Menunggu BL, Qty Beli Langsung, Ref.
 function _bomWriteBLRow(sheet, rowIdx, qtyMenunggu, qtyBeliLangsung, ref) {
   sheet.getRange(rowIdx + 1, 24, 1, 3).setValues([[qtyMenunggu, qtyBeliLangsung, ref]]);
+  try { invalidateBOMCache(); } catch (e) {}
 }
 // Peta stok yang di-hold (dialokasikan reserve tapi belum dikirim) per item stok.
 // hold = Qty Reserved − Qty Dikirim. Dipakai Inventory untuk hitung ketersediaan.
 function getBOMHoldMap() {
   try {
-    var data = _ensureBOMItemSheet(getSpreadsheet()).getDataRange().getValues();
+    _ensureBOMItemSheet(getSpreadsheet());
+    var data = _cachedBOMItem();
     var map = {};
     for (var i = 1; i < data.length; i++) {
       var sid = (data[i][17] || '').toString();
@@ -792,7 +800,8 @@ function getReserveDetailByStok(idStok) {
   try {
     idStok = (idStok || '').toString().trim();
     if (!idStok) return { success: false, list: [], total: 0, message: 'ID Stok wajib.' };
-    var data = _ensureBOMItemSheet(getSpreadsheet()).getDataRange().getValues();
+    _ensureBOMItemSheet(getSpreadsheet());
+    var data = _cachedBOMItem();
     var projMap = {};
     try { _bomRegisteredWOs().forEach(function (r) { projMap[r.noWO] = r; }); } catch (e) {}
     var byWO = {};
@@ -929,6 +938,7 @@ function batalkanBOMProcurement(id, oleh) {
         var sisaBeli = Math.max(0, Qb - qMen - qBLg);
         var st = _bomDeriveProcStatus(0, sisaBeli, qMen, qBLg);
         _bomWriteProcRow(sheet, i, st, '', 0, '', sisaBeli, (oleh || '').toString(), _bomNow());
+        try { invalidateBOMCache(); } catch (e) {}
         return { success: true, message: 'Reserve (alokasi) dibatalkan.' };
       }
     }

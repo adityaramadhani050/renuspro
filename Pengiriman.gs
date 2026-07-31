@@ -257,8 +257,8 @@ function getPengirimanRequests() {
     var reqData = reqSheet.getDataRange().getValues();
     var projMap = {};
     _bomRegisteredWOs().forEach(function (r) { projMap[r.noWO] = r; });
-    var itemSheet = _ensureBOMItemSheet(ss);
-    var iData = itemSheet.getDataRange().getValues();
+    _ensureBOMItemSheet(ss);
+    var iData = _cachedBOMItem();
     var out = [];
     for (var i = 1; i < reqData.length; i++) {
       if ((reqData[i][1] || '').toString() !== 'Diminta') continue;
@@ -372,6 +372,7 @@ function prosesKirim(payload) {
     // Bila semua material Reserved WO sudah dikirim penuh → request Selesai.
     _kirimCekRequestSelesai(ss, noWO);
     invalidateStokCache();
+    try { invalidateBOMCache(); } catch (e) {}
     return { success: true, message: 'Surat Jalan ' + noSJ + ' dibuat. Stok keluar & HPP tercatat.', noSuratJalan: noSJ, idKirim: idKirim };
   } catch (e) { return { success: false, message: e.toString() }; }
 }
@@ -437,6 +438,7 @@ function terimaPengiriman(payload) {
           var diterima = Number(f.row[27]) || 0;
           itemSheet.getRange(f.rowIdx + 1, 28).setValue(diterima + (Number(ln.qty) || 0));
         });
+        try { invalidateBOMCache(); } catch (e) {}
         return { success: true, message: 'Surat Jalan ' + (data[i][1] || '') + ' ditandai Diterima di lokasi.' };
       }
     }

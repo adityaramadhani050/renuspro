@@ -65,8 +65,8 @@ function _schDurasi(mulaiIso, selesaiIso) {
 
 // Baca semua tugas → peta noWO → [task]. Task = objek siap render.
 function _schTasksMap(ss) {
-  var sheet = _ensureScheduleTaskSheet(ss);
-  var data = sheet.getDataRange().getValues();
+  _ensureScheduleTaskSheet(ss);
+  var data = _cachedScheduleTask();
   var map = {};
   for (var i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
@@ -128,6 +128,7 @@ function addScheduleProject(noWO, addedBy, siteEngineer) {
       if (wo) { proj = wo.namaProject || ''; klien = wo.namaKlien || ''; }
     } catch (e) {}
     sheet.appendRow([noWO, proj, klien, (addedBy || '').toString(), _schNow(), (siteEngineer || '').toString()]);
+    try { invalidateScheduleCache(); } catch (e) {}
     return { success: true, message: 'Work Order ditambahkan ke Schedule.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -146,6 +147,7 @@ function removeScheduleProject(noWO) {
     for (var i = data.length - 1; i >= 1; i--) {
       if ((data[i][0] || '').toString().trim() === noWO) { sheet.deleteRow(i + 1); removed = true; }
     }
+    if (removed) { try { invalidateScheduleCache(); } catch (e) {} }
     return { success: removed, message: removed ? 'Dikeluarkan dari Schedule (tugas tidak dihapus).' : 'WO tidak ditemukan.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -164,6 +166,7 @@ function updateScheduleSiteEngineer(noWO, siteEngineer) {
     for (var i = 1; i < data.length; i++) {
       if ((data[i][0] || '').toString().trim() === noWO) {
         sheet.getRange(i + 1, 6).setValue((siteEngineer || '').toString());
+        try { invalidateScheduleCache(); } catch (e) {}
         return { success: true, message: 'Site Engineer diperbarui.' };
       }
     }
@@ -177,8 +180,8 @@ function updateScheduleSiteEngineer(noWO, siteEngineer) {
 function getScheduleWOList() {
   try {
     var ss = getSpreadsheet();
-    var pSheet = _ensureScheduleProjectSheet(ss);
-    var pData = pSheet.getDataRange().getValues();
+    _ensureScheduleProjectSheet(ss);
+    var pData = _cachedScheduleProject();
     var taskMap = _schTasksMap(ss);
     var list = [];
     for (var i = 1; i < pData.length; i++) {
@@ -204,7 +207,8 @@ function getScheduleByWO(noWO) {
   try {
     noWO = (noWO || '').toString().trim();
     var ss = getSpreadsheet();
-    var pData = _ensureScheduleProjectSheet(ss).getDataRange().getValues();
+    _ensureScheduleProjectSheet(ss);
+    var pData = _cachedScheduleProject();
     var proj = null;
     for (var i = 1; i < pData.length; i++) {
       if ((pData[i][0] || '').toString().trim() === noWO) { proj = { noWO: noWO, namaProject: (pData[i][1] || '').toString(), namaKlien: (pData[i][2] || '').toString(), siteEngineer: (pData[i][5] || '').toString() }; break; }
@@ -238,6 +242,7 @@ function saveScheduleTask(payload) {
       (payload.warna || '').toString(), Number(payload.urutan) || 0,
       (payload.catatan || '').toString(), (payload.oleh || '').toString(), _schNow()
     ]);
+    try { invalidateScheduleCache(); } catch (e) {}
     return { success: true, message: 'Tugas ditambahkan.', id: id };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -264,6 +269,7 @@ function updateScheduleTask(payload) {
           mulai, selesai, Math.max(0, Math.min(100, Number(payload.progress) || 0)),
           (payload.warna || '').toString(), Number(payload.urutan) || 0, (payload.catatan || '').toString()
         ]]);
+        try { invalidateScheduleCache(); } catch (e) {}
         return { success: true, message: 'Tugas diperbarui.' };
       }
     }
@@ -282,7 +288,7 @@ function hapusScheduleTask(id) {
     var sheet = _ensureScheduleTaskSheet(getSpreadsheet());
     var data = sheet.getDataRange().getValues();
     for (var i = data.length - 1; i >= 1; i--) {
-      if ((data[i][0] || '').toString().trim() === id) { sheet.deleteRow(i + 1); return { success: true, message: 'Tugas dihapus.' }; }
+      if ((data[i][0] || '').toString().trim() === id) { sheet.deleteRow(i + 1); try { invalidateScheduleCache(); } catch (e) {} return { success: true, message: 'Tugas dihapus.' }; }
     }
     return { success: false, message: 'Tugas tidak ditemukan.' };
   } catch (e) {
