@@ -19,6 +19,20 @@
       return map[status] || 'bg-slate-100 text-slate-500';
     }
 
+    // Badge status Hand Over untuk kartu WO.
+    function _woHoBadge(st) {
+      const map = {
+        'Diminta':     'bg-amber-100 text-amber-700',
+        'Dijadwalkan': 'bg-indigo-100 text-indigo-700',
+        'Selesai':     'bg-emerald-100 text-emerald-700',
+        'Batal':       'bg-slate-100 text-slate-400'
+      };
+      const cls = st ? (map[st] || 'bg-slate-100 text-slate-500') : 'bg-slate-100 text-slate-400';
+      const label = st ? ('HO: ' + st) : 'Belum HO';
+      const icon = (st === 'Selesai') ? 'fa-handshake' : 'fa-handshake-angle';
+      return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}"><i class="fa-solid ${icon}"></i>${label}</span>`;
+    }
+
     // ── Render daftar WO sbg card (klik utk buka detail) ──
     function _pgRenderWorkOrder(data) {
       const box = document.getElementById('table-workorder');
@@ -47,6 +61,7 @@
               <span class="inline-flex items-center bg-emerald-50 text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-100 text-sm"><i class="fa-solid fa-clipboard-check mr-1.5 text-xs"></i>${i.noWO}</span>
               <p class="text-[11px] text-blue-600 font-semibold mt-1.5">${i.id} <span class="text-slate-400 font-normal">Rev${i.rev}</span></p>
               <p class="text-[10px] text-slate-400">${i.tanggal || ''}</p>
+              <div class="mt-1.5">${_woHoBadge(i.hoStatus)}</div>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-[11px] text-slate-400 truncate">${i.namaKlien}</p>

@@ -328,7 +328,8 @@ function getWorkOrderDashboard() {
         totalDitagihDpp: totalDitagihDpp, totalLunasDpp: totalLunasDpp,
         totalLunasTotal: totalLunasTotal, sisaDpp: sisaDpp,
         pctDitagih: pctDitagih, pctLunas: pctLunas,
-        paymentStatus: paymentStatus, invoices: invoices
+        paymentStatus: paymentStatus, invoices: invoices,
+        hoStatus: w.hoStatus || ''
       };
     });
 
