@@ -368,14 +368,16 @@ function _schRenderGantt() {
     var prog = Number(t.progress)||0;
     var clickable = canEd ? ' cursor-pointer' : '';
     var onclk = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
-    var nameDiv = canEd
-      ? '<div class="text-xs font-bold text-slate-700 truncate cursor-text hover:bg-indigo-50 rounded px-0.5 -mx-0.5" title="Klik untuk ubah nama" onclick="_schEditName(this,\'' + _schEsc(t.id) + '\')">' + _schEsc(t.namaTugas) + '</div>'
-      : '<div class="text-xs font-bold text-slate-700 truncate">' + _schEsc(t.namaTugas) + '</div>';
+    var nameInner = canEd
+      ? '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0 cursor-text hover:bg-indigo-50 rounded px-0.5 -mx-0.5" title="Klik untuk ubah nama" onclick="_schEditName(this,\'' + _schEsc(t.id) + '\')">' + _schEsc(t.namaTugas) + '</div>'
+      : '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0">' + _schEsc(t.namaTugas) + '</div>';
+    var delBtn = canEd ? '<button onclick="_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
+    var nameDiv = '<div class="flex items-center gap-1">' + nameInner + delBtn + '</div>';
     var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
     var dateDiv = canEd
       ? '<div class="text-[10px] text-slate-400 whitespace-nowrap cursor-text hover:text-indigo-600" title="Klik untuk ubah tanggal" onclick="_schEditDates(this,\'' + _schEsc(t.id) + '\')">' + dateTxt + '</div>'
       : '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
-    return '<div class="flex border-b border-slate-100 items-stretch">'
+    return '<div class="flex border-b border-slate-100 items-stretch group">'
       + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
       +   nameDiv
       +   dateDiv
@@ -626,6 +628,19 @@ function _schDeleteTask() {
   _schCloseTask();  // tutup modal tugas dulu agar tidak menutupi modal konfirmasi
   showConfirm({ title: 'Hapus Tugas', message: 'Hapus tugas ini dari schedule?', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
     // Hapus di background — tanpa loader layar penuh.
+    showNotification('Menghapus tugas...', 'success');
+    google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); })
+      .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+      .hapusScheduleTask(id);
+  }});
+}
+
+// Hapus tugas langsung dari baris (ikon tempat sampah saat hover), tanpa buka modal.
+function _schInlineDelete(id) {
+  if (!_schCanEdit()) return;
+  var t = (_schTasks || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  if (!t) return;
+  showConfirm({ title: 'Hapus Tugas', message: 'Hapus tugas "' + (t.namaTugas || '') + '"?', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
     showNotification('Menghapus tugas...', 'success');
     google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); })
       .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
