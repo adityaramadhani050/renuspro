@@ -202,6 +202,7 @@ function _hoSubmitSchedule() {
     oleh: _hoUserNama()
   };
   if (!payload.tanggal) return showNotification('Tanggal jadwal wajib.', 'error');
+  if (!payload.waktu) return showNotification('Waktu jadwal wajib diisi.', 'error');
   if (payload.mode === 'Online' && !payload.link) return showNotification('Isi link meeting (generate Meet atau tempel manual).', 'error');
   if (payload.mode === 'Offline' && !payload.lokasi) return showNotification('Isi lokasi hand over.', 'error');
   _hoCloseSchedule();

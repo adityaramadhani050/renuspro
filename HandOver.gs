@@ -278,6 +278,7 @@ function scheduleHandOver(payload) {
     if (!noWO) return { success: false, message: 'No WO wajib.' };
     var tanggal = _hoIso(payload.tanggal);
     if (!tanggal) return { success: false, message: 'Tanggal jadwal wajib.' };
+    if (!(payload.waktu || '').toString().trim()) return { success: false, message: 'Waktu jadwal wajib diisi.' };
     var mode = (payload.mode || '').toString();
     if (mode !== 'Online' && mode !== 'Offline') return { success: false, message: 'Pilih mode Online/Offline.' };
     var link = (payload.link || '').toString().trim();
