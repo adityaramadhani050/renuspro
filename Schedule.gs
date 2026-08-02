@@ -40,7 +40,15 @@ function _schIso(v) {
     var s = (v || '').toString().trim();
     if (!s) return '';
     var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+    if (iso) {
+      // ISO ber-waktu/Z (mis. dari cache Date.toISOString UTC) → konversi ke zona lokal
+      // agar tanggal tidak mundur 1 hari untuk zona di timur UTC (GMT+7).
+      if (/[T ]\d{2}:\d{2}/.test(s) || s.indexOf('Z') !== -1) {
+        var dz = new Date(s);
+        if (!isNaN(dz.getTime())) return Utilities.formatDate(dz, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      }
+      return iso[1] + '-' + iso[2] + '-' + iso[3];
+    }
     var dmy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
     if (dmy) return dmy[3] + '-' + dmy[2] + '-' + dmy[1];
     if (s.indexOf('GMT') !== -1) {
