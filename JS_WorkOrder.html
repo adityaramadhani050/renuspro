@@ -247,7 +247,62 @@
       _woLoadQC(item.noWO);
       _woLoadDokumen(item.noWO);
       if (typeof _hoLoad === 'function') _hoLoad(item.noWO);
+      _woLoadTimeline(item.noWO);
     };
+
+    // ── Timeline Project (live dari Project Schedule WO) ──
+    var _WO_TL_FASE = [
+      { nama: 'Hand Over',  icon: 'fa-handshake' },
+      { nama: 'Engineering', icon: 'fa-ruler-combined' },
+      { nama: 'Pengadaan',  icon: 'fa-cart-shopping' },
+      { nama: 'Pengiriman', icon: 'fa-truck' },
+      { nama: 'Kontruksi',  icon: 'fa-screwdriver-wrench' },
+      { nama: 'Finishing',  icon: 'fa-flag-checkered' }
+    ];
+    function _woTlDays(a, b) {
+      var x = new Date((a || '') + 'T00:00:00'), y = new Date((b || '') + 'T00:00:00');
+      if (isNaN(x) || isNaN(y)) return 1;
+      return Math.max(1, Math.round((y - x) / 86400000) + 1);
+    }
+    function _woTlProg(arr) { var d = 0, w = 0; arr.forEach(function(t){ var dd = _woTlDays(t.mulai, t.selesai); d += dd; w += (Number(t.progress) || 0) * dd; }); return d ? Math.round(w / d) : 0; }
+    function _woLoadTimeline(noWO) {
+      _woRenderTimeline(null);
+      if (typeof google === 'undefined') return;
+      google.script.run.withSuccessHandler(function(res) {
+        _woRenderTimeline((res && res.success) ? res : null);
+      }).withFailureHandler(function() { _woRenderTimeline(null); }).getScheduleByWO(noWO);
+    }
+    function _woRenderTimeline(res) {
+      var grid = document.getElementById('wo-timeline-grid'); if (!grid) return;
+      var barEl = document.getElementById('wo-timeline-bar');
+      var pctEl = document.getElementById('wo-timeline-pct');
+      var tasks = (res && res.tasks) || [];
+      var byFase = {}; tasks.forEach(function(t){ var f = (t.fase || '').trim(); (byFase[f] = byFase[f] || []).push(t); });
+      var overall = (res && res.summary && res.summary.progress != null) ? Number(res.summary.progress) : (tasks.length ? _woTlProg(tasks) : 0);
+      if (barEl) barEl.style.width = (tasks.length ? overall : 0) + '%';
+      if (barEl) barEl.className = 'h-full rounded-full transition-all duration-500 ' + (overall >= 100 ? 'bg-emerald-500' : 'bg-indigo-500');
+      if (pctEl) pctEl.textContent = tasks.length ? (overall + '% selesai') : 'Belum ada jadwal';
+      grid.innerHTML = _WO_TL_FASE.map(function(f) {
+        var arr = byFase[f.nama] || [];
+        var has = arr.length > 0;
+        var pct = has ? _woTlProg(arr) : 0;
+        var done = has && pct >= 100;
+        var active = has && pct > 0 && pct < 100;
+        var ring = done ? 'bg-emerald-500 text-white ring-emerald-200'
+                 : active ? 'bg-indigo-500 text-white ring-indigo-200'
+                 : has ? 'bg-slate-200 text-slate-500 ring-slate-200'
+                 : 'bg-slate-100 text-slate-300 ring-slate-200';
+        var barColor = done ? 'bg-emerald-500' : 'bg-indigo-500';
+        return '<div class="text-center">'
+          + '<div class="h-9 w-9 mx-auto rounded-full border-2 border-white ring-1 ' + ring + ' flex items-center justify-center mb-1.5"><i class="fa-solid ' + f.icon + '"></i></div>'
+          + '<p class="text-xs font-bold text-slate-600">' + f.nama + '</p>'
+          + (has
+              ? '<div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 mx-auto max-w-[80px]"><div class="h-full ' + barColor + ' rounded-full" style="width:' + pct + '%"></div></div>'
+                + '<p class="text-[10px] font-bold text-slate-500 mt-0.5">' + pct + '% · ' + arr.length + ' tugas</p>'
+              : '<p class="text-[10px] text-slate-300 mt-0.5">Belum tersedia</p>')
+          + '</div>';
+      }).join('');
+    }
 
     // Kembali dari detail WO (halaman penuh) ke daftar.
     window.kembaliListWO = function() {
