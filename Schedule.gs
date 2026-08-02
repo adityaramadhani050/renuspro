@@ -229,6 +229,43 @@ function getScheduleByWO(noWO) {
   } catch (e) { return { success: false, message: e.toString() }; }
 }
 
+// Tambah banyak tugas sekaligus (template / bulk). 1 round-trip, 1 kali tulis.
+// payload: { noWO, oleh, tasks: [{namaTugas, fase, mulai, selesai, progress, warna, urutan, catatan}] }
+function saveScheduleTasksBatch(payload) {
+  var lock = LockService.getScriptLock();
+  try {
+    payload = payload || {};
+    var noWO = (payload.noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var arr = payload.tasks || [];
+    if (!arr.length) return { success: false, message: 'Tidak ada tugas untuk ditambahkan.' };
+    var rows = [];
+    var t0 = new Date().getTime();
+    for (var i = 0; i < arr.length; i++) {
+      var it = arr[i] || {};
+      var nama = (it.namaTugas || '').toString().trim();
+      if (!nama) continue;
+      var mulai = _schIso(it.mulai), selesai = _schIso(it.selesai);
+      if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib untuk "' + nama + '".' };
+      if (selesai < mulai) return { success: false, message: 'Tanggal selesai sebelum mulai untuk "' + nama + '".' };
+      rows.push([
+        'TSK-' + t0 + '-' + i, noWO, nama, (it.fase || '').toString(), mulai, selesai,
+        Math.max(0, Math.min(100, Number(it.progress) || 0)),
+        (it.warna || '').toString(), Number(it.urutan) || 0,
+        (it.catatan || '').toString(), (payload.oleh || '').toString(), _schNow()
+      ]);
+    }
+    if (!rows.length) return { success: false, message: 'Tidak ada tugas valid (nama kosong).' };
+    lock.waitLock(15000);
+    var sheet = _ensureScheduleTaskSheet(getSpreadsheet());
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 12).setValues(rows);
+    try { invalidateScheduleCache(); } catch (e) {}
+    return { success: true, message: rows.length + ' tugas ditambahkan.', count: rows.length };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
 // Tambah tugas. payload: { noWO, namaTugas, fase, mulai, selesai, progress, warna, urutan, catatan, oleh }
 function saveScheduleTask(payload) {
   var lock = LockService.getScriptLock();

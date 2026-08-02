@@ -269,7 +269,8 @@ function _schRenderDetail() {
       + '</div>'
     : '';
   var reloadBtn = '<button onclick="_engMuatUlang(\'_schReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[38px] w-[38px] rounded-lg shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
-  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + assignBtn + addBtn + '</div>';
+  var bulkBtn = _schCanEdit() ? '<button onclick="_schOpenBulk()" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bolt"></i><span class="hidden sm:inline"> Tambah Cepat</span></button>' : '';
+  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + assignBtn + bulkBtn + addBtn + '</div>';
 
   var se = _schWO.siteEngineer || '';
   var seBadge = se
@@ -429,6 +430,66 @@ function _schRenderGantt() {
     + '</div></div>';
 }
 function _schMonLbl(d){ var m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; return m[d.getMonth()] + ' ' + d.getFullYear(); }
+
+// ── Tambah Cepat / Template (bulk) ──
+var _SCH_FASE_WARNA = { 'Hand Over':'indigo', 'Engineering':'emerald', 'Pengadaan':'amber', 'Pengiriman':'sky', 'Kontruksi':'violet', 'Finishing':'rose' };
+var _SCH_TEMPLATE = [
+  { nama:'Hand Over', durasi:1, fase:'Hand Over' },
+  { nama:'Detail Engineering Design', durasi:2, fase:'Engineering' },
+  { nama:'Bill of Material', durasi:2, fase:'Engineering' },
+  { nama:'Pengadaan', durasi:7, fase:'Pengadaan' },
+  { nama:'Pengiriman Material', durasi:4, fase:'Pengiriman' },
+  { nama:'Mobilisasi Tim', durasi:1, fase:'Kontruksi' },
+  { nama:'Pemeriksaan Area Kerja, APD', durasi:1, fase:'Kontruksi' },
+  { nama:'Instalasi Struktur', durasi:3, fase:'Kontruksi' },
+  { nama:'Instalasi Panel Surya', durasi:2, fase:'Kontruksi' },
+  { nama:'Wiring & Kelistrikan', durasi:2, fase:'Kontruksi' },
+  { nama:'Commissioning', durasi:1, fase:'Finishing' },
+  { nama:'Serah Terima', durasi:1, fase:'Finishing' }
+];
+function _schOpenBulk() {
+  if (!_schCanEdit()) return;
+  // default tanggal mulai: setelah tugas terakhir bila ada, else hari ini
+  var base = _schTodayIso();
+  if ((_schTasks || []).length) {
+    var maxSel = ''; _schTasks.forEach(function(t){ if (t.selesai && (!maxSel || t.selesai > maxSel)) maxSel = t.selesai; });
+    if (maxSel) base = _schShiftIso(maxSel, 1);
+  }
+  document.getElementById('sch-bulk-mulai').value = base;
+  document.getElementById('sch-bulk-seq').checked = true;
+  document.getElementById('sch-bulk-text').value = '';
+  document.getElementById('sch-modal-bulk').classList.remove('hidden');
+}
+function _schCloseBulk(){ document.getElementById('sch-modal-bulk').classList.add('hidden'); }
+function _schBulkTemplate(){
+  document.getElementById('sch-bulk-text').value = _SCH_TEMPLATE.map(function(t){ return t.nama + ' | ' + t.durasi + ' | ' + t.fase; }).join('\n');
+}
+function _schBulkSubmit() {
+  var base = document.getElementById('sch-bulk-mulai').value;
+  if (!base) return showNotification('Tanggal mulai wajib.', 'error');
+  var seq = document.getElementById('sch-bulk-seq').checked;
+  var lines = (document.getElementById('sch-bulk-text').value || '').split('\n');
+  var urut = (_schTasks || []).length;
+  var cursor = base;
+  var tasks = [];
+  lines.forEach(function(ln) {
+    ln = ln.trim(); if (!ln) return;
+    var p = ln.split('|').map(function(x){ return x.trim(); });
+    var nama = p[0]; if (!nama) return;
+    var durasi = Math.max(1, parseInt(p[1], 10) || 1);
+    var fase = p[2] || '';
+    var mulai = seq ? cursor : base;
+    var selesai = _schShiftIso(mulai, durasi - 1);
+    tasks.push({ namaTugas: nama, fase: fase, mulai: mulai, selesai: selesai, warna: _SCH_FASE_WARNA[fase] || 'indigo', progress: 0, urutan: urut++ });
+    if (seq) cursor = _schShiftIso(selesai, 1);
+  });
+  if (!tasks.length) return showNotification('Isi minimal 1 tugas.', 'error');
+  _schCloseBulk();
+  showNotification('Menambahkan ' + tasks.length + ' tugas...', 'success');
+  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); })
+    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menambahkan tugas.', 'error'); })
+    .saveScheduleTasksBatch({ noWO: _schWO.noWO, oleh: _schUserNama(), tasks: tasks });
+}
 
 // ── Tugas CRUD ──
 function _schOpenTask(id) {
