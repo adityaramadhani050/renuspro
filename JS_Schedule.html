@@ -433,19 +433,28 @@ function _schMonLbl(d){ var m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','
 
 // ── Tambah Cepat / Template (bulk) ──
 var _SCH_FASE_WARNA = { 'Hand Over':'indigo', 'Engineering':'emerald', 'Pengadaan':'amber', 'Pengiriman':'sky', 'Kontruksi':'violet', 'Finishing':'rose' };
+// off = hari ke- dari tanggal mulai (0 = tanggal mulai); mendukung tugas paralel.
 var _SCH_TEMPLATE = [
-  { nama:'Hand Over', durasi:1, fase:'Hand Over' },
-  { nama:'Detail Engineering Design', durasi:2, fase:'Engineering' },
-  { nama:'Bill of Material', durasi:2, fase:'Engineering' },
-  { nama:'Pengadaan', durasi:7, fase:'Pengadaan' },
-  { nama:'Pengiriman Material', durasi:4, fase:'Pengiriman' },
-  { nama:'Mobilisasi Tim', durasi:1, fase:'Kontruksi' },
-  { nama:'Pemeriksaan Area Kerja, APD', durasi:1, fase:'Kontruksi' },
-  { nama:'Instalasi Struktur', durasi:3, fase:'Kontruksi' },
-  { nama:'Instalasi Panel Surya', durasi:2, fase:'Kontruksi' },
-  { nama:'Wiring & Kelistrikan', durasi:2, fase:'Kontruksi' },
-  { nama:'Commissioning', durasi:1, fase:'Finishing' },
-  { nama:'Serah Terima', durasi:1, fase:'Finishing' }
+  { nama:'Hand Over', off:0, durasi:1, fase:'Hand Over' },
+  { nama:'Detail Engineering Design', off:1, durasi:2, fase:'Engineering' },
+  { nama:'Bill of Material', off:1, durasi:2, fase:'Engineering' },
+  { nama:'Pengadaan', off:3, durasi:7, fase:'Pengadaan' },
+  { nama:'Pengiriman Material', off:10, durasi:4, fase:'Pengiriman' },
+  { nama:'Mobilisasi Tim', off:14, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemeriksaan Kelengkapan', off:14, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemasangan Mounting', off:14, durasi:2, fase:'Kontruksi' },
+  { nama:'Pemasangan Panel Surya', off:15, durasi:3, fase:'Kontruksi' },
+  { nama:'Pulling & Wiring Kabel DC', off:18, durasi:2, fase:'Kontruksi' },
+  { nama:'Pulling & Wiring Kabel AC', off:18, durasi:2, fase:'Kontruksi' },
+  { nama:'Pemasangan Inverter', off:19, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemasangan Proteksi PLTS', off:19, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemasangan Baterai', off:19, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemasangan Proteksi Baterai', off:19, durasi:1, fase:'Kontruksi' },
+  { nama:'Pemasangan Sistem Grounding', off:19, durasi:1, fase:'Kontruksi' },
+  { nama:'Test & Commissioning', off:20, durasi:1, fase:'Finishing' },
+  { nama:'Dokumentasi Pekerjaan', off:20, durasi:1, fase:'Finishing' },
+  { nama:'Pembersihan Area Kerja', off:20, durasi:1, fase:'Finishing' },
+  { nama:'Edukasi & BAST', off:20, durasi:1, fase:'Finishing' }
 ];
 function _schOpenBulk() {
   if (!_schCanEdit()) return;
@@ -462,7 +471,7 @@ function _schOpenBulk() {
 }
 function _schCloseBulk(){ document.getElementById('sch-modal-bulk').classList.add('hidden'); }
 function _schBulkTemplate(){
-  document.getElementById('sch-bulk-text').value = _SCH_TEMPLATE.map(function(t){ return t.nama + ' | ' + t.durasi + ' | ' + t.fase; }).join('\n');
+  document.getElementById('sch-bulk-text').value = _SCH_TEMPLATE.map(function(t){ return t.nama + ' | ' + t.durasi + ' | ' + t.fase + ' | ' + t.off; }).join('\n');
 }
 function _schBulkSubmit() {
   var base = document.getElementById('sch-bulk-mulai').value;
@@ -478,10 +487,15 @@ function _schBulkSubmit() {
     var nama = p[0]; if (!nama) return;
     var durasi = Math.max(1, parseInt(p[1], 10) || 1);
     var fase = p[2] || '';
-    var mulai = seq ? cursor : base;
+    // Kolom ke-4 opsional = "hari ke-" dari tanggal mulai (untuk tugas paralel/template).
+    var hasOff = p[3] !== undefined && p[3] !== '' && !isNaN(parseInt(p[3], 10));
+    var mulai;
+    if (hasOff) mulai = _schShiftIso(base, Math.max(0, parseInt(p[3], 10)));
+    else if (seq) mulai = cursor;
+    else mulai = base;
     var selesai = _schShiftIso(mulai, durasi - 1);
     tasks.push({ namaTugas: nama, fase: fase, mulai: mulai, selesai: selesai, warna: _SCH_FASE_WARNA[fase] || 'indigo', progress: 0, urutan: urut++ });
-    if (seq) cursor = _schShiftIso(selesai, 1);
+    if (!hasOff && seq) cursor = _schShiftIso(selesai, 1);
   });
   if (!tasks.length) return showNotification('Isi minimal 1 tugas.', 'error');
   _schCloseBulk();
