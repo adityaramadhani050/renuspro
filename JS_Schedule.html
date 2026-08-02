@@ -359,18 +359,26 @@ function _schRenderGantt() {
   // Header ticks (helper bersama dengan home)
   var ticks = _schBuildTicks(start, totalDays, ppd, _schZoom);
 
-  // Satu baris tugas (dipakai di dalam grup fase).
+  var canEd = _schCanEdit();
+  // Satu baris tugas (dipakai di dalam grup fase). Nama & tanggal = inline edit.
   function _schTaskRow(t){
     var b = _schBar(t.warna);
     var leftPx = _schDays(start, t.mulai) * ppd;
     var wPx = (_schDays(t.mulai, t.selesai) + 1) * ppd; if (wPx < 6) wPx = 6;
     var prog = Number(t.progress)||0;
-    var clickable = _schCanEdit() ? ' cursor-pointer' : '';
-    var onclk = _schCanEdit() ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
+    var clickable = canEd ? ' cursor-pointer' : '';
+    var onclk = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
+    var nameDiv = canEd
+      ? '<div class="text-xs font-bold text-slate-700 truncate cursor-text hover:bg-indigo-50 rounded px-0.5 -mx-0.5" title="Klik untuk ubah nama" onclick="_schEditName(this,\'' + _schEsc(t.id) + '\')">' + _schEsc(t.namaTugas) + '</div>'
+      : '<div class="text-xs font-bold text-slate-700 truncate">' + _schEsc(t.namaTugas) + '</div>';
+    var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
+    var dateDiv = canEd
+      ? '<div class="text-[10px] text-slate-400 whitespace-nowrap cursor-text hover:text-indigo-600" title="Klik untuk ubah tanggal" onclick="_schEditDates(this,\'' + _schEsc(t.id) + '\')">' + dateTxt + '</div>'
+      : '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
     return '<div class="flex border-b border-slate-100 items-stretch">'
       + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
-      +   '<div class="text-xs font-bold text-slate-700 truncate' + clickable + '"' + onclk + '>' + _schEsc(t.namaTugas) + '</div>'
-      +   '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%</div>'
+      +   nameDiv
+      +   dateDiv
       + '</div>'
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:42px">'
       +   todayLine
@@ -418,7 +426,15 @@ function _schRenderGantt() {
       + '</div>'
       + '<div class="relative bg-slate-50" style="width:' + totalPx + 'px;min-height:28px">' + todayLine + spanBar + '</div>'
       + '</div>';
-    return header + gtasks.map(_schTaskRow).join('');
+    var addRow = canEd
+      ? '<div class="flex border-b border-slate-100 items-stretch hover:bg-slate-50/60">'
+        + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-1.5 border-r border-slate-100" style="width:' + leftW + 'px">'
+        +   '<input type="text" placeholder="+ tambah tugas..." class="w-full text-xs text-slate-500 bg-transparent outline-none placeholder-slate-300" onkeydown="_schInlineAdd(event, this, \'' + _schEsc(f) + '\')">'
+        + '</div>'
+        + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:30px">' + todayLine + '</div>'
+        + '</div>'
+      : '';
+    return header + gtasks.map(_schTaskRow).join('') + addRow;
   }).join('');
 
   box.innerHTML = '<div class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
@@ -503,6 +519,63 @@ function _schBulkSubmit() {
   google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); })
     .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menambahkan tugas.', 'error'); })
     .saveScheduleTasksBatch({ noWO: _schWO.noWO, oleh: _schUserNama(), tasks: tasks });
+}
+
+// ── Inline edit (nama & tanggal) di gantt detail ──
+function _schDetailOpen(){ var d = document.getElementById('sch-detail'); return d && !d.classList.contains('hidden'); }
+function _schInlineUpdate(t, changes) {
+  var payload = { id: t.id, noWO: _schWO.noWO, namaTugas: t.namaTugas, fase: t.fase, warna: t.warna, mulai: t.mulai, selesai: t.selesai, progress: t.progress, urutan: t.urutan, catatan: t.catatan, oleh: _schUserNama() };
+  Object.keys(changes).forEach(function(k){ payload[k] = changes[k]; });
+  showNotification('Menyimpan...', 'success');
+  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (_schDetailOpen()) _schReloadDetail(); })
+    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menyimpan.', 'error'); if (_schDetailOpen()) _schReloadDetail(); })
+    .updateScheduleTask(payload);
+}
+function _schEditName(el, id) {
+  if (!_schCanEdit() || el.getAttribute('data-ed')) return;
+  var t = _schTasks.filter(function(x){ return x.id === id; })[0]; if (!t) return;
+  el.setAttribute('data-ed', '1');
+  el.innerHTML = '<input type="text" class="w-full text-xs font-bold text-slate-700 border-b border-indigo-400 bg-white outline-none px-0.5">';
+  var inp = el.querySelector('input'); inp.value = t.namaTugas; inp.focus(); inp.select();
+  var done = false;
+  var finish = function(save){ if (done) return; done = true; var v = inp.value.trim(); if (save && v && v !== t.namaTugas) _schInlineUpdate(t, { namaTugas: v }); else _schRenderGantt(); };
+  inp.addEventListener('blur', function(){ finish(true); });
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); finish(true); } else if (e.key === 'Escape'){ e.preventDefault(); finish(false); } });
+}
+function _schEditDates(el, id) {
+  if (!_schCanEdit() || el.getAttribute('data-ed')) return;
+  var t = _schTasks.filter(function(x){ return x.id === id; })[0]; if (!t) return;
+  el.setAttribute('data-ed', '1');
+  el.innerHTML = '<span class="inline-flex items-center gap-1 text-[10px]"><input type="date" class="sch-d0 border border-slate-200 rounded px-1 py-0.5"> → <input type="date" class="sch-d1 border border-slate-200 rounded px-1 py-0.5"></span>';
+  var d0 = el.querySelector('.sch-d0'), d1 = el.querySelector('.sch-d1');
+  d0.value = t.mulai; d1.value = t.selesai;
+  var done = false;
+  var finish = function(){ if (done) return; done = true; var m = d0.value, s = d1.value;
+    if (!m || !s) { _schRenderGantt(); return; }
+    if (s < m) { showNotification('Tanggal selesai tidak boleh sebelum mulai.', 'error'); _schRenderGantt(); return; }
+    if (m === t.mulai && s === t.selesai) { _schRenderGantt(); return; }
+    _schInlineUpdate(t, { mulai: m, selesai: s });
+  };
+  var maybe = function(){ setTimeout(function(){ var a = document.activeElement; if (a !== d0 && a !== d1) finish(); }, 120); };
+  d0.addEventListener('blur', maybe); d1.addEventListener('blur', maybe);
+  d0.focus();
+}
+function _schInlineAdd(e, inp, fase) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  var nama = inp.value.trim(); if (!nama) return;
+  // Tanggal default: setelah tugas terakhir di fase; else setelah semua; else hari ini.
+  var faseTasks = _schTasks.filter(function(t){ return (t.fase || '').trim() === fase; });
+  var lastSel = ''; faseTasks.forEach(function(t){ if (t.selesai && (!lastSel || t.selesai > lastSel)) lastSel = t.selesai; });
+  var mulai;
+  if (lastSel) mulai = _schShiftIso(lastSel, 1);
+  else { var allSel = ''; _schTasks.forEach(function(t){ if (t.selesai && (!allSel || t.selesai > allSel)) allSel = t.selesai; }); mulai = allSel ? _schShiftIso(allSel, 1) : _schTodayIso(); }
+  var payload = { noWO: _schWO.noWO, namaTugas: nama, fase: fase, warna: (_SCH_FASE_WARNA[fase] || 'indigo'), mulai: mulai, selesai: mulai, progress: 0, urutan: _schTasks.length, oleh: _schUserNama() };
+  inp.value = ''; inp.disabled = true;
+  showNotification('Menambahkan tugas...', 'success');
+  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && _schDetailOpen()) _schReloadDetail(); else inp.disabled = false; })
+    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal.', 'error'); inp.disabled = false; })
+    .saveScheduleTask(payload);
 }
 
 // ── Tugas CRUD ──
