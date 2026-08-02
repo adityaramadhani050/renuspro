@@ -804,15 +804,27 @@ function getBOMSummaryByWO(noWO) {
     var res = getBOMByWO(noWO);
     var items = (res && res.success) ? (res.items || []) : [];
     var total = items.length, approved = 0, rejected = 0, pending = 0;
+    // Progress procurement (dari material Approved).
+    var proc = { base: 0, reserved: 0, direct: 0, perluBeli: 0, tunggu: 0, dikirim: 0, tuntas: 0, pct: 0 };
     items.forEach(function (it) {
       if (it.status === 'Approved') approved++;
       else if (it.status === 'Rejected') rejected++;
       else pending++;
+      if (it.status !== 'Approved') return;
+      proc.base++;
+      var qr = Number(it.qtyReserved) || 0, qb = Number(it.qtyBeli) || 0, qm = Number(it.qtyMenungguBL) || 0, qbl = Number(it.qtyBeliLangsung) || 0, qd = Number(it.qtyDikirim) || 0;
+      if (qr > 0) proc.reserved++;
+      if (qbl > 0) proc.direct++;
+      if (qb > 0) proc.perluBeli++;
+      if (qm > 0) proc.tunggu++;
+      if (qd > 0) proc.dikirim++;
+      if (qb === 0 && qm === 0 && (qr > 0 || qbl > 0)) proc.tuntas++;   // sudah dialokasi, tak ada sisa beli
     });
+    proc.pct = proc.base ? Math.round(proc.tuntas / proc.base * 100) : 0;
     var pct = total ? Math.round(approved / total * 100) : 0;
     return { success: true, summary: {
       total: total, approved: approved, pending: pending, rejected: rejected,
-      pct: pct, bomStatus: (res && res.finalizedBy) ? 'Final' : 'Draft'
+      pct: pct, bomStatus: (res && res.finalizedBy) ? 'Final' : 'Draft', proc: proc
     } };
   } catch (e) { return { success: false, message: e.toString() }; }
 }

@@ -253,35 +253,69 @@
 
     // ── Ringkasan BoM & DED (lintas divisi, read-only) ──
     function _woLoadBomDed(noWO) {
-      var el = document.getElementById('wo-bomded-summary');
-      if (el) el.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      ['wo-bom-summary','wo-ded-summary'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML='<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>'; });
       if (typeof google === 'undefined') return;
-      var st = { bom: undefined, ded: undefined };
-      var done = function() { if (st.bom !== undefined && st.ded !== undefined) _woRenderBomDed(st.bom, st.ded); };
-      google.script.run.withSuccessHandler(function(r) { st.bom = (r && r.success) ? r.summary : null; done(); }).withFailureHandler(function() { st.bom = null; done(); }).getBOMSummaryByWO(noWO);
-      google.script.run.withSuccessHandler(function(r) { st.ded = (r && r.success) ? r.summary : null; done(); }).withFailureHandler(function() { st.ded = null; done(); }).getDEDSummaryByWO(noWO);
+      google.script.run.withSuccessHandler(function(r){ _woRenderBom((r && r.success) ? r.summary : null); }).withFailureHandler(function(){ _woRenderBom(undefined); }).getBOMSummaryByWO(noWO);
+      google.script.run.withSuccessHandler(function(r){ _woRenderDed(r && r.success ? r : null); }).withFailureHandler(function(){ _woRenderDed(undefined); }).getDEDSummaryByWO(noWO);
     }
-    function _woBomDedRow(label, icon, s, statusText) {
-      if (!s) return '<div class="flex items-center justify-between gap-2 text-xs"><span class="font-bold text-slate-500"><i class="fa-solid ' + icon + ' text-slate-300 mr-1"></i>' + label + '</span><span class="text-slate-300 italic">Belum terdaftar</span></div>';
-      var pct = s.pct || 0;
-      var barColor = pct >= 100 ? 'bg-emerald-500' : 'bg-indigo-500';
-      var badge = statusText ? ' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ' + (statusText === 'Final' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500') + '">' + statusText + '</span>' : '';
-      return '<div>'
-        + '<div class="flex items-center justify-between mb-1"><span class="text-xs font-bold text-slate-600"><i class="fa-solid ' + icon + ' text-indigo-400 mr-1"></i>' + label + badge + '</span><span class="text-xs font-extrabold text-slate-800">' + pct + '%</span></div>'
-        + '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ' + barColor + '" style="width:' + pct + '%"></div></div>'
+    function _woProgBar(pct, done) {
+      return '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ' + (done ? 'bg-emerald-500' : 'bg-indigo-500') + '" style="width:' + (pct||0) + '%"></div></div>';
+    }
+    function _woRenderBom(s) {
+      var el = document.getElementById('wo-bom-summary'); if (!el) return;
+      if (s === undefined) { el.innerHTML = '<div class="text-center py-3 text-rose-400 text-xs">Gagal memuat BoM.</div>'; return; }
+      if (!s) { el.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl"><i class="fa-solid fa-list-check text-2xl mb-2 opacity-30 block"></i>Belum terdaftar di BoM.</div>'; return; }
+      var badge = ' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ' + (s.bomStatus === 'Final' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500') + '">' + s.bomStatus + '</span>';
+      var p = s.proc || { base:0 };
+      var procRow = p.base
+        ? '<div class="mt-3 pt-3 border-t border-slate-100">'
+          + '<div class="flex items-center justify-between mb-1"><span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Procurement</span><span class="text-xs font-extrabold text-slate-800">' + (p.pct||0) + '%</span></div>'
+          + _woProgBar(p.pct, (p.pct>=100))
+          + '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold mt-1">'
+          +   '<span class="text-emerald-700">' + p.reserved + ' Reserved</span>'
+          +   '<span class="text-violet-600">' + p.direct + ' Direct</span>'
+          +   '<span class="text-amber-600">' + p.perluBeli + ' Perlu Beli</span>'
+          +   (p.tunggu ? '<span class="text-violet-500">' + p.tunggu + ' Tunggu Beli</span>' : '')
+          +   '<span class="text-sky-600">' + p.dikirim + ' Dikirim</span>'
+          + '</div></div>'
+        : '';
+      el.innerHTML =
+          '<div class="flex items-center justify-between mb-1"><span class="text-xs font-bold text-slate-600">Approval' + badge + '</span><span class="text-xs font-extrabold text-slate-800">' + (s.pct||0) + '%</span></div>'
+        + _woProgBar(s.pct, (s.pct>=100))
         + '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold mt-1">'
-        +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (s.approved || 0) + ' Approved</span>'
-        +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (s.pending || 0) + ' Pending</span>'
-        +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (s.rejected || 0) + ' Rejected</span>'
-        +   '<span class="text-slate-400">' + (s.total || 0) + ' item</span>'
-        + '</div></div>';
+        +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (s.approved||0) + ' Approved</span>'
+        +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (s.pending||0) + ' Pending</span>'
+        +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (s.rejected||0) + ' Rejected</span>'
+        +   '<span class="text-slate-400">' + (s.total||0) + ' item</span>'
+        + '</div>' + procRow;
     }
-    function _woRenderBomDed(bom, ded) {
-      var el = document.getElementById('wo-bomded-summary'); if (!el) return;
-      el.innerHTML = _woBomDedRow('BoM', 'fa-list-check', bom, bom ? bom.bomStatus : '')
-        + '<div class="border-t border-slate-100"></div>'
-        + _woBomDedRow('DED', 'fa-file-pen', ded, '');
+    function _woRenderDed(res) {
+      var el = document.getElementById('wo-ded-summary'); if (!el) return;
+      if (res === undefined) { el.innerHTML = '<div class="text-center py-3 text-rose-400 text-xs">Gagal memuat DED.</div>'; return; }
+      var s = res ? res.summary : null;
+      if (!s) { el.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl"><i class="fa-solid fa-file-pen text-2xl mb-2 opacity-30 block"></i>Belum terdaftar di DED.</div>'; return; }
+      var docs = (res.approvedDocs || []);
+      var docHtml = '';
+      if (docs.length) {
+        docHtml = '<div class="mt-3 pt-3 border-t border-slate-100"><p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dokumen Approved</p><div class="space-y-1.5">'
+          + docs.map(function(d){
+              return d.files.map(function(f){
+                return '<a href="' + _escHtmlWO(f.fileUrl) + '" target="_blank" rel="noopener" class="flex items-center gap-2 text-xs text-rose-600 hover:text-rose-700 bg-rose-50 rounded-lg px-2.5 py-1.5"><i class="fa-solid fa-file-pdf shrink-0"></i><span class="truncate">' + _escHtmlWO(d.label) + '</span></a>';
+              }).join('');
+            }).join('')
+          + '</div></div>';
+      }
+      el.innerHTML =
+          '<div class="flex items-center justify-between mb-1"><span class="text-xs font-bold text-slate-600">Progress</span><span class="text-xs font-extrabold text-slate-800">' + (s.pct||0) + '%</span></div>'
+        + _woProgBar(s.pct, (s.pct>=100))
+        + '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold mt-1">'
+        +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (s.approved||0) + ' Approved</span>'
+        +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (s.pending||0) + ' Pending</span>'
+        +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (s.rejected||0) + ' Rejected</span>'
+        +   '<span class="text-slate-400">' + (s.belum||0) + ' Belum</span>'
+        + '</div>' + docHtml;
     }
+    function _escHtmlWO(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
     // ── Timeline Project (live dari Project Schedule WO) ──
     var _WO_TL_FASE = [

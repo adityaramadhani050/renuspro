@@ -245,9 +245,15 @@ function getDEDSummaryByWO(noWO) {
     noWO = (noWO || '').toString().trim();
     if (!noWO) return { success: true, summary: null };
     var reg = _dedRegisteredWOs().filter(function (w) { return w.noWO === noWO; })[0];
-    if (!reg) return { success: true, summary: null };
+    if (!reg) return { success: true, summary: null, approvedDocs: [] };
     var res = getDEDByWO(noWO);
-    return { success: true, summary: (res && res.success) ? res.summary : null };
+    var list = (res && res.success) ? (res.list || []) : [];
+    // Dokumen yang sudah Approved + ada file → tampilkan di panel WO detail.
+    var approvedDocs = list.filter(function (it) { return it.status === 'Approved' && (it.files || []).length; })
+      .map(function (it) {
+        return { label: it.label, files: (it.files || []).map(function (f) { return { fileUrl: f.fileUrl, fileName: f.fileName }; }) };
+      });
+    return { success: true, summary: (res && res.success) ? res.summary : null, approvedDocs: approvedDocs };
   } catch (e) { return { success: false, message: e.toString() }; }
 }
 
