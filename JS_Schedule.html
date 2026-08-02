@@ -351,7 +351,7 @@ function _schRenderGantt() {
   var totalDays = _schDays(start, end) + 1; if (totalDays < 1) totalDays = 1;
   var ppd = _schZoom === 'hari' ? 34 : (_schZoom === 'bulan' ? 6 : 15);
   var totalPx = totalDays * ppd;
-  var leftW = 210;
+  var leftW = 280;
   var todayIso = _schTodayIso();
   var todayPx = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) * ppd) : -1;
   var todayLine = todayPx >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-20" style="left:' + todayPx + 'px"></div>' : '';
@@ -370,7 +370,7 @@ function _schRenderGantt() {
     return '<div class="flex border-b border-slate-100 items-stretch">'
       + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
       +   '<div class="text-xs font-bold text-slate-700 truncate' + clickable + '"' + onclk + '>' + _schEsc(t.namaTugas) + '</div>'
-      +   '<div class="text-[10px] text-slate-400">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%</div>'
+      +   '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%</div>'
       + '</div>'
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:42px">'
       +   todayLine
