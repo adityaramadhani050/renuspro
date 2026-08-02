@@ -369,7 +369,7 @@ function _schRenderGantt() {
     return '<div class="flex border-b border-slate-100 items-stretch">'
       + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
       +   '<div class="text-xs font-bold text-slate-700 truncate' + clickable + '"' + onclk + '>' + _schEsc(t.namaTugas) + '</div>'
-      +   '<div class="text-[10px] text-slate-400">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + prog + '%</div>'
+      +   '<div class="text-[10px] text-slate-400">' + _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%</div>'
       + '</div>'
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:42px">'
       +   todayLine
@@ -401,6 +401,7 @@ function _schRenderGantt() {
       gdur += d; gwp += (Number(t.progress)||0) * d;
     });
     var gpct = gdur ? Math.round(gwp / gdur) : 0;
+    var gdays = (gmin && gmax) ? (_schDays(gmin, gmax) + 1) : 0;
     var spanBar = '';
     if (gmin && gmax) {
       var gl = _schDays(start, gmin) * ppd;
@@ -412,7 +413,7 @@ function _schRenderGantt() {
       +   '<i class="fa-solid fa-layer-group text-[10px] text-slate-400"></i>'
       +   '<span class="text-[11px] font-extrabold text-slate-600 uppercase tracking-wide truncate">' + _schEsc(f || 'Tanpa Fase') + '</span>'
       +   '<span class="text-[10px] font-bold text-slate-400">(' + gtasks.length + ')</span>'
-      +   '<span class="ml-auto text-[10px] font-bold text-slate-400">' + gpct + '%</span>'
+      +   '<span class="ml-auto text-[10px] font-bold text-slate-400">' + (gdays ? gdays + ' hari · ' : '') + gpct + '%</span>'
       + '</div>'
       + '<div class="relative bg-slate-50" style="width:' + totalPx + 'px;min-height:28px">' + todayLine + spanBar + '</div>'
       + '</div>';
