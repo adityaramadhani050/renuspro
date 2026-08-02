@@ -464,9 +464,10 @@ function _schSubmitTask() {
   if (!payload.namaTugas) return showNotification('Nama tugas wajib.', 'error');
   if (!payload.mulai || !payload.selesai) return showNotification('Tanggal mulai & selesai wajib.', 'error');
   _schCloseTask();
-  toggleLoader(true, 'Menyimpan...');
-  var cb = function(res){ toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); };
-  var fail = function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); };
+  // Simpan di background — tanpa loader layar penuh, user bisa lanjut edit/tambah tugas.
+  showNotification(id ? 'Menyimpan perubahan tugas...' : 'Menambahkan tugas...', 'success');
+  var cb = function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); };
+  var fail = function(err){ showNotification((err && err.message) || 'Gagal menyimpan tugas.', 'error'); };
   if (id) google.script.run.withSuccessHandler(cb).withFailureHandler(fail).updateScheduleTask(payload);
   else google.script.run.withSuccessHandler(cb).withFailureHandler(fail).saveScheduleTask(payload);
 }
@@ -475,9 +476,10 @@ function _schDeleteTask() {
   if (!id) return;
   _schCloseTask();  // tutup modal tugas dulu agar tidak menutupi modal konfirmasi
   showConfirm({ title: 'Hapus Tugas', message: 'Hapus tugas ini dari schedule?', confirmText: 'Ya, Hapus', icon: 'fa-trash-can', type: 'warning', onConfirm: function() {
-    toggleLoader(true, 'Menghapus...');
-    google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
-      .withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    // Hapus di background — tanpa loader layar penuh.
+    showNotification('Menghapus tugas...', 'success');
+    google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success && document.getElementById('sch-detail') && !document.getElementById('sch-detail').classList.contains('hidden')) _schReloadDetail(); })
+      .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
       .hapusScheduleTask(id);
   }});
 }
