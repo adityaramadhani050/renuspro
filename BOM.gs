@@ -794,6 +794,29 @@ function getBOMHoldMap() {
   } catch (e) { return {}; }
 }
 
+// Ringkasan BoM 1 WO untuk panel di detail Work Order (null bila belum terdaftar).
+function getBOMSummaryByWO(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: true, summary: null };
+    var reg = _bomRegisteredWOs().filter(function (w) { return w.noWO === noWO; })[0];
+    if (!reg) return { success: true, summary: null };
+    var res = getBOMByWO(noWO);
+    var items = (res && res.success) ? (res.items || []) : [];
+    var total = items.length, approved = 0, rejected = 0, pending = 0;
+    items.forEach(function (it) {
+      if (it.status === 'Approved') approved++;
+      else if (it.status === 'Rejected') rejected++;
+      else pending++;
+    });
+    var pct = total ? Math.round(approved / total * 100) : 0;
+    return { success: true, summary: {
+      total: total, approved: approved, pending: pending, rejected: rejected,
+      pct: pct, bomStatus: (res && res.finalizedBy) ? 'Final' : 'Draft'
+    } };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 // Rincian reserve stok per WO/proyek untuk sebuah idStok (hold = Qty Reserved −
 // Qty Dikirim > 0). Dipakai modal "Detail Reserve" di Inventory → Daftar Stok.
 function getReserveDetailByStok(idStok) {

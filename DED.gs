@@ -239,6 +239,18 @@ function _dedMergeItem(master, itemRow) {
     activity:      itemRow ? _dedParseActivity(itemRow[10]) : []
   };
 }
+// Ringkasan DED 1 WO untuk panel di detail Work Order (null bila belum terdaftar).
+function getDEDSummaryByWO(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: true, summary: null };
+    var reg = _dedRegisteredWOs().filter(function (w) { return w.noWO === noWO; })[0];
+    if (!reg) return { success: true, summary: null };
+    var res = getDEDByWO(noWO);
+    return { success: true, summary: (res && res.success) ? res.summary : null };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 function _dedCountSummary(list) {
   var s = { total: list.length, approved: 0, pending: 0, rejected: 0, belum: 0, na: 0, wajibTotal: 0, wajibSelesai: 0 };
   list.forEach(function (it) {

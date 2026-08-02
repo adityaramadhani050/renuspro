@@ -248,7 +248,40 @@
       _woLoadDokumen(item.noWO);
       if (typeof _hoLoad === 'function') _hoLoad(item.noWO);
       _woLoadTimeline(item.noWO);
+      _woLoadBomDed(item.noWO);
     };
+
+    // ── Ringkasan BoM & DED (lintas divisi, read-only) ──
+    function _woLoadBomDed(noWO) {
+      var el = document.getElementById('wo-bomded-summary');
+      if (el) el.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      if (typeof google === 'undefined') return;
+      var st = { bom: undefined, ded: undefined };
+      var done = function() { if (st.bom !== undefined && st.ded !== undefined) _woRenderBomDed(st.bom, st.ded); };
+      google.script.run.withSuccessHandler(function(r) { st.bom = (r && r.success) ? r.summary : null; done(); }).withFailureHandler(function() { st.bom = null; done(); }).getBOMSummaryByWO(noWO);
+      google.script.run.withSuccessHandler(function(r) { st.ded = (r && r.success) ? r.summary : null; done(); }).withFailureHandler(function() { st.ded = null; done(); }).getDEDSummaryByWO(noWO);
+    }
+    function _woBomDedRow(label, icon, s, statusText) {
+      if (!s) return '<div class="flex items-center justify-between gap-2 text-xs"><span class="font-bold text-slate-500"><i class="fa-solid ' + icon + ' text-slate-300 mr-1"></i>' + label + '</span><span class="text-slate-300 italic">Belum terdaftar</span></div>';
+      var pct = s.pct || 0;
+      var barColor = pct >= 100 ? 'bg-emerald-500' : 'bg-indigo-500';
+      var badge = statusText ? ' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ' + (statusText === 'Final' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500') + '">' + statusText + '</span>' : '';
+      return '<div>'
+        + '<div class="flex items-center justify-between mb-1"><span class="text-xs font-bold text-slate-600"><i class="fa-solid ' + icon + ' text-indigo-400 mr-1"></i>' + label + badge + '</span><span class="text-xs font-extrabold text-slate-800">' + pct + '%</span></div>'
+        + '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ' + barColor + '" style="width:' + pct + '%"></div></div>'
+        + '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold mt-1">'
+        +   '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ' + (s.approved || 0) + ' Approved</span>'
+        +   '<span class="text-amber-600"><i class="fa-solid fa-clock"></i> ' + (s.pending || 0) + ' Pending</span>'
+        +   '<span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> ' + (s.rejected || 0) + ' Rejected</span>'
+        +   '<span class="text-slate-400">' + (s.total || 0) + ' item</span>'
+        + '</div></div>';
+    }
+    function _woRenderBomDed(bom, ded) {
+      var el = document.getElementById('wo-bomded-summary'); if (!el) return;
+      el.innerHTML = _woBomDedRow('BoM', 'fa-list-check', bom, bom ? bom.bomStatus : '')
+        + '<div class="border-t border-slate-100"></div>'
+        + _woBomDedRow('DED', 'fa-file-pen', ded, '');
+    }
 
     // ── Timeline Project (live dari Project Schedule WO) ──
     var _WO_TL_FASE = [
