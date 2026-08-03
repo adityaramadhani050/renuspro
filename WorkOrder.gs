@@ -255,17 +255,19 @@ function getWOContextByWO(noWO) {
     var tipeMap = _woProdukTipeMap();
     var kelompokList = [];
     try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
-    var material = [], jasa = [], budMaterial = 0, budJasa = 0;
+    var budMaterial = 0, budJasa = 0;
+    var kelompok = [];   // tampilan per-kelompok (gaya Lihat WO, hanya HPP)
     kelompokList.forEach(function (k) {
+      var disp = { nama: (k.namaKelompok || '').toString(), items: [] };
       (k.subItems || []).forEach(function (s) {
         var pid = (s.produkId || '').toString().trim();
         var tipe = pid ? (tipeMap[pid] || '') : '';
         var isJasa = (tipe === 'jasa') || ((!pid || !tipe) && _woKeywordHitJasa((s.deskripsi || '').toString().toLowerCase()));
         var qty = Number(s.qty) || 0, hpp = Number(s.hpp) || 0;
-        var row = { deskripsi: (s.deskripsi || '').toString(), qty: qty, unit: (s.unit || '').toString(), hpp: hpp, totalHpp: qty * hpp, kelompok: (k.namaKelompok || '').toString() };
-        if (isJasa) { jasa.push(row); budJasa += qty * hpp; }
-        else { material.push(row); budMaterial += qty * hpp; }
+        if (isJasa) budJasa += qty * hpp; else budMaterial += qty * hpp;
+        disp.items.push({ deskripsi: (s.deskripsi || '').toString(), qty: qty, unit: (s.unit || '').toString(), hpp: hpp, totalHpp: qty * hpp });
       });
+      kelompok.push(disp);
     });
 
     var ho = null;
@@ -275,10 +277,12 @@ function getWOContextByWO(noWO) {
 
     return {
       success: true,
-      noWO: noWO, namaProject: wo.namaProject || '', namaKlien: wo.namaKlien || '',
+      noWO: noWO, id: wo.id || '', rev: wo.rev != null ? wo.rev : '', tanggal: wo.tanggal || '',
+      dibuatOleh: wo.dibuatOleh || '',
+      namaProject: wo.namaProject || '', namaKlien: wo.namaKlien || '',
       jenisWO: wo.jenisWO || 'Material', status: wo.status || '',
       catatanCustomer: wo.catatanCustomer || '',
-      items: { material: material, jasa: jasa },
+      kelompok: kelompok,
       budget: { material: budMaterial, jasa: budJasa, total: budMaterial + budJasa },
       ho: ho, surveys: surveys
     };

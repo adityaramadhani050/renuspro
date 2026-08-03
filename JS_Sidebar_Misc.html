@@ -152,44 +152,61 @@ function openWOContext(noWO){
     .withFailureHandler(function(err){ body.innerHTML = '<div class="p-6 text-center text-rose-400 text-sm">Gagal memuat: ' + ((err&&err.message)||err) + '</div>'; })
     .getWOContextByWO(noWO);
 }
-function _woCtxBudget(label, val, cls){
-  return '<div class="rounded-xl p-3 text-center ' + cls + '"><div class="text-[10px] font-semibold uppercase tracking-wider opacity-80">' + label + '</div><div class="text-sm font-extrabold mt-0.5">Rp ' + Math.round(val||0).toLocaleString('id-ID') + '</div></div>';
+function _woCtxInfoRow(label, val){
+  return '<div class="flex gap-2"><span class="font-bold text-slate-500 w-28 shrink-0">' + label + '</span><span class="text-slate-800 min-w-0">: ' + val + '</span></div>';
 }
-function _woCtxItemTable(judul, arr){
+function _woCtxSumRow(label, val, cls){
+  return '<div class="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 ' + (cls||'') + '"><span>' + label + '</span><span>' + val + '</span></div>';
+}
+// Tabel item per-kelompok (gaya Lihat WO), hanya kolom HPP — tanpa nilai jual/margin.
+function _woCtxItemTable(kelompok){
   var esc = _woCtxEsc;
-  var rows = (arr||[]).map(function(s, i){
-    return '<tr class="border-b border-slate-100">'
-      + '<td class="px-2 py-1.5 text-center text-slate-400">' + (i+1) + '</td>'
-      + '<td class="px-2 py-1.5">' + esc(s.deskripsi||'') + (s.kelompok ? '<span class="block text-[10px] text-slate-400">' + esc(s.kelompok) + '</span>' : '') + '</td>'
-      + '<td class="px-2 py-1.5 text-center whitespace-nowrap">' + (s.qty||0) + ' ' + esc(s.unit||'') + '</td>'
-      + '<td class="px-2 py-1.5 text-right whitespace-nowrap text-slate-600">Rp ' + Math.round(s.totalHpp||0).toLocaleString('id-ID') + '</td>'
-      + '</tr>';
-  }).join('');
-  if (!arr || !arr.length) rows = '<tr><td colspan="4" class="px-2 py-3 text-center text-slate-400 text-xs">Tidak ada item ' + esc(judul.toLowerCase()) + '.</td></tr>';
-  return '<div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">' + esc(judul) + '</div>'
-    + '<div class="overflow-x-auto rounded-xl border border-slate-200 mb-4"><table class="w-full text-xs min-w-[420px]">'
-    + '<thead><tr class="bg-slate-100 text-slate-500 text-[10px]"><th class="px-2 py-1.5">No</th><th class="px-2 py-1.5 text-left">Deskripsi</th><th class="px-2 py-1.5">Qty</th><th class="px-2 py-1.5 text-right">Budget (HPP)</th></tr></thead>'
+  var rp = function(v){ return Math.round(Math.abs(v||0)).toLocaleString('id-ID'); };
+  var rows = '';
+  (kelompok||[]).forEach(function(k, ki){
+    var letter = String.fromCharCode(65+ki);
+    rows += '<tr class="bg-slate-100"><td colspan="6" class="px-2 py-1.5 font-bold text-slate-700 text-xs">' + esc(letter + '. ' + (k.nama||'').toUpperCase()) + '</td></tr>';
+    (k.items||[]).forEach(function(s, si){
+      rows += '<tr class="border-b border-slate-100">'
+        + '<td class="px-2 py-1.5 text-center text-slate-500">' + (si+1) + '</td>'
+        + '<td class="px-2 py-1.5">' + esc(s.deskripsi||'') + '</td>'
+        + '<td class="px-2 py-1.5 text-center">' + (s.qty||0) + '</td>'
+        + '<td class="px-2 py-1.5 text-center">' + esc(s.unit||'') + '</td>'
+        + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(s.hpp) + '</td>'
+        + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(s.totalHpp) + '</td>'
+        + '</tr>';
+    });
+  });
+  if (!rows) rows = '<tr><td colspan="6" class="px-2 py-4 text-center text-slate-400">Tidak ada item.</td></tr>';
+  return '<div class="overflow-x-auto rounded-xl border border-slate-200 mb-4"><table class="w-full text-xs min-w-[520px]">'
+    + '<thead><tr class="bg-blue-700 text-white text-[11px]"><th class="px-2 py-2 font-bold">No</th><th class="px-2 py-2 font-bold text-left">Deskripsi Produk / Jasa</th><th class="px-2 py-2 font-bold">Qty</th><th class="px-2 py-2 font-bold">Unit</th><th class="px-2 py-2 font-bold text-right bg-rose-800">HPP Satuan</th><th class="px-2 py-2 font-bold text-right bg-rose-800">Total HPP</th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table></div>';
 }
 function _renderWOContext(res){
   var body = document.getElementById('wo-ctx-body'); if (!body) return;
   if (!res || !res.success){ body.innerHTML = '<div class="p-6 text-center text-rose-400 text-sm">' + ((res&&res.message)||'Gagal memuat.') + '</div>'; return; }
   var esc = _woCtxEsc;
+  var rp = function(v){ return Math.round(v||0).toLocaleString('id-ID'); };
   var b = res.budget || {};
   var html = '';
-  html += '<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4">'
-    + '<div><span class="text-slate-400">Project</span><div class="font-bold text-slate-800">' + esc(res.namaProject||'-') + '</div></div>'
-    + '<div><span class="text-slate-400">Klien</span><div class="font-bold text-slate-800">' + esc(res.namaKlien||'-') + '</div></div>'
-    + '<div><span class="text-slate-400">Jenis WO</span><div class="font-bold text-slate-800">' + esc(res.jenisWO||'-') + '</div></div>'
-    + '<div><span class="text-slate-400">Status</span><div class="font-bold text-slate-800">' + esc(res.status||'-') + '</div></div>'
+  // Header — gaya info-grid Lihat WO.
+  html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-4">'
+    + _woCtxInfoRow('No Penawaran', esc(res.id||'-') + (res.rev!==''&&res.rev!=null ? ' (Rev ' + esc(String(res.rev)) + ')' : ''))
+    + _woCtxInfoRow('Klien', esc(res.namaKlien||'-'))
+    + _woCtxInfoRow('Tanggal', esc(res.tanggal||'-'))
+    + _woCtxInfoRow('Project', esc(res.namaProject||'-'))
+    + _woCtxInfoRow('Sales / PIC', esc(res.dibuatOleh||'-'))
+    + _woCtxInfoRow('Jenis WO', esc(res.jenisWO||'-'))
     + '</div>';
-  html += '<div class="grid grid-cols-3 gap-2 mb-4">'
-    + _woCtxBudget('Budget Material', b.material, 'bg-cyan-50 text-cyan-700')
-    + _woCtxBudget('Budget Jasa', b.jasa, 'bg-violet-50 text-violet-700')
-    + _woCtxBudget('Total Budget', b.total, 'bg-slate-100 text-slate-700')
-    + '</div>';
-  html += _woCtxItemTable('Material', (res.items||{}).material || []);
-  html += _woCtxItemTable('Jasa', (res.items||{}).jasa || []);
+  // Detail item per-kelompok (HPP only).
+  html += _woCtxItemTable(res.kelompok || []);
+  // Budget — kotak ringkasan gaya Lihat WO (hanya HPP).
+  var sum = '<div class="ml-auto w-full sm:w-72 text-xs rounded-xl border border-slate-200 overflow-hidden">';
+  sum += _woCtxSumRow('Budget Material', 'Rp ' + rp(b.material), 'text-cyan-700');
+  sum += _woCtxSumRow('Budget Jasa', 'Rp ' + rp(b.jasa), 'text-violet-700');
+  sum += _woCtxSumRow('Total Budget', 'Rp ' + rp(b.total), 'font-extrabold text-slate-800 bg-slate-100');
+  sum += '</div>';
+  html += '<div class="flex mb-4">' + sum + '</div>';
   if (res.catatanCustomer) html += '<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3"><div class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-comment-dots mr-1"></i>Catatan Customer</div><div class="text-xs text-amber-900 whitespace-pre-wrap">' + esc(res.catatanCustomer) + '</div></div>';
   if (res.ho && res.ho.mom) html += '<div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><div class="text-[11px] font-bold text-emerald-700 mb-1"><i class="fa-solid fa-handshake mr-1"></i>Catatan Hasil Hand Over (MoM)</div><div class="text-xs text-emerald-900 whitespace-pre-wrap">' + esc(res.ho.mom) + '</div></div>';
   var surv = res.surveys || [];
