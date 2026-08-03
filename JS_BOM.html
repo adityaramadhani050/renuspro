@@ -838,7 +838,6 @@ function _bomRowHtml(optsStr) {
     + '<td class="p-2 text-center text-xs font-bold text-slate-400 col-no bom-new-no">1</td>'
     + '<td class="p-2 col-desk" data-label="Material">'
     +   '<select onchange="_bomOnPickRow(this)" class="bom-new-pl w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + optsStr + '</select>'
-    +   '<div class="bom-new-manual hidden mt-1.5"><input class="bom-nm-nama w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Nama material (manual)"></div>'
     +   '<div class="bom-new-extra"></div>'
     + '</td>'
     + '<td class="p-2 col-merek" data-label="Merek"><input class="bom-new-merek w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Merek"></td>'
@@ -861,12 +860,27 @@ function _bomAppendRowToBlock(block, optsStr, item) {
     tr.setAttribute('data-id', item.id);
     var sel = tr.querySelector('.bom-new-pl');
     var plExists = item.pricelistId && sel.querySelector('option[value="' + item.pricelistId + '"]');
-    sel.value = plExists ? item.pricelistId : '__manual__';
+    if (plExists) {
+      sel.value = item.pricelistId;
+    } else {
+      // Item lama tak ada di pricelist saat ini (entri lama/manual sebelum aturan
+      // ini) — sisipkan opsi sintetis agar tetap tampil & tersimpan. Tak ada
+      // lagi entri manual baru; ganti dengan pilih material dari pricelist.
+      var syn = document.createElement('option');
+      syn.value = '__keep__';
+      syn.textContent = (item.namaMaterial || '(tanpa nama)') + ' — data lama';
+      syn.setAttribute('data-nama', item.namaMaterial || '');
+      syn.setAttribute('data-merek', item.merek || '');
+      syn.setAttribute('data-supplier', item.supplier || '');
+      syn.setAttribute('data-satuan', item.satuan || '');
+      syn.setAttribute('data-plid', item.pricelistId || '');
+      sel.appendChild(syn);
+      sel.value = '__keep__';
+    }
     _bomOnPickRow(sel);
     tr.querySelector('.bom-new-merek').value = item.merek || '';
     tr.querySelector('.bom-new-supplier').value = item.supplier || '';
     tr.querySelector('.bom-new-satuan').value = item.satuan || '';
-    if (!plExists) tr.querySelector('.bom-nm-nama').value = item.namaMaterial || '';
     tr.querySelector('.bom-new-qty').value = (item.qty || item.qty === 0) ? item.qty : 1;
     tr.querySelector('.bom-new-status').innerHTML = _bomStatusItemBadge(item.status || 'Pending');
     if (item.status === 'Rejected' && item.catatanReview) tr.querySelector('.bom-new-extra').innerHTML = '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(item.catatanReview) + '</div>';
@@ -918,9 +932,10 @@ function _bomCatChanged(input) {
   block.querySelectorAll('.bom-cat-tbody .bom-new-row').forEach(function(tr) {
     var sel = tr.querySelector('.bom-new-pl');
     if (sel.disabled) return;   // baris Approved terkunci, jangan diutak-atik
+    if (sel.value === '__keep__') return;   // baris data lama, pertahankan opsi sintetisnya
     var cur = sel.value;
     sel.innerHTML = opts;
-    if (cur && (cur === '__manual__' || sel.querySelector('option[value="' + cur + '"]'))) sel.value = cur;
+    if (cur && sel.querySelector('option[value="' + cur + '"]')) sel.value = cur;
     else sel.value = '';
     _bomOnPickRow(sel);
   });
@@ -933,21 +948,17 @@ function _bomRemoveRow(btn) {
 // Pilih material → auto-isi merek/supplier/satuan (read-only bila dari pricelist).
 function _bomOnPickRow(sel) {
   var tr = sel.closest('tr');
-  var manual = tr.querySelector('.bom-new-manual');
   var mk = tr.querySelector('.bom-new-merek'), sp = tr.querySelector('.bom-new-supplier'), st = tr.querySelector('.bom-new-satuan');
   var opt = sel.options[sel.selectedIndex];
   var ro = function(el, on) { el.readOnly = on; el.classList.toggle('bg-slate-100', on); el.classList.toggle('text-slate-500', on); };
-  if (opt && opt.value === '__manual__') {
-    manual.classList.remove('hidden');
-    ro(mk, false); ro(sp, false); ro(st, false);
-  } else if (opt && opt.value) {
-    manual.classList.add('hidden');
+  // Material selalu dari pricelist (atau opsi data lama) → merek/supplier/satuan
+  // terisi otomatis & read-only.
+  if (opt && opt.value) {
     mk.value = opt.getAttribute('data-merek') || '';
     sp.value = opt.getAttribute('data-supplier') || '';
     st.value = opt.getAttribute('data-satuan') || '';
     ro(mk, true); ro(sp, true); ro(st, true);
   } else {
-    manual.classList.add('hidden');
     mk.value = ''; sp.value = ''; st.value = '';
     ro(mk, true); ro(sp, true); ro(st, true);
   }
@@ -964,9 +975,9 @@ function _bomEditSave() {
       var merek = tr.querySelector('.bom-new-merek').value.trim();
       var supplier = tr.querySelector('.bom-new-supplier').value.trim();
       var satuan = tr.querySelector('.bom-new-satuan').value.trim();
-      var nama, pricelistId;
-      if (v === '__manual__') { pricelistId = ''; nama = tr.querySelector('.bom-nm-nama').value.trim(); }
-      else { var opt = sel.options[sel.selectedIndex]; pricelistId = v; nama = opt.getAttribute('data-nama'); }
+      var opt = sel.options[sel.selectedIndex];
+      var nama = opt ? (opt.getAttribute('data-nama') || '') : '';
+      var pricelistId = (v === '__keep__') ? (opt.getAttribute('data-plid') || '') : v;
       if (!nama || qty <= 0) return;
       var obj = { kategori: kat, pricelistId: pricelistId, namaMaterial: nama, merek: merek, supplier: supplier, satuan: satuan, qty: qty, catatan: '' };
       var id = tr.getAttribute('data-id'); if (id) obj.id = id;
@@ -1011,7 +1022,7 @@ function _bomCatSelectOptions(selected) {
   if (selected && !has) opts += '<option value="' + _bomEsc(selected) + '" selected>' + _bomEsc(selected) + ' (lama)</option>';
   return opts;
 }
-// Opsi <option> material yang HANYA berisi kategori terpilih (+ Input Manual).
+// Opsi <option> material dari pricelist supplier untuk kategori terpilih.
 function _bomOptsForCat(kat) {
   var k = (kat || '').trim().toLowerCase();
   var list = k ? (_bomPricelist || []).filter(function(p){ return (p.kategori || '').trim().toLowerCase() === k; }) : [];
@@ -1023,7 +1034,7 @@ function _bomOptsForCat(kat) {
     var lbl = p.namaMaterial + (p.spesifikasi ? ' (' + p.spesifikasi + ')' : '');
     opts += '<option value="' + _bomEsc(p.id) + '" data-nama="' + _bomEsc(p.namaMaterial) + '" data-merek="' + _bomEsc(p.merek) + '" data-supplier="' + _bomEsc(p.namaSupplier) + '" data-satuan="' + _bomEsc(p.satuan) + '">' + _bomEsc(lbl) + '</option>';
   });
-  opts += '<option value="__manual__">— Input Manual —</option>';
+  // Material hanya dari pricelist supplier — tidak ada input manual.
   return opts;
 }
 // ── Review material (Lead Engineer) — loading inline di kolom aksi ──
