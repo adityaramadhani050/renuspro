@@ -815,3 +815,17 @@
     </div>
   </div>
 </div>
+
+<!-- ═══ Modal Konteks Work Order (read-only, dipakai di BOM/DED/QC) ═══ -->
+<div id="modal-wo-context" class="hidden fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-2 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+      <div class="flex items-center gap-2 min-w-0">
+        <i class="fa-solid fa-circle-info text-blue-600"></i>
+        <h3 id="wo-ctx-title" class="text-base font-extrabold text-slate-800 truncate">Info Work Order</h3>
+      </div>
+      <button onclick="tutupWOContext()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="wo-ctx-body" class="p-5 overflow-y-auto"></div>
+  </div>
+</div>

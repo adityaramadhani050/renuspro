@@ -242,6 +242,49 @@ function _woJenisAuto(itemsJson, tipeMap) {
   } catch (e) { return 'Material'; }
 }
 
+// ── Konteks WO untuk Site Engineer (BOM/DED/QC) — read-only, 1 round-trip ───
+// Menyatukan detail item (Material vs Jasa), budget HPP Material/Jasa, catatan
+// customer, ringkasan site survey, & MoM Hand Over. TANPA harga jual/margin.
+function getWOContextByWO(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var wo = (getWorkOrderList() || []).filter(function (w) { return w.noWO === noWO; })[0];
+    if (!wo) return { success: false, message: 'Work Order tidak ditemukan.' };
+
+    var tipeMap = _woProdukTipeMap();
+    var kelompokList = [];
+    try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
+    var material = [], jasa = [], budMaterial = 0, budJasa = 0;
+    kelompokList.forEach(function (k) {
+      (k.subItems || []).forEach(function (s) {
+        var pid = (s.produkId || '').toString().trim();
+        var tipe = pid ? (tipeMap[pid] || '') : '';
+        var isJasa = (tipe === 'jasa') || ((!pid || !tipe) && _woKeywordHitJasa((s.deskripsi || '').toString().toLowerCase()));
+        var qty = Number(s.qty) || 0, hpp = Number(s.hpp) || 0;
+        var row = { deskripsi: (s.deskripsi || '').toString(), qty: qty, unit: (s.unit || '').toString(), hpp: hpp, totalHpp: qty * hpp, kelompok: (k.namaKelompok || '').toString() };
+        if (isJasa) { jasa.push(row); budJasa += qty * hpp; }
+        else { material.push(row); budMaterial += qty * hpp; }
+      });
+    });
+
+    var ho = null;
+    try { var hr = getHandOverByWO(noWO); if (hr && hr.success && hr.record) { var r = hr.record; ho = { status: r.status, mom: r.mom, tglJadwal: r.tglJadwal, waktu: r.waktu, mode: r.mode, selesaiOleh: r.selesaiOleh, selesaiPada: r.selesaiPada }; } } catch (e) {}
+    var surveys = [];
+    try { var sr = getSiteSurveysByWO(noWO); if (sr && sr.success) surveys = sr.list || []; } catch (e) {}
+
+    return {
+      success: true,
+      noWO: noWO, namaProject: wo.namaProject || '', namaKlien: wo.namaKlien || '',
+      jenisWO: wo.jenisWO || 'Material', status: wo.status || '',
+      catatanCustomer: wo.catatanCustomer || '',
+      items: { material: material, jasa: jasa },
+      budget: { material: budMaterial, jasa: budJasa, total: budMaterial + budJasa },
+      ho: ho, surveys: surveys
+    };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 // Jenis efektif ('Jasa'/'Material') untuk 1 WO — dipakai gating QC/DED/Schedule.
 function _woJenisEfektif(noWO) {
   try {
