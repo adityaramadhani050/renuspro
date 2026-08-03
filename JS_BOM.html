@@ -146,6 +146,10 @@ function _bomRenderWOList() {
     var removeBtn = _bomCanManage()
       ? '<button onclick="event.stopPropagation();_bomRemoveProject(\'' + _bomEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari BOM"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
+    // Reminder WA agregat (Site: Ajukan Review · Lead: Kirim Hasil Review).
+    var remindBtn = (_bomCanReview() || _bomRole() === 'siteengineer')
+      ? '<button onclick="event.stopPropagation();_bomCardRemind(\'' + _bomEsc(w.noWO) + '\')" class="text-amber-500 hover:text-amber-700 hover:bg-amber-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Kirim notifikasi WhatsApp"><i class="fa-regular fa-bell text-sm"></i></button>'
+      : '';
     return '<div onclick="bukaBOMDetail(\'' + _bomEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-indigo-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
       +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _bomEsc(w.noWO) + '</span>' + _bomStatusBadge(w.status) + _bomWOProcProgress(w) + '</div>'
@@ -157,7 +161,7 @@ function _bomRenderWOList() {
       +     '<div class="flex flex-wrap gap-1 flex-1 min-w-0 sm:flex-none sm:justify-end">' + seBadges + '</div>'
       +     _bomCountHtml(w.jumlahItem || 0, w.jumlahKategori || 0)
       +   '</div>'
-      +   removeBtn
+      +   remindBtn + removeBtn
       +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
       + '</div></div>';
   }).join('');
@@ -173,6 +177,23 @@ function _bomRemoveProject(noWO) {
       loadBOM();
     }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
       .removeBOMProject(noWO);
+  }});
+}
+
+// Reminder cepat dari kartu list BOM (tanpa membuka detail). Backend memvalidasi
+// isi (pending/reviewed) & mengirim 1 notif agregat.
+function _bomCardRemind(noWO) {
+  var isLead = _bomCanReview();  // lead/admin → kirim hasil review; site → ajukan review
+  var title = isLead ? 'Kirim Hasil Review' : 'Ajukan Review';
+  var msg = isLead
+    ? 'Kirim notifikasi hasil review BOM WO ' + noWO + ' ke Site Engineer?'
+    : 'Ajukan BOM WO ' + noWO + ' ke Lead Engineer untuk direview?';
+  showConfirm({ title: title, message: msg, confirmText: 'Ya, Kirim', icon: 'fa-paper-plane', onConfirm: function() {
+    showNotification('Mengirim...', 'success');
+    var run = google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
+      .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal mengirim.', 'error'); });
+    if (isLead) run.kirimHasilReviewBOM(noWO, _bomUserNama());
+    else run.ajukanReviewBOM(noWO, _bomUserNama());
   }});
 }
 

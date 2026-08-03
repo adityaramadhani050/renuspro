@@ -151,6 +151,12 @@ function _dedRenderWOList() {
     var removeBtn = _dedCanAssign()
       ? '<button onclick="event.stopPropagation();_dedRemoveProject(\'' + _dedEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Keluarkan dari DED"><i class="fa-regular fa-trash-can text-sm"></i></button>'
       : '';
+    var selesaiBtn = (_dedCanAssign() && !(w.selesaiManual || w.pct === 100))
+      ? '<button onclick="event.stopPropagation();_dedCardTandaiSelesai(\'' + _dedEsc(w.noWO) + '\')" class="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Tandai DED Approved"><i class="fa-regular fa-circle-check text-sm"></i></button>'
+      : '';
+    var remindBtn = ((_dedCanAssign() || _dedCanUpload()) && !(w.selesaiManual || w.pct === 100))
+      ? '<button onclick="event.stopPropagation();_dedCardRemind(\'' + _dedEsc(w.noWO) + '\')" class="text-amber-500 hover:text-amber-700 hover:bg-amber-50 h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0" title="Kirim reminder WhatsApp"><i class="fa-regular fa-bell text-sm"></i></button>'
+      : '';
     return '<div onclick="bukaDEDDetail(\'' + _dedEsc(w.noWO) + '\')" class="w-full text-left bg-white rounded-2xl border border-slate-150 hover:border-teal-300 hover:shadow-sm transition p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer">'
       + '<div class="flex-1 min-w-0">'
       +   '<div class="flex items-center gap-2 flex-wrap"><span class="font-mono font-extrabold text-slate-700">' + _dedEsc(w.noWO) + '</span>'
@@ -167,10 +173,36 @@ function _dedRenderWOList() {
       +       '<div class="flex items-center justify-end gap-2 text-[10px] font-bold mt-1 whitespace-nowrap">' + _dedCountChips(w.approved, w.pending, w.rejected, w.belum) + '</div>'
       +     '</div>'
       +   '</div>'
-      +   removeBtn
+      +   selesaiBtn + remindBtn + removeBtn
       +   '<i class="fa-solid fa-chevron-right text-slate-300"></i>'
       + '</div></div>';
   }).join('');
+}
+
+// Aksi cepat dari kartu list DED (per WO, tanpa membuka detail).
+function _dedCardTandaiSelesai(noWO) {
+  showConfirm({ title: 'Tandai DED Approved', message: 'Tandai DED ' + noWO + ' sebagai Approved secara manual? WO pindah ke tab "Approved".', confirmText: 'Ya, Tandai Approved', icon: 'fa-circle-check', onConfirm: function() {
+    toggleLoader(true, 'Menandai Approved...');
+    google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) loadDED();
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .tandaiDEDSelesai(noWO, _dedUserNama());
+  } });
+}
+function _dedCardRemind(noWO) {
+  var isLead = _dedCanAssign();
+  var msg = isLead
+    ? 'Kirim reminder WhatsApp ke Site Engineer WO ' + noWO + ' untuk melengkapi DED yang belum upload / ditolak?'
+    : 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview DED WO ' + noWO + ' (Pending)?';
+  showConfirm({ title: 'Kirim Reminder', message: msg, confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+    toggleLoader(true, 'Mengirim reminder...');
+    var run = google.script.run.withSuccessHandler(function(res) {
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim reminder.', 'error'); });
+    if (isLead) run.dedRemindSiteEngineer(noWO, _dedUserNama());
+    else run.dedRemindLeadEngineer(noWO, _dedUserNama());
+  } });
 }
 
 // ── DETAIL per WO ───────────────────────────────────────────────
@@ -215,6 +247,10 @@ function _dedRenderDetail(summary) {
         + '<div class="relative"><button onclick="_dedToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
         + '<div id="ded-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
     }
+    // Reminder WA: Lead → Site (lengkapi upload/reject); Site → Lead (review Pending).
+    var _dedDone = (_dedWO && _dedWO.selesaiManual) || ((summary.pct || 0) === 100);
+    if (!_dedDone && _dedCanReview()) btns += '<button onclick="_dedRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
+    if (!_dedDone && _dedCanUpload()) btns += '<button onclick="_dedRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
     actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
   }
   _dedRenderHead(summary);
@@ -514,6 +550,26 @@ function _dedBatalkanSelesai() {
       if (res && res.success) { if (_dedWO) _dedWO.selesaiManual = false; _dedReloadDetail(); }
     }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
       .batalkanDEDSelesai(_dedWO.noWO, _dedUserNama());
+  } });
+}
+
+// ── Reminder WA DED (dengan konfirmasi). Backend menangani cooldown & hitungan.
+function _dedRemindSite() {
+  if (!_dedWO) return;
+  showConfirm({ title: 'Ingatkan Site Engineer', message: 'Kirim reminder WhatsApp ke Site Engineer WO ini untuk melengkapi DED yang belum upload / ditolak?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+    toggleLoader(true, 'Mengirim reminder...');
+    google.script.run.withSuccessHandler(function(res) { toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
+      .withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim reminder.', 'error'); })
+      .dedRemindSiteEngineer(_dedWO.noWO, _dedUserNama());
+  } });
+}
+function _dedRemindLead() {
+  if (!_dedWO) return;
+  showConfirm({ title: 'Ingatkan Lead Engineer', message: 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview DED yang telah terupload (Pending)?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+    toggleLoader(true, 'Mengirim reminder...');
+    google.script.run.withSuccessHandler(function(res) { toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
+      .withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim reminder.', 'error'); })
+      .dedRemindLeadEngineer(_dedWO.noWO, _dedUserNama());
   } });
 }
 

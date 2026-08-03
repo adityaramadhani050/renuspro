@@ -676,6 +676,60 @@ function qcRemindLeadEngineer(noWO, oleh) {
   } catch (e) { return { success: false, message: e.toString() }; }
 }
 
+// ── Reminder manual DED (mirror QC; cooldown pakai helper QC dgn tipe khusus) ─
+// Lead → Site Engineer: ingatkan lengkapi DED yang Belum Upload / Rejected.
+function dedRemindSiteEngineer(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (!_waDEDEnabled()) return { success: false, message: 'Notifikasi WA DED tidak aktif. Aktifkan di Pengaturan.' };
+    var cd = _qcReminderCooldown('dedsite', noWO);
+    if (cd > 0) return { success: false, message: 'Reminder baru saja dikirim. Coba lagi dalam ' + cd + ' menit.' };
+    var sum = getDEDSummaryByWO(noWO) || {};
+    var belum = sum.belum || 0, reject = sum.rejected || 0;
+    if (belum + reject === 0) return { success: false, message: 'Tidak ada dokumen yang perlu diingatkan (tak ada Belum Upload / Reject).' };
+    var sites = _dedPhonesForWO(noWO);
+    if (!sites.length) return { success: false, message: 'Tidak ada Site Engineer dengan No. WhatsApp untuk WO ini.' };
+    var proj = _qcWOProject(noWO);
+    var parts = [];
+    if (belum) parts.push(belum + ' dokumen belum diupload');
+    if (reject) parts.push(reject + ' dokumen ditolak (perlu revisi)');
+    var msg = ['🔔 *Reminder DED*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Mohon segera lengkapi: ' + parts.join(' & ') + '.',
+      '',
+      'Silakan upload di RenusPro.'].join('\n');
+    sites.forEach(function (s) { _waSendTo(s.phone, msg); });
+    _qcReminderStamp('dedsite', noWO);
+    return { success: true, message: 'Reminder terkirim ke ' + sites.length + ' Site Engineer.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
+// Site → semua Lead Engineer: ingatkan review DED yang sudah terupload (Pending).
+function dedRemindLeadEngineer(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (!_waDEDEnabled()) return { success: false, message: 'Notifikasi WA DED tidak aktif. Aktifkan di Pengaturan.' };
+    var cd = _qcReminderCooldown('dedlead', noWO);
+    if (cd > 0) return { success: false, message: 'Reminder baru saja dikirim. Coba lagi dalam ' + cd + ' menit.' };
+    var sum = getDEDSummaryByWO(noWO) || {};
+    var pending = sum.pending || 0;
+    if (pending === 0) return { success: false, message: 'Tidak ada dokumen Pending yang perlu direview.' };
+    var leads = _qcPhonesByRole('leadengineer');
+    if (!leads.length) return { success: false, message: 'Tidak ada Lead Engineer dengan No. WhatsApp.' };
+    var proj = _qcWOProject(noWO);
+    var msg = ['🔔 *Reminder Review DED*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      pending + ' dokumen menunggu direview.',
+      '',
+      'Mohon segera direview di RenusPro.'].join('\n');
+    leads.forEach(function (l) { _waSendTo(l.phone, msg); });
+    _qcReminderStamp('dedlead', noWO);
+    return { success: true, message: 'Reminder terkirim ke ' + leads.length + ' Lead Engineer.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  NOTIFIKASI: Penerimaan Barang · Pembayaran · Penugasan Engineer
 // ═══════════════════════════════════════════════════════════════════════════
