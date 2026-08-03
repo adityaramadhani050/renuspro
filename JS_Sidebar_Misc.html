@@ -198,10 +198,13 @@ function _renderWOContext(res){
     + _woCtxInfoRow('Sales / PIC', esc(res.dibuatOleh||'-'))
     + _woCtxInfoRow('Jenis WO', esc(res.jenisWO||'-'))
     + '</div>';
+  // Catatan (2 kolom: kiri Customer, kanan MoM HO) DI ATAS tabel item —
+  // agar Site Engineer membaca catatan dulu sebelum melihat item.
+  var noteCust = '<div class="rounded-xl border border-amber-200 bg-amber-50 p-3"><div class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-comment-dots mr-1"></i>Catatan Customer</div><div class="text-xs text-amber-900 whitespace-pre-wrap">' + (res.catatanCustomer ? esc(res.catatanCustomer) : '<span class="text-amber-400">Tidak ada catatan.</span>') + '</div></div>';
+  var noteHO = '<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3"><div class="text-[11px] font-bold text-emerald-700 mb-1"><i class="fa-solid fa-handshake mr-1"></i>Catatan Hasil Hand Over (MoM)</div><div class="text-xs text-emerald-900 whitespace-pre-wrap">' + ((res.ho && res.ho.mom) ? esc(res.ho.mom) : '<span class="text-emerald-400">Belum ada MoM.</span>') + '</div></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">' + noteCust + noteHO + '</div>';
   // Detail item per-kelompok (HPP only).
   html += _woCtxItemTable(res.kelompok || []);
-  if (res.catatanCustomer) html += '<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3"><div class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-comment-dots mr-1"></i>Catatan Customer</div><div class="text-xs text-amber-900 whitespace-pre-wrap">' + esc(res.catatanCustomer) + '</div></div>';
-  if (res.ho && res.ho.mom) html += '<div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><div class="text-[11px] font-bold text-emerald-700 mb-1"><i class="fa-solid fa-handshake mr-1"></i>Catatan Hasil Hand Over (MoM)</div><div class="text-xs text-emerald-900 whitespace-pre-wrap">' + esc(res.ho.mom) + '</div></div>';
   var surv = res.surveys || [];
   html += '<div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-map-location-dot mr-1 text-blue-400"></i>Site Survey (' + surv.length + ')</div>';
   if (!surv.length) html += '<div class="text-xs text-slate-400">Belum ada site survey tertaut.</div>';
