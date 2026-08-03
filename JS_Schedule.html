@@ -489,7 +489,11 @@ function _schOpenBulk() {
 }
 function _schCloseBulk(){ document.getElementById('sch-modal-bulk').classList.add('hidden'); }
 function _schBulkTemplate(){
-  document.getElementById('sch-bulk-text').value = _SCH_TEMPLATE.map(function(t){ return t.nama + ' | ' + t.durasi + ' | ' + t.fase + ' | ' + t.off; }).join('\n');
+  // WO Material-only tidak melalui fase Konstruksi → tugas Konstruksi tidak diisi.
+  var materialOnly = !!(_schWO && _schWO.jenisWO === 'Material');
+  var tpl = _SCH_TEMPLATE.filter(function(t){ return !(materialOnly && (t.fase || '').trim() === 'Kontruksi'); });
+  document.getElementById('sch-bulk-text').value = tpl.map(function(t){ return t.nama + ' | ' + t.durasi + ' | ' + t.fase + ' | ' + t.off; }).join('\n');
+  if (materialOnly) showNotification('WO Material saja — tugas fase Konstruksi tidak dimasukkan ke template.', 'success');
 }
 function _schBulkSubmit() {
   var base = document.getElementById('sch-bulk-mulai').value;

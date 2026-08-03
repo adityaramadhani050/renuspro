@@ -191,6 +191,8 @@ function getScheduleWOList() {
     _ensureScheduleProjectSheet(ss);
     var pData = _cachedScheduleProject();
     var taskMap = _schTasksMap(ss);
+    var jenisMap = {};
+    try { (getWorkOrderList() || []).forEach(function (w) { jenisMap[w.noWO] = w.jenisWO || 'Material'; }); } catch (e) {}
     var list = [];
     for (var i = 1; i < pData.length; i++) {
       var noWO = (pData[i][0] || '').toString().trim();
@@ -202,6 +204,7 @@ function getScheduleWOList() {
         namaKlien: (pData[i][2] || '').toString(),
         tambahOleh: (pData[i][3] || '').toString(),
         siteEngineer: (pData[i][5] || '').toString(),
+        jenisWO: jenisMap[noWO] || 'Material',
         tasks: tasks,
         summary: _schSummary(tasks)
       });
