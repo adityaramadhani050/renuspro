@@ -1690,8 +1690,25 @@
         doc.text('Dokumen internal PT. Renus Global Indonesia — dilarang diberikan ke pelanggan.', ML, PH - 8);
 
         const fname = 'WO_' + String(item.noWO) + '_' + (item.namaProject || '').replace(/[\\/]/g, '-') + '.pdf';
-        doc.save(fname);
-        showNotification('PDF Work Order diunduh: ' + fname);
+        // Tampilkan preview di modal (bukan langsung unduh). Tombol "Download PDF"
+        // di modal memakai downloadQuotationPDF() → _activePdfDoc.save(_activePdfName).
+        _activePdfDoc    = doc;
+        _activePdfName   = fname;
+        _activePdfBase64 = null;
+        document.getElementById('preview-pdf-title').innerText    = 'Work Order — ' + String(item.noWO);
+        document.getElementById('preview-pdf-subtitle').innerText = item.namaProject || '';
+        document.getElementById('preview-pdf-loading').innerHTML  =
+          '<div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div>' +
+          '<p class="text-sm font-medium">Membuat preview...</p>';
+        document.getElementById('preview-pdf-loading').classList.remove('hidden');
+        document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
+        document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
+        document.getElementById('modal-preview-pdf').classList.remove('hidden');
+        renderPDFKeCanvas(doc).catch(function(err) {
+          document.getElementById('preview-pdf-loading').innerHTML =
+            '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+            '<p class="text-sm text-rose-400">Gagal render preview: ' + (err.message || err) + '</p>';
+        });
       } catch (err) {
         console.error(err);
         showNotification('Gagal membuat PDF Work Order: ' + (err.message || err), 'error');
