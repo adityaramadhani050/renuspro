@@ -406,8 +406,8 @@
       if (barEl) barEl.style.width = (tasks.length ? overall : 0) + '%';
       if (barEl) barEl.className = 'h-full rounded-full transition-all duration-500 ' + (overall >= 100 ? 'bg-emerald-500' : 'bg-indigo-500');
       if (pctEl) pctEl.textContent = tasks.length ? (overall + '% selesai') : 'Belum ada jadwal';
-      // WO Material-only tidak melalui fase Konstruksi → sembunyikan dari timeline.
-      var fases = _WO_TL_FASE.filter(function(f) { return !(_woMaterialOnly() && f.nama === 'Kontruksi'); });
+      // WO Material-only tidak melalui fase Konstruksi & Finishing → sembunyikan dari timeline.
+      var fases = _WO_TL_FASE.filter(function(f) { return !(_woMaterialOnly() && (f.nama === 'Kontruksi' || f.nama === 'Finishing')); });
       grid.innerHTML = fases.map(function(f) {
         var arr = byFase[f.nama] || [];
         var has = arr.length > 0;
