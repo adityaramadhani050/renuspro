@@ -303,19 +303,25 @@ function setBOMAssignment(noWO, userIds, assignedBy) {
     var ss = getSpreadsheet();
     var sheet = _bomAssignmentSheet(ss);
     var data = sheet.getDataRange().getValues();
+    var prevIds = {};
+    for (var p = 1; p < data.length; p++) {
+      if ((data[p][0] || '').toString().trim() === noWO) prevIds[(data[p][1] || '').toString().trim()] = true;
+    }
     for (var i = data.length - 1; i >= 1; i--) {
       if ((data[i][0] || '').toString().trim() === noWO) sheet.deleteRow(i + 1);
     }
     var userMap = {};
     try { (getUserList() || []).forEach(function (u) { userMap[u.id] = u.nama; }); } catch (e) {}
     var when = _bomNow();
-    var seen = {};
+    var seen = {}, newIds = [];
     for (var j = 0; j < userIds.length; j++) {
       var uid = (userIds[j] || '').toString().trim();
       if (!uid || seen[uid]) continue;
       seen[uid] = true;
+      if (!prevIds[uid]) newIds.push(uid);
       sheet.appendRow([noWO, uid, userMap[uid] || uid, (assignedBy || '').toString(), when]);
     }
+    if (typeof _notifAssignEngineer === 'function') _notifAssignEngineer('BOM', noWO, newIds, assignedBy);
     return { success: true, message: 'Penugasan diperbarui (' + Object.keys(seen).length + ' engineer).' };
   } catch (e) {
     return { success: false, message: e.toString() };

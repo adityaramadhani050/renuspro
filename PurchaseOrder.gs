@@ -763,9 +763,13 @@ function submitPOKeGudang(noPO, namaUser) {
     var poSheet = _ensurePOSheet(ss);
     SpreadsheetApp.flush();
     var poData = poSheet.getDataRange().getValues();
-    var poRowIdx = -1, statusPO = '';
+    var poRowIdx = -1, statusPO = '', poNoWO = '', poSupplier = '';
     for (var i = 1; i < poData.length; i++) {
-      if ((poData[i][0] || '').toString() === noPO) { poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString(); break; }
+      if ((poData[i][0] || '').toString() === noPO) {
+        poRowIdx = i + 1; statusPO = (poData[i][6] || '').toString();
+        poSupplier = (poData[i][3] || '').toString(); poNoWO = (poData[i][5] || '').toString().trim();
+        break;
+      }
     }
     if (poRowIdx === -1) return { success: false, message: 'PO tidak ditemukan.' };
     if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') {
@@ -776,6 +780,7 @@ function submitPOKeGudang(noPO, namaUser) {
     poSheet.getRange(poRowIdx, 17).setValue(namaUser || '');
     poSheet.getRange(poRowIdx, 18).setValue(nowStr);
     invalidatePOCache();
+    if (typeof _notifPOKeGudang === 'function') _notifPOKeGudang(noPO, poNoWO, poSupplier, namaUser);
     return { success: true, message: 'PO ' + noPO + ' berhasil dikirim ke gudang.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -1231,6 +1236,10 @@ function requestPembayaranNonPO(payload) {
       '', '', '', '',
       kategori
     ]);
+    if (typeof _notifRequestPembayaran === 'function') {
+      var refNon = 'Tanpa PO' + (noWO ? (' · WO: ' + noWO) : (kategori ? (' · ' + kategori) : '')) + ' · ' + keterangan;
+      _notifRequestPembayaran(idReq, refNon, jumlah, payload.dibuatOleh, payload.catatan);
+    }
     return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -1357,6 +1366,10 @@ function requestPembayaranPO(payload) {
       invFileId, invFileUrl, invFileName
     ]);
 
+    if (typeof _notifRequestPembayaran === 'function') {
+      var refPO = 'PO: ' + noPO + (noWO ? (' · WO: ' + noWO) : '') + (namaSupplier ? (' · ' + namaSupplier) : '');
+      _notifRequestPembayaran(idReq, refPO, jumlah, payload.dibuatOleh, payload.catatan);
+    }
     return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -1499,6 +1512,10 @@ function approvePembayaranPO(payload) {
       return { success: false, message: 'Gagal mencatat pembayaran: ' + bayarResult.message };
     }
 
+    if (typeof _notifHasilPembayaran === 'function') {
+      var refApprove = noPO ? ('PO: ' + noPO) : ('Tanpa PO' + (reqKeterangan ? (' · ' + reqKeterangan) : ''));
+      _notifHasilPembayaran(idReq, refApprove, jumlah, true, payload.approvedBy, '');
+    }
     return { success: true, message: (noPO ? ('Pembayaran PO ' + noPO) : 'Pembayaran (tanpa PO)') + ' sebesar Rp ' + jumlah.toLocaleString('id-ID') + ' berhasil disetujui dan dicatat.' };
   } catch (e) {
     return { success: false, message: e.toString() };
@@ -1528,6 +1545,13 @@ function tolakRequestPembayaranPO(idReq, namaUser, catatanTolak) {
         prSheet.getRange(i + 1, 14).setValue(namaUser || '');
         prSheet.getRange(i + 1, 15).setValue(nowStr);
         prSheet.getRange(i + 1, 19).setValue(catatanTolak.toString().trim());
+        if (typeof _notifHasilPembayaran === 'function') {
+          var tNoPO = (prData[i][1] || '').toString();
+          var tKet  = (prData[i][3] || '').toString();
+          var tJml  = parseFloat(prData[i][6]) || 0;
+          var refTolak = tNoPO ? ('PO: ' + tNoPO) : ('Tanpa PO' + (tKet ? (' · ' + tKet) : ''));
+          _notifHasilPembayaran(idReq, refTolak, tJml, false, namaUser, catatanTolak.toString().trim());
+        }
         return { success: true, message: 'Request ' + idReq + ' ditolak.' };
       }
     }

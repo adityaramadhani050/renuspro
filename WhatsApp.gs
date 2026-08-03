@@ -592,6 +592,115 @@ function qcRemindLeadEngineer(noWO, oleh) {
   } catch (e) { return { success: false, message: e.toString() }; }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  NOTIFIKASI: Penerimaan Barang · Pembayaran · Penugasan Engineer
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Kirim ke semua user aktif ber-role tertentu (yang punya No. WA).
+function _waNotifRole(role, msg) {
+  try {
+    if (!msg) return;
+    (_qcPhonesByRole(role) || []).forEach(function (u) { _waSendTo(u.phone, msg); });
+  } catch (e) { Logger.log('_waNotifRole error: ' + e); }
+}
+
+// ── 1. Penerimaan Barang ────────────────────────────────────────────────────
+// Procurement kirim PO ke gudang → WA ke semua Warehouse (minta diterima).
+function _notifPOKeGudang(noPO, noWO, supplier, oleh) {
+  try {
+    var proj = noWO ? _qcWOProject(noWO) : '';
+    var msg = [
+      '📦 *Permintaan Penerimaan Barang*',
+      'PO: *' + noPO + '*',
+      noWO ? ('WO: ' + noWO + (proj ? ' — ' + proj : '')) : 'Peruntukan: Stok',
+      supplier ? ('Supplier: ' + supplier) : '',
+      'Dikirim ke gudang oleh: ' + (oleh || '-'),
+      '',
+      'Mohon proses di menu Inventory → Penerimaan Barang.'
+    ].filter(function (s) { return s !== ''; }).join('\n');
+    _waNotifRole('warehouse', msg);
+  } catch (e) { Logger.log('_notifPOKeGudang error: ' + e); }
+}
+
+// Warehouse selesai menerima (penuh/sebagian, dengan catatan) → WA ke Procurement.
+function _notifBarangDiterima(noPO, noWO, statusPO, oleh, catatanList) {
+  try {
+    var proj = noWO ? _qcWOProject(noWO) : '';
+    var penuh = statusPO === 'Diterima';
+    var lines = [
+      penuh ? '✅ *Barang Diterima Lengkap*' : '📥 *Barang Diterima Sebagian*',
+      'PO: *' + noPO + '*',
+      noWO ? ('WO: ' + noWO + (proj ? ' — ' + proj : '')) : 'Peruntukan: Stok',
+      'Status PO: ' + statusPO,
+      'Diterima oleh: ' + (oleh || '-')
+    ];
+    if (catatanList && catatanList.length) {
+      lines.push('', '📝 Catatan:');
+      catatanList.forEach(function (c) { lines.push('• ' + c); });
+    }
+    _waNotifRole('procurement', lines.join('\n'));
+  } catch (e) { Logger.log('_notifBarangDiterima error: ' + e); }
+}
+
+// ── 2. Pembayaran ───────────────────────────────────────────────────────────
+// Procurement request pembayaran → WA ke semua Finance.
+function _notifRequestPembayaran(idReq, ref, jumlah, oleh, catatan) {
+  try {
+    var msg = [
+      '💰 *Request Pembayaran Baru*',
+      'ID: *' + idReq + '*',
+      ref || '',
+      'Nominal: ' + _waFmtRp(jumlah),
+      'Diminta oleh: ' + (oleh || '-'),
+      catatan ? ('📝 ' + catatan) : '',
+      '',
+      'Mohon direview di menu Purchase Order → Request Pembayaran.'
+    ].filter(function (s) { return s !== ''; }).join('\n');
+    _waNotifRole('finance', msg);
+  } catch (e) { Logger.log('_notifRequestPembayaran error: ' + e); }
+}
+
+// Finance setujui/tolak request → WA balik ke semua Procurement.
+function _notifHasilPembayaran(idReq, ref, jumlah, disetujui, oleh, catatanTolak) {
+  try {
+    var lines = disetujui
+      ? ['✅ *Pembayaran Disetujui*', 'ID: *' + idReq + '*', ref || '',
+         'Nominal: ' + _waFmtRp(jumlah), 'Disetujui oleh: ' + (oleh || '-')]
+      : ['❌ *Pembayaran Ditolak*', 'ID: *' + idReq + '*', ref || '',
+         'Nominal: ' + _waFmtRp(jumlah), 'Ditolak oleh: ' + (oleh || '-'),
+         catatanTolak ? ('📝 Alasan: ' + catatanTolak) : ''];
+    _waNotifRole('procurement', lines.filter(function (s) { return s !== ''; }).join('\n'));
+  } catch (e) { Logger.log('_notifHasilPembayaran error: ' + e); }
+}
+
+// ── 3. Penugasan Engineer (assign BOM/QC/DED) ───────────────────────────────
+// Lead Engineer assign → WA ke tiap Site Engineer yang BARU ditugaskan.
+function _notifAssignEngineer(modul, noWO, userIds, assignedBy) {
+  try {
+    userIds = userIds || [];
+    if (!userIds.length) return;
+    var proj = _qcWOProject(noWO);
+    var byId = {};
+    (getUserList() || []).forEach(function (u) { byId[u.id] = u; });
+    var msg = [
+      '🧑‍🔧 *Penugasan ' + modul + '*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Anda ditugaskan menangani ' + modul + ' untuk WO ini.',
+      'Ditugaskan oleh: ' + (assignedBy || '-'),
+      '',
+      'Silakan buka menu ' + modul + ' di RenusPro.'
+    ].join('\n');
+    var seen = {};
+    userIds.forEach(function (uid) {
+      uid = (uid || '').toString().trim();
+      if (!uid || seen[uid]) return;
+      seen[uid] = true;
+      var u = byId[uid];
+      if (u && u.aktif && u.noWa) _waSendTo(_normalizePhone(u.noWa), msg);
+    });
+  } catch (e) { Logger.log('_notifAssignEngineer error: ' + e); }
+}
+
 // ── Trigger harian (self-installing, dipanggil dari doGet) ──────────────────
 function _ensureTriggerReminderExpired() {
   try {

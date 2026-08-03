@@ -998,6 +998,16 @@ function terimaPOItems(payload) {
     invalidatePOCache();
     invalidateProdukCache();
 
+    // Notifikasi ke Procurement: barang diterima (penuh/sebagian) + catatan.
+    if (typeof _notifBarangDiterima === 'function') {
+      var catatanNotif = [];
+      items.forEach(function (it) {
+        var c = (it.catatan || '').toString().trim();
+        if (c) catatanNotif.push((it.namaItem ? it.namaItem + ': ' : '') + c);
+      });
+      _notifBarangDiterima(noPO, noWOPO, newStatus, namaUser, catatanNotif);
+    }
+
     return { success: true, message: 'Penerimaan berhasil. Status PO: ' + newStatus };
   } catch(e) {
     return { success: false, message: e.toString() };
