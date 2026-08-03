@@ -124,6 +124,8 @@
         if (search) search.value = '';
         const filterEl = document.getElementById('filter-wo-status');
         if (filterEl) filterEl.value = '';
+        const filterHoEl = document.getElementById('filter-wo-ho');
+        if (filterHoEl) filterHoEl.value = '';
         _pgState.workorder.data = _cachedWorkOrderData;
         _pgState.workorder.page = 1;
         _injectPgBar('workorder', '#table-workorder');
@@ -141,10 +143,12 @@
     window.filterWorkOrder = function() {
       const q       = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
       const status  = (document.getElementById('filter-wo-status') || {}).value || '';
+      const ho      = (document.getElementById('filter-wo-ho') || {}).value || '';
       _pgState.workorder.data = _cachedWorkOrderData.filter(d => {
         const matchQ = !q || (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase().includes(q);
         const matchS = !status || d.paymentStatus === status;
-        return matchQ && matchS;
+        const matchHO = !ho || (ho === '__none__' ? !d.hoStatus : d.hoStatus === ho);
+        return matchQ && matchS && matchHO;
       });
       _pgState.workorder.page = 1;
       _pgRender('workorder');
@@ -1410,6 +1414,104 @@
     function _pdfDariDetailWO() {
       if (!_woDetailCurrent) return;
       exportWorkOrderPDF(_woDetailCurrent);
+    }
+
+    // ── Lihat WO: tampilkan data + tabel item penawaran & HPP (bukan preview PDF) ──
+    function _woTutupLihat() { var m = document.getElementById('modal-wo-lihat'); if (m) m.classList.add('hidden'); }
+    function _woLihatExportPDF() { _woTutupLihat(); if (_woDetailCurrent) exportWorkOrderPDF(_woDetailCurrent); }
+    function _woLihatInfoRow(label, val) {
+      return '<div class="flex gap-2"><span class="font-bold text-slate-500 w-28 shrink-0">' + label + '</span><span class="text-slate-800 min-w-0">: ' + val + '</span></div>';
+    }
+    function _woLihatSumRow(label, val, cls) {
+      return '<div class="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 ' + (cls || '') + '"><span>' + label + '</span><span>' + val + '</span></div>';
+    }
+    function _woLihatData() {
+      var item = _woDetailCurrent;
+      if (!item) return;
+      var rp = function(v){ return Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
+      var esc = _escHtmlWO;
+      var kelompokList = []; try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
+      var tc = {}; try { tc = JSON.parse(item.termConditions || '{}'); } catch (e) {}
+
+      // Info ringkas
+      var info = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-4">'
+        + _woLihatInfoRow('No Penawaran', esc(item.id) + ' (Rev ' + esc(String(item.rev != null ? item.rev : 0)) + ')')
+        + _woLihatInfoRow('Klien', esc(item.namaKlien || '-'))
+        + _woLihatInfoRow('Tanggal', esc(item.tanggal || '-'))
+        + _woLihatInfoRow('Project', esc(item.namaProject || '-'))
+        + _woLihatInfoRow('Sales / PIC', esc(item.dibuatOleh || '-'))
+        + _woLihatInfoRow('Status', esc(item.status || 'Deal'))
+        + '</div>';
+
+      var catatan = (item.catatanCustomer || '').trim();
+      var catatanHtml = catatan
+        ? '<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3"><div class="text-[11px] font-bold text-amber-700 mb-1"><i class="fa-solid fa-comment-dots mr-1"></i>Catatan dari Customer</div><div class="text-xs text-amber-900 whitespace-pre-wrap">' + esc(catatan) + '</div></div>'
+        : '';
+
+      // Tabel item + HPP + margin (grup per kelompok)
+      var rows = '';
+      kelompokList.forEach(function (k, ki) {
+        var letter = k.kelompok || String.fromCharCode(65 + ki);
+        rows += '<tr class="bg-slate-100"><td colspan="9" class="px-2 py-1.5 font-bold text-slate-700 text-xs">' + esc(letter + '. ' + (k.namaKelompok || '').toUpperCase()) + '</td></tr>';
+        (k.subItems || []).forEach(function (s, si) {
+          var qty = s.qty || 0, harga = s.harga || 0, hpp = s.hpp || 0;
+          var totalJual = (s.total != null) ? s.total : qty * harga;
+          var totalHpp = qty * hpp;
+          var margin = totalJual > 0 ? ((totalJual - totalHpp) / totalJual * 100) : 0;
+          var mCls = margin >= 25 ? 'text-emerald-600' : 'text-rose-600';
+          rows += '<tr class="border-b border-slate-100">'
+            + '<td class="px-2 py-1.5 text-center text-slate-500">' + (si + 1) + '</td>'
+            + '<td class="px-2 py-1.5">' + esc(s.deskripsi || '') + '</td>'
+            + '<td class="px-2 py-1.5 text-center">' + qty + '</td>'
+            + '<td class="px-2 py-1.5 text-center">' + esc(s.unit || '') + '</td>'
+            + '<td class="px-2 py-1.5 text-right">' + rp(harga) + '</td>'
+            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(hpp) + '</td>'
+            + '<td class="px-2 py-1.5 text-right">' + rp(totalJual) + '</td>'
+            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(totalHpp) + '</td>'
+            + '<td class="px-2 py-1.5 text-center font-bold ' + mCls + '">' + margin.toFixed(1) + '%</td>'
+            + '</tr>';
+        });
+      });
+      if (!rows) rows = '<tr><td colspan="9" class="px-2 py-4 text-center text-slate-400">Tidak ada item.</td></tr>';
+      var table = '<div class="overflow-x-auto rounded-xl border border-slate-200 mb-4"><table class="w-full text-xs min-w-[720px]">'
+        + '<thead><tr class="bg-blue-700 text-white text-[11px]">'
+        + '<th class="px-2 py-2 font-bold">No</th><th class="px-2 py-2 font-bold text-left">Deskripsi Produk / Jasa</th><th class="px-2 py-2 font-bold">Qty</th><th class="px-2 py-2 font-bold">Unit</th><th class="px-2 py-2 font-bold text-right">Harga Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">HPP Satuan</th><th class="px-2 py-2 font-bold text-right">Total Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">Total HPP</th><th class="px-2 py-2 font-bold">Margin</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+      // Hidden cost (internal)
+      var hcList = Array.isArray(tc.hiddenCosts) ? tc.hiddenCosts : [];
+      var hcHtml = '';
+      if (hcList.length) {
+        var hcRows = '', hcTotal = 0;
+        hcList.forEach(function (h, i) {
+          var q = h.qty || 0, hpp = h.hpp || 0, tot = (h.total != null) ? h.total : q * hpp;
+          hcTotal += tot;
+          hcRows += '<tr class="border-b border-rose-100"><td class="px-2 py-1.5 text-center text-rose-400">' + (i + 1) + '</td><td class="px-2 py-1.5">' + esc(h.deskripsi || '') + '</td><td class="px-2 py-1.5 text-center">' + q + '</td><td class="px-2 py-1.5 text-center">' + esc(h.unit || '') + '</td><td class="px-2 py-1.5 text-right">' + rp(hpp) + '</td><td class="px-2 py-1.5 text-right">' + rp(tot) + '</td></tr>';
+        });
+        hcRows += '<tr class="bg-rose-50 font-bold text-rose-700"><td colspan="5" class="px-2 py-1.5 text-right">Total Hidden Cost</td><td class="px-2 py-1.5 text-right">' + rp(hcTotal) + '</td></tr>';
+        hcHtml = '<div class="text-[11px] font-bold text-rose-700 mb-1"><i class="fa-solid fa-eye-slash mr-1"></i>Hidden Cost (Internal)</div>'
+          + '<div class="overflow-x-auto rounded-xl border border-rose-200 mb-4"><table class="w-full text-xs min-w-[520px]"><thead><tr class="bg-rose-700 text-white text-[11px]"><th class="px-2 py-2">No</th><th class="px-2 py-2 text-left">Deskripsi (Internal)</th><th class="px-2 py-2">Qty</th><th class="px-2 py-2">Unit</th><th class="px-2 py-2 text-right">HPP Satuan</th><th class="px-2 py-2 text-right">HPP Total</th></tr></thead><tbody>' + hcRows + '</tbody></table></div>';
+      }
+
+      // Ringkasan HPP & margin
+      var netSub = (item.subtotal || 0) - (item.diskon || 0);
+      var totalHppAll = item.hpp || 0;
+      if (!totalHppAll) { kelompokList.forEach(function (k) { (k.subItems || []).forEach(function (s) { totalHppAll += (s.qty || 0) * (s.hpp || 0); }); }); }
+      var profit = (item.profit != null && item.profit !== 0) ? item.profit : (netSub - totalHppAll);
+      var marginAll = (item.marginPersen != null && item.marginPersen !== 0) ? item.marginPersen : (netSub > 0 ? (profit / netSub * 100) : 0);
+      var sum = '<div class="ml-auto w-full sm:w-80 text-xs rounded-xl border border-slate-200 overflow-hidden">';
+      sum += _woLihatSumRow('Subtotal (Jual)', 'Rp ' + rp(item.subtotal || 0), '');
+      if ((item.diskon || 0) > 0) sum += _woLihatSumRow('Diskon', '- Rp ' + rp(item.diskon), 'text-rose-600');
+      if ((item.pajak || 0) > 0) { var pct = netSub > 0 ? Math.round(item.pajak / netSub * 100) : 11; sum += _woLihatSumRow('PPN ' + pct + '%', 'Rp ' + rp(item.pajak), ''); }
+      sum += _woLihatSumRow('Grand Total', 'Rp ' + rp(item.grandTotal || 0), 'font-extrabold text-blue-700 bg-blue-50');
+      sum += _woLihatSumRow('Total HPP', 'Rp ' + rp(totalHppAll), 'text-rose-600');
+      sum += _woLihatSumRow('Estimasi Profit', 'Rp ' + rp(profit), 'font-bold text-emerald-600');
+      sum += _woLihatSumRow('Margin', Number(marginAll).toFixed(1) + '%', 'font-bold text-emerald-600 bg-emerald-50');
+      sum += '</div>';
+
+      document.getElementById('wo-lihat-title').innerText = 'Work Order — ' + (item.noWO || '');
+      document.getElementById('wo-lihat-body').innerHTML = info + catatanHtml + table + hcHtml + '<div class="flex">' + sum + '</div>';
+      document.getElementById('modal-wo-lihat').classList.remove('hidden');
     }
 
     function _exportKwDariWODetail(kwitansiId) {

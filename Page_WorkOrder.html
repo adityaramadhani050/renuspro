@@ -23,6 +23,15 @@
                 <option value="Lunas Sebagian">Lunas Sebagian</option>
                 <option value="Lunas">Lunas</option>
               </select>
+              <select id="filter-wo-ho" onchange="filterWorkOrder()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                <option value="">Semua HO</option>
+                <option value="__none__">Belum HO</option>
+                <option value="Diminta">HO Diminta</option>
+                <option value="Dijadwalkan">HO Dijadwalkan</option>
+                <option value="Selesai">HO Selesai</option>
+                <option value="Batal">HO Batal</option>
+              </select>
             </div>
           </div>
 
@@ -72,7 +81,7 @@
                 class="px-3.5 py-2 text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold transition flex items-center gap-2">
                 <i class="fa-solid fa-comment-dots text-amber-500"></i> <span class="hidden sm:inline">Catatan</span>
               </button>
-              <button id="wo-btn-pdf" onclick="_pdfDariDetailWO()"
+              <button id="wo-btn-pdf" onclick="_woLihatData()"
                 class="px-3.5 py-2 text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold transition flex items-center gap-2">
                 <i class="fa-solid fa-eye text-indigo-500"></i> <span class="hidden sm:inline">Lihat WO</span>
               </button>
@@ -422,6 +431,25 @@
               <button id="catatan-wo-save-btn" onclick="kirimCatatanWO()" class="px-5 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Catatan
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Lihat Data WO (data + tabel item penawaran & HPP) -->
+        <div id="modal-wo-lihat" class="hidden fixed inset-0 z-[240] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-2 sm:p-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <div class="flex items-center gap-2 min-w-0">
+                <i class="fa-solid fa-clipboard-list text-blue-600"></i>
+                <h3 id="wo-lihat-title" class="text-base font-extrabold text-slate-800 truncate">Work Order</h3>
+                <span class="hidden sm:inline text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">Internal · Rahasia</span>
+              </div>
+              <button onclick="_woTutupLihat()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="wo-lihat-body" class="p-5 overflow-y-auto"></div>
+            <div class="flex justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
+              <button onclick="_woTutupLihat()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Tutup</button>
+              <button onclick="_woLihatExportPDF()" class="px-5 py-2 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
             </div>
           </div>
         </div>
