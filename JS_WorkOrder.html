@@ -295,12 +295,22 @@
       var scrollHost = document.getElementById('wo-detail-view').closest('.overflow-y-auto');
       if (scrollHost) scrollHost.scrollTop = 0;
       _loadRealisasiHPP(item.noWO);
-      _woLoadSurveys(item.noWO);
-      _woLoadQC(item.noWO);
-      _woLoadDokumen(item.noWO);
+      // WO Material-only: panel Dokumen Project, Site Survey, QC, & DED tidak
+      // relevan → disembunyikan sekalian (tanpa memuat datanya). BOM tetap.
+      var _isMat = item.jenisWO === 'Material';
+      ['wo-panel-survey','wo-panel-doc','wo-panel-qc','wo-panel-ded'].forEach(function(id){
+        var p = document.getElementById(id); if (p) p.classList.toggle('hidden', _isMat);
+      });
+      if (!_isMat) {
+        _woLoadSurveys(item.noWO);
+        _woLoadQC(item.noWO);
+        _woLoadDokumen(item.noWO);
+      } else {
+        var engEl = document.getElementById('wo-detail-engineer'); if (engEl) engEl.innerText = '—';
+      }
       if (typeof _hoLoad === 'function') _hoLoad(item.noWO);
       _woLoadTimeline(item.noWO);
-      _woLoadBomDed(item.noWO);
+      _woLoadBomDed(item.noWO);   // BOM tetap; bagian DED dilewati untuk material
     };
 
     // ── Ringkasan BoM & DED (lintas divisi, read-only) ──
