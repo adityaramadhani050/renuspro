@@ -565,7 +565,8 @@ function getAvailableWOForDED() {
     _dedRegisteredWOs().forEach(function (w) { reg[w.noWO] = true; });
     var woList = [];
     try { woList = getWorkOrderList() || []; } catch (e) {}
-    var list = woList.filter(function (wo) { return !reg[wo.noWO] && wo.hoStatus === 'Selesai'; })
+    // WO Material-only tidak memerlukan DED → dikecualikan dari daftar.
+    var list = woList.filter(function (wo) { return !reg[wo.noWO] && wo.hoStatus === 'Selesai' && wo.jenisWO !== 'Material'; })
       .map(function (wo) { return { noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status }; });
     return { success: true, list: list };
   } catch (e) {
@@ -579,6 +580,9 @@ function addDEDProject(noWO, userIds, addedBy) {
     if (!noWO) return { success: false, message: 'Pilih Work Order dulu.' };
     var _hoG = (typeof _hoRequireSelesai === 'function') ? _hoRequireSelesai(noWO) : { ok: true };
     if (!_hoG.ok) return { success: false, message: _hoG.message };
+    if (typeof _woIsMaterialOnly === 'function' && _woIsMaterialOnly(noWO)) {
+      return { success: false, message: 'WO jenis Material saja tidak memerlukan DED.' };
+    }
     lock.waitLock(15000);
     var ss = getSpreadsheet();
     var sheet = _dedProjectSheet(ss);

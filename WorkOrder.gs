@@ -242,6 +242,17 @@ function _woJenisAuto(itemsJson, tipeMap) {
   } catch (e) { return 'Material'; }
 }
 
+// Jenis efektif ('Jasa'/'Material') untuk 1 WO — dipakai gating QC/DED/Schedule.
+function _woJenisEfektif(noWO) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return 'Material';
+    var wo = (getWorkOrderList() || []).filter(function (w) { return w.noWO === noWO; })[0];
+    return wo ? (wo.jenisWO || 'Material') : 'Material';
+  } catch (e) { return 'Material'; }
+}
+function _woIsMaterialOnly(noWO) { return _woJenisEfektif(noWO) === 'Material'; }
+
 // ── Override manual jenis WO ────────────────────────────────────────────────
 function _woJenisOverrideSheet(ss) {
   ss = ss || getSpreadsheet();

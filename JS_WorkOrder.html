@@ -309,7 +309,10 @@
     function _woLoadBomDed(noWO) {
       ['wo-bom-summary','wo-ded-summary'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML='<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>'; });
       if (typeof google === 'undefined') return;
+      // BOM tetap berlaku untuk semua jenis WO.
       google.script.run.withSuccessHandler(function(r){ _woRenderBom((r && r.success) ? r.summary : null); }).withFailureHandler(function(){ _woRenderBom(undefined); }).getBOMSummaryByWO(noWO);
+      // DED hanya untuk WO ber-jasa; Material-only → tandai tidak perlu.
+      if (_woMaterialOnly()) { _woPanelTidakPerlu('wo-ded-summary', 'DED'); return; }
       google.script.run.withSuccessHandler(function(r){ _woRenderDed(r && r.success ? r : null); }).withFailureHandler(function(){ _woRenderDed(undefined); }).getDEDSummaryByWO(noWO);
     }
     function _woProgBar(pct, done) {
@@ -563,9 +566,21 @@
     // ================================================================
     // RINGKASAN QC LAPANGAN (read-only) + engineer ditugaskan di header WO
     // ================================================================
+    // WO Material-only tidak melalui QC/DED/Konstruksi.
+    function _woMaterialOnly() { return !!(_woDetailCurrent && _woDetailCurrent.jenisWO === 'Material'); }
+    function _woPanelTidakPerlu(id, label) {
+      var el = document.getElementById(id); if (!el) return;
+      el.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl">'
+        + '<i class="fa-solid fa-boxes-stacked text-2xl mb-2 opacity-30 block"></i>Tidak perlu ' + label + ' — WO jenis <b>Material saja</b>.</div>';
+    }
     function _woLoadQC(noWO) {
       var engEl = document.getElementById('wo-detail-engineer');
       var sumEl = document.getElementById('wo-qc-summary');
+      if (_woMaterialOnly()) {
+        if (engEl) engEl.innerText = '—';
+        _woPanelTidakPerlu('wo-qc-summary', 'QC lapangan');
+        return;
+      }
       if (engEl) engEl.innerText = '…';
       if (sumEl) sumEl.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
       google.script.run.withSuccessHandler(function(res) {
