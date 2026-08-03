@@ -192,6 +192,106 @@ function rebuildWorkOrderSheet() {
   } finally { try { lock.releaseLock(); } catch (e) {} }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  JENIS WO: Jasa vs Material-only (untuk gating Konstruksi/QC/DED)
+//  Auto dari Tipe master produk (produkId → Jasa) + fallback kata kunci untuk
+//  item custom; bisa di-override manual (sheet WorkOrder_JenisOverride).
+// ════════════════════════════════════════════════════════════════════════════
+var _WO_JASA_KEYWORDS = ['jasa', 'instalasi', 'komisioning', 'commissioning', 'pemasangan', 'pasang', 'instal', 'install'];
+
+function _woKeywordHitJasa(text) {
+  if (!text) return false;
+  for (var i = 0; i < _WO_JASA_KEYWORDS.length; i++) { if (text.indexOf(_WO_JASA_KEYWORDS[i]) !== -1) return true; }
+  return false;
+}
+
+// Peta produkId → Tipe (lowercase) dari Master_Produk (cached).
+function _woProdukTipeMap() {
+  var m = {};
+  try {
+    var d = _cachedProduk();
+    for (var i = 1; i < d.length; i++) {
+      var id = (d[i][0] || '').toString().trim();
+      if (id) m[id] = (d[i][5] || '').toString().trim().toLowerCase();
+    }
+  } catch (e) {}
+  return m;
+}
+
+// Deteksi otomatis: 'Jasa' bila ada ≥1 item bertipe Jasa; item custom (tanpa
+// produkId / tipe kosong) → fallback kata kunci deskripsi. Selain itu 'Material'.
+function _woJenisAuto(itemsJson, tipeMap) {
+  try {
+    tipeMap = tipeMap || _woProdukTipeMap();
+    var kelompokList = [];
+    try { kelompokList = JSON.parse(itemsJson || '[]'); } catch (e) { kelompokList = []; }
+    for (var a = 0; a < kelompokList.length; a++) {
+      var k = kelompokList[a] || {};
+      if (_woKeywordHitJasa((k.namaKelompok || '').toString().toLowerCase())) return 'Jasa';
+      var subs = k.subItems || [];
+      for (var b = 0; b < subs.length; b++) {
+        var s = subs[b] || {};
+        var pid = (s.produkId || '').toString().trim();
+        var tipe = pid ? (tipeMap[pid] || '') : '';
+        if (tipe === 'jasa') return 'Jasa';
+        // Item tanpa produkId / tipe kosong → fallback kata kunci deskripsi.
+        if ((!pid || !tipe) && _woKeywordHitJasa((s.deskripsi || '').toString().toLowerCase())) return 'Jasa';
+      }
+    }
+    return 'Material';
+  } catch (e) { return 'Material'; }
+}
+
+// ── Override manual jenis WO ────────────────────────────────────────────────
+function _woJenisOverrideSheet(ss) {
+  ss = ss || getSpreadsheet();
+  var sheet = ss.getSheetByName('WorkOrder_JenisOverride');
+  if (!sheet) {
+    sheet = ss.insertSheet('WorkOrder_JenisOverride');
+    sheet.appendRow(['No WO', 'Jenis Manual', 'Diubah Oleh', 'Diubah Pada']);
+    sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+  }
+  return sheet;
+}
+function _woJenisOverrideMap() {
+  var m = {};
+  try {
+    var d = _woJenisOverrideSheet().getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      var w = (d[i][0] || '').toString().trim();
+      var j = (d[i][1] || '').toString().trim();
+      if (w && (j === 'Jasa' || j === 'Material')) m[w] = j;
+    }
+  } catch (e) {}
+  return m;
+}
+// Set/hapus override. jenis: 'Jasa'|'Material'|'' (kosong = kembali ke Auto).
+function setWorkOrderJenis(noWO, jenis, oleh) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    noWO = (noWO || '').toString().trim();
+    jenis = (jenis || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    if (jenis && jenis !== 'Jasa' && jenis !== 'Material') return { success: false, message: 'Jenis tidak valid.' };
+    var sheet = _woJenisOverrideSheet();
+    var d = sheet.getDataRange().getValues();
+    var rowIdx = -1;
+    for (var i = 1; i < d.length; i++) { if ((d[i][0] || '').toString().trim() === noWO) { rowIdx = i + 1; break; } }
+    var when = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    if (!jenis) {
+      if (rowIdx > 0) sheet.deleteRow(rowIdx);   // kembali ke Auto
+    } else if (rowIdx > 0) {
+      sheet.getRange(rowIdx, 1, 1, 4).setValues([[noWO, jenis, oleh || '', when]]);
+    } else {
+      sheet.appendRow([noWO, jenis, oleh || '', when]);
+    }
+    invalidateWorkOrderCache();
+    return { success: true, message: 'Jenis WO diperbarui menjadi ' + (jenis || 'Otomatis') + '.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+
 // ── Daftar Work Order: baca dari sheet Work_Order (cepat & di-cache) ─────────
 function getWorkOrderList() {
   try {
@@ -199,11 +299,16 @@ function getWorkOrderList() {
     if (!data || data.length < 2) return [];
     var catatanMap = _getCatatanWOMap();
     var hoMap = (typeof _hoStatusMap === 'function') ? _hoStatusMap() : {};
+    var tipeMap = _woProdukTipeMap();
+    var jenisOverride = _woJenisOverrideMap();
     var list = [];
     for (var i = 1; i < data.length; i++) {
       var r = data[i];
       var noWO = (r[0] !== '' && r[0] != null) ? r[0].toString() : '';
       if (!noWO) continue;
+      var jenisAuto = _woJenisAuto((r[17] || '[]').toString(), tipeMap);
+      var jenisManual = jenisOverride[noWO] || '';
+      var jenisEfektif = jenisManual || jenisAuto;
       list.push({
         noWO:           noWO,
         id:             (r[1] || '').toString(),
@@ -225,7 +330,11 @@ function getWorkOrderList() {
         items:          (r[17] || '[]').toString(),
         status:         (r[18] || '').toString(),
         hoStatus:       hoMap[noWO] || '',
-        catatanCustomer: catatanMap[noWO] || ''
+        catatanCustomer: catatanMap[noWO] || '',
+        jenisWO:        jenisEfektif,        // 'Jasa' | 'Material' (efektif = override || auto)
+        jenisWOAuto:    jenisAuto,
+        jenisWOManual:  jenisManual,         // '' bila mengikuti deteksi otomatis
+        adaJasa:        jenisEfektif === 'Jasa'
       });
     }
     list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
@@ -329,7 +438,9 @@ function getWorkOrderDashboard() {
         totalLunasTotal: totalLunasTotal, sisaDpp: sisaDpp,
         pctDitagih: pctDitagih, pctLunas: pctLunas,
         paymentStatus: paymentStatus, invoices: invoices,
-        hoStatus: w.hoStatus || ''
+        hoStatus: w.hoStatus || '',
+        jenisWO: w.jenisWO || 'Material', jenisWOAuto: w.jenisWOAuto || 'Material',
+        jenisWOManual: w.jenisWOManual || '', adaJasa: !!w.adaJasa
       };
     });
 

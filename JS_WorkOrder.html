@@ -33,6 +33,51 @@
       return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}"><i class="fa-solid ${icon}"></i>${label}</span>`;
     }
 
+    // Badge jenis WO: Jasa (ada konstruksi/QC/DED) vs Material saja.
+    function _woJenisBadge(j) {
+      const isJasa = j === 'Jasa';
+      const cls  = isJasa ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700';
+      const icon = isJasa ? 'fa-screwdriver-wrench' : 'fa-boxes-stacked';
+      return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}"><i class="fa-solid ${icon}"></i>${isJasa ? 'Jasa' : 'Material'}</span>`;
+    }
+
+    // Badge jenis WO + kontrol override (Project Coordinator / Admin) di detail.
+    function _woRefreshJenisBadge(item) {
+      const jenisEl = document.getElementById('wo-detail-jenis-badge');
+      if (!jenisEl || !item) return;
+      const canOverride = (typeof _currentUser !== 'undefined' && _currentUser && (_currentUser.role === 'projectcoordinator' || _currentUser.role === 'admin'));
+      let html = _woJenisBadge(item.jenisWO);
+      if (item.jenisWOManual) html += '<span class="ml-1 text-[9px] text-slate-400">(manual)</span>';
+      if (canOverride) {
+        html += ' <select onchange="_woSetJenis(this.value)" title="Ubah klasifikasi jenis WO" class="text-[10px] border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white text-slate-600 font-semibold ml-1 align-middle">'
+          + `<option value=""${!item.jenisWOManual ? ' selected' : ''}>Otomatis (${item.jenisWOAuto || 'Material'})</option>`
+          + `<option value="Jasa"${item.jenisWOManual === 'Jasa' ? ' selected' : ''}>Jasa</option>`
+          + `<option value="Material"${item.jenisWOManual === 'Material' ? ' selected' : ''}>Material</option>`
+          + '</select>';
+      }
+      jenisEl.innerHTML = html;
+    }
+    function _woSetJenis(val) {
+      if (!_woDetailCurrent) return;
+      const noWO = _woDetailCurrent.noWO;
+      toggleLoader(true, 'Menyimpan jenis WO...');
+      google.script.run.withSuccessHandler(function(res) {
+        toggleLoader(false);
+        showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+        if (res && res.success) {
+          _woDetailCurrent.jenisWOManual = val;
+          _woDetailCurrent.jenisWO = val || _woDetailCurrent.jenisWOAuto;
+          _woDetailCurrent.adaJasa = _woDetailCurrent.jenisWO === 'Jasa';
+          _woRefreshJenisBadge(_woDetailCurrent);
+          if (typeof invalidateNavCache === 'function') invalidateNavCache('workorder');
+          if (Array.isArray(_cachedWorkOrderData)) {
+            _cachedWorkOrderData.forEach(function(w){ if (w.noWO === noWO) { w.jenisWOManual = _woDetailCurrent.jenisWOManual; w.jenisWO = _woDetailCurrent.jenisWO; w.adaJasa = _woDetailCurrent.adaJasa; } });
+          }
+        }
+      }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal menyimpan.', 'error'); })
+        .setWorkOrderJenis(noWO, val, (typeof _currentUser !== 'undefined' && _currentUser ? _currentUser.nama : ''));
+    }
+
     // ── Render daftar WO sbg card (klik utk buka detail) ──
     function _pgRenderWorkOrder(data) {
       const box = document.getElementById('table-workorder');
@@ -87,7 +132,7 @@
               <div class="text-left sm:text-right">
                 <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${_woBadge(i.paymentStatus)}">${i.paymentStatus}</span>
                 ${agingBadgeWO ? `<div class="mt-1">${agingBadgeWO}</div>` : ''}
-                <div class="mt-1">${_woHoBadge(i.hoStatus)}</div>
+                <div class="mt-1 flex sm:justify-end gap-1 flex-wrap">${_woHoBadge(i.hoStatus)}${_woJenisBadge(i.jenisWO)}</div>
               </div>
               <i class="fa-solid fa-chevron-right text-slate-300"></i>
             </div>
@@ -126,6 +171,8 @@
         if (filterEl) filterEl.value = '';
         const filterHoEl = document.getElementById('filter-wo-ho');
         if (filterHoEl) filterHoEl.value = '';
+        const filterJenisEl = document.getElementById('filter-wo-jenis');
+        if (filterJenisEl) filterJenisEl.value = '';
         _pgState.workorder.data = _cachedWorkOrderData;
         _pgState.workorder.page = 1;
         _injectPgBar('workorder', '#table-workorder');
@@ -144,11 +191,13 @@
       const q       = (document.getElementById('search-workorder').value || '').toLowerCase().trim();
       const status  = (document.getElementById('filter-wo-status') || {}).value || '';
       const ho      = (document.getElementById('filter-wo-ho') || {}).value || '';
+      const jenis   = (document.getElementById('filter-wo-jenis') || {}).value || '';
       _pgState.workorder.data = _cachedWorkOrderData.filter(d => {
         const matchQ = !q || (d.noWO + d.id + d.namaProject + d.namaKlien + d.dibuatOleh).toLowerCase().includes(q);
         const matchS = !status || d.paymentStatus === status;
         const matchHO = !ho || (ho === '__none__' ? !d.hoStatus : d.hoStatus === ho);
-        return matchQ && matchS && matchHO;
+        const matchJenis = !jenis || (d.jenisWO || 'Material') === jenis;
+        return matchQ && matchS && matchHO && matchJenis;
       });
       _pgState.workorder.page = 1;
       _pgRender('workorder');
@@ -169,6 +218,7 @@
       const badge = el('wo-detail-status-badge');
       badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full ' + _woBadge(item.paymentStatus);
       badge.innerText = item.paymentStatus;
+      _woRefreshJenisBadge(item);
 
       // Keuangan
       const ditagihTotal = item.totalDitagihDpp + Math.round(item.totalDitagihDpp * (item.ppnRate || 0) / 100);

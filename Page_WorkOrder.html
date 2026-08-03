@@ -32,6 +32,12 @@
                 <option value="Selesai">HO Selesai</option>
                 <option value="Batal">HO Batal</option>
               </select>
+              <select id="filter-wo-jenis" onchange="filterWorkOrder()"
+                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-400 bg-white text-slate-600 font-medium">
+                <option value="">Semua Jenis</option>
+                <option value="Jasa">Jasa</option>
+                <option value="Material">Material saja</option>
+              </select>
             </div>
           </div>
 
@@ -99,6 +105,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <h3 id="wo-detail-nowo" class="text-lg font-extrabold text-slate-800"></h3>
                   <span id="wo-detail-status-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full"></span>
+                  <span id="wo-detail-jenis-badge"></span>
                 </div>
                 <p id="wo-detail-subtitle" class="text-sm text-slate-500 mt-0.5"></p>
               </div>
