@@ -535,6 +535,12 @@ function _bomRenderDetail() {
   var btns = '';
   btns += '<button onclick="_engMuatUlang(\'_bomReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
   btns += '<button onclick="openWOContext(_bomWO.noWO)" title="Info Work Order: item jasa/material, budget, catatan customer, site survey, MoM Hand Over" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-circle-info"></i><span class="hidden sm:inline"> Info WO</span></button>';
+  // Reminder WA agregat (Ajukan Review / Kirim Hasil Review) — slot sama seperti QC.
+  var _bomPend = (_bomItems || []).filter(function(it){ return it.status !== 'Approved' && it.status !== 'Rejected'; }).length;
+  var _bomRev  = (_bomItems || []).filter(function(it){ return it.status === 'Approved' || it.status === 'Rejected'; }).length;
+  var _bomIsSite = (_bomRole() === 'siteengineer' && _bomIsAssigned()) || _bomRole() === 'admin';
+  if (_bomIsSite && _bomPend > 0 && _bomWOStatus !== 'Closed') btns += '<button onclick="_bomAjukanReview()" title="Ajukan BOM ke Lead untuk direview" class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Ajukan Review</span></button>';
+  if (_bomCanReview() && _bomRev > 0) btns += '<button onclick="_bomKirimHasilReview()" title="Kirim hasil review ke Site Engineer" class="inline-flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Kirim Hasil Review</span></button>';
   btns += '<button onclick="_bomExportPDF()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>';
   if (_bomCanManage()) {
     btns += '<div class="relative"><button onclick="_bomToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
@@ -556,18 +562,6 @@ function _bomRenderDetail() {
     } else if (adaApproved && adaKirim) {
       btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Request Pengiriman</button>';
     }
-  }
-  // Notifikasi WA agregat (1 pesan) — hindari spam per-item khas BOM.
-  // Site Engineer (assigned) ajukan BOM ke Lead bila ada material Pending.
-  var _bomPend = (_bomItems || []).filter(function(it){ return it.status !== 'Approved' && it.status !== 'Rejected'; }).length;
-  var _bomRev  = (_bomItems || []).filter(function(it){ return it.status === 'Approved' || it.status === 'Rejected'; }).length;
-  var _bomIsSite = (_bomRole() === 'siteengineer' && _bomIsAssigned()) || _bomRole() === 'admin';
-  if (_bomIsSite && _bomPend > 0 && _bomWOStatus !== 'Closed') {
-    btns += '<button onclick="_bomAjukanReview()" title="Ajukan BOM ke Lead untuk direview" class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Ajukan Review</span></button>';
-  }
-  // Lead Engineer kirim hasil review ke Site Engineer bila ada yang sudah direview.
-  if (_bomCanReview() && _bomRev > 0) {
-    btns += '<button onclick="_bomKirimHasilReview()" title="Kirim hasil review ke Site Engineer" class="inline-flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Kirim Hasil Review</span></button>';
   }
   actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 

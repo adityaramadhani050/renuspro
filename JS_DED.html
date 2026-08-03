@@ -240,6 +240,10 @@ function _dedRenderDetail(summary) {
     var btns = '';
     btns += '<button onclick="_engMuatUlang(\'_dedReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
     btns += '<button onclick="openWOContext(_dedWO.noWO)" title="Info Work Order: item jasa/material, budget, catatan customer, site survey, MoM Hand Over" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-circle-info"></i><span class="hidden sm:inline"> Info WO</span></button>';
+    // Reminder WA (Ingatkan Engineer/Lead) — slot sama seperti QC (sebelum Tandai/Atur SE).
+    var _dedDone = (_dedWO && _dedWO.selesaiManual) || ((summary.pct || 0) === 100);
+    if (!_dedDone && _dedCanReview()) btns += '<button onclick="_dedRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
+    if (!_dedDone && _dedCanUpload()) btns += '<button onclick="_dedRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
     if (_dedCanAssign()) {
       var selesaiBtn = (_dedWO && _dedWO.selesaiManual)
         ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Approved</span></button>'
@@ -248,10 +252,6 @@ function _dedRenderDetail(summary) {
         + '<div class="relative"><button onclick="_dedToggleAssign(event)" title="Atur Site Engineer" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-3 sm:px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-user-pen"></i><span class="hidden sm:inline"> Atur Site Engineer</span></button>'
         + '<div id="ded-assign-panel" class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-150 z-40 p-4"></div></div>';
     }
-    // Reminder WA: Lead → Site (lengkapi upload/reject); Site → Lead (review Pending).
-    var _dedDone = (_dedWO && _dedWO.selesaiManual) || ((summary.pct || 0) === 100);
-    if (!_dedDone && _dedCanReview()) btns += '<button onclick="_dedRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
-    if (!_dedDone && _dedCanUpload()) btns += '<button onclick="_dedRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
     actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
   }
   _dedRenderHead(summary);
