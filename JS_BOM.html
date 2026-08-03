@@ -535,6 +535,18 @@ function _bomRenderDetail() {
       btns += '<button onclick="_bomRequestKirim()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-truck-arrow-right"></i> Request Pengiriman</button>';
     }
   }
+  // Notifikasi WA agregat (1 pesan) — hindari spam per-item khas BOM.
+  // Site Engineer (assigned) ajukan BOM ke Lead bila ada material Pending.
+  var _bomPend = (_bomItems || []).filter(function(it){ return it.status !== 'Approved' && it.status !== 'Rejected'; }).length;
+  var _bomRev  = (_bomItems || []).filter(function(it){ return it.status === 'Approved' || it.status === 'Rejected'; }).length;
+  var _bomIsSite = (_bomRole() === 'siteengineer' && _bomIsAssigned()) || _bomRole() === 'admin';
+  if (_bomIsSite && _bomPend > 0 && _bomWOStatus !== 'Closed') {
+    btns += '<button onclick="_bomAjukanReview()" title="Ajukan BOM ke Lead untuk direview" class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Ajukan Review</span></button>';
+  }
+  // Lead Engineer kirim hasil review ke Site Engineer bila ada yang sudah direview.
+  if (_bomCanReview() && _bomRev > 0) {
+    btns += '<button onclick="_bomKirimHasilReview()" title="Kirim hasil review ke Site Engineer" class="inline-flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i><span class="hidden sm:inline"> Kirim Hasil Review</span></button>';
+  }
   actions.innerHTML = '<div class="flex items-center gap-2 flex-wrap justify-end">' + btns + '</div>';
 
   // Head — judul + status; badge Site Engineer di kanan; ringkasan review di bawah.
@@ -1028,6 +1040,30 @@ function _bomReviewFail(id, err) {
   delete _bomBusyIds[id];
   showNotification((err && err.message) || 'Gagal.', 'error');
   _bomRenderDetail();
+}
+// Site Engineer → Lead: ajukan BOM untuk direview (1 notif WA agregat).
+function _bomAjukanReview() {
+  if (!_bomWO) return;
+  var pending = (_bomItems || []).filter(function(it){ return it.status !== 'Approved' && it.status !== 'Rejected'; }).length;
+  if (!pending) { showNotification('Tidak ada material Pending untuk diajukan.', 'error'); return; }
+  showConfirm({ title: 'Ajukan Review ke Lead', message: 'Kirim notifikasi ke Lead Engineer bahwa BOM WO ' + _bomWO.noWO + ' (' + pending + ' material) siap direview?', confirmText: 'Ya, Ajukan', icon: 'fa-paper-plane', onConfirm: function() {
+    showNotification('Mengirim pengajuan...', 'success');
+    google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
+      .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal mengirim pengajuan.', 'error'); })
+      .ajukanReviewBOM(_bomWO.noWO, _bomUserNama());
+  }});
+}
+// Lead → Site Engineer: kirim hasil review (1 notif WA agregat).
+function _bomKirimHasilReview() {
+  if (!_bomWO) return;
+  var reviewed = (_bomItems || []).filter(function(it){ return it.status === 'Approved' || it.status === 'Rejected'; }).length;
+  if (!reviewed) { showNotification('Belum ada material yang direview.', 'error'); return; }
+  showConfirm({ title: 'Kirim Hasil Review', message: 'Kirim notifikasi hasil review (' + reviewed + ' material) ke Site Engineer WO ' + _bomWO.noWO + '?', confirmText: 'Ya, Kirim', icon: 'fa-paper-plane', onConfirm: function() {
+    showNotification('Mengirim hasil review...', 'success');
+    google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
+      .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal mengirim hasil review.', 'error'); })
+      .kirimHasilReviewBOM(_bomWO.noWO, _bomUserNama());
+  }});
 }
 function _bomApprove(id) {
   if (_bomBusyIds[id]) return;

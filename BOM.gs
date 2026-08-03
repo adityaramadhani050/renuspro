@@ -293,6 +293,40 @@ function getBOMAssignment(noWO) {
   } catch (e) { return { success: false, list: [], message: e.toString() }; }
 }
 
+// ── Notifikasi WA agregat (tombol manual) ───────────────────────────────────
+// Site Engineer: ajukan seluruh BOM ke Lead untuk direview → 1 notif ringkasan.
+function ajukanReviewBOM(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var det = getBOMByWO(noWO);
+    if (!det || !det.success) return { success: false, message: 'Gagal membaca BOM.' };
+    var sum = det.summary || {};
+    if ((sum.total || 0) === 0)   return { success: false, message: 'Belum ada material di BOM.' };
+    if ((sum.pending || 0) === 0) return { success: false, message: 'Tidak ada material Pending yang perlu diajukan.' };
+    if (typeof _bomNotifAjukanReview !== 'function') return { success: false, message: 'Notifikasi WA tidak tersedia.' };
+    var r = _bomNotifAjukanReview(noWO, oleh, sum, det.items);
+    if (!r.sent) return { success: false, message: r.message || 'Notifikasi tidak terkirim.' };
+    return { success: true, message: 'Pengajuan review terkirim ke ' + r.count + ' Lead Engineer (' + sum.pending + ' material menunggu review).' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
+// Lead Engineer: kirim hasil review (approve/reject) ke Site Engineer → 1 notif ringkasan.
+function kirimHasilReviewBOM(noWO, oleh) {
+  try {
+    noWO = (noWO || '').toString().trim();
+    if (!noWO) return { success: false, message: 'No WO wajib.' };
+    var det = getBOMByWO(noWO);
+    if (!det || !det.success) return { success: false, message: 'Gagal membaca BOM.' };
+    var sum = det.summary || {};
+    if ((sum.approved || 0) + (sum.rejected || 0) === 0) return { success: false, message: 'Belum ada material yang direview (approve/reject).' };
+    if (typeof _bomNotifHasilReview !== 'function') return { success: false, message: 'Notifikasi WA tidak tersedia.' };
+    var r = _bomNotifHasilReview(noWO, oleh, sum, det.items, det.assigned);
+    if (!r.sent) return { success: false, message: r.message || 'Notifikasi tidak terkirim.' };
+    return { success: true, message: 'Hasil review terkirim ke ' + r.count + ' Site Engineer.' };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 function setBOMAssignment(noWO, userIds, assignedBy) {
   var lock = LockService.getScriptLock();
   try {

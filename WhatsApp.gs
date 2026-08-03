@@ -522,6 +522,90 @@ function _dedNotifSiteReview(noWO, kode, keputusan, catatan) {
   } catch (e) { Logger.log('_dedNotifSiteReview error: ' + e); }
 }
 
+// ── Notifikasi BOM (agregat, dipicu tombol manual) ──────────────────────────
+// BOM bisa berisi banyak item; notif per-item = spam. Karena itu notif BOM
+// dikirim SEKALI lewat aksi tombol: Site Engineer "Ajukan Review", Lead
+// Engineer "Kirim Hasil Review".
+
+// Nomor WA Site Engineer yang di-assign ke WO (BOM). assigned opsional (dari getBOMByWO).
+function _bomPhonesForWO(noWO, assigned) {
+  var out = [];
+  try {
+    var list = assigned;
+    if (!list) { list = (typeof _bomAssignedMap === 'function') ? (_bomAssignedMap()[noWO] || []) : []; }
+    if (!list.length) return out;
+    var byId = {};
+    (getUserList() || []).forEach(function (u) { byId[u.id] = u; });
+    list.forEach(function (a) {
+      var u = byId[a.id];
+      if (u && u.aktif && u.noWa) out.push({ nama: u.nama, phone: _normalizePhone(u.noWa) });
+    });
+  } catch (e) {}
+  return out;
+}
+
+function _bomKategoriCount(items) {
+  var s = {};
+  (items || []).forEach(function (it) { s[(it.kategori || 'Lainnya')] = true; });
+  return Object.keys(s).length;
+}
+
+// Site Engineer ajukan review → DM semua Lead Engineer. Return {sent, count, message}.
+function _bomNotifAjukanReview(noWO, oleh, sum, items) {
+  try {
+    if (PropertiesService.getScriptProperties().getProperty('WA_ENABLED') !== 'true')
+      return { sent: false, count: 0, message: 'Notifikasi WA tidak aktif. Aktifkan di Pengaturan.' };
+    var leads = _qcPhonesByRole('leadengineer');
+    if (!leads.length) return { sent: false, count: 0, message: 'Tidak ada Lead Engineer dengan No. WhatsApp.' };
+    var proj = _qcWOProject(noWO);
+    var nKat = _bomKategoriCount(items);
+    var msg = [
+      '📋 *BOM Diajukan untuk Review*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Diajukan oleh: ' + (oleh || '-'),
+      '',
+      'Ringkasan material:',
+      '• Total: ' + (sum.total || 0) + ' item (' + nKat + ' kategori)',
+      '• Menunggu review: ' + (sum.pending || 0),
+      '',
+      'Mohon segera direview di menu BOM RenusPro.'
+    ].join('\n');
+    leads.forEach(function (l) { _waSendTo(l.phone, msg); });
+    return { sent: true, count: leads.length };
+  } catch (e) { Logger.log('_bomNotifAjukanReview error: ' + e); return { sent: false, count: 0, message: e.toString() }; }
+}
+
+// Lead Engineer kirim hasil review → DM Site Engineer yang di-assign. Return {sent, count, message}.
+function _bomNotifHasilReview(noWO, oleh, sum, items, assigned) {
+  try {
+    if (PropertiesService.getScriptProperties().getProperty('WA_ENABLED') !== 'true')
+      return { sent: false, count: 0, message: 'Notifikasi WA tidak aktif. Aktifkan di Pengaturan.' };
+    var sites = _bomPhonesForWO(noWO, assigned);
+    if (!sites.length) return { sent: false, count: 0, message: 'Tidak ada Site Engineer (dengan No. WhatsApp) yang ditugaskan ke WO ini.' };
+    var proj = _qcWOProject(noWO);
+    var lines = [
+      '📋 *Hasil Review BOM*',
+      'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
+      'Direview oleh: ' + (oleh || '-'),
+      '',
+      '✅ Disetujui: ' + (sum.approved || 0),
+      '❌ Ditolak: ' + (sum.rejected || 0)
+    ];
+    if ((sum.pending || 0) > 0) lines.push('⏳ Belum direview: ' + (sum.pending || 0));
+    var rejected = (items || []).filter(function (it) { return it.status === 'Rejected'; });
+    if (rejected.length) {
+      lines.push('', '📝 Material ditolak:');
+      rejected.slice(0, 15).forEach(function (it) {
+        lines.push('• ' + (it.namaMaterial || '-') + (it.catatanReview ? ' — ' + it.catatanReview : ''));
+      });
+      if (rejected.length > 15) lines.push('• …dan ' + (rejected.length - 15) + ' lainnya');
+    }
+    lines.push('', 'Buka menu BOM untuk detail.');
+    sites.forEach(function (s) { _waSendTo(s.phone, lines.join('\n')); });
+    return { sent: true, count: sites.length };
+  } catch (e) { Logger.log('_bomNotifHasilReview error: ' + e); return { sent: false, count: 0, message: e.toString() }; }
+}
+
 // ── Reminder manual QC (tombol di detail QC per WO) ─────────────────────────
 var _QC_REMINDER_COOLDOWN_MS = 30 * 60 * 1000;   // 30 menit per WO per jenis
 function _qcReminderKey(type, noWO) { return 'QCREM_' + type + '_' + noWO; }
