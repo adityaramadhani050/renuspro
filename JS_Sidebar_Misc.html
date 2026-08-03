@@ -143,7 +143,7 @@ function openWOContext(noWO){
   var body = document.getElementById('wo-ctx-body');
   var title = document.getElementById('wo-ctx-title');
   if (!modal || !body) return;
-  if (title) title.innerText = noWO + ' - Info Work Order';
+  if (title) title.innerText = 'Info Work Order - ' + noWO;
   body.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat konteks WO...</div>';
   modal.classList.remove('hidden');
   if (typeof google === 'undefined') return;
