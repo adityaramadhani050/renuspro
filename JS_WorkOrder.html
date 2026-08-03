@@ -45,17 +45,15 @@
     function _woRefreshJenisBadge(item) {
       const jenisEl = document.getElementById('wo-detail-jenis-badge');
       if (!jenisEl || !item) return;
+      // Badge status disembunyikan; sisakan hanya kontrol override untuk PC/Admin.
       const canOverride = (typeof _currentUser !== 'undefined' && _currentUser && (_currentUser.role === 'projectcoordinator' || _currentUser.role === 'admin'));
-      let html = _woJenisBadge(item.jenisWO);
-      if (item.jenisWOManual) html += '<span class="ml-1 text-[9px] text-slate-400">(manual)</span>';
-      if (canOverride) {
-        html += ' <select onchange="_woSetJenis(this.value)" title="Ubah klasifikasi jenis WO" class="text-[10px] border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white text-slate-600 font-semibold ml-1 align-middle">'
-          + `<option value=""${!item.jenisWOManual ? ' selected' : ''}>Otomatis (${item.jenisWOAuto || 'Material'})</option>`
-          + `<option value="Jasa"${item.jenisWOManual === 'Jasa' ? ' selected' : ''}>Jasa</option>`
-          + `<option value="Material"${item.jenisWOManual === 'Material' ? ' selected' : ''}>Material</option>`
-          + '</select>';
-      }
-      jenisEl.innerHTML = html;
+      if (!canOverride) { jenisEl.innerHTML = ''; return; }
+      jenisEl.innerHTML = '<span class="text-[10px] text-slate-400 font-semibold mr-1">Jenis:</span>'
+        + '<select onchange="_woSetJenis(this.value)" title="Ubah klasifikasi jenis WO" class="text-[10px] border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white text-slate-600 font-semibold align-middle">'
+        + `<option value=""${!item.jenisWOManual ? ' selected' : ''}>Otomatis (${item.jenisWOAuto || 'Material'})</option>`
+        + `<option value="Jasa"${item.jenisWOManual === 'Jasa' ? ' selected' : ''}>Jasa</option>`
+        + `<option value="Material"${item.jenisWOManual === 'Material' ? ' selected' : ''}>Material</option>`
+        + '</select>';
     }
     function _woSetJenis(val) {
       if (!_woDetailCurrent) return;
@@ -132,7 +130,7 @@
               <div class="text-left sm:text-right">
                 <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${_woBadge(i.paymentStatus)}">${i.paymentStatus}</span>
                 ${agingBadgeWO ? `<div class="mt-1">${agingBadgeWO}</div>` : ''}
-                <div class="mt-1 flex sm:justify-end gap-1 flex-wrap">${_woHoBadge(i.hoStatus)}${_woJenisBadge(i.jenisWO)}</div>
+                <div class="mt-1">${_woHoBadge(i.hoStatus)}</div>
               </div>
               <i class="fa-solid fa-chevron-right text-slate-300"></i>
             </div>
@@ -419,7 +417,7 @@
                  : has ? 'bg-slate-200 text-slate-500 ring-slate-200'
                  : 'bg-slate-100 text-slate-300 ring-slate-200';
         var barColor = done ? 'bg-emerald-500' : 'bg-indigo-500';
-        return '<div class="text-center">'
+        return '<div class="text-center grow basis-0 min-w-[64px]">'
           + '<div class="h-9 w-9 mx-auto rounded-full border-2 border-white ring-1 ' + ring + ' flex items-center justify-center mb-1.5"><i class="fa-solid ' + f.icon + '"></i></div>'
           + '<p class="text-xs font-bold text-slate-600">' + f.nama + '</p>'
           + (has
@@ -1532,8 +1530,8 @@
             + '<td class="px-2 py-1.5 text-center">' + qty + '</td>'
             + '<td class="px-2 py-1.5 text-center">' + esc(s.unit || '') + '</td>'
             + '<td class="px-2 py-1.5 text-right">' + rp(harga) + '</td>'
-            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(hpp) + '</td>'
             + '<td class="px-2 py-1.5 text-right">' + rp(totalJual) + '</td>'
+            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(hpp) + '</td>'
             + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(totalHpp) + '</td>'
             + '<td class="px-2 py-1.5 text-center font-bold ' + mCls + '">' + margin.toFixed(1) + '%</td>'
             + '</tr>';
@@ -1542,7 +1540,7 @@
       if (!rows) rows = '<tr><td colspan="9" class="px-2 py-4 text-center text-slate-400">Tidak ada item.</td></tr>';
       var table = '<div class="overflow-x-auto rounded-xl border border-slate-200 mb-4"><table class="w-full text-xs min-w-[720px]">'
         + '<thead><tr class="bg-blue-700 text-white text-[11px]">'
-        + '<th class="px-2 py-2 font-bold">No</th><th class="px-2 py-2 font-bold text-left">Deskripsi Produk / Jasa</th><th class="px-2 py-2 font-bold">Qty</th><th class="px-2 py-2 font-bold">Unit</th><th class="px-2 py-2 font-bold text-right">Harga Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">HPP Satuan</th><th class="px-2 py-2 font-bold text-right">Total Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">Total HPP</th><th class="px-2 py-2 font-bold">Margin</th>'
+        + '<th class="px-2 py-2 font-bold">No</th><th class="px-2 py-2 font-bold text-left">Deskripsi Produk / Jasa</th><th class="px-2 py-2 font-bold">Qty</th><th class="px-2 py-2 font-bold">Unit</th><th class="px-2 py-2 font-bold text-right">Harga Jual</th><th class="px-2 py-2 font-bold text-right">Total Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">HPP Satuan</th><th class="px-2 py-2 font-bold text-right bg-rose-800">Total HPP</th><th class="px-2 py-2 font-bold">Margin</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
       // Hidden cost (internal)
@@ -1758,13 +1756,13 @@
             const totalHpp  = qty * hpp;
             const margin    = totalJual > 0 ? ((totalJual - totalHpp) / totalJual * 100) : 0;
             const mColor    = margin >= 25 ? GREEN : RED;
-            body.push([String(si+1), s.deskripsi||'', String(qty), s.unit||'', rp(harga), rp(hpp), rp(totalJual), rp(totalHpp), { content: margin.toFixed(1)+'%', styles: { textColor: mColor, fontStyle: 'bold', halign: 'center' } }]);
+            body.push([String(si+1), s.deskripsi||'', String(qty), s.unit||'', rp(harga), rp(totalJual), rp(hpp), rp(totalHpp), { content: margin.toFixed(1)+'%', styles: { textColor: mColor, fontStyle: 'bold', halign: 'center' } }]);
           });
         });
 
         doc.autoTable({
           startY: y,
-          head: [['No', 'Deskripsi Produk / Jasa', 'Qty', 'Unit', 'Harga Jual', 'HPP Satuan', 'Total Jual', 'Total HPP', 'Margin']],
+          head: [['No', 'Deskripsi Produk / Jasa', 'Qty', 'Unit', 'Harga Jual', 'Total Jual', 'HPP Satuan', 'Total HPP', 'Margin']],
           body: body, theme: 'grid',
           margin: { left: ML, right: MR },
           headStyles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
@@ -1772,7 +1770,8 @@
           columnStyles: { 0:{cellWidth:10,halign:'center'}, 1:{cellWidth:'auto'}, 2:{cellWidth:14,halign:'center'}, 3:{cellWidth:16,halign:'center'}, 4:{cellWidth:28,halign:'right'}, 5:{cellWidth:28,halign:'right'}, 6:{cellWidth:30,halign:'right'}, 7:{cellWidth:30,halign:'right'}, 8:{cellWidth:18,halign:'center'} },
           styles: { overflow: 'linebreak' },
           didParseCell: function(data) {
-            if (data.column.index === 5 || data.column.index === 7) {
+            // Kolom HPP (HPP Satuan=6, Total HPP=7) disorot merah.
+            if (data.column.index === 6 || data.column.index === 7) {
               if (data.section === 'head') { data.cell.styles.fillColor = [153,27,27]; data.cell.styles.textColor = [255,255,255]; }
               else if (data.section === 'body') { data.cell.styles.fillColor = [254,235,235]; data.cell.styles.textColor = [190,30,30]; data.cell.styles.fontStyle = 'bold'; }
             }
@@ -1859,25 +1858,9 @@
         doc.text('Dokumen internal PT. Renus Global Indonesia — dilarang diberikan ke pelanggan.', ML, PH - 8);
 
         const fname = 'WO_' + String(item.noWO) + '_' + (item.namaProject || '').replace(/[\\/]/g, '-') + '.pdf';
-        // Tampilkan preview di modal (bukan langsung unduh). Tombol "Download PDF"
-        // di modal memakai downloadQuotationPDF() → _activePdfDoc.save(_activePdfName).
-        _activePdfDoc    = doc;
-        _activePdfName   = fname;
-        _activePdfBase64 = null;
-        document.getElementById('preview-pdf-title').innerText    = 'Work Order — ' + String(item.noWO);
-        document.getElementById('preview-pdf-subtitle').innerText = item.namaProject || '';
-        document.getElementById('preview-pdf-loading').innerHTML  =
-          '<div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div>' +
-          '<p class="text-sm font-medium">Membuat preview...</p>';
-        document.getElementById('preview-pdf-loading').classList.remove('hidden');
-        document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
-        document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
-        document.getElementById('modal-preview-pdf').classList.remove('hidden');
-        renderPDFKeCanvas(doc).catch(function(err) {
-          document.getElementById('preview-pdf-loading').innerHTML =
-            '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-            '<p class="text-sm text-rose-400">Gagal render preview: ' + (err.message || err) + '</p>';
-        });
+        // Langsung unduh (tanpa preview).
+        doc.save(fname);
+        showNotification('PDF Work Order diunduh: ' + fname);
       } catch (err) {
         console.error(err);
         showNotification('Gagal membuat PDF Work Order: ' + (err.message || err), 'error');
