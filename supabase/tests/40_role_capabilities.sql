@@ -108,12 +108,23 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000d3';
 
 do $$
 begin
-  perform assert_true(can_see_all_quotations(), 'warehouse melihat penawaran & Work Order');
+  -- Modul warehouse belum dimigrasi; sampai saat itu ia belum melihat apa pun
+  -- dari modul penjualan.
+  perform assert_true(not has_sales_module_access(),
+                      'warehouse belum punya akses ke modul penjualan');
+  perform assert_true(not can_see_all_quotations(),
+                      'warehouse TIDAK melihat penawaran');
   perform assert_true(not can_write_quotations(),
                       'warehouse TIDAK boleh membuat penawaran');
   perform assert_true(not can_manage_master(),
                       'warehouse TIDAK boleh mengubah data master');
   perform assert_true(not can_manage_finance(), 'warehouse tidak menerbitkan invoice');
+
+  -- Yang paling penting: HPP tidak boleh terbaca.
+  perform assert_eq((select count(*)::int from products), 0,
+                    'warehouse tidak melihat produk — di situ ada HPP');
+  perform assert_eq((select count(*)::int from customers), 0,
+                    'warehouse tidak melihat daftar klien');
 
   begin
     insert into quotations (quote_number, customer_id, project_name, owner_id)
@@ -144,15 +155,21 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000d4';
 
 do $$
 begin
-  perform assert_true(can_manage_master(), 'procurement mengelola data produk');
+  -- Modul pengadaan juga belum dimigrasi.
+  perform assert_true(not has_sales_module_access(),
+                      'procurement belum punya akses ke modul penjualan');
+  perform assert_true(not can_manage_master(),
+                      'procurement TIDAK mengelola data produk di sistem ini');
   perform assert_true(not can_write_quotations(),
                       'procurement TIDAK membuat penawaran');
-end $$;
 
-insert into products (legacy_code, name, price, cost) values ('PX8', 'Panel dari pengadaan', 100, 80);
-do $$
-begin
-  perform assert_true(true, 'procurement boleh menambah produk');
+  begin
+    insert into products (legacy_code, name, price, cost)
+    values ('PX8', 'Panel dari pengadaan', 100, 80);
+    raise exception 'GAGAL — procurement seharusnya tidak bisa menambah produk';
+  exception when insufficient_privilege then
+    raise notice '  ✓ procurement tidak bisa menambah produk';
+  end;
 end $$;
 
 reset role;
@@ -175,6 +192,14 @@ begin
   perform assert_true(
     (select count(*) from quotations where quote_number = '700/QUOT/III/2026') = 1,
     'sales melihat penawaran miliknya sendiri');
+
+  -- Penyempitan akses tidak boleh kebablasan sampai melumpuhkan peran yang
+  -- modulnya memang sudah ada.
+  perform assert_true(has_sales_module_access(), 'sales tetap punya akses modulnya');
+  perform assert_true((select count(*) from products) > 0,
+                      'sales tetap melihat produk untuk menyusun penawaran');
+  perform assert_true((select count(*) from customers) > 0,
+                      'sales tetap melihat daftar klien');
 end $$;
 
 reset role;
@@ -200,18 +225,21 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000e1';
 
 do $$
 begin
-  perform assert_true(can_see_all_quotations(),
-                      'site engineer melihat pekerjaan yang harus dikerjakan');
-  perform assert_true(can_write_wo_notes(),
-                      'site engineer mencatat progres Work Order');
-  perform assert_true(not can_write_quotations(),
-                      'site engineer TIDAK membuat penawaran');
-  perform assert_true(not can_manage_finance(),
-                      'site engineer TIDAK menerbitkan invoice');
-  perform assert_true(not can_request_invoice(),
-                      'site engineer tidak meminta invoice; itu tugas koordinator');
-  perform assert_true(not can_manage_master(),
-                      'site engineer tidak mengubah data master');
+  -- Peran teknik punya modulnya sendiri yang belum dimigrasi. Akunnya ada dan
+  -- bisa masuk, tapi belum melihat data modul penjualan.
+  perform assert_true(not has_sales_module_access(),
+                      'site engineer belum punya akses ke modul penjualan');
+  perform assert_true(not can_see_all_quotations(),
+                      'site engineer TIDAK melihat penawaran');
+  perform assert_true(not can_write_quotations(), 'site engineer TIDAK membuat penawaran');
+  perform assert_true(not can_manage_finance(), 'site engineer TIDAK menerbitkan invoice');
+  perform assert_true(not can_manage_master(), 'site engineer tidak mengubah data master');
+
+  -- Inti perbaikan ini: tujuh site engineer tidak lagi melihat HPP.
+  perform assert_eq((select count(*)::int from products), 0,
+                    'site engineer tidak melihat produk — di situ ada HPP');
+  perform assert_eq((select count(*)::int from invoices), 0,
+                    'site engineer tidak melihat invoice');
 end $$;
 
 reset role;
@@ -222,10 +250,12 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000e2';
 
 do $$
 begin
-  perform assert_true(can_request_invoice(), 'koordinator proyek boleh meminta invoice');
-  perform assert_true(can_write_wo_notes(),  'koordinator proyek mencatat progres');
+  perform assert_true(not has_sales_module_access(),
+                      'koordinator proyek belum punya akses ke modul penjualan');
+  perform assert_true(not can_request_invoice(),
+                      'permintaan invoice menyusul bersama modulnya sendiri');
   perform assert_true(not can_manage_finance(),
-                      'koordinator meminta, bukan menerbitkan');
+                      'koordinator tidak menerbitkan invoice');
 end $$;
 
 reset role;
