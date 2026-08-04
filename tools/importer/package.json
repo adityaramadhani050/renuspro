@@ -1,0 +1,20 @@
+{
+  "name": "renuspro-importer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Impor idempoten dari Google Sheets RenusPro ke Supabase/Postgres",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "import": "node src/index.js",
+    "import:dry": "node src/index.js --dry-run",
+    "reconcile": "node src/index.js --reconcile-only",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "pg": "^8.22.0"
+  }
+}

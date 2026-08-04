@@ -1,0 +1,186 @@
+/**
+ * Impor user.
+ *
+ * Ini langkah yang paling banyak menuntut keputusan manusia, karena dua hal:
+ *
+ * 1. Master_User TIDAK punya kolom email, sedangkan Supabase Auth memerlukan
+ *    email sebagai identitas. Email diturunkan dari username + AUTH_EMAIL_DOMAIN,
+ *    dan bisa ditimpa per user lewat berkas users.csv.
+ *
+ * 2. Password di sheet tersimpan PLAINTEXT (Auth.gs:60) dan TIDAK PERNAH
+ *    diimpor. User dibuat tanpa password lalu diundang untuk membuat yang baru.
+ *    Ini bukan pilihan gaya — memindahkan password plaintext ke sistem baru
+ *    berarti mewariskan kerentanannya.
+ */
+import fs from 'node:fs';
+import { parseText, parseNumber, parseBool } from './parse.js';
+import { config } from './config.js';
+
+const VALID_ROLES = new Set(['admin', 'sales', 'finance']);
+
+/** Baca users.csv opsional: username,email */
+export function readEmailOverrides(path) {
+  if (!path || !fs.existsSync(path)) return new Map();
+
+  const map = new Map();
+  const lines = fs.readFileSync(path, 'utf8').split(/\r?\n/);
+  for (const [i, line] of lines.entries()) {
+    const trimmed = line.trim();
+    if (!trimmed || (i === 0 && /username/i.test(trimmed))) continue;
+    const [username, email] = trimmed.split(',').map((s) => s?.trim());
+    if (username && email) map.set(username.toLowerCase(), email);
+  }
+  return map;
+}
+
+/** Tulis template users.csv agar operator tinggal mengisi kolom email. */
+export function writeEmailTemplate(sheet, path) {
+  const lines = ['username,email,# nama lengkap,# role'];
+  for (const row of sheet.rows) {
+    const username = parseText(row[2]);
+    if (!username) continue;
+    lines.push(`${username},,${parseText(row[1]) || ''},${parseText(row[4]) || 'sales'}`);
+  }
+  fs.writeFileSync(path, lines.join('\n') + '\n', 'utf8');
+  return lines.length - 1;
+}
+
+function resolveEmail(username, overrides) {
+  const fromFile = overrides.get(username.toLowerCase());
+  if (fromFile) return fromFile;
+  if (config.authEmailDomain) return `${username.toLowerCase()}@${config.authEmailDomain}`;
+  return null;
+}
+
+/**
+ * Buat (atau temukan) user di Supabase Auth lewat Admin API.
+ * Mengembalikan uuid, atau null kalau tidak bisa.
+ */
+async function ensureAuthUser(email, fullName) {
+  const base = config.supabaseUrl;
+  const key = config.supabaseServiceKey;
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+
+  const created = await fetch(`${base}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      email,
+      email_confirm: false,
+      user_metadata: { full_name: fullName },
+      // Sengaja tanpa password: user menetapkannya sendiri lewat undangan.
+    }),
+  });
+
+  if (created.ok) {
+    const body = await created.json();
+    return body.id;
+  }
+
+  // Sudah ada — cari id-nya supaya impor tetap idempoten.
+  if (created.status === 422 || created.status === 409) {
+    const found = await fetch(
+      `${base}/auth/v1/admin/users?filter=${encodeURIComponent(email)}`,
+      { headers }
+    );
+    if (found.ok) {
+      const body = await found.json();
+      const match = (body.users || []).find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      );
+      if (match) return match.id;
+    }
+  }
+
+  const detail = await created.text().catch(() => '');
+  throw new Error(`Gagal membuat auth user ${email}: HTTP ${created.status} ${detail}`);
+}
+
+/**
+ * Impor Master_User → profiles.
+ *
+ * Mengembalikan peta nama lengkap (lowercase) → uuid, yang dipakai seluruh
+ * langkah lain untuk menerjemahkan kolom "Dibuat Oleh".
+ */
+export async function importProfiles(client, sheet, options, report) {
+  // Master_User: 0 ID | 1 Nama Lengkap | 2 Username | 3 Password | 4 Role | 5 Aktif | 6 Target
+  const overrides = readEmailOverrides(options.usersCsv);
+  const ownerByName = new Map();
+  let count = 0;
+
+  const canCreateAuth =
+    options.createAuthUsers && config.supabaseUrl && config.supabaseServiceKey;
+
+  for (const row of sheet.rows) {
+    const legacyCode = parseText(row[0]);
+    const fullName = parseText(row[1]);
+    const username = parseText(row[2]);
+    if (!username || !fullName) continue;
+
+    let role = (parseText(row[4]) || 'sales').toLowerCase();
+    if (!VALID_ROLES.has(role)) {
+      report.warn('role_asing', `User "${username}" punya role "${role}"; dijadikan sales`);
+      role = 'sales';
+    }
+
+    // Sudah ada dari impor sebelumnya?
+    const { rows: existing } = await client.query(
+      'select id from profiles where lower(username) = lower($1)',
+      [username]
+    );
+
+    let userId = existing[0]?.id || null;
+
+    if (!userId) {
+      const email = resolveEmail(username, overrides);
+      if (!email) {
+        report.warn(
+          'email_kosong',
+          `User "${username}" dilewati: tidak ada email. Set AUTH_EMAIL_DOMAIN ` +
+            `atau isi users.csv (jalankan dengan --emit-user-template).`
+        );
+        continue;
+      }
+
+      if (!canCreateAuth) {
+        report.warn(
+          'auth_nonaktif',
+          `User "${username}" (${email}) belum dibuat: jalankan dengan --create-auth-users ` +
+            `dan set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.`
+        );
+        continue;
+      }
+
+      userId = await ensureAuthUser(email, fullName);
+    }
+
+    await client.query(
+      `insert into profiles
+         (id, legacy_code, full_name, username, role, is_active, monthly_target)
+       values ($1,$2,$3,$4,$5,$6,$7)
+       on conflict (id) do update
+         set legacy_code = excluded.legacy_code, full_name = excluded.full_name,
+             username = excluded.username, role = excluded.role,
+             is_active = excluded.is_active, monthly_target = excluded.monthly_target`,
+      [
+        userId,
+        legacyCode,
+        fullName,
+        username.toLowerCase(),
+        role,
+        parseBool(row[5]),
+        parseNumber(row[6]),
+      ]
+    );
+
+    ownerByName.set(fullName.trim().toLowerCase(), userId);
+    count++;
+  }
+
+  report.add('profiles', count);
+  return ownerByName;
+}
