@@ -490,6 +490,7 @@ function getWorkOrderDashboard() {
         noWO: w.noWO, id: w.id, rev: w.rev, tanggal: w.tanggal,
         namaProject: w.namaProject, namaKlien: w.namaKlien, dibuatOleh: w.dibuatOleh,
         subtotal: w.subtotal, diskon: w.diskon, pajak: w.pajak, grandTotal: w.grandTotal,
+        hpp: w.hpp, profit: w.profit, marginPersen: w.marginPersen,   // total HPP sudah termasuk hidden cost
         items: w.items, termConditions: w.termConditions, catatanCustomer: w.catatanCustomer,
         nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
         totalDitagihDpp: totalDitagihDpp, totalLunasDpp: totalLunasDpp,
