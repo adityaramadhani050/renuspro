@@ -11,18 +11,19 @@
  */
 
 function exportKwitansiDariTemplate(idKwitansi) {
-  const lock = LockService.getScriptLock();
+  // Isolasi ke sheet sementara → TANPA LockService global (tak memblok write lain).
+  const ss = getSpreadsheet();
+  var temp = null;
   try {
-    lock.waitLock(25000);
-
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Template_Kwitansi');
-    if (!sheet) return { success: false, message: 'Sheet "Template_Kwitansi" tidak ditemukan.' };
+    const prep = _pdfMakeTempFromTemplate(ss, 'Template_Kwitansi');
+    if (!prep) return { success: false, message: 'Sheet "Template_Kwitansi" tidak ditemukan.' };
+    temp = prep.sheet;
+    const sheet = prep.sheet;
+    const cache = prep.cache;
 
     const kw = _getKwitansiById(ss, idKwitansi);
     if (!kw) return { success: false, message: 'Kwitansi tidak ditemukan.' };
 
-    const cache = _buildNamedRangeCache(ss);
     const set = function(name, val) {
       const range = cache.get(name);
       if (range) range.setValue(val);
@@ -63,12 +64,7 @@ function exportKwitansiDariTemplate(idKwitansi) {
 
     SpreadsheetApp.flush();
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheet);
-
-    // Bersihkan baris ttd yang disisipkan agar template tidak berubah permanen
-    try {
-      const newLast = sheet.getLastRow();
-      if (newLast > lastRow - 1) sheet.deleteRows(lastRow - 1, newLast - lastRow + 2);
-    } catch(e) {}
+    // Tak perlu bersihkan baris ttd — sheet sementara dibuang di finally.
 
     const safe = (s) => (s || '').toString().replace(/[\\/]/g, '-');
     return { success: true, pdfBase64: pdfBase64,
@@ -77,7 +73,7 @@ function exportKwitansiDariTemplate(idKwitansi) {
     Logger.log('exportKwitansiDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export kwitansi: ' + e.toString() };
   } finally {
-    try { lock.releaseLock(); } catch (e) {}
+    _pdfDisposeTemp(ss, temp);
   }
 }
 

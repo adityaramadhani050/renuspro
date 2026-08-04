@@ -18,15 +18,18 @@
 // ── Export utama ──────────────────────────────────────────────────────────────
 
 function exportPODariTemplate(noPO) {
-  var lock = LockService.getScriptLock();
+  // Isolasi ke sheet sementara → TANPA LockService global, agar generate PDF
+  // tidak memblok operasi tulis lain (setiap export punya sheet sendiri).
+  var ss   = getSpreadsheet();
+  var temp = null;
   try {
-    lock.waitLock(25000);
-
-    var ss    = getSpreadsheet();
-    var sheet = ss.getSheetByName('Template_PO');
-    if (!sheet) {
+    var prep = _pdfMakeTempFromTemplate(ss, 'Template_PO');
+    if (!prep) {
       return { success: false, message: 'Sheet "Template_PO" tidak ditemukan. Jalankan initPOTemplate() dari Apps Script editor terlebih dahulu.' };
     }
+    temp = prep.sheet;
+    var sheet = prep.sheet;
+    var cache = prep.cache;
 
     var detail = getPODetail(noPO);
     if (!detail.success) return { success: false, message: detail.message };
@@ -39,7 +42,6 @@ function exportPODariTemplate(noPO) {
     try { tc = JSON.parse(po.termConditions || '{}'); } catch(e) {}
 
     var tcOptions = _getPOTCOptionsForPDF();
-    var cache = _buildNamedRangeCache(ss);
 
     if (!cache.has('tpl_po_item_zona_start')) {
       return { success: false, message: 'Named range "tpl_po_item_zona_start" tidak ditemukan. Jalankan initPOTemplate() lagi.' };
@@ -78,12 +80,7 @@ function exportPODariTemplate(noPO) {
     Logger.log('exportPODariTemplate error: ' + e.toString());
     return { success: false, message: 'Gagal export PDF PO: ' + e.toString() };
   } finally {
-    try {
-      var ss2    = getSpreadsheet();
-      var sheet2 = ss2.getSheetByName('Template_PO');
-      if (sheet2) _bersihkanZonaPO(sheet2, _buildNamedRangeCache(ss2));
-    } catch(e) { Logger.log('POPdf finally cleanup: ' + e); }
-    lock.releaseLock();
+    _pdfDisposeTemp(ss, temp);
   }
 }
 

@@ -19,15 +19,17 @@
 
 
 function exportQuotationDariTemplate(item) {
-  const lock = LockService.getScriptLock();
+  // Isolasi ke sheet sementara → TANPA LockService global (tak memblok write lain).
+  const ss = getSpreadsheet();
+  var temp = null;
   try {
-    lock.waitLock(25000);
-
-    const ss = getSpreadsheet();
-    const sheetTemplate = ss.getSheetByName('Template_Quotation');
-    if (!sheetTemplate) {
+    const prep = _pdfMakeTempFromTemplate(ss, 'Template_Quotation');
+    if (!prep) {
       return { success: false, message: 'Sheet "Template_Quotation" tidak ditemukan.' };
     }
+    temp = prep.sheet;
+    const sheetTemplate = prep.sheet;
+    const namedRangeCache = prep.cache;
 
     let tc = {};
     try { tc = JSON.parse(item.termConditions || '{}'); } catch(e) {}
@@ -36,9 +38,6 @@ function exportQuotationDariTemplate(item) {
 
     const klienMap = _getKlienMap(ss);
     const klien = klienMap[item.klienId] || {};
-
-    // Cache semua named ranges SEKALI — hindari loop scan berulang
-    const namedRangeCache = _buildNamedRangeCache(ss);
 
     // 1. Bersihkan zona dinamis
     _bersihkanZonaDinamis(sheetTemplate, namedRangeCache);
@@ -53,7 +52,6 @@ function exportQuotationDariTemplate(item) {
     _sisipkanFooter(sheetTemplate, rowSetelahItem, item, tc);
 
     SpreadsheetApp.flush();
-    // HAPUS: Utilities.sleep(1500) — tidak diperlukan setelah flush()
 
     const pdfBase64 = _exportSheetToPdfBase64(ss, sheetTemplate);
 
@@ -67,15 +65,7 @@ function exportQuotationDariTemplate(item) {
     Logger.log('exportQuotationDariTemplate error: ' + e.toString());
     return { success: false, message: 'Gagal export PDF: ' + e.toString() };
   } finally {
-    try {
-      const ss = getSpreadsheet();
-      const sh = ss.getSheetByName('Template_Quotation');
-      if (sh) {
-        const cache = _buildNamedRangeCache(ss);
-        _bersihkanZonaDinamis(sh, cache);
-      }
-    } catch(e) { Logger.log('Finally cleanup error: ' + e); }
-    lock.releaseLock();
+    _pdfDisposeTemp(ss, temp);
   }
 }
 
@@ -90,6 +80,29 @@ function _buildNamedRangeCache(ss) {
     cache.set(nr.getName(), nr.getRange());
   });
   return cache;
+}
+
+// ── Isolasi generate PDF: salin template ke sheet SEMENTARA unik per-request ──
+// Tujuan: proses isi-template + export tidak lagi mengunci resource bersama,
+// sehingga TAK PERLU LockService global → fitur tulis lain tidak menunggu.
+// Cache named-range dipetakan ulang ke sheet sementara via A1 notation (sheet
+// hasil copy identik dengan template, jadi sel A1 yang sama = placeholder sama).
+function _pdfMakeTempFromTemplate(ss, templateName) {
+  var tpl = ss.getSheetByName(templateName);
+  if (!tpl) return null;
+  var temp = tpl.copyTo(ss).setName('_tmp_' + templateName + '_' + Utilities.getUuid().slice(0, 8));
+  var tplId = tpl.getSheetId();
+  var cache = new Map();
+  ss.getNamedRanges().forEach(function(nr) {
+    try {
+      var r = nr.getRange();
+      if (r.getSheet().getSheetId() === tplId) cache.set(nr.getName(), temp.getRange(r.getA1Notation()));
+    } catch (e) {}
+  });
+  return { sheet: temp, cache: cache };
+}
+function _pdfDisposeTemp(ss, sheet) {
+  try { if (sheet) ss.deleteSheet(sheet); } catch (e) { Logger.log('_pdfDisposeTemp: ' + e); }
 }
 
 

@@ -15,21 +15,21 @@
  */
 
 function exportInvoiceDariTemplate(idInvoice) {
-  const lock = LockService.getScriptLock();
+  // Isolasi ke sheet sementara → TANPA LockService global (tak memblok write lain).
+  const ss = getSpreadsheet();
+  var temp = null;
   try {
-    lock.waitLock(25000);
-
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Template_Invoice');
-    if (!sheet) return { success: false, message: 'Sheet "Template_Invoice" tidak ditemukan.' };
+    const prep = _pdfMakeTempFromTemplate(ss, 'Template_Invoice');
+    if (!prep) return { success: false, message: 'Sheet "Template_Invoice" tidak ditemukan.' };
+    temp = prep.sheet;
+    const sheet = prep.sheet;
+    const cache = prep.cache;
 
     const inv = _getInvoiceById(ss, idInvoice);
     if (!inv) return { success: false, message: 'Invoice tidak ditemukan.' };
 
     const klien = _getKlienMap(ss)[inv.klienId] || {};
     const meta = _parseInvoiceMeta(inv);
-
-    const cache = _buildNamedRangeCache(ss);
 
     // Validasi anchor sebelum operasi destruktif
     if (!_anchorInvoiceValid(cache)) {
@@ -57,12 +57,7 @@ function exportInvoiceDariTemplate(idInvoice) {
     Logger.log('exportInvoiceDariTemplate error: ' + e);
     return { success: false, message: 'Gagal export invoice: ' + e.toString() };
   } finally {
-    try {
-      const ss = getSpreadsheet();
-      const sh = ss.getSheetByName('Template_Invoice');
-      if (sh) _bersihkanZonaInvoice(sh, _buildNamedRangeCache(ss));
-    } catch (e) { Logger.log('Finally cleanup invoice error: ' + e); }
-    lock.releaseLock();
+    _pdfDisposeTemp(ss, temp);
   }
 }
 
