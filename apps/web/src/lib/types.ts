@@ -208,6 +208,8 @@ export type InvoiceRow = {
   quotation_id: string | null;
   quote_number: string | null;
   is_predeal: boolean;
+  is_legacy: boolean;
+  legacy_reference: string | null;
   customer_id: string | null;
   customer_name: string | null;
   project_name: string | null;

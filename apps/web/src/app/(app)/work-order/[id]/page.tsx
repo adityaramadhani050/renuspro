@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { NotesForm } from './NotesForm';
 import { RequestInvoiceForm } from './RequestInvoiceForm';
 import type { WorkOrderRow, InvoiceRow } from '@/lib/types';
-import { canManageFinance, isSuperuser } from '@/lib/roles';
+import { canManageFinance, canWriteWoNotes, canRequestInvoice, isSuperuser } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +55,12 @@ export default async function WorkOrderDetailPage({
   ]);
 
   const canBillFinance = !!profile && canManageFinance(profile.role);
-  const isOwner = !!profile && (isSuperuser(profile.role) || wo.owner_id === profile.id);
+  // Catatan progres ditulis orang lapangan, bukan hanya pemilik penawaran.
+  const canEditNotes = !!profile && (canWriteWoNotes(profile.role) || wo.owner_id === profile.id);
+  const canAskInvoice =
+    !!profile &&
+    canRequestInvoice(profile.role) &&
+    (isSuperuser(profile.role) || wo.owner_id === profile.id);
   const canBill = canBillFinance && wo.remaining_dpp > 0;
 
   return (
@@ -140,7 +145,13 @@ export default async function WorkOrderDetailPage({
               <h2>Catatan Work Order</h2>
             </div>
             <div style={{ padding: 16 }}>
-              <NotesForm id={wo.id} notes={wo.notes ?? ''} />
+              {canEditNotes ? (
+                <NotesForm id={wo.id} notes={wo.notes ?? ''} />
+              ) : (
+                <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+                  {wo.notes || 'Belum ada catatan.'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -148,7 +159,7 @@ export default async function WorkOrderDetailPage({
             <div className="card-head">
               <h2>Permintaan Invoice</h2>
             </div>
-            {isOwner ? (
+            {canAskInvoice ? (
               <div style={{ padding: '16px 16px 0' }}>
                 <RequestInvoiceForm workOrderId={wo.id} />
               </div>

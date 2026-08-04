@@ -458,3 +458,5 @@ input:focus, select:focus { outline: 2px solid var(--brand-soft); border-color: 
   font-size: 13px;
   margin-bottom: 12px;
 }
+
+.badge-legacy { background: #eef2ff; color: var(--brand); }

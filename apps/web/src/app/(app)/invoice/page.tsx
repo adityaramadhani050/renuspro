@@ -43,7 +43,7 @@ export default async function InvoicePage({
     .from('v_invoices')
     .select(
       'id, invoice_number, issue_date, type, percent, wo_number, quote_number, ' +
-        'is_predeal, customer_name, project_name, dpp, vat_amount, total, ' +
+        'is_predeal, is_legacy, legacy_reference, customer_name, project_name, dpp, vat_amount, total, ' +
         'payment_status, paid_at, receipt_number, aging_bucket, days_outstanding',
       { count: 'exact' }
     )
@@ -137,7 +137,14 @@ export default async function InvoicePage({
                 </td>
                 <td>{formatDate(inv.issue_date)}</td>
                 <td>
-                  {inv.is_predeal ? (
+                  {/* Warisan dan pre-deal sama-sama tanpa No WO, tapi sangat
+                      berbeda: yang satu menunggu penawaran di-Deal, yang satu
+                      lagi penawarannya memang sudah tidak ada. */}
+                  {inv.is_legacy ? (
+                    <span className="badge badge-legacy" title={inv.legacy_reference ?? ''}>
+                      warisan
+                    </span>
+                  ) : inv.is_predeal ? (
                     <span className="badge badge-progress">pre-deal</span>
                   ) : (
                     inv.wo_number

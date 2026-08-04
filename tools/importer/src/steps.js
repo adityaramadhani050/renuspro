@@ -472,20 +472,27 @@ export async function importInvoices(client, sheet, ctx, report) {
 
     const quotationId = quoteNumber ? quotationByNumber.get(quoteNumber) || null : null;
 
-    if (!workOrderId && !quotationId) {
-      // Sebutkan isi kedua kolom rujukannya. Tanpa itu, satu-satunya cara
-      // menyelidiki 32 invoice yang terlewat adalah membukanya satu per satu
-      // di spreadsheet — padahal informasinya sudah ada di tangan kita.
-      const total = parseNumber(row[14]);
+    // Invoice yang rujukannya tidak ditemukan TIDAK dibuang. Sebagian besar
+    // adalah dokumen 2025 yang penawarannya sudah dibersihkan dari sheet, dan
+    // di antaranya ada piutang berjalan yang nyata. Yang hilang hanya
+    // tautannya, bukan invoicenya.
+    const isLegacy = !workOrderId && !quotationId;
+    const legacyReference = isLegacy
+      ? [
+          parseText(row[1]) ? `No WO: ${parseText(row[1])}` : null,
+          parseText(row[2]) ? `No Penawaran: ${parseText(row[2])}` : null,
+        ]
+          .filter(Boolean)
+          .join(' | ') || '(kedua kolom rujukan kosong)'
+      : null;
+
+    if (isLegacy) {
       report.warn(
-        'invoice_yatim',
-        `Invoice ${invoiceNumber} (Rp ${total.toLocaleString('id-ID')}) DILEWATI — ` +
-          `No WO: ${parseText(row[1]) ?? '(kosong)'}, ` +
-          `No Penawaran: ${parseText(row[2]) ?? '(kosong)'}`
+        'invoice_warisan',
+        `Invoice ${invoiceNumber} (Rp ${parseNumber(row[14]).toLocaleString('id-ID')}) ` +
+          `diimpor sebagai WARISAN — ${legacyReference}`
       );
-      report.add('invoices_dilewati', 1);
-      report.addSkippedValue('invoices', total);
-      continue;
+      report.add('invoices_warisan', 1);
     }
 
     const meta = parseJsonSafe(row[15]);
@@ -494,7 +501,7 @@ export async function importInvoices(client, sheet, ctx, report) {
 
     // Jenis invoice pre-deal wajib DP (constraint database, Invoice.gs:275).
     let type = parseText(row[4]) || 'Penuh';
-    if (!workOrderId && type !== 'DP') {
+    if (!workOrderId && !isLegacy && type !== 'DP') {
       report.warn(
         'jenis_predeal',
         `Invoice ${invoiceNumber} pre-deal berjenis "${type}"; diimpor sebagai DP agar lolos constraint`
@@ -507,8 +514,8 @@ export async function importInvoices(client, sheet, ctx, report) {
          (invoice_number, work_order_id, quotation_id, issue_date, type, percent,
           po_number, po_date, customer_id, customer_snapshot, dpp, vat_percent,
           vat_amount, total, payment_status, notes, created_by, paid_at,
-          scope, contract_value, input_mode)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          scope, contract_value, input_mode, is_legacy, legacy_reference)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        on conflict (invoice_number) do update
          set work_order_id = excluded.work_order_id,
              quotation_id = excluded.quotation_id,
@@ -520,7 +527,8 @@ export async function importInvoices(client, sheet, ctx, report) {
              total = excluded.total, payment_status = excluded.payment_status,
              notes = excluded.notes, created_by = excluded.created_by,
              paid_at = excluded.paid_at, scope = excluded.scope,
-             contract_value = excluded.contract_value, input_mode = excluded.input_mode`,
+             contract_value = excluded.contract_value, input_mode = excluded.input_mode,
+             is_legacy = excluded.is_legacy, legacy_reference = excluded.legacy_reference`,
       [
         invoiceNumber,
         workOrderId,
@@ -543,6 +551,8 @@ export async function importInvoices(client, sheet, ctx, report) {
         parseText(meta.scope),
         parseNumber(meta.nilaiKontrak),
         meta.inputMode === 'nominal' ? 'nominal' : 'persen',
+        isLegacy,
+        legacyReference,
       ]
     );
     count++;
