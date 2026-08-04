@@ -98,11 +98,11 @@ sebagian besar keuntungan latensi yang dikejar.
 | `Master_Produk` | `products` | langsung |
 | `Master_User` | `profiles` (+ `auth.users`) | password **tidak** dimigrasi |
 | `Template_Paket` | `package_templates` + `package_template_items` | kolom JSON dinormalisasi |
-| `Penawaran_Main` | `quotations` + `quotation_revisions` + `quotation_items` | dipecah 3, lihat §5.3 |
+| `Penawaran_Main` | `quotations` + `quotation_revisions` + `quotation_item_groups` + `quotation_items` | dipecah 4, lihat §5.3 |
 | `Penawaran_Main` kol. 18–19 | `work_orders` | No WO & Tanggal Deal dipromosikan jadi tabel |
 | `WorkOrder_Catatan` | `work_orders.notes` | 1:1, dilebur |
 | `WO_RequestInvoice` | `invoice_requests` | kolom denormal dibuang |
-| `Invoice_Main` | `invoices` + `invoice_items` | kolom JSON dinormalisasi |
+| `Invoice_Main` | `invoices` | **tidak** punya tabel item — lihat §5.3b |
 | `Kwitansi_Main` | `receipts` | langsung |
 | ScriptProperties `BANK_ACCOUNTS` | `bank_accounts` | |
 | ScriptProperties `TC_OPTIONS` | `app_settings` | |
@@ -129,7 +129,10 @@ Hasil pembacaan `SheetInit.gs`, `Penawaran.gs:60-70`, `WorkOrder.gs:63`,
 
 ### 5.3 Keputusan desain penting
 
-**a) `Penawaran_Main` dipecah menjadi `quotations` + `quotation_revisions`.**
+**a) `Penawaran_Main` dipecah menjadi empat tabel.**
+
+`quotations` (identitas & keadaan) → `quotation_revisions` (isi per revisi) →
+`quotation_item_groups` (sub-paket) → `quotation_items` (baris item).
 
 Saat ini setiap revisi adalah baris baru dengan kunci majemuk (No Penawaran, Rev),
 dan seluruh header diduplikasi. Akibatnya pola "ambil revisi terakhir" muncul
@@ -145,13 +148,40 @@ ke satu baris revisi tertentu, sementara semua pembaca mengambil revisi terakhir
 > dengan unique (quote_number, rev) + kolom `is_current`. Lebih dekat ke sumber,
 > tapi mewariskan masalah di atas. Rekomendasi tetap pemecahan.
 
-**b) Kolom JSON dinormalisasi jadi tabel item.**
-`Rincian Item (JSON)` (`Penawaran_Main` kol. 15) dan `Rincian Item (JSON)`
-(`Invoice_Main` kol. 15) menjadi `quotation_items` dan `invoice_items`. Ini yang
-memungkinkan laporan seperti "produk terlaris" jadi satu query SQL, bukan
-parsing JSON di loop.
+**b) Kolom JSON dinormalisasi — dengan dua koreksi penting.**
 
-`Syarat Ketentuan (JSON)` tetap `jsonb` — isinya memang bebas bentuk.
+*Koreksi pertama:* `Rincian Item (JSON)` pada `Penawaran_Main` (kol. 16) **bukan
+array datar**, melainkan daftar kelompok. Lihat `JS_Form_Penawaran.html:350-352`:
+
+```json
+[{ "kelompok": "A", "namaKelompok": "PAKET UTAMA", "subtotal": 84500000,
+   "subItems": [{ "noItem": 1, "produkId": "P001", "deskripsi": "...",
+                  "qty": 17, "unit": "unit", "harga": 2500000,
+                  "hpp": 1900000, "total": 42500000 }] }]
+```
+
+Karena itu dibutuhkan **dua** tabel — `quotation_item_groups` →
+`quotation_items` — bukan satu. Penawaran lama yang masih berupa array datar
+(dari sebelum fitur sub-paket ada) tetap ditangani importer: dibungkus menjadi
+satu kelompok tanpa nama sehingga tidak ada data yang hilang.
+
+Normalisasi inilah yang membuat laporan seperti "produk terlaris" menjadi satu
+query SQL (`v_product_sales`), bukan parsing JSON di dalam loop.
+
+*Koreksi kedua:* kolom `Invoice_Main` yang **berlabel** `Rincian Item (JSON)`
+(kol. 16) sebenarnya **tidak berisi item baris sama sekali**. Yang ditulis ke
+sana adalah meta — lihat `Invoice.gs:326-339`:
+
+```js
+const meta = { scope, nilaiKontrak, inputMode };
+sheet.appendRow([ ..., JSON.stringify(meta), 'Belum Lunas', ... ]);
+```
+
+Invoice di sistem ini menagih **persentase dari nilai kontrak**; rincian
+barangnya tetap milik penawaran. Karena itu **tidak ada tabel `invoice_items`** —
+ketiga field meta menjadi kolom biasa (`scope`, `contract_value`, `input_mode`).
+
+`Syarat Ketentuan (JSON)` tetap `jsonb` karena isinya memang bebas bentuk.
 
 **c) Invoice menyimpan snapshot data klien.**
 `Invoice_Main` sekarang menduplikasi Klien ID, Nama Klien, Nama Project. Itu
@@ -179,254 +209,41 @@ sumber bug yang tidak perlu.
 
 ### 5.4 DDL
 
-```sql
--- ══════════════════════════════════════════════════════════════
--- ENUM
--- ══════════════════════════════════════════════════════════════
-create type user_role         as enum ('admin', 'sales', 'finance');
-create type quotation_status  as enum ('On-Progress', 'Deal', 'Fail');
-create type invoice_type      as enum ('DP', 'Termin', 'Pelunasan', 'Penuh');
-create type payment_status    as enum ('Belum Lunas', 'Lunas');
-create type request_status    as enum ('Pending', 'Diproses', 'Selesai', 'Ditolak');
+DDL lengkapnya **bukan di dokumen ini**, melainkan di
+[`supabase/migrations/`](supabase/migrations/) sebagai migration file yang
+benar-benar bisa dijalankan. Menyalinnya ke sini hanya akan membuat dokumen dan
+kode berbeda pelan-pelan tanpa ada yang menyadari.
 
--- ══════════════════════════════════════════════════════════════
--- MASTER
--- ══════════════════════════════════════════════════════════════
+| Berkas | Isi |
+|--------|-----|
+| `20260804010000_extensions_and_enums.sql` | Extension & enum |
+| `20260804020000_master_tables.sql` | `profiles`, `customers`, `products`, template paket |
+| `20260804030000_quotations.sql` | Penawaran, revisi, kelompok item, item |
+| `20260804040000_work_orders.sql` | Work Order & permintaan invoice |
+| `20260804050000_invoices_receipts.sql` | Invoice, kwitansi, pengaturan |
+| `20260804060000_numbering.sql` | Penomoran transaksional & otomasi status |
+| `20260804070000_views.sql` | View dashboard & laporan |
+| `20260804080000_rls.sql` | Row Level Security |
 
--- Master_User  →  auth.users (Supabase Auth) + profiles
-create table profiles (
-  id             uuid primary key references auth.users(id) on delete cascade,
-  legacy_code    text unique,                    -- 'U001'
-  full_name      text not null,
-  username       text not null unique,
-  role           user_role not null default 'sales',
-  is_active      boolean not null default true,
-  monthly_target numeric(15,2) not null default 0,
-  created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
-);
--- CATATAN: kolom Password TIDAK dimigrasi. Semua user reset password.
+Verifikasi seluruhnya pada database bersih:
 
--- Master_Klien  →  customers
-create table customers (
-  id          uuid primary key default gen_random_uuid(),
-  legacy_code text unique,                        -- 'K001'
-  name        text not null,                      -- Nama Klien
-  company     text,                               -- Perusahaan
-  address     text,                               -- Alamat
-  phone       text,                               -- Kontak
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-create index on customers using gin (to_tsvector('simple', name || ' ' || coalesce(company,'')));
-
--- Master_Produk  →  products
-create table products (
-  id          uuid primary key default gen_random_uuid(),
-  legacy_code text unique,                        -- 'P001'
-  name        text not null,                      -- Nama Jasa/Produk
-  unit        text not null default 'unit',
-  price       numeric(15,2) not null default 0,   -- Harga Satuan
-  cost        numeric(15,2) not null default 0,   -- HPP
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-create index on products using gin (to_tsvector('simple', name));
-
--- Template_Paket  →  package_templates + items
-create table package_templates (
-  id          uuid primary key default gen_random_uuid(),
-  legacy_code text unique,                        -- 'PKT001'
-  name        text not null,
-  created_at  timestamptz not null default now()
-);
-
-create table package_template_items (
-  id          uuid primary key default gen_random_uuid(),
-  template_id uuid not null references package_templates(id) on delete cascade,
-  product_id  uuid references products(id) on delete set null,
-  description text not null,
-  qty         numeric(15,3) not null default 1,
-  unit        text,
-  price       numeric(15,2) not null default 0,
-  cost        numeric(15,2) not null default 0,
-  sort_order  int not null default 0
-);
-create index on package_template_items (template_id);
-
--- ══════════════════════════════════════════════════════════════
--- PENAWARAN
--- ══════════════════════════════════════════════════════════════
-
-create table quotations (
-  id                  uuid primary key default gen_random_uuid(),
-  quote_number        text not null unique,       -- kol.0  'No Penawaran'
-  customer_id         uuid not null references customers(id),
-  project_name        text not null,              -- kol.4
-  owner_id            uuid references profiles(id),  -- kol.6 'Dibuat Oleh' (dipetakan dari nama)
-  status              quotation_status not null default 'On-Progress',  -- kol.16
-  deal_date           timestamptz,                -- kol.18 'Tanggal Deal'
-  current_revision_id uuid,                       -- FK ditambahkan setelah tabel revisi dibuat
-  created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
-);
-create index on quotations (status, deal_date desc);
-create index on quotations (owner_id);
-create index on quotations (customer_id);
-
-create table quotation_revisions (
-  id             uuid primary key default gen_random_uuid(),
-  quotation_id   uuid not null references quotations(id) on delete cascade,
-  rev            int  not null default 0,         -- kol.1
-  issue_date     date not null,                   -- kol.2  'Tanggal'
-  valid_until    date,                            -- kol.3  'Valid Hingga'
-  subtotal       numeric(15,2) not null default 0,-- kol.7
-  discount       numeric(15,2) not null default 0,-- kol.8
-  tax_amount     numeric(15,2) not null default 0,-- kol.9  'Pajak (PPN)'
-  grand_total    numeric(15,2) not null default 0,-- kol.10
-  total_cost     numeric(15,2) not null default 0,-- kol.11 'Total HPP'
-  est_profit     numeric(15,2) not null default 0,-- kol.12
-  margin_pct     numeric(6,2)  not null default 0,-- kol.13
-  terms          jsonb not null default '{}',     -- kol.14 'Syarat Ketentuan (JSON)'
-  created_by     uuid references profiles(id),
-  created_at     timestamptz not null default now(),
-  unique (quotation_id, rev)
-);
-create index on quotation_revisions (quotation_id, rev desc);
-
-alter table quotations
-  add constraint quotations_current_revision_fkey
-  foreign key (current_revision_id) references quotation_revisions(id);
-
--- kol.15 'Rincian Item (JSON)' dinormalisasi
-create table quotation_items (
-  id           uuid primary key default gen_random_uuid(),
-  revision_id  uuid not null references quotation_revisions(id) on delete cascade,
-  product_id   uuid references products(id) on delete set null,
-  group_name   text,                              -- 'kelompok' pada JSON existing
-  description  text not null,
-  qty          numeric(15,3) not null default 1,
-  unit         text,
-  price        numeric(15,2) not null default 0,
-  cost         numeric(15,2) not null default 0,  -- hpp
-  sort_order   int not null default 0
-);
-create index on quotation_items (revision_id);
-create index on quotation_items (product_id);
-
--- ══════════════════════════════════════════════════════════════
--- WORK ORDER  (dari Penawaran_Main kol.17 + sheet WorkOrder_Catatan)
--- ══════════════════════════════════════════════════════════════
-
-create table work_orders (
-  id               uuid primary key default gen_random_uuid(),
-  wo_number        text not null unique,          -- format [YY][NNN], reset per tahun
-  quotation_id     uuid not null unique references quotations(id),
-  notes            text,                          -- WorkOrder_Catatan kol. 'Catatan'
-  notes_updated_by uuid references profiles(id),
-  notes_updated_at timestamptz,
-  created_at       timestamptz not null default now()
-);
-
--- WO_RequestInvoice
-create table invoice_requests (
-  id            uuid primary key default gen_random_uuid(),
-  work_order_id uuid not null references work_orders(id) on delete cascade,
-  requested_by  uuid references profiles(id),
-  message       text,
-  status        request_status not null default 'Pending',
-  created_at    timestamptz not null default now()
-);
-create index on invoice_requests (status, created_at desc);
-
--- ══════════════════════════════════════════════════════════════
--- INVOICE & KWITANSI
--- ══════════════════════════════════════════════════════════════
-
-create table bank_accounts (
-  id           uuid primary key default gen_random_uuid(),
-  bank_name    text not null,
-  account_no   text not null,
-  account_name text not null,
-  is_active    boolean not null default true,
-  sort_order   int not null default 0
-);
-
-create table invoices (
-  id               uuid primary key default gen_random_uuid(),
-  invoice_number   text not null unique,          -- kol.0
-  -- Invoice pre-deal menempel ke penawaran; invoice normal menempel ke WO.
-  work_order_id    uuid references work_orders(id),   -- kol.1
-  quotation_id     uuid references quotations(id),    -- kol.2
-  issue_date       date not null,                 -- kol.3
-  type             invoice_type not null default 'Penuh',  -- kol.4  'Jenis'
-  percent          numeric(6,2) not null default 0,-- kol.5  'Persen'
-  po_number        text,                          -- kol.6
-  po_date          date,                          -- kol.7
-  customer_id      uuid references customers(id), -- kol.8
-  customer_snapshot jsonb not null default '{}',  -- kol.9,10 — nama klien & project saat terbit
-  dpp              numeric(15,2) not null default 0,-- kol.11
-  vat_percent      numeric(6,2)  not null default 0,-- kol.12
-  vat_amount       numeric(15,2) not null default 0,-- kol.13
-  total            numeric(15,2) not null default 0,-- kol.14
-  payment_status   payment_status not null default 'Belum Lunas', -- kol.16
-  notes            text,                          -- kol.17
-  created_by       uuid references profiles(id),  -- kol.18
-  bank_account_id  uuid references bank_accounts(id), -- kol.19
-  paid_at          date,                          -- kol.20 'Tanggal Bayar'
-  -- dari meta JSON (Invoice.gs:326)
-  scope            text,
-  contract_value   numeric(15,2) not null default 0,
-  input_mode       text not null default 'persen',
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now(),
-  constraint invoice_has_parent
-    check (work_order_id is not null or quotation_id is not null),
-  constraint predeal_must_be_dp
-    check (work_order_id is not null or type = 'DP')  -- Invoice.gs:275
-);
-create index on invoices (work_order_id);
-create index on invoices (payment_status, issue_date);
-create index on invoices (customer_id);
-
-create table invoice_items (
-  id          uuid primary key default gen_random_uuid(),
-  invoice_id  uuid not null references invoices(id) on delete cascade,
-  description text not null,
-  qty         numeric(15,3) not null default 1,
-  unit        text,
-  price       numeric(15,2) not null default 0,
-  sort_order  int not null default 0
-);
-create index on invoice_items (invoice_id);
-
-create table receipts (
-  id             uuid primary key default gen_random_uuid(),
-  receipt_number text not null unique,            -- kol.0 'No Kwitansi'
-  invoice_id     uuid references invoices(id),    -- kol.1
-  work_order_id  uuid references work_orders(id), -- kol.2
-  issue_date     date not null,                   -- kol.3
-  received_from  text not null,                   -- kol.4 'Terima Dari'
-  amount         numeric(15,2) not null default 0,-- kol.5 'Jumlah'
-  purpose        text,                            -- kol.6 'Untuk Pembayaran'
-  method         text not null default 'Transfer',-- kol.7 'Metode'
-  notes          text,                            -- kol.8
-  created_by     uuid references profiles(id),    -- kol.9
-  created_at     timestamptz not null default now()
-);
-create index on receipts (invoice_id);
-
--- ══════════════════════════════════════════════════════════════
--- SETTINGS  (dari PropertiesService)
--- ══════════════════════════════════════════════════════════════
-create table app_settings (
-  key        text primary key,                    -- 'TC_OPTIONS', dst.
-  value      jsonb not null default '{}',
-  updated_at timestamptz not null default now()
-);
--- WA_ENDPOINT / kredensial WhatsApp → env var di Railway, BUKAN tabel ini.
+```bash
+./tools/verify-schema.sh
 ```
+
+Skrip itu menjalankan setiap migration secara berurutan, lalu menjalankan
+[`supabase/tests/10_behaviour.sql`](supabase/tests/10_behaviour.sql) yang
+membuktikan perilakunya — penomoran, pointer revisi terkini, otomasi
+Deal→Work Order, constraint invoice pre-deal, perhitungan view, dan isolasi
+RLS antar role.
+
+### 5.4a Catatan keamanan pada view
+
+Secara default, view di Postgres dieksekusi dengan hak **pemilik view**,
+sehingga RLS pada tabel di bawahnya tidak berlaku. Tanpa `security_invoker`,
+seorang sales bisa membaca seluruh penawaran milik orang lain cukup lewat
+`v_quotations` — persis lubang yang ingin ditutup RLS. Semua view di migrasi 07
+karena itu di-set `security_invoker = true`, dan setiap view baru wajib ikut.
 
 ### 5.5 Penomoran dokumen yang aman dari race
 
@@ -656,9 +473,41 @@ Full-time bisa ditekan ke ±8–10 minggu.
 
 ---
 
-## 10. Langkah berikutnya
+## 10. Status pengerjaan
 
-1. Konfirmasi keputusan desain §5.3 — terutama pemecahan `Penawaran_Main`
-   menjadi `quotations` + `quotation_revisions` (5.3a)
-2. Mulai Fase 0, dengan pencatatan angka *sebelum* sebagai pembanding
-3. Provision Supabase dan terapkan DDL §5.4 sebagai migration file pertama
+### Sudah selesai & terverifikasi
+
+| Bagian | Lokasi | Bukti |
+|--------|--------|-------|
+| Skema Postgres (16 tabel, 9 view, 35 policy RLS) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
+| Tes perilaku skema | `supabase/tests/10_behaviour.sql` | penomoran, otomasi Deal→WO, constraint invoice, isolasi RLS antar role |
+| Importer Sheets → Supabase | `tools/importer/` | 22 tes lulus (15 parser + 7 integrasi ke Postgres sungguhan) |
+| Aplikasi web + modul Produk & Klien | `apps/web/` | `npm run build` lolos, termasuk pemeriksaan tipe |
+
+### Belum dikerjakan
+
+| Bagian | Fase |
+|--------|------|
+| Modul Penawaran, Work Order, Invoice, Kwitansi di aplikasi web | 3 |
+| Form tulis (create/edit) untuk Produk & Klien — saat ini baru daftar & pencarian | 3 |
+| Service WhatsApp/Baileys di Railway | 4 |
+| PDF service (Puppeteer) | 5 |
+| Fase 0 — perbaikan cepat di Apps Script | 0 |
+
+### Yang perlu keputusan Anda
+
+1. **Visibilitas penawaran bagi sales.** Kode lama tidak konsisten:
+   `getPenawaranList()` mengembalikan semua penawaran, sedangkan
+   `getDashboardRawData()` memfilter milik sendiri untuk non-admin. RLS saat ini
+   memakai yang lebih ketat (sales hanya melihat miliknya). Kalau tim sales
+   memang perlu saling melihat, ubah satu policy: `quotations_select` di
+   `supabase/migrations/20260804080000_rls.sql`.
+
+2. **Email untuk tiap user.** `Master_User` tidak punya kolom email, sedangkan
+   Supabase Auth memerlukannya. Tetapkan `AUTH_EMAIL_DOMAIN` (email diturunkan
+   dari username) atau isi `users.csv` per user.
+
+3. **Fase 0 dijalankan atau dilewati.** Migrasi penuh masih 3–4 bulan. Kalau
+   pengguna sedang sangat terganggu, memindahkan sheet template PDF ke
+   spreadsheet terpisah saja sudah menghilangkan antrean lock 25 detik yang jadi
+   penyebab dominan lambatnya sistem.
