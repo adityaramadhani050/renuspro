@@ -1557,27 +1557,30 @@
         + '<th class="px-2 py-2 font-bold">No</th><th class="px-2 py-2 font-bold text-left">Deskripsi Produk / Jasa</th><th class="px-2 py-2 font-bold">Qty</th><th class="px-2 py-2 font-bold">Unit</th><th class="px-2 py-2 font-bold text-right">Harga Jual</th><th class="px-2 py-2 font-bold text-right">Total Jual</th><th class="px-2 py-2 font-bold text-right bg-rose-800">HPP Satuan</th><th class="px-2 py-2 font-bold text-right bg-rose-800">Total HPP</th><th class="px-2 py-2 font-bold">Margin</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
-      // Hidden cost (internal)
+      // Hidden cost (internal) — HPP hidden dihitung upfront agar masuk Total HPP.
       var hcList = Array.isArray(tc.hiddenCosts) ? tc.hiddenCosts : [];
+      var hiddenTotal = hcList.reduce(function (a, h) { return a + ((h.total != null) ? h.total : (h.qty || 0) * (h.hpp || 0)); }, 0);
       var hcHtml = '';
       if (hcList.length) {
-        var hcRows = '', hcTotal = 0;
+        var hcRows = '';
         hcList.forEach(function (h, i) {
           var q = h.qty || 0, hpp = h.hpp || 0, tot = (h.total != null) ? h.total : q * hpp;
-          hcTotal += tot;
           hcRows += '<tr class="border-b border-rose-100"><td class="px-2 py-1.5 text-center text-rose-400">' + (i + 1) + '</td><td class="px-2 py-1.5">' + esc(h.deskripsi || '') + '</td><td class="px-2 py-1.5 text-center">' + q + '</td><td class="px-2 py-1.5 text-center">' + esc(h.unit || '') + '</td><td class="px-2 py-1.5 text-right">' + rp(hpp) + '</td><td class="px-2 py-1.5 text-right">' + rp(tot) + '</td></tr>';
         });
-        hcRows += '<tr class="bg-rose-50 font-bold text-rose-700"><td colspan="5" class="px-2 py-1.5 text-right">Total Hidden Cost</td><td class="px-2 py-1.5 text-right">' + rp(hcTotal) + '</td></tr>';
+        hcRows += '<tr class="bg-rose-50 font-bold text-rose-700"><td colspan="5" class="px-2 py-1.5 text-right">Total Hidden Cost</td><td class="px-2 py-1.5 text-right">' + rp(hiddenTotal) + '</td></tr>';
         hcHtml = '<div class="text-[11px] font-bold text-rose-700 mb-1"><i class="fa-solid fa-eye-slash mr-1"></i>Hidden Cost (Internal)</div>'
           + '<div class="overflow-x-auto rounded-xl border border-rose-200 mb-4"><table class="w-full text-xs min-w-[520px]"><thead><tr class="bg-rose-700 text-white text-[11px]"><th class="px-2 py-2">No</th><th class="px-2 py-2 text-left">Deskripsi (Internal)</th><th class="px-2 py-2">Qty</th><th class="px-2 py-2">Unit</th><th class="px-2 py-2 text-right">HPP Satuan</th><th class="px-2 py-2 text-right">HPP Total</th></tr></thead><tbody>' + hcRows + '</tbody></table></div>';
       }
 
-      // Ringkasan HPP & margin
+      // Ringkasan HPP & margin — Total HPP = HPP item + hidden cost (konsisten
+      // dengan form penawaran & panel Realisasi). Dihitung langsung dari data
+      // modal, tidak bergantung nilai proyeksi tersimpan.
       var netSub = (item.subtotal || 0) - (item.diskon || 0);
-      var totalHppAll = item.hpp || 0;
-      if (!totalHppAll) { kelompokList.forEach(function (k) { (k.subItems || []).forEach(function (s) { totalHppAll += (s.qty || 0) * (s.hpp || 0); }); }); }
-      var profit = (item.profit != null && item.profit !== 0) ? item.profit : (netSub - totalHppAll);
-      var marginAll = (item.marginPersen != null && item.marginPersen !== 0) ? item.marginPersen : (netSub > 0 ? (profit / netSub * 100) : 0);
+      var totalHppItems = 0;
+      kelompokList.forEach(function (k) { (k.subItems || []).forEach(function (s) { totalHppItems += (s.qty || 0) * (s.hpp || 0); }); });
+      var totalHppAll = totalHppItems + hiddenTotal;
+      var profit = netSub - totalHppAll;
+      var marginAll = netSub > 0 ? (profit / netSub * 100) : 0;
       var sum = '<div class="ml-auto w-full sm:w-80 text-xs rounded-xl border border-slate-200 overflow-hidden">';
       sum += _woLihatSumRow('Subtotal (Jual)', 'Rp ' + rp(item.subtotal || 0), '');
       if ((item.diskon || 0) > 0) sum += _woLihatSumRow('Diskon', '- Rp ' + rp(item.diskon), 'text-rose-600');
@@ -1823,17 +1826,14 @@
 
         let curY = doc.lastAutoTable.finalY + 5;
         const netSub    = (item.subtotal||0) - (item.diskon||0);
-        // Fallback: hitung dari items JSON jika kolom hpp belum tersimpan (data lama/migrasi)
-        let totalHppAll = item.hpp || 0;
-        if (!totalHppAll) {
-          try {
-            JSON.parse(item.items || '[]').forEach(function(k) {
-              (k.subItems || []).forEach(function(s) { totalHppAll += (s.qty||0) * (s.hpp||0); });
-            });
-          } catch(e) {}
-        }
-        const profit    = (item.profit != null && item.profit !== 0) ? item.profit : (netSub - totalHppAll);
-        const marginAll = (item.marginPersen != null && item.marginPersen !== 0) ? item.marginPersen : (netSub > 0 ? (profit / netSub * 100) : 0);
+        // Total HPP = HPP item + hidden cost (konsisten dgn form penawaran &
+        // panel Realisasi). Dihitung langsung dari data, bukan kolom tersimpan.
+        const hiddenTotal = hcList.reduce(function(a, h) { return a + ((h.total != null) ? h.total : (h.qty||0) * (h.hpp||0)); }, 0);
+        let totalHppItems = 0;
+        kelompokList.forEach(function(k) { (k.subItems || []).forEach(function(s) { totalHppItems += (s.qty||0) * (s.hpp||0); }); });
+        const totalHppAll = totalHppItems + hiddenTotal;
+        const profit    = netSub - totalHppAll;
+        const marginAll = netSub > 0 ? (profit / netSub * 100) : 0;
 
         const sumLines = [];
         sumLines.push(['Subtotal (Jual)', 'Rp ' + rp(item.subtotal||0), false, DARK]);
