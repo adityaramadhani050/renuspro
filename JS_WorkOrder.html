@@ -1504,6 +1504,9 @@
       var item = _woDetailCurrent;
       if (!item) return;
       var rp = function(v){ return Math.round(Math.abs(v || 0)).toLocaleString('id-ID'); };
+      // Bertanda: baris diskon/negatif tampil dengan '-' agar kolom benar-benar
+      // menjumlah ke Subtotal (konsisten dengan penawaran).
+      var rpS = function(v){ v = v || 0; return (v < 0 ? '-' : '') + Math.round(Math.abs(v)).toLocaleString('id-ID'); };
       var esc = _escHtmlWO;
       var kelompokList = []; try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
       var tc = {}; try { tc = JSON.parse(item.termConditions || '{}'); } catch (e) {}
@@ -1534,16 +1537,17 @@
           var totalHpp = qty * hpp;
           var margin = totalJual > 0 ? ((totalJual - totalHpp) / totalJual * 100) : 0;
           var mCls = margin >= 25 ? 'text-emerald-600' : 'text-rose-600';
+          var mTxt = totalJual > 0 ? (margin.toFixed(1) + '%') : '—';
           rows += '<tr class="border-b border-slate-100">'
             + '<td class="px-2 py-1.5 text-center text-slate-500">' + (si + 1) + '</td>'
             + '<td class="px-2 py-1.5">' + esc(s.deskripsi || '') + '</td>'
             + '<td class="px-2 py-1.5 text-center">' + qty + '</td>'
             + '<td class="px-2 py-1.5 text-center">' + esc(s.unit || '') + '</td>'
-            + '<td class="px-2 py-1.5 text-right">' + rp(harga) + '</td>'
-            + '<td class="px-2 py-1.5 text-right">' + rp(totalJual) + '</td>'
-            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(hpp) + '</td>'
-            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rp(totalHpp) + '</td>'
-            + '<td class="px-2 py-1.5 text-center font-bold ' + mCls + '">' + margin.toFixed(1) + '%</td>'
+            + '<td class="px-2 py-1.5 text-right">' + rpS(harga) + '</td>'
+            + '<td class="px-2 py-1.5 text-right">' + rpS(totalJual) + '</td>'
+            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rpS(hpp) + '</td>'
+            + '<td class="px-2 py-1.5 text-right bg-rose-50 text-rose-700 font-semibold">' + rpS(totalHpp) + '</td>'
+            + '<td class="px-2 py-1.5 text-center font-bold ' + mCls + '">' + mTxt + '</td>'
             + '</tr>';
         });
       });
