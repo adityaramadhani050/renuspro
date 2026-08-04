@@ -401,6 +401,61 @@ describe('importer → Postgres', { skip: available ? false : 'Postgres tidak te
     );
   });
 
+  test('selisih menyebutkan dokumennya, bukan hanya jumlahnya', async () => {
+    // Meniru pola yang muncul di produksi: impor dijalankan, lalu tim membuat
+    // penawaran baru di sheet. Rekonsiliasi berikutnya melaporkan -1 penawaran
+    // dan -2 revisi — angka yang tidak berguna sampai dokumennya disebut.
+    const data = sheets();
+    await runImport(data);
+
+    const baru = (rev) => [
+      '004/QUOT/VIII/2026', rev, '03/08/2026', '03/09/2026', 'Proyek Setelah Impor',
+      'K001', 'Sales Executive', 69900000, 0, 0, 69900000,
+      40000000, 29900000, 42.8, '{}',
+      JSON.stringify([{ kelompok: 'A', namaKelompok: 'X', subtotal: 69900000,
+        subItems: [{ noItem: 1, deskripsi: 'Item', qty: 1, harga: 69900000, hpp: 40000000, total: 69900000 }] }]),
+      'On-Progress', '', '',
+    ];
+    data.quotation.rows.push(baru(0), baru(1));
+
+    const report = new Report();
+    await reconcileMod.reconcile(client, data, report);
+
+    const quoteRow = report.reconciliation.find((r) =>
+      r.label.startsWith('Jumlah penawaran')
+    );
+    assert.equal(quoteRow.ok, false, 'selisihnya memang harus terdeteksi');
+
+    const rincian = (quoteRow.items ?? []).join('\n');
+    assert.match(rincian, /004\/QUOT\/VIII\/2026/, 'nomor penawarannya disebut');
+    assert.match(rincian, /03\/08\/2026/, 'tanggalnya ikut — itu yang membuktikan ia baru');
+    assert.match(rincian, /69\.900\.000/, 'nilainya ikut supaya cocok dengan selisih rupiah');
+    assert.match(rincian, /sheet lebih baru/, 'arah selisihnya disimpulkan');
+
+    const revRow = report.reconciliation.find((r) =>
+      r.label.startsWith('Jumlah revisi penawaran')
+    );
+    assert.equal(revRow.ok, false);
+    assert.match((revRow.items ?? []).join('\n'), /Rev 1/, 'revisi yang belum masuk disebut');
+
+    // Arah sebaliknya: dokumen yang ada di database tapi sudah tidak ada di
+    // sheet. Artinya berbeda sama sekali — itu penghapusan, bukan keterlambatan.
+    data.quotation.rows = data.quotation.rows.filter(
+      (r) => r[0] !== '004/QUOT/VIII/2026' && r[0] !== '001/QUOT/III/2026'
+    );
+
+    const report2 = new Report();
+    await reconcileMod.reconcile(client, data, report2);
+    const quoteRow2 = report2.reconciliation.find((r) =>
+      r.label.startsWith('Jumlah penawaran')
+    );
+    assert.match(
+      (quoteRow2.items ?? []).join('\n'),
+      /ada di database, tidak lagi di sheet: 001\/QUOT\/III\/2026/,
+      'penghapusan di sheet dilaporkan sebagai arah yang berbeda'
+    );
+  });
+
   test('klien pengganti tidak dihitung sebagai selisih', async () => {
     const data = sheets();
     // Penawaran yang merujuk klien di luar Master_Klien → importer membuat

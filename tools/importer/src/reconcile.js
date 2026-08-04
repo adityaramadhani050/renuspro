@@ -43,28 +43,34 @@ export async function reconcile(client, sheets, report) {
   await compareCount(client, report, 'Jumlah produk', 'products', countRows(sheets.product, 0));
 
   // ── Penawaran: jumlah unik + jumlah revisi ──
-  const uniqueQuotes = new Set(
+  const sheetQuotes = new Set(
     sheets.quotation.rows.map((r) => parseText(r[0])).filter(Boolean)
-  ).size;
-  await compareCount(client, report, 'Jumlah penawaran (unik)', 'quotations', uniqueQuotes);
+  );
+  await compareCount(
+    client, report, 'Jumlah penawaran (unik)', 'quotations', sheetQuotes.size,
+    undefined,
+    () => diffQuotations(client, sheets, sheetQuotes)
+  );
 
   // Yang dibandingkan pasangan (No Penawaran, Rev) yang UNIK, bukan jumlah
   // baris. Dua baris dengan pasangan yang sama memang menyatu menjadi satu
   // revisi — itu benar, dan tidak boleh dilaporkan sebagai data hilang.
   // Kejadiannya sendiri tetap dilaporkan lewat peringatan revisi_ganda.
-  const uniqueRevisions = new Set(
+  const sheetRevisions = new Set(
     (sheets.quotation.rows || [])
       .filter((r) => parseText(r[0]))
       .map((r) => `${parseText(r[0])}#${Math.trunc(parseNumber(r[1]))}`)
-  ).size;
-  const duplicateRevRows = countRows(sheets.quotation, 0) - uniqueRevisions;
+  );
+  const duplicateRevRows = countRows(sheets.quotation, 0) - sheetRevisions.size;
 
   await compareCount(
     client,
     report,
     'Jumlah revisi penawaran (pasangan No+Rev unik)',
     'quotation_revisions',
-    uniqueRevisions
+    sheetRevisions.size,
+    undefined,
+    () => diffRevisions(client, sheetRevisions)
   );
 
   if (duplicateRevRows > 0) {
@@ -173,15 +179,116 @@ function sumLatestRevision(sheet, columnIndex) {
   return [...latest.values()].reduce((s, x) => s + x.value, 0);
 }
 
-async function compareCount(client, report, label, table, sheetCount, note) {
+async function compareCount(client, report, label, table, sheetCount, note, rincian) {
   const { rows: [r] } = await client.query(`select count(*)::int as n from ${table}`);
+  const ok = r.n === sheetCount;
+
   report.addReconciliation({
     label,
     sheet: sheetCount,
     db: r.n,
-    ok: r.n === sheetCount,
-    note: r.n === sheetCount ? undefined : note,
+    ok,
+    note: ok ? undefined : note,
+    // Rincian hanya dihitung saat memang ada selisih: menjalankan kueri diff
+    // pada setiap impor yang sehat cuma memperlambat tanpa memberi apa pun.
+    items: ok || !rincian ? undefined : await rincian(),
   });
+}
+
+const BATAS_RINCIAN = 15;
+
+/**
+ * Sebutkan penawaran mana yang berbeda antara sheet dan database.
+ *
+ * Arahnya sengaja dibedakan, karena artinya sangat berbeda:
+ *
+ * • Ada di sheet, tidak di database — hampir selalu dokumen yang dibuat
+ *   SETELAH impor terakhir. Tanggalnya yang membuktikan; karena itu tanggal
+ *   ikut dicetak. Ini bukan data hilang, hanya data yang belum ikut.
+ *
+ * • Ada di database, tidak di sheet — dokumen yang dihapus dari sheet setelah
+ *   diimpor, atau dibuat langsung di sistem baru. Yang pertama perlu
+ *   diputuskan manusia; yang kedua justru tanda cutover sudah berjalan.
+ */
+async function diffQuotations(client, sheets, sheetQuotes) {
+  const { rows } = await client.query('select quote_number from quotations');
+  const dbQuotes = new Set(rows.map((r) => r.quote_number));
+
+  // Tanggal & nilai diambil dari revisi tertinggi, sama seperti yang dipakai
+  // seluruh laporan.
+  const infoSheet = new Map();
+  for (const row of sheets.quotation.rows || []) {
+    const no = parseText(row[0]);
+    if (!no) continue;
+    const rev = parseNumber(row[1]);
+    const prev = infoSheet.get(no);
+    if (!prev || rev > prev.rev) {
+      infoSheet.set(no, { rev, tanggal: parseText(row[2]), total: parseNumber(row[10]) });
+    }
+  }
+
+  const out = [];
+
+  const belumMasuk = [...sheetQuotes].filter((no) => !dbQuotes.has(no));
+  for (const no of belumMasuk.slice(0, BATAS_RINCIAN)) {
+    const i = infoSheet.get(no) || {};
+    out.push(
+      `ada di sheet, belum di database: ${no}  ` +
+        `(tanggal ${i.tanggal || '?'}, Rp ${(i.total ?? 0).toLocaleString('id-ID')})`
+    );
+  }
+  if (belumMasuk.length > BATAS_RINCIAN) {
+    out.push(`… dan ${belumMasuk.length - BATAS_RINCIAN} lagi`);
+  }
+
+  const sudahHilang = [...dbQuotes].filter((no) => !sheetQuotes.has(no));
+  for (const no of sudahHilang.slice(0, BATAS_RINCIAN)) {
+    out.push(`ada di database, tidak lagi di sheet: ${no}`);
+  }
+  if (sudahHilang.length > BATAS_RINCIAN) {
+    out.push(`… dan ${sudahHilang.length - BATAS_RINCIAN} lagi`);
+  }
+
+  if (belumMasuk.length && !sudahHilang.length) {
+    out.push(
+      'Semuanya searah — sheet lebih baru daripada database. Kalau tanggalnya ' +
+        'setelah impor terakhir, jalankan impor ulang lalu rekonsiliasi lagi.'
+    );
+  }
+
+  return out;
+}
+
+/** Sama seperti di atas, tapi pada tingkat revisi (pasangan No + Rev). */
+async function diffRevisions(client, sheetRevisions) {
+  const { rows } = await client.query(
+    `select q.quote_number, r.rev
+       from quotation_revisions r
+       join quotations q on q.id = r.quotation_id`
+  );
+  const dbRevisions = new Set(rows.map((r) => `${r.quote_number}#${r.rev}`));
+
+  const out = [];
+
+  const belumMasuk = [...sheetRevisions].filter((k) => !dbRevisions.has(k));
+  for (const k of belumMasuk.slice(0, BATAS_RINCIAN)) {
+    const [no, rev] = k.split('#');
+    out.push(`ada di sheet, belum di database: ${no} Rev ${rev}`);
+  }
+  if (belumMasuk.length > BATAS_RINCIAN) {
+    out.push(`… dan ${belumMasuk.length - BATAS_RINCIAN} lagi`);
+  }
+
+  const sudahHilang = [...dbRevisions].filter((k) => !sheetRevisions.has(k));
+  for (const k of sudahHilang.slice(0, BATAS_RINCIAN)) {
+    const [no, rev] = k.split('#');
+    out.push(`ada di database, tidak lagi di sheet: ${no} Rev ${rev}`);
+  }
+  if (sudahHilang.length > BATAS_RINCIAN) {
+    out.push(`… dan ${sudahHilang.length - BATAS_RINCIAN} lagi`);
+  }
+
+  return out;
 }
 
 function compareAmount(report, label, sheetTotal, dbTotal, note) {
