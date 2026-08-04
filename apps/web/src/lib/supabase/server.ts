@@ -53,3 +53,23 @@ export async function getCurrentProfile() {
 
   return data;
 }
+
+/**
+ * Apakah pengguna masih memakai password awal yang dibagikan saat cutover?
+ *
+ * Jawabannya dibaca langsung dari password yang tersimpan (migrasi 17), bukan
+ * dari kolom penanda. Bedanya terasa saat admin mengembalikan password
+ * seseorang ke default: dengan penanda, pagarnya harus diingat untuk
+ * dinyalakan ulang — dan yang harus diingat pada akhirnya terlupa.
+ *
+ * Bila pemeriksaannya gagal, jawabannya `true`. Menahan pengguna di layar
+ * ganti password saat ragu jauh lebih murah daripada membuka seluruh data
+ * karena satu panggilan RPC gagal.
+ */
+export async function pakaiPasswordDefault() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('sedang_pakai_password_default');
+
+  if (error) return true;
+  return data === true;
+}
