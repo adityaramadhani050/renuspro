@@ -22,6 +22,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { pesanGalatAuth } from '@/lib/auth-errors';
 
 const PANJANG_MINIMAL = 8;
 
@@ -97,11 +98,7 @@ export default function ResetPasswordPage() {
     const { error: gagal } = await createClient().auth.updateUser({ password });
 
     if (gagal) {
-      setError(
-        /session|jwt|expired/i.test(gagal.message)
-          ? 'Sesi pemulihan sudah berakhir. Mintalah tautan baru lalu ulangi.'
-          : gagal.message
-      );
+      setError(pesanGalatAuth(gagal));
       setBusy(false);
       return;
     }
