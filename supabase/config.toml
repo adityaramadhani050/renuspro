@@ -1,0 +1,40 @@
+# Konfigurasi Supabase CLI.
+#
+# Berkas ini yang membuat `supabase link` dan `supabase db push` mengenali
+# direktori ini sebagai proyek Supabase, sehingga migration di
+# supabase/migrations/ bisa dijalankan tanpa menyalin SQL manual.
+#
+# project_id di bawah hanya nama lokal — bukan ID proyek Supabase Anda.
+# ID proyek yang sebenarnya ditentukan saat `supabase link --project-ref <ref>`.
+
+project_id = "renuspro"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Sesuaikan dengan versi Postgres proyek Supabase Anda bila berbeda.
+# Hanya memengaruhi `supabase start` (lingkungan lokal), bukan proyek remote.
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# Diisi URL Vercel saat produksi; nilai di bawah untuk pengembangan lokal.
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = false          # user dibuat administrator, bukan mendaftar sendiri
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true

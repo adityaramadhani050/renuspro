@@ -16,8 +16,11 @@ paket, dan manajemen user — dengan penyimpanan di Google Sheets.
 ## Migrasi ke Supabase + Railway + Vercel
 
 Sistem ini sedang dimigrasi secara bertahap dari Google Sheets + Apps Script.
-Rencana lengkapnya — beserta diagnosa penyebab lambat, temuan keamanan, dan
-pemetaan sheet ke skema Postgres — ada di [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md).
+- **[`RUNBOOK.md`](RUNBOOK.md)** — cara menjalankan migrasinya, langkah demi
+  langkah. Mulai dari sini kalau ingin langsung mengerjakan.
+- **[`MIGRATION_PLAN.md`](MIGRATION_PLAN.md)** — diagnosa penyebab lambat,
+  temuan keamanan, pemetaan sheet ke skema Postgres, dan alasan di balik tiap
+  keputusan desain.
 
 | Direktori | Isi |
 |-----------|-----|
