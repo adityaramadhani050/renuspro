@@ -345,7 +345,7 @@ Aman dijalankan berkali-kali — impor bersifat idempoten, tidak menggandakan da
 
 ### 4.2 Kirim undangan password — **setelah Tahap 5, bukan sekarang**
 
-> **Jangan kirim undangan sebelum aplikasi web dideploy dan Tahap 5.2 selesai.**
+> **Jangan kirim undangan sebelum aplikasi web dideploy dan Tahap 5.2–5.3 selesai.**
 >
 > Tautan pemulihan mengarah ke **Site URL** yang tersimpan di Supabase. Selama
 > Site URL masih bawaan (`http://localhost:3000`), tautan itu mendarat di alamat
@@ -383,7 +383,7 @@ dan pastikan:
 
 ---
 
-## Tahap 5 — Deploy aplikasi web (± 30 menit)
+## Tahap 5 — Deploy aplikasi web (± 45 menit)
 
 ### 5.1 Vercel
 
@@ -420,7 +420,37 @@ tidak terdaftar di sini akan ditolak dan dialihkan ke Site URL.
 Kalau memakai domain sendiri, daftarkan keduanya — domain Vercel dan domain
 Anda.
 
-### 5.3 Uji
+### 5.3 Pasang SMTP sendiri ← **wajib sebelum mengundang 22 user**
+
+Layanan email bawaan Supabase **hanya untuk pengembangan**. Batasnya beberapa
+email per jam saja; melewatinya menghasilkan `email rate limit exceeded`.
+
+Dengan 22 user yang harus menetapkan password, batas itu bukan gangguan kecil —
+undangan akan menetes berjam-jam, sebagian pengguna menerima tautan yang sudah
+kedaluwarsa sebelum sempat dibuka, dan Anda tidak punya cara membedakan mana
+yang belum dikirim dari mana yang gagal.
+
+Dashboard Supabase → **Authentication → Emails → SMTP Settings** → aktifkan
+**Enable Custom SMTP**, lalu isi dari salah satu penyedia:
+
+| Penyedia | Cocok bila | Catatan |
+|----------|-----------|---------|
+| **Google Workspace** | domain `@renergynusantara.com` sudah di Workspace | Paling cepat: buat App Password untuk satu akun pengirim, host `smtp.gmail.com` port `465`. Tidak perlu ubah DNS |
+| **Resend** | ingin pengiriman terpisah dari email kantor | Gratis sampai ribuan email/bulan, tapi perlu menambah data DNS untuk verifikasi domain |
+| **Brevo / SendGrid** | sudah dipakai untuk keperluan lain | Setara; pilih yang tim Anda sudah kenal |
+
+Isi juga **Sender email** dan **Sender name** dengan alamat perusahaan — bukan
+alamat pribadi. Undangan yang datang dari alamat asing paling sering berakhir
+di folder spam atau dilaporkan sebagai penipuan oleh penerimanya sendiri.
+
+Setelah SMTP aktif, naikkan batasnya di **Authentication → Rate Limits**
+secukupnya untuk 22 user. Selama SMTP bawaan masih dipakai, batas itu tidak bisa
+dinaikkan.
+
+**✔ Lulus bila:** tombol *Lupa password?* di aplikasi mengirim email yang benar-
+benar sampai, dan pengirimnya beralamat perusahaan.
+
+### 5.4 Uji
 
 Buka aplikasi, login, lalu periksa:
 
@@ -569,6 +599,27 @@ Lalu perbarui **dua** secret sekaligus: `DATABASE_URL` dan `SUPABASE_DB_PASSWORD
 
 Catatan: `@` dan spasi pada password justru **aman** — parser URL menanganinya
 dengan benar. Jadi kalau password Anda hanya memuat itu, masalahnya di tempat lain.
+
+### `email rate limit exceeded`
+
+Layanan email bawaan Supabase hanya untuk pengembangan, dan batasnya beberapa
+email per jam. Ini **bukan** kesalahan konfigurasi Anda dan bukan tanda ada yang
+rusak — menekan tombolnya berulang kali hanya memperpanjang masa tunggu.
+
+Untuk saat ini: tunggu sekitar satu jam. Untuk seterusnya: pasang SMTP sendiri
+lewat **Tahap 5.3**. Dengan 22 user yang harus diundang, langkah itu wajib, bukan
+penyempurnaan.
+
+### Undangan masuk ke folder spam
+
+Terjadi saat Sender email masih memakai alamat bawaan Supabase atau alamat yang
+tidak cocok dengan domain perusahaan. Isi **Sender email** di Tahap 5.3 dengan
+alamat `@renergynusantara.com`, dan kalau memakai penyedia luar seperti Resend,
+selesaikan verifikasi domainnya sampai hijau.
+
+Beri tahu tim sebelum undangan dikirim serentak. Email yang tidak diharapkan dan
+berisi tautan penetapan password adalah bentuk yang persis sama dengan percobaan
+penipuan — kecurigaan mereka justru tanda yang sehat.
 
 ### Tautan reset password mengarah ke `localhost:3000`
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { pesanGalatAuth } from '@/lib/auth-errors';
 
 export default function LoginPage() {
   return (
@@ -53,7 +54,7 @@ function LoginForm() {
     setBusy(false);
 
     if (gagal) {
-      setError(gagal.message);
+      setError(pesanGalatAuth(gagal));
       return;
     }
 
@@ -78,7 +79,7 @@ function LoginForm() {
     });
 
     if (signInError) {
-      setError('Username/email atau password salah.');
+      setError(pesanGalatAuth(signInError));
       setBusy(false);
       return;
     }
