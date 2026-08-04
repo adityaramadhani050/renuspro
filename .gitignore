@@ -3,3 +3,19 @@
 
 # Kredensial clasp
 .clasprc.json
+
+# Node / Next.js (aplikasi migrasi)
+node_modules/
+.next/
+dist/
+build/
+
+# Kredensial & konfigurasi lingkungan — JANGAN pernah di-commit
+.env
+.env.*
+!.env.example
+service-account*.json
+credentials*.json
+
+# Artefak lokal
+*.log
