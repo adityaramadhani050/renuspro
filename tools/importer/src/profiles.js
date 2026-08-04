@@ -26,6 +26,9 @@ const VALID_ROLES = new Set([
   'leadsales',
   'warehouse',
   'procurement',
+  'siteengineer',
+  'leadengineer',
+  'projectcoordinator',
 ]);
 
 /** Baca users.csv opsional: username,email */

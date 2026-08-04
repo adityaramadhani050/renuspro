@@ -92,16 +92,14 @@ export async function reconcile(client, sheets, report) {
   await compareCount(client, report, 'Jumlah Work Order', 'work_orders', sheetWoCount);
 
   // ── Invoice ──
-  // Invoice yang tidak bisa dikaitkan ke WO maupun penawaran dilewati, sehingga
-  // selisihnya sudah bisa diperkirakan. Menyebutkannya di sini membedakan
-  // "data hilang tanpa sebab" dari "data dilewati karena rujukannya rusak" —
-  // keduanya sama-sama harus dibereskan, tapi penanganannya berbeda.
-  const skippedInvoices = report.counts.get('invoices_dilewati') ?? 0;
+  // Invoice yang rujukannya tidak ditemukan kini tetap diimpor sebagai
+  // warisan, jadi jumlahnya harus cocok. Kalau ternyata TIDAK cocok, itu
+  // masalah baru — bukan lagi hal yang sudah diketahui sebabnya.
+  const legacyInvoices = report.counts.get('invoices_warisan') ?? 0;
   const skippedValue = report.skippedTotal('invoices');
-  const invoiceNote = skippedInvoices
-    ? `${skippedInvoices} invoice dilewati karena rujukannya tidak ditemukan ` +
-      '(lihat peringatan invoice_yatim)'
-    : undefined;
+  const invoiceNote =
+    'Seluruh invoice seharusnya terimpor, termasuk yang berstatus warisan. ' +
+    'Selisih di sini berarti ada penyebab lain.';
 
   await compareCount(
     client, report, 'Jumlah invoice', 'invoices',
@@ -116,6 +114,19 @@ export async function reconcile(client, sheets, report) {
       ? `Rp ${skippedValue.toLocaleString('id-ID')} berasal dari invoice yang dilewati`
       : undefined
   );
+
+  // Informasi, bukan kegagalan: invoice warisan memang terimpor utuh, tapi
+  // keberadaannya perlu diketahui karena tautannya ke penawaran hilang.
+  if (legacyInvoices) {
+    report.addReconciliation({
+      label: 'Invoice warisan (rujukan penawaran tidak ditemukan)',
+      sheet: legacyInvoices,
+      db: legacyInvoices,
+      ok: true,
+      note: 'terimpor utuh; tautan ke penawaran hilang, rujukan aslinya ' +
+            'tersimpan di kolom legacy_reference',
+    });
+  }
 
   const sheetInvoiceDpp = sumColumn(sheets.invoice, 11);
   const { rows: [d] } = await client.query('select coalesce(sum(dpp), 0) as total from invoices');

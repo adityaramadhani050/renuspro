@@ -18,14 +18,30 @@ export type UserRole =
   | 'sales'
   | 'leadsales'
   | 'warehouse'
-  | 'procurement';
+  | 'procurement'
+  | 'siteengineer'
+  | 'leadengineer'
+  | 'projectcoordinator';
 
 const SUPERUSER: UserRole[] = ['admin', 'owner'];
 const SEE_ALL_QUOTATIONS: UserRole[] = [
   'admin', 'owner', 'finance', 'leadsales', 'warehouse', 'procurement',
+  'siteengineer', 'leadengineer', 'projectcoordinator',
 ];
 const WRITE_QUOTATIONS: UserRole[] = ['admin', 'owner', 'sales', 'leadsales'];
-const MANAGE_MASTER: UserRole[] = ['admin', 'owner', 'sales', 'leadsales', 'procurement'];
+const MANAGE_MASTER: UserRole[] = [
+  'admin', 'owner', 'sales', 'leadsales', 'procurement', 'leadengineer',
+];
+
+/** Menulis catatan progres pada Work Order — pekerjaan orang lapangan. */
+const WRITE_WO_NOTES: UserRole[] = [
+  'admin', 'owner', 'finance', 'siteengineer', 'leadengineer', 'projectcoordinator',
+];
+
+/** Meminta finance menerbitkan invoice. */
+const REQUEST_INVOICE: UserRole[] = [
+  'admin', 'owner', 'sales', 'leadsales', 'projectcoordinator',
+];
 const MANAGE_FINANCE: UserRole[] = ['admin', 'owner', 'finance'];
 
 const has = (list: UserRole[], role: string) => list.includes(role as UserRole);
@@ -45,6 +61,12 @@ export const canManageMaster = (role: string) => has(MANAGE_MASTER, role);
 /** Menerbitkan invoice dan kwitansi. */
 export const canManageFinance = (role: string) => has(MANAGE_FINANCE, role);
 
+/** Menulis catatan progres pada Work Order. */
+export const canWriteWoNotes = (role: string) => has(WRITE_WO_NOTES, role);
+
+/** Meminta penerbitan invoice. */
+export const canRequestInvoice = (role: string) => has(REQUEST_INVOICE, role);
+
 const LABEL: Record<string, string> = {
   admin: 'Administrator',
   owner: 'Owner',
@@ -53,6 +75,9 @@ const LABEL: Record<string, string> = {
   leadsales: 'Lead Sales',
   warehouse: 'Gudang',
   procurement: 'Pengadaan',
+  siteengineer: 'Site Engineer',
+  leadengineer: 'Lead Engineer',
+  projectcoordinator: 'Koordinator Proyek',
 };
 
 export const roleLabel = (role: string) => LABEL[role] ?? role;

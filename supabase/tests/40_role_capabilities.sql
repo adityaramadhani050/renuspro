@@ -181,3 +181,54 @@ reset role;
 reset request.jwt.claim.sub;
 
 \echo '✓ Tes kapabilitas peran lulus.'
+
+-- ============================================================================
+-- 6. Peran teknik: baca dan catat, tapi tidak menjual maupun menagih
+-- ============================================================================
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-0000000000e1', 'site@renus.test'),
+  ('00000000-0000-0000-0000-0000000000e2', 'koordinator@renus.test')
+on conflict do nothing;
+
+insert into profiles (id, legacy_code, full_name, username, role) values
+  ('00000000-0000-0000-0000-0000000000e1', 'R6', 'Site Engineer', 'siteeng', 'siteengineer'),
+  ('00000000-0000-0000-0000-0000000000e2', 'R7', 'Koordinator',   'koord',   'projectcoordinator')
+on conflict (id) do nothing;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000e1';
+
+do $$
+begin
+  perform assert_true(can_see_all_quotations(),
+                      'site engineer melihat pekerjaan yang harus dikerjakan');
+  perform assert_true(can_write_wo_notes(),
+                      'site engineer mencatat progres Work Order');
+  perform assert_true(not can_write_quotations(),
+                      'site engineer TIDAK membuat penawaran');
+  perform assert_true(not can_manage_finance(),
+                      'site engineer TIDAK menerbitkan invoice');
+  perform assert_true(not can_request_invoice(),
+                      'site engineer tidak meminta invoice; itu tugas koordinator');
+  perform assert_true(not can_manage_master(),
+                      'site engineer tidak mengubah data master');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000e2';
+
+do $$
+begin
+  perform assert_true(can_request_invoice(), 'koordinator proyek boleh meminta invoice');
+  perform assert_true(can_write_wo_notes(),  'koordinator proyek mencatat progres');
+  perform assert_true(not can_manage_finance(),
+                      'koordinator meminta, bukan menerbitkan');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+\echo '✓ Tes peran teknik lulus.'
