@@ -68,9 +68,70 @@ export function assertValidPostgresUrl(raw) {
 }
 
 export async function connect() {
-  const client = new pg.Client({ connectionString: assertValidPostgresUrl(config.databaseUrl()) });
-  await client.connect();
+  const url = assertValidPostgresUrl(config.databaseUrl());
+  const client = new pg.Client({ connectionString: url });
+
+  try {
+    await client.connect();
+  } catch (err) {
+    throw explainConnectionError(err, url);
+  }
+
   return client;
+}
+
+/**
+ * Terjemahkan kegagalan koneksi menjadi arahan yang bisa ditindaklanjuti.
+ *
+ * Pesan asli Postgres benar tapi tidak menuntun: "password authentication
+ * failed for user X" tidak memberi tahu bahwa untuk Session pooler, X memang
+ * HARUS berbentuk postgres.<project-ref> — dan bahwa memakai 'postgres' saja
+ * pasti gagal berapa kali pun passwordnya diperbaiki.
+ */
+export function explainConnectionError(err, url) {
+  const { username, hostname } = new URL(url);
+  const isPooler = hostname.includes('pooler.supabase.com');
+  const hasTenant = username.includes('.');
+
+  if (err.code === '28P01') {
+    // Penyebab paling sering, dan paling membingungkan karena gejalanya
+    // terlihat seperti password salah.
+    if (isPooler && !hasTenant) {
+      return new Error(
+        `Autentikasi ditolak untuk user "${username}".\n\n` +
+          'Anda memakai Session pooler, tetapi usernya masih "postgres" saja. ' +
+          'Pooler memerlukan username berbentuk postgres.<project-ref> — tanpa itu ' +
+          'ia tidak tahu proyek mana yang dituju, dan menolak berapa kali pun ' +
+          'password diperbaiki.\n\n' +
+          'Salin ulang connection string dari tombol Connect → Session pooler, ' +
+          'jangan dari Direct connection.'
+      );
+    }
+
+    return new Error(
+      `Autentikasi ditolak untuk user "${username}".\n\n` +
+        'Password pada DATABASE_URL tidak cocok. Yang paling sering terlewat: ' +
+        'password sudah di-reset di Supabase, tetapi DATABASE_URL belum ikut ' +
+        'diperbarui — keduanya harus diganti bersamaan dengan SUPABASE_DB_PASSWORD.\n\n' +
+        'Bila password memuat karakter %, ia harus ditulis %25 di dalam URL.'
+    );
+  }
+
+  if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+    return new Error(`Host "${hostname}" tidak dapat ditemukan. Periksa kembali DATABASE_URL.`);
+  }
+
+  if (err.code === 'ENETUNREACH' || err.code === 'ETIMEDOUT') {
+    return new Error(
+      `Tidak bisa menjangkau "${hostname}".\n\n` +
+        (isPooler
+          ? 'Periksa apakah proyek Supabase sedang aktif (proyek gratis dijeda bila lama tidak dipakai).'
+          : 'Anda memakai Direct connection yang hanya melayani IPv6, sedangkan ' +
+            'runner GitHub Actions hanya punya IPv4. Ganti ke Session pooler.')
+    );
+  }
+
+  return err;
 }
 
 /**
