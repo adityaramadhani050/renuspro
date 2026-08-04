@@ -105,7 +105,7 @@ Baris hanya perlu ditulis untuk user yang emailnya **berbeda** dari pola
 | 0 — Backup spreadsheet | Google Sheets: **File → Make a copy** |
 | 1.1 — Provision Supabase | dashboard Supabase di browser |
 | 2 — Service account Google | console.cloud.google.com; aktifkan **mode desktop** di browser, tampilannya padat |
-| 4.2 — Undangan password | Supabase → Authentication → Users → Send recovery |
+| 4.2 — Password awal | Supabase → SQL Editor (Opsi A), atau Authentication → Users → Send recovery (Opsi B) |
 | 5 — Deploy Vercel | vercel.com/new, impor dari GitHub |
 | 6 — Cutover Apps Script | script.google.com; menyunting `.gs` di tablet bisa, tapi sempit |
 
@@ -343,22 +343,60 @@ Supabase Auth (tanpa password).
 
 Aman dijalankan berkali-kali — impor bersifat idempoten, tidak menggandakan data.
 
-### 4.2 Kirim undangan password — **setelah Tahap 5, bukan sekarang**
-
-> **Jangan kirim undangan sebelum aplikasi web dideploy dan Tahap 5.2–5.3 selesai.**
->
-> Tautan pemulihan mengarah ke **Site URL** yang tersimpan di Supabase. Selama
-> Site URL masih bawaan (`http://localhost:3000`), tautan itu mendarat di alamat
-> yang tidak ada isinya di tablet maupun HP mana pun, dan penerima tidak bisa
-> menetapkan password. Tautannya hangus setelah satu jam dan hanya berlaku
-> sekali, jadi undangan yang dikirim terlalu awal harus dikirim ulang.
-
-Setelah Tahap 5 selesai: Dashboard Supabase → **Authentication → Users** → tiap
-user → **Send recovery**. Pengguna juga bisa memintanya sendiri lewat tombol
-**Lupa password?** di halaman masuk.
+### 4.2 Beri password awal
 
 Password lama dari sheet **tidak pernah** diimpor. Ia tersimpan plaintext
-(`Auth.gs:60`); memindahkannya berarti mewariskan kerentanannya.
+(`Auth.gs:60`); memindahkannya berarti mewariskan kerentanannya. Ada dua cara
+memberi user password baru — pilih salah satu.
+
+#### Opsi A — password awal bersama, diganti sendiri di aplikasi *(tanpa email)*
+
+Cara tercepat, dan tidak bergantung pada SMTP sama sekali. Jalankan di
+Dashboard Supabase → **SQL Editor**:
+
+```sql
+update auth.users u
+   set encrypted_password = crypt(default_bootstrap_password(), gen_salt('bf', 10)),
+       email_confirmed_at = coalesce(u.email_confirmed_at, now()),
+       updated_at         = now()
+ where u.id in (select p.id from profiles p where p.is_active);
+```
+
+Lalu umumkan ke tim: *"Masuk pakai email masing-masing, password `123456`.
+Aplikasi akan langsung meminta Anda menggantinya."*
+
+Bagian terakhir itu bukan basa-basi — **aplikasi menahan seluruh halaman**
+selama password masih yang awal (migrasi 17). Tanpa pagar itu, satu password
+yang sama untuk 22 orang di aplikasi yang terbuka di internet berarti satu
+tebakan membuka seluruh harga, HPP, dan tagihan. Dengan pagar itu, password
+awal hanya berguna satu kali.
+
+Periksa siapa yang belum mengganti — kapan pun, tanpa mengganggu siapa pun:
+
+```sql
+select p.username, p.full_name, p.role
+  from profiles p
+  join auth.users u on u.id = p.id
+ where u.encrypted_password = crypt(default_bootstrap_password(), u.encrypted_password)
+ order by p.username;
+```
+
+Kejar sampai daftarnya kosong. Selama masih ada isinya, akun-akun itulah
+lubangnya.
+
+#### Opsi B — undangan lewat email
+
+Lebih rapi karena tiap orang menetapkan passwordnya sendiri sejak awal, tapi
+**butuh Tahap 5.2–5.3 selesai lebih dulu**: tautan pemulihan mengarah ke Site
+URL, dan SMTP bawaan Supabase hanya sanggup beberapa email per jam.
+
+Dashboard Supabase → **Authentication → Users** → tiap user → **Send recovery**.
+Pengguna juga bisa memintanya sendiri lewat tombol **Lupa password?** di
+halaman masuk.
+
+> Kalau ragu: pakai **Opsi A** untuk cutover — semua orang bisa masuk di hari
+> yang sama tanpa bergantung pada email — dan **Opsi B** untuk seterusnya,
+> ketika ada satu orang yang lupa password.
 
 Kabarkan ke tim: *"Password lama tidak berlaku. Cek email untuk membuat password
 baru."*

@@ -479,7 +479,7 @@ Full-time bisa ditekan ke ±8–10 minggu.
 
 | Bagian | Lokasi | Bukti |
 |--------|--------|-------|
-| Skema Postgres (16 tabel, 9 view, 35 policy RLS, 96 fungsi) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
+| Skema Postgres (16 tabel, 9 view, 35 policy RLS, 98 fungsi) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
 | Tes perilaku skema | `supabase/tests/10_behaviour.sql` | penomoran, otomasi Deal→WO, constraint invoice, isolasi RLS antar role |
 | Importer Sheets → Supabase | `tools/importer/` | 22 tes lulus (15 parser + 7 integrasi ke Postgres sungguhan) |
 | Aplikasi web: Dashboard, Penawaran, Work Order, Invoice, Kwitansi, Produk, Klien | `apps/web/` | `npm run build` lolos (18 route), termasuk pemeriksaan tipe |

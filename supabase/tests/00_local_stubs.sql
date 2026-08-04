@@ -7,9 +7,12 @@
 
 create schema if not exists auth;
 
+-- encrypted_password ikut ditiru karena pagar password default membacanya.
+-- Supabase menyimpan bcrypt di sini; pgcrypto menghasilkan format yang sama.
 create table if not exists auth.users (
-  id    uuid primary key default gen_random_uuid(),
-  email text unique
+  id                 uuid primary key default gen_random_uuid(),
+  email              text unique,
+  encrypted_password text
 );
 
 -- Supabase menyediakan auth.uid() dari JWT. Lokal: dibaca dari GUC supaya

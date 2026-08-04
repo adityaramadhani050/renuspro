@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { getCurrentProfile } from '@/lib/supabase/server';
+import Link from 'next/link';
+import { getCurrentProfile, pakaiPasswordDefault } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/Sidebar';
 import { SignOutButton } from '@/components/SignOutButton';
 import { roleLabel, hasSalesModuleAccess } from '@/lib/roles';
@@ -11,6 +12,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // terautentikasi yang belum punya baris profiles, atau yang dinonaktifkan.
   if (!profile) redirect('/login?error=no-profile');
   if (!profile.is_active) redirect('/login?error=inactive');
+
+  // Pagar password awal. Ditaruh di layout, bukan di tiap halaman, supaya
+  // tidak ada rute yang bisa terlewat — termasuk rute yang ditambahkan nanti.
+  // Password awal itu sama untuk semua orang dan diketahui semua orang; selama
+  // masih terpasang, satu tebakan membuka seluruh harga dan HPP.
+  if (await pakaiPasswordDefault()) redirect('/ganti-password?wajib=1');
 
   // Peran yang modulnya belum ikut dimigrasi. Tanpa layar ini mereka akan
   // melihat menu lengkap berisi tabel kosong — dan menyimpulkan sistem barunya
@@ -25,7 +32,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <h1>RenusPro</h1>
           <div className="who">
             <strong>{profile.full_name}</strong>
-            <span>{roleLabel(profile.role)}</span>
+            <span>
+              {roleLabel(profile.role)} ·{' '}
+              <Link href="/ganti-password">Ganti password</Link>
+            </span>
           </div>
           <SignOutButton />
         </header>
