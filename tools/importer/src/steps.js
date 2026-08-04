@@ -19,9 +19,24 @@ import {
   parseWoNumber,
   splitWoNumber,
 } from './parse.js';
-import { loadLegacyMap } from './db.js';
+import { loadLegacyMap, loadKeyMap, insertMany } from './db.js';
 
 const norm = (v) => (parseText(v) || '').toLowerCase();
+
+/**
+ * Buang baris berkode ganda, pertahankan yang TERAKHIR.
+ *
+ * Wajib sebelum penyisipan massal: Postgres menolak satu pernyataan
+ * ON CONFLICT DO UPDATE yang menyentuh baris yang sama dua kali
+ * ("cannot affect row a second time"). Versi lama yang menyisipkan baris per
+ * baris tidak pernah menemui ini — baris belakangan sekadar menimpa yang
+ * sebelumnya. Perilaku itulah yang dipertahankan di sini.
+ */
+function dedupeByFirstColumn(rows) {
+  const byKey = new Map();
+  for (const row of rows) byKey.set(row[0], row);
+  return [...byKey.values()];
+}
 
 // ============================================================================
 // Data master
@@ -29,48 +44,62 @@ const norm = (v) => (parseText(v) || '').toLowerCase();
 
 export async function importCustomers(client, sheet, report) {
   // Master_Klien: 0 ID | 1 Nama Klien | 2 Perusahaan | 3 Alamat | 4 Kontak
-  let count = 0;
+  const rows = [];
   for (const row of sheet.rows) {
     const code = parseText(row[0]);
     if (!code) continue;
+    rows.push([
+      code,
+      parseText(row[1]) || code,
+      parseText(row[2]),
+      parseText(row[3]),
+      parseText(row[4]),
+    ]);
+  }
 
-    await client.query(
-      `insert into customers (legacy_code, name, company, address, phone)
-       values ($1, $2, $3, $4, $5)
-       on conflict (legacy_code) do update
+  await insertMany(
+    client,
+    'customers',
+    ['legacy_code', 'name', 'company', 'address', 'phone'],
+    dedupeByFirstColumn(rows),
+    {
+      onConflict: `on conflict (legacy_code) do update
          set name = excluded.name, company = excluded.company,
              address = excluded.address, phone = excluded.phone`,
-      [code, parseText(row[1]) || code, parseText(row[2]), parseText(row[3]), parseText(row[4])]
-    );
-    count++;
-  }
-  report.add('customers', count);
+    }
+  );
+
+  report.add('customers', dedupeByFirstColumn(rows).length);
 }
 
 export async function importProducts(client, sheet, report) {
   // Master_Produk: 0 ID | 1 Nama | 2 Unit | 3 Harga Satuan | 4 HPP
-  let count = 0;
+  const rows = [];
   for (const row of sheet.rows) {
     const code = parseText(row[0]);
     if (!code) continue;
+    rows.push([
+      code,
+      parseText(row[1]) || code,
+      parseText(row[2]) || 'unit',
+      parseNumber(row[3]),
+      parseNumber(row[4]),
+    ]);
+  }
 
-    await client.query(
-      `insert into products (legacy_code, name, unit, price, cost)
-       values ($1, $2, $3, $4, $5)
-       on conflict (legacy_code) do update
+  await insertMany(
+    client,
+    'products',
+    ['legacy_code', 'name', 'unit', 'price', 'cost'],
+    dedupeByFirstColumn(rows),
+    {
+      onConflict: `on conflict (legacy_code) do update
          set name = excluded.name, unit = excluded.unit,
              price = excluded.price, cost = excluded.cost`,
-      [
-        code,
-        parseText(row[1]) || code,
-        parseText(row[2]) || 'unit',
-        parseNumber(row[3]),
-        parseNumber(row[4]),
-      ]
-    );
-    count++;
-  }
-  report.add('products', count);
+    }
+  );
+
+  report.add('products', dedupeByFirstColumn(rows).length);
 }
 
 export async function importTemplates(client, sheet, report) {
@@ -250,25 +279,24 @@ export async function importQuotations(client, sheet, ctx, report) {
           [r.id, group.code, group.name, group.subtotal, group.sortOrder]
         );
 
-        for (const [i, item] of group.items.entries()) {
-          await client.query(
-            `insert into quotation_items
-               (group_id, product_id, description, qty, unit, price, cost, line_total, sort_order)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-            [
-              g.id,
-              productMap.get(item.productLegacyCode) || null,
-              item.description,
-              item.qty,
-              item.unit,
-              item.price,
-              item.cost,
-              item.lineTotal,
-              item.sortOrder || i,
-            ]
-          );
-          itemCount++;
-        }
+        await insertMany(
+          client,
+          'quotation_items',
+          ['group_id', 'product_id', 'description', 'qty', 'unit',
+           'price', 'cost', 'line_total', 'sort_order'],
+          group.items.map((item, i) => [
+            g.id,
+            productMap.get(item.productLegacyCode) || null,
+            item.description,
+            item.qty,
+            item.unit,
+            item.price,
+            item.cost,
+            item.lineTotal,
+            item.sortOrder || i,
+          ])
+        );
+        itemCount += group.items.length;
       }
     }
   }
@@ -324,16 +352,14 @@ export async function importWorkOrders(client, quotationSheet, notesSheet, ctx, 
 
   let count = 0;
   const seqByYear = new Map();
+  const quotationByNumber = await loadKeyMap(client, 'quotations', 'quote_number');
 
   for (const [quoteNumber, { row }] of latestByQuote) {
     const woNumber = parseWoNumber(row[17]);
     if (!woNumber) continue;
 
-    const { rows: [q] } = await client.query(
-      'select id from quotations where quote_number = $1',
-      [quoteNumber]
-    );
-    if (!q) continue;
+    const quotationId = quotationByNumber.get(quoteNumber);
+    if (!quotationId) continue;
 
     const note = notesByWo.get(woNumber) || {};
     const updatedById = note.updatedByName
@@ -349,7 +375,7 @@ export async function importWorkOrders(client, quotationSheet, notesSheet, ctx, 
              notes = excluded.notes,
              notes_updated_by = excluded.notes_updated_by,
              notes_updated_at = excluded.notes_updated_at`,
-      [woNumber, q.id, note.notes || null, updatedById, note.updatedAt || null]
+      [woNumber, quotationId, note.notes || null, updatedById, note.updatedAt || null]
     );
     count++;
 
@@ -367,16 +393,15 @@ export async function importWorkOrders(client, quotationSheet, notesSheet, ctx, 
 
 export async function importInvoiceRequests(client, sheet, ctx, report) {
   // WO_RequestInvoice: 0 No WO | 1 Klien | 2 Project | 3 Sales | 4 Pesan | 5 Status | 6 Tanggal
+  const workOrderByNumber = await loadKeyMap(client, 'work_orders', 'wo_number');
   let count = 0;
+
   for (const row of sheet.rows || []) {
     const woNumber = parseWoNumber(row[0]);
     if (!woNumber) continue;
 
-    const { rows: [w] } = await client.query(
-      'select id from work_orders where wo_number = $1',
-      [woNumber]
-    );
-    if (!w) {
+    const workOrderId = workOrderByNumber.get(woNumber);
+    if (!workOrderId) {
       report.warn('wo_hilang', `Permintaan invoice merujuk No WO ${woNumber} yang tidak ada`);
       continue;
     }
@@ -395,7 +420,7 @@ export async function importInvoiceRequests(client, sheet, ctx, report) {
              and message is not distinct from $3
              and created_at = coalesce($5::timestamptz, created_at)
         )`,
-      [w.id, requestedBy, parseText(row[4]), parseText(row[5]) || 'Pending', createdAt]
+      [workOrderId, requestedBy, parseText(row[4]), parseText(row[5]) || 'Pending', createdAt]
     );
     count += rowCount;
   }
@@ -412,6 +437,8 @@ export async function importInvoices(client, sheet, ctx, report) {
   // 11 DPP | 12 PPN(%) | 13 PPN Nominal | 14 Total | 15 META(JSON) |
   // 16 Status Bayar | 17 Catatan | 18 Dibuat Oleh | 19 Bank Account | 20 Tanggal Bayar
   const customerMap = await loadLegacyMap(client, 'customers');
+  const workOrderByNumber = await loadKeyMap(client, 'work_orders', 'wo_number');
+  const quotationByNumber = await loadKeyMap(client, 'quotations', 'quote_number');
   let count = 0;
 
   for (const row of sheet.rows) {
@@ -423,16 +450,11 @@ export async function importInvoices(client, sheet, ctx, report) {
 
     let workOrderId = null;
     if (woNumber) {
-      const { rows } = await client.query('select id from work_orders where wo_number = $1', [woNumber]);
-      workOrderId = rows[0]?.id || null;
+      workOrderId = workOrderByNumber.get(woNumber) || null;
       if (!workOrderId) report.warn('wo_hilang', `Invoice ${invoiceNumber} merujuk No WO ${woNumber} yang tidak ada`);
     }
 
-    let quotationId = null;
-    if (quoteNumber) {
-      const { rows } = await client.query('select id from quotations where quote_number = $1', [quoteNumber]);
-      quotationId = rows[0]?.id || null;
-    }
+    const quotationId = quoteNumber ? quotationByNumber.get(quoteNumber) || null : null;
 
     if (!workOrderId && !quotationId) {
       report.warn('invoice_yatim', `Invoice ${invoiceNumber} tidak bisa dikaitkan ke WO maupun penawaran — DILEWATI`);
@@ -504,7 +526,10 @@ export async function importInvoices(client, sheet, ctx, report) {
 export async function importReceipts(client, sheet, ctx, report) {
   // Kwitansi_Main: 0 No Kwitansi | 1 No Invoice | 2 No WO | 3 Tanggal |
   // 4 Terima Dari | 5 Jumlah | 6 Untuk Pembayaran | 7 Metode | 8 Catatan | 9 Dibuat Oleh
+  const invoiceByNumber = await loadKeyMap(client, 'invoices', 'invoice_number');
+  const workOrderByNumber = await loadKeyMap(client, 'work_orders', 'wo_number');
   let count = 0;
+
   for (const row of sheet.rows) {
     const receiptNumber = parseText(row[0]);
     if (!receiptNumber) continue;
@@ -512,16 +537,8 @@ export async function importReceipts(client, sheet, ctx, report) {
     const invoiceNumber = parseText(row[1]);
     const woNumber = parseWoNumber(row[2]);
 
-    let invoiceId = null;
-    if (invoiceNumber) {
-      const { rows } = await client.query('select id from invoices where invoice_number = $1', [invoiceNumber]);
-      invoiceId = rows[0]?.id || null;
-    }
-    let workOrderId = null;
-    if (woNumber) {
-      const { rows } = await client.query('select id from work_orders where wo_number = $1', [woNumber]);
-      workOrderId = rows[0]?.id || null;
-    }
+    const invoiceId = invoiceNumber ? invoiceByNumber.get(invoiceNumber) || null : null;
+    const workOrderId = woNumber ? workOrderByNumber.get(woNumber) || null : null;
 
     await client.query(
       `insert into receipts

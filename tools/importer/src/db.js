@@ -174,6 +174,62 @@ export async function loadLegacyMap(client, table) {
 }
 
 /**
+ * Peta <kolom kunci> → id, dimuat sekali di awal.
+ *
+ * Ini pengganti pola "satu SELECT per baris" yang tampak wajar saat ditulis
+ * tapi menjadi mahal sekali di produksi: 383 invoice yang masing-masing mencari
+ * Work Order dan penawarannya berarti 766 perjalanan bolak-balik ke Singapura.
+ * Satu query di muka menggantikan seluruhnya.
+ */
+export async function loadKeyMap(client, table, keyColumn) {
+  const { rows } = await client.query(
+    `select ${keyColumn} as k, id from ${table} where ${keyColumn} is not null`
+  );
+  return new Map(rows.map((r) => [String(r.k), r.id]));
+}
+
+// Postgres membatasi 65535 parameter per pernyataan; disisakan sedikit ruang.
+const MAX_PARAMS = 60000;
+
+/**
+ * Sisipkan banyak baris dalam satu pernyataan.
+ *
+ * Menyisipkan item satu per satu membuat biaya impor ditentukan oleh LATENSI
+ * jaringan, bukan oleh banyaknya data — dan latensi itulah yang dominan saat
+ * database berada di benua lain. Menggabungkannya menjadi satu pernyataan
+ * mengubah ribuan perjalanan menjadi beberapa saja.
+ *
+ * Dipecah otomatis bila melebihi batas parameter Postgres.
+ */
+export async function insertMany(client, table, columns, rows, { onConflict = '' } = {}) {
+  if (!rows.length) return 0;
+
+  const perRow = columns.length;
+  const chunkSize = Math.max(1, Math.floor(MAX_PARAMS / perRow));
+  let inserted = 0;
+
+  for (let start = 0; start < rows.length; start += chunkSize) {
+    const chunk = rows.slice(start, start + chunkSize);
+    const params = [];
+    const tuples = chunk.map((row, i) => {
+      const placeholders = row.map((value, j) => {
+        params.push(value);
+        return `$${i * perRow + j + 1}`;
+      });
+      return `(${placeholders.join(',')})`;
+    });
+
+    const { rowCount } = await client.query(
+      `insert into ${table} (${columns.join(',')}) values ${tuples.join(',')} ${onConflict}`,
+      params
+    );
+    inserted += rowCount;
+  }
+
+  return inserted;
+}
+
+/**
  * Semai document_counters dari nomor tertinggi yang sudah ada, supaya
  * dokumen baru tidak menabrak nomor historis.
  */
