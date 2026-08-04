@@ -222,3 +222,59 @@ export type InvoiceRow = {
   days_outstanding: number | null;
   aging_bucket: 'current' | 'gte30' | 'gte60' | 'gte90' | null;
 };
+
+/** Baris tunggal dari dashboard_kpi() — migrasi 19. */
+export type DashboardKpi = {
+  revenue_deal: number;
+  revenue_prev: number;
+  jumlah_penawaran: number;
+  penawaran_prev: number;
+  total_deal: number;
+  deal_prev: number;
+  pipeline_nilai: number;
+  pipeline_jumlah: number;
+  target_bulanan: number;
+  realisasi_bulanan: number;
+  target_setahun: number;
+  realisasi_setahun: number;
+  win_rate_pct: number;
+  avg_nilai_deal: number;
+  avg_margin_pct: number;
+  avg_sales_cycle: number;
+};
+
+export type LeaderboardRow = {
+  owner_id: string;
+  nama_sales: string;
+  penawaran: number;
+  nilai_total: number;
+  deal: number;
+  revenue_deal: number;
+  avg_margin_pct: number;
+  win_rate_pct: number;
+  target: number;
+  capaian_pct: number;
+};
+
+export type PipelineHealth = {
+  pipeline_nilai: number;
+  pipeline_jumlah: number;
+  sisa_target: number;
+  coverage: number;
+  umur_0_30_n: number;   umur_0_30_v: number;
+  umur_31_60_n: number;  umur_31_60_v: number;
+  umur_61_90_n: number;  umur_61_90_v: number;
+  umur_90plus_n: number; umur_90plus_v: number;
+};
+
+export type StaleRow = {
+  owner_id: string | null;
+  nama_sales: string;
+  quotation_id: string;
+  quote_number: string;
+  issue_date: string;
+  customer: string;
+  project: string;
+  nilai: number;
+  umur_hari: number;
+};
