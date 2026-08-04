@@ -16,7 +16,17 @@ import fs from 'node:fs';
 import { parseText, parseNumber, parseBool } from './parse.js';
 import { config } from './config.js';
 
-const VALID_ROLES = new Set(['admin', 'sales', 'finance']);
+// Sejalan dengan enum user_role di migrasi 11. Peran di luar daftar ini
+// tetap dijadikan 'sales' — tapi dilaporkan, bukan diam-diam.
+const VALID_ROLES = new Set([
+  'admin',
+  'owner',
+  'finance',
+  'sales',
+  'leadsales',
+  'warehouse',
+  'procurement',
+]);
 
 /** Baca users.csv opsional: username,email */
 export function readEmailOverrides(path) {
@@ -119,6 +129,7 @@ export async function importProfiles(client, sheet, options, report) {
   // Master_User: 0 ID | 1 Nama Lengkap | 2 Username | 3 Password | 4 Role | 5 Aktif | 6 Target
   const overrides = readEmailOverrides(options.usersCsv);
   const ownerByName = new Map();
+  const roleTally = new Map();
   let count = 0;
 
   const canCreateAuth =
@@ -131,8 +142,14 @@ export async function importProfiles(client, sheet, options, report) {
     if (!username || !fullName) continue;
 
     let role = (parseText(row[4]) || 'sales').toLowerCase();
+    roleTally.set(role, (roleTally.get(role) ?? 0) + 1);
+
     if (!VALID_ROLES.has(role)) {
-      report.warn('role_asing', `User "${username}" punya role "${role}"; dijadikan sales`);
+      report.warn(
+        'role_belum_dikenal',
+        `User "${username}" punya role "${role}" yang belum ada di skema; ` +
+          'sementara dijadikan sales'
+      );
       role = 'sales';
     }
 
@@ -189,6 +206,13 @@ export async function importProfiles(client, sheet, options, report) {
     ownerByName.set(fullName.trim().toLowerCase(), userId);
     count++;
   }
+
+  // Daftar peran selalu dicetak, bukan hanya yang bermasalah. Keputusan
+  // "peran apa saja yang perlu ada di sistem baru" tidak bisa diambil dari
+  // lima contoh yang terpotong — ia butuh daftar yang utuh.
+  report.roleTally = [...roleTally.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([role, n]) => ({ role, count: n, known: VALID_ROLES.has(role) }));
 
   report.add('profiles', count);
   return ownerByName;

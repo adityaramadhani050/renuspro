@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/lib/supabase/server';
 import { QuotationForm } from '../QuotationForm';
 import { loadQuotationFormOptions, today, defaultValidUntil } from '../formData';
+import { canWriteQuotations } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export default async function PenawaranBaruPage() {
   const profile = await getCurrentProfile();
   // Finance tidak membuat penawaran; RLS juga menolaknya, ini hanya agar
   // pengguna tidak dibiarkan mengisi form yang pasti gagal disimpan.
-  if (!profile || !['admin', 'sales'].includes(profile.role)) redirect('/penawaran');
+  if (!profile || !canWriteQuotations(profile.role)) redirect('/penawaran');
 
   const { customers, products, templates } = await loadQuotationFormOptions();
 

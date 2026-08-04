@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/lib/supabase/server';
 import { createCustomer } from '../actions';
 import { CustomerForm } from '../CustomerForm';
+import { canManageMaster } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
 export default async function KlienBaruPage() {
   const profile = await getCurrentProfile();
-  if (!profile || !['admin', 'sales'].includes(profile.role)) redirect('/klien');
+  if (!profile || !canManageMaster(profile.role)) redirect('/klien');
 
   return (
     <>

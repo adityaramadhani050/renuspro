@@ -4,6 +4,7 @@ import { parseListParams, rangeFor, likePattern, formatRupiah } from '@/lib/quer
 import { Pagination } from '@/components/Pagination';
 import { StatusBadge } from '@/components/StatusBadge';
 import type { QuotationListRow } from '@/lib/types';
+import { canWriteQuotations } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function PenawaranPage({
 
   const supabase = await createClient();
   const profile = await getCurrentProfile();
-  const canWrite = !!profile && ['admin', 'sales'].includes(profile.role);
+  const canWrite = !!profile && canWriteQuotations(profile.role);
 
   let query = supabase
     .from('v_quotations')

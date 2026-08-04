@@ -3,6 +3,7 @@ import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { QuotationForm } from '../../QuotationForm';
 import { loadQuotationFormOptions, today, defaultValidUntil } from '../../formData';
 import type { QuotationItemGroup } from '@/lib/types';
+import { canWriteQuotations } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,7 @@ export default async function PenawaranRevisiPage({
   const { id } = await params;
 
   const profile = await getCurrentProfile();
-  if (!profile || !['admin', 'sales'].includes(profile.role)) redirect(`/penawaran/${id}`);
+  if (!profile || !canWriteQuotations(profile.role)) redirect(`/penawaran/${id}`);
 
   const supabase = await createClient();
 

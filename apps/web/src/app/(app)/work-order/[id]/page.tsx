@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { NotesForm } from './NotesForm';
 import { RequestInvoiceForm } from './RequestInvoiceForm';
 import type { WorkOrderRow, InvoiceRow } from '@/lib/types';
+import { canManageFinance, isSuperuser } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,9 +54,9 @@ export default async function WorkOrderDetailPage({
       .returns<RequestRow[]>(),
   ]);
 
-  const canManageFinance = !!profile && ['admin', 'finance'].includes(profile.role);
-  const isOwner = !!profile && (profile.role === 'admin' || wo.owner_id === profile.id);
-  const canBill = canManageFinance && wo.remaining_dpp > 0;
+  const canBillFinance = !!profile && canManageFinance(profile.role);
+  const isOwner = !!profile && (isSuperuser(profile.role) || wo.owner_id === profile.id);
+  const canBill = canBillFinance && wo.remaining_dpp > 0;
 
   return (
     <>

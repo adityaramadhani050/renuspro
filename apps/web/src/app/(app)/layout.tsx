@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/Sidebar';
 import { SignOutButton } from '@/components/SignOutButton';
+import { roleLabel } from '@/lib/roles';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
@@ -29,6 +30,3 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 }
 
-function roleLabel(role: string) {
-  return { admin: 'Administrator', sales: 'Sales', finance: 'Finance' }[role] ?? role;
-}
