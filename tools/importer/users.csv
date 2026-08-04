@@ -1,23 +1,23 @@
 username,email,# nama lengkap,# role
-admin,,Admin,admin
-adit,,Aditya R,leadsales
-cica,,Elizabeth,sales
-rodea,,Rodea RR,sales
-irwin,,Irwinsyah P,leadsales
-musthofa,,Musthofa,sales
-finance,,Finance,finance
-warehouse,,Warehouse,warehouse
-sefty,,Sefty,procurement
-owner,,Owner,owner
-hartoyo,,Hartoyo,leadengineer
-akmal,,Akmal,siteengineer
-johan,,Johan,siteengineer
-ageng,,Ageng,siteengineer
-wahyu,,Wahyu,siteengineer
-jaka,,Jaka,siteengineer
-unyil,,Afif,siteengineer
-nanang,,Nanang,siteengineer
-priyo,,Priyo,sales
-lista,,Lista,sales
-dimas,,Dimas,projectcoordinator
-fina,,Fina,procurement
+admin,admin@renergynusantara.com,Admin,admin
+adit,adit@renergynusantara.com,Aditya R,leadsales
+cica,cica@renergynusantara.com,Elizabeth,sales
+rodea,rodea@renergynusantara.com,Rodea RR,sales
+irwin,irwin@renergynusantara.com,Irwinsyah P,leadsales
+musthofa,musthofa@renergynusantara.com,Musthofa,sales
+finance,finance@renergynusantara.com,Finance,finance
+warehouse,warehouse@renergynusantara.com,Warehouse,warehouse
+sefty,sefty@renergynusantara.com,Sefty,procurement
+owner,owner@renergynusantara.com,Owner,owner
+hartoyo,hartoyo@renergynusantara.com,Hartoyo,leadengineer
+akmal,akmal@renergynusantara.com,Akmal,siteengineer
+johan,johan@renergynusantara.com,Johan,siteengineer
+ageng,ageng@renergynusantara.com,Ageng,siteengineer
+wahyu,wahyu@renergynusantara.com,Wahyu,siteengineer
+jaka,jaka@renergynusantara.com,Jaka,siteengineer
+unyil,unyil@renergynusantara.com,Afif,siteengineer
+nanang,nanang@renergynusantara.com,Nanang,siteengineer
+priyo,priyo@renergynusantara.com,Priyo,sales
+lista,lista@renergynusantara.com,Lista,sales
+dimas,dimas@renergynusantara.com,Dimas,projectcoordinator
+fina,fina@renergynusantara.com,Fina,procurement
