@@ -40,3 +40,64 @@ export async function updateQuotationStatus(
   revalidatePath(`/penawaran/${id}`);
   return { ok: true };
 }
+
+// ── Simpan penawaran (baru atau revisi) ─────────────────────────────────────
+
+export type QuotationItemInput = {
+  product_id: string | null;
+  description: string;
+  qty: number;
+  unit: string;
+  price: number;
+  cost: number;
+};
+
+export type QuotationGroupInput = {
+  code: string | null;
+  name: string;
+  items: QuotationItemInput[];
+};
+
+export type QuotationPayload = {
+  quotation_id: string | null;
+  customer_id: string;
+  project_name: string;
+  issue_date: string;
+  valid_until: string | null;
+  discount: number;
+  tax_percent: number;
+  terms: Record<string, string>;
+  groups: QuotationGroupInput[];
+};
+
+export type SaveResult =
+  | { ok: true; quotation_id: string; quote_number: string; rev: number }
+  | { ok: false; error: string };
+
+/**
+ * Menyimpan penawaran lewat RPC save_quotation().
+ *
+ * Seluruh angka uang dihitung ULANG oleh database dari item — nilai yang
+ * dihitung di browser hanya untuk ditampilkan, tidak pernah dipercaya sebagai
+ * yang tersimpan. Sistem lama menyimpan apa pun yang dikirim browser
+ * (JS_Form_Penawaran.html:271 → Penawaran.gs:475).
+ *
+ * Empat tabel ditulis dalam satu transaksi; kalau ada yang gagal, tidak ada
+ * penawaran separuh jadi yang tertinggal.
+ */
+export async function saveQuotation(payload: QuotationPayload): Promise<SaveResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('save_quotation', { p_payload: payload });
+
+  if (error) {
+    return { ok: false, error: describeDbError(error) };
+  }
+
+  const result = data as { quotation_id: string; quote_number: string; rev: number };
+
+  revalidatePath('/penawaran');
+  revalidatePath(`/penawaran/${result.quotation_id}`);
+
+  return { ok: true, ...result };
+}

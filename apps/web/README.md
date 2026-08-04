@@ -11,13 +11,21 @@ satu tabel hanya boleh punya satu pemilik tulis.
 | Dashboard | `getDashboardRawData()` + kalkulasi KPI di `JS_Dashboard.html` |
 | Produk & Jasa (daftar + tambah/ubah/hapus) | `getProdukList`, `simpanProduk`, `editProduk`, `hapusProduk` (`Produk.gs`) |
 | Klien (daftar + tambah/ubah/hapus) | `getCustomerList`, `simpanCustomer`, `editCustomer`, `hapusCustomer` (`Customer.gs`) |
-| Penawaran (daftar, detail, riwayat revisi, ubah status) | `getPenawaranList`, `getRiwayatRevisi`, `updateStatusPenawaran` (`Penawaran.gs`) |
+| Penawaran (daftar, detail, buat, revisi, ubah status) | `getPenawaranList`, `getRiwayatRevisi`, `getInitialData`, `simpanPenawaranKeSheet`, `editPenawaran`, `updateStatusPenawaran` (`Penawaran.gs`) |
 
-Work Order, Invoice, dan Kwitansi menyusul pada tahap berikutnya. Form
-buat/ubah penawaran juga belum ada — modul Penawaran saat ini sudah bisa
-dibaca dan diubah statusnya, tapi penawaran baru masih dibuat di sistem lama.
+Work Order, Invoice, dan Kwitansi menyusul pada tahap berikutnya.
 
-### Dua perbedaan perilaku yang disengaja
+### Nilai uang dihitung server, bukan browser
+
+Penawaran disimpan lewat satu RPC `save_quotation()` yang menulis empat tabel
+dalam satu transaksi **dan menghitung ulang seluruh nilai uang dari item**.
+Angka yang dihitung di form hanya untuk ditampilkan.
+
+Sistem lama menyimpan apa pun yang dikirim browser
+(`JS_Form_Penawaran.html:271` → `Penawaran.gs:475`), sehingga nilai kontrak di
+database hanya sebaik JavaScript yang mengirimnya.
+
+### Tiga perbedaan perilaku yang disengaja
 
 **Menghapus klien yang masih punya penawaran ditolak.** Sistem lama
 (`Customer.gs:70`) menghapusnya begitu saja dan meninggalkan penawaran yang
@@ -26,6 +34,11 @@ merujuk klien tidak ada — di dashboard ia muncul sebagai kode mentah, bukan na
 **Keluar dari status Deal tidak menghapus Work Order.** Sistem lama
 menghapusnya (`Penawaran.gs:345`), padahal nomor WO itu mungkin sudah dipakai
 di invoice, yang lalu menjadi yatim.
+
+**Revisi tidak pernah menimpa revisi lama.** Tiap penyimpanan membuat revisi
+baru berikut seluruh itemnya, jadi riwayat penawaran bisa ditelusuri utuh —
+termasuk rincian item tiap revisi, yang di sistem lama hanya tersimpan sebagai
+satu blob JSON per baris.
 
 ## Menjalankan
 

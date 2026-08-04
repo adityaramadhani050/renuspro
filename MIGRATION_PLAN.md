@@ -482,13 +482,13 @@ Full-time bisa ditekan ke ±8–10 minggu.
 | Skema Postgres (16 tabel, 9 view, 35 policy RLS) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
 | Tes perilaku skema | `supabase/tests/10_behaviour.sql` | penomoran, otomasi Deal→WO, constraint invoice, isolasi RLS antar role |
 | Importer Sheets → Supabase | `tools/importer/` | 22 tes lulus (15 parser + 7 integrasi ke Postgres sungguhan) |
-| Aplikasi web: Dashboard, Produk, Klien (CRUD penuh), Penawaran (daftar/detail/revisi/status) | `apps/web/` | `npm run build` lolos, termasuk pemeriksaan tipe |
+| Aplikasi web: Dashboard, Produk, Klien, Penawaran — semuanya CRUD penuh | `apps/web/` | `npm run build` lolos, termasuk pemeriksaan tipe |
+| RPC `save_quotation()` transaksional | `supabase/migrations/20260804090000_save_quotation.sql` | 22 assertion di `supabase/tests/20_save_quotation.sql` |
 
 ### Belum dikerjakan
 
 | Bagian | Fase |
 |--------|------|
-| Form buat/ubah penawaran (item berkelompok) | 3 |
 | Modul Work Order, Invoice, Kwitansi di aplikasi web | 3 |
 | Laporan Sales & Finance di aplikasi web (view-nya sudah ada) | 3 |
 | Service WhatsApp/Baileys di Railway | 4 |

@@ -56,6 +56,7 @@ export type QuotationRevision = {
 
 export type QuotationItem = {
   id: string;
+  product_id: string | null;
   description: string;
   qty: number;
   unit: string;

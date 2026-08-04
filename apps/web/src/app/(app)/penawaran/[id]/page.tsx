@@ -25,10 +25,10 @@ export default async function PenawaranDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ rev?: string }>;
+  searchParams: Promise<{ rev?: string; error?: string }>;
 }) {
   const { id } = await params;
-  const { rev: revParam } = await searchParams;
+  const { rev: revParam, error: errorParam } = await searchParams;
 
   const supabase = await createClient();
   const profile = await getCurrentProfile();
@@ -65,7 +65,7 @@ export default async function PenawaranDetailPage({
         .from('quotation_item_groups')
         .select(
           'id, code, name, subtotal, sort_order, ' +
-            'quotation_items(id, description, qty, unit, price, cost, line_total, sort_order)'
+            'quotation_items(id, product_id, description, qty, unit, price, cost, line_total, sort_order)'
         )
         .eq('revision_id', selected.id)
         .order('sort_order')
@@ -73,9 +73,12 @@ export default async function PenawaranDetailPage({
     : { data: [] as QuotationItemGroup[] };
 
   const isCurrent = selected?.id === quotation.revision_id;
-  const canEditStatus =
-    !!profile &&
-    (profile.role === 'admin' || quotation.owner_id === profile.id);
+  const isOwnerOrAdmin =
+    !!profile && (profile.role === 'admin' || quotation.owner_id === profile.id);
+  const canEditStatus = isOwnerOrAdmin;
+  // Penawaran yang sudah Deal tidak boleh direvisi — aturan yang sama
+  // ditegakkan save_quotation() di database (Penawaran.gs:457).
+  const canRevise = isOwnerOrAdmin && quotation.status !== 'Deal';
 
   return (
     <>
@@ -88,12 +91,27 @@ export default async function PenawaranDetailPage({
             {quotation.quote_number} <StatusBadge status={quotation.status} />
           </h2>
         </div>
-        {quotation.wo_number ? (
-          <div className="wo-chip">
-            No. WO <strong>{quotation.wo_number}</strong>
-          </div>
-        ) : null}
+        <div className="filters">
+          {quotation.wo_number ? (
+            <div className="wo-chip">
+              No. WO <strong>{quotation.wo_number}</strong>
+            </div>
+          ) : null}
+          {canRevise ? (
+            <Link className="btn btn-primary" href={`/penawaran/${quotation.id}/revisi`}>
+              Buat Revisi
+            </Link>
+          ) : null}
+        </div>
       </div>
+
+      {errorParam === 'deal' ? (
+        <div className="error" style={{ maxWidth: 'none' }}>
+          Penawaran berstatus Deal tidak dapat direvisi. Nilainya sudah menjadi
+          dasar Work Order dan mungkin sudah ditagih, sehingga mengubahnya akan
+          membuat invoice tidak lagi cocok dengan kontraknya.
+        </div>
+      ) : null}
 
       <div className="detail-grid">
         {/* ── Kolom kiri: item ── */}

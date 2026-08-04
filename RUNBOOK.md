@@ -86,7 +86,7 @@ supabase link --project-ref <project-ref-anda>
 supabase db push
 ```
 
-`db push` menjalankan kedelapan berkas di `supabase/migrations/` secara berurutan.
+`db push` menjalankan seluruh berkas di `supabase/migrations/` secara berurutan.
 
 ### 1.4 Verifikasi
 
@@ -299,13 +299,18 @@ pada satu waktu**.
 |---|-------|-----------------|
 | 1 | Produk & Jasa | siap (CRUD lengkap) |
 | 2 | Klien | siap (CRUD lengkap) |
-| 3 | Penawaran — baca & ubah status | siap sebagian: **membuat penawaran baru masih di sistem lama** |
-| 4 | Penawaran — buat/ubah | belum dibangun |
-| 5 | Work Order, Invoice, Kwitansi | belum dibangun |
+| 3 | Penawaran (buat, revisi, ubah status) | siap |
+| 4 | Work Order, Invoice, Kwitansi | belum dibangun |
 
-Modul 1 dan 2 bisa di-cutover sekarang. Modul 3 baru bisa setelah form
-buat/ubah penawaran selesai — sebelum itu, penawaran masih harus ditulis dari
-Apps Script, sehingga kepemilikan tulisnya belum berpindah.
+Modul 1–3 bisa di-cutover sekarang.
+
+> **Catatan untuk Penawaran:** export PDF belum ada di aplikasi baru. Selama
+> Fase 5 belum selesai, penawaran tetap dibuat di aplikasi baru tapi PDF-nya
+> masih digenerate dari Apps Script. Itu tidak melanggar aturan satu-pemilik-
+> tulis — Apps Script hanya MEMBACA untuk mencetak, tidak menulis.
+>
+> Agar itu bekerja selama transisi, jalankan `npm run import` secara berkala
+> supaya data di kedua sisi tetap selaras, atau cetak PDF sebelum cutover.
 
 ### Langkah untuk tiap modul
 

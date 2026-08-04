@@ -382,3 +382,51 @@ input:focus, select:focus { outline: 2px solid var(--brand-soft); border-color: 
 .status-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .status-form .status-row { display: flex; gap: 8px; }
 .status-form .status-row select { flex: 1; }
+
+/* ── Form penawaran ──────────────────────────────────────────────────────── */
+.group-title { display: flex; align-items: center; gap: 10px; }
+.group-letter {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  background: var(--brand); color: #fff;
+  font-size: 13px; font-weight: 700;
+}
+.item-table th, .item-table td { padding: 7px 8px; }
+.item-table th:first-child, .item-table td:first-child { padding-left: 16px; }
+.item-table th:last-child,  .item-table td:last-child  { padding-right: 16px; }
+.item-table input, .item-table select { padding: 6px 8px; font-size: 13px; }
+.item-table tbody tr:hover { background: transparent; }
+
+.group-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  width: 26px; height: 26px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:hover { background: #fee4e2; border-color: #f3c6c2; color: var(--danger); }
+
+.internal-box {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.margin-warn { color: var(--danger); font-weight: 700; }
+.margin-ok   { color: var(--ok); font-weight: 700; }
+
+.totals .line input { padding: 5px 8px; font-size: 13px; }

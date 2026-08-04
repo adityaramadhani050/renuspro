@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { parseListParams, rangeFor, likePattern, formatRupiah } from '@/lib/query';
 import { Pagination } from '@/components/Pagination';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -31,6 +31,8 @@ export default async function PenawaranPage({
   const [from, to] = rangeFor(params);
 
   const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  const canWrite = !!profile && ['admin', 'sales'].includes(profile.role);
 
   let query = supabase
     .from('v_quotations')
@@ -86,6 +88,11 @@ export default async function PenawaranPage({
               Cari
             </button>
           </form>
+          {canWrite ? (
+            <Link className="btn btn-primary" href="/penawaran/baru">
+              + Buat Penawaran
+            </Link>
+          ) : null}
         </div>
       </div>
 

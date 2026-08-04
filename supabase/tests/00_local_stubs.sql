@@ -44,3 +44,14 @@ begin
   end if;
 end
 $$;
+
+-- Meniru grant bawaan Supabase atas helper auth.
+--
+-- Ini penting untuk kesetiaan tes: ekspresi kebijakan RLS dievaluasi Postgres
+-- dengan hak PEMILIK TABEL, sehingga auth.uid() di dalam policy tetap jalan
+-- tanpa grant apa pun. Tapi fungsi SECURITY INVOKER seperti save_quotation()
+-- memanggilnya sebagai pemanggil biasa — dan di situlah grant ini dibutuhkan.
+-- Tanpa baris ini, tes lokal gagal pada kasus yang di produksi justru berhasil.
+grant usage on schema auth to anon, authenticated, service_role;
+grant execute on function auth.uid()  to anon, authenticated, service_role;
+grant execute on function auth.role() to anon, authenticated, service_role;
