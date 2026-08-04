@@ -71,8 +71,8 @@ export default async function InvoicePage({
   };
 
   return (
-    <div className="card">
-      <div className="card-head">
+    <>
+      <div className="page-head">
         <h2>Invoice</h2>
         <div className="filters">
           <SearchBox
@@ -88,6 +88,8 @@ export default async function InvoicePage({
           ) : null}
         </div>
       </div>
+
+      <div className="card">
 
       <div className="tabbar">
         <Link className={!status ? 'active' : ''} href={filterHref('')}>
@@ -186,7 +188,8 @@ export default async function InvoicePage({
         q={params.q}
         extra={status ? { status } : undefined}
       />
-    </div>
+      </div>
+    </>
   );
 }
 

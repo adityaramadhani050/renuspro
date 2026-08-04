@@ -71,44 +71,47 @@ export default async function PenawaranPage({
   };
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Penawaran</h2>
-        <div className="filters">
-          <form className="search" method="get" action="/penawaran">
-            {status ? <input type="hidden" name="status" value={status} /> : null}
-            <input
-              type="search"
-              name="q"
-              defaultValue={params.q}
-              placeholder="Cari nomor, project, atau klien…"
-              aria-label="Cari penawaran"
-              style={{ minWidth: 260 }}
-            />
-            <button type="submit" className="btn">
-              Cari
-            </button>
-          </form>
-          {canWrite ? (
-            <Link className="btn btn-primary" href="/penawaran/baru">
-              + Buat Penawaran
+    <>
+      {/* Page_Penawaran.html: judul "Manajemen Penawaran" dengan tombol biru
+          di kanan, lalu baris filter di kartunya sendiri, baru tabel. */}
+      <div className="page-head">
+        <h2>Manajemen Penawaran</h2>
+        {canWrite ? (
+          <Link className="btn btn-primary" href="/penawaran/baru">
+            + Buat Penawaran Baru
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="filter-bar">
+        <form className="search" method="get" action="/penawaran">
+          {status ? <input type="hidden" name="status" value={status} /> : null}
+          <input
+            type="search"
+            name="q"
+            defaultValue={params.q}
+            placeholder="Cari no, project, klien..."
+            aria-label="Cari penawaran"
+          />
+          <button type="submit" className="btn">
+            Cari
+          </button>
+        </form>
+
+        <div className="tabbar plain">
+          <Link className={!status ? 'active' : ''} href={filterHref('')}>
+            Semua Status
+          </Link>
+          {STATUSES.map((s) => (
+            <Link key={s} className={status === s ? 'active' : ''} href={filterHref(s)}>
+              {s}
             </Link>
-          ) : null}
+          ))}
         </div>
       </div>
 
-      <div className="tabbar">
-        <Link className={!status ? 'active' : ''} href={filterHref('')}>
-          Semua
-        </Link>
-        {STATUSES.map((s) => (
-          <Link key={s} className={status === s ? 'active' : ''} href={filterHref(s)}>
-            {s}
-          </Link>
-        ))}
-      </div>
-
-      {error ? (
+      <div className="card">
+        {error ? (
         <div className="empty">Gagal memuat data: {error.message}</div>
       ) : !data || data.length === 0 ? (
         <div className="empty">
@@ -154,15 +157,16 @@ export default async function PenawaranPage({
         </table>
       )}
 
-      <Pagination
-        basePath="/penawaran"
-        page={params.page}
-        perPage={params.perPage}
-        count={count ?? 0}
-        q={params.q}
-        extra={status ? { status } : undefined}
-      />
-    </div>
+        <Pagination
+          basePath="/penawaran"
+          page={params.page}
+          perPage={params.perPage}
+          count={count ?? 0}
+          q={params.q}
+          extra={status ? { status } : undefined}
+        />
+      </div>
+    </>
   );
 }
 

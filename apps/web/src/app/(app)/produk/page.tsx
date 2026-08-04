@@ -36,9 +36,9 @@ export default async function ProdukPage({
   const { data, count, error } = await query.range(from, to);
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Produk &amp; Jasa</h2>
+    <>
+      <div className="page-head">
+        <h2>Katalog Material &amp; Jasa</h2>
         <div className="filters">
           <SearchBox
             basePath="/produk"
@@ -53,6 +53,8 @@ export default async function ProdukPage({
           ) : null}
         </div>
       </div>
+
+      <div className="card">
 
       {error ? (
         <div className="empty">Gagal memuat data: {error.message}</div>
@@ -100,7 +102,8 @@ export default async function ProdukPage({
         count={count ?? 0}
         q={params.q}
       />
-    </div>
+      </div>
+    </>
   );
 }
 
