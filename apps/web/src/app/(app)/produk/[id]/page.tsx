@@ -4,6 +4,7 @@ import { updateProduct, deleteProduct } from '../actions';
 import { ProductForm } from '../ProductForm';
 import { DeleteForm } from '@/components/DeleteForm';
 import type { Product } from '@/lib/types';
+import { canManageMaster } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export default async function ProdukEditPage({
   const { id } = await params;
 
   const profile = await getCurrentProfile();
-  if (!profile || !['admin', 'sales'].includes(profile.role)) redirect('/produk');
+  if (!profile || !canManageMaster(profile.role)) redirect('/produk');
 
   const supabase = await createClient();
   const { data: product } = await supabase

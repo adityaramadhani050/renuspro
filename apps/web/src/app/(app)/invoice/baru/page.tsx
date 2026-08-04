@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { InvoiceForm, type BillingSource, type BankOption } from '../InvoiceForm';
 import type { WorkOrderRow } from '@/lib/types';
+import { canManageFinance } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export default async function InvoiceBaruPage({
   const profile = await getCurrentProfile();
   // Sales meminta lewat halaman Work Order; penerbitannya hak finance & admin,
   // dan RLS menegakkannya di database.
-  if (!profile || !['admin', 'finance'].includes(profile.role)) redirect('/invoice');
+  if (!profile || !canManageFinance(profile.role)) redirect('/invoice');
 
   const supabase = await createClient();
 

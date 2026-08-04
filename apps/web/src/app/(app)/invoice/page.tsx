@@ -6,6 +6,7 @@ import { SearchBox } from '@/components/SearchBox';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PaymentStatusForm } from './PaymentStatusForm';
 import type { InvoiceRow } from '@/lib/types';
+import { canManageFinance } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default async function InvoicePage({
 
   const supabase = await createClient();
   const profile = await getCurrentProfile();
-  const canManageFinance = !!profile && ['admin', 'finance'].includes(profile.role);
+  const canWriteFinance = !!profile && canManageFinance(profile.role);
 
   let query = supabase
     .from('v_invoices')
@@ -80,7 +81,7 @@ export default async function InvoicePage({
             perPage={params.perPage}
             placeholder="Cari nomor, klien, atau project…"
           />
-          {canManageFinance ? (
+          {canWriteFinance ? (
             <Link className="btn btn-primary" href="/invoice/baru">
               + Terbitkan Invoice
             </Link>
@@ -120,7 +121,7 @@ export default async function InvoicePage({
               <th className="num" style={{ width: 150 }}>Total</th>
               <th style={{ width: 110 }}>Umur</th>
               <th style={{ width: 105 }}>Status</th>
-              {canManageFinance ? <th style={{ width: 120 }} /> : null}
+              {canWriteFinance ? <th style={{ width: 120 }} /> : null}
             </tr>
           </thead>
           <tbody>
@@ -159,7 +160,7 @@ export default async function InvoicePage({
                 <td>
                   <StatusBadge status={inv.payment_status} />
                 </td>
-                {canManageFinance ? (
+                {canWriteFinance ? (
                   <td>
                     <PaymentStatusForm id={inv.id} current={inv.payment_status} />
                   </td>

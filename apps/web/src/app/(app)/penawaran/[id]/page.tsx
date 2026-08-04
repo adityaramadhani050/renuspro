@@ -4,6 +4,7 @@ import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { formatRupiah, formatNumber } from '@/lib/query';
 import { StatusBadge } from '@/components/StatusBadge';
 import { StatusForm } from './StatusForm';
+import { isSuperuser, canWriteQuotations } from '@/lib/roles';
 import type {
   QuotationDetail,
   QuotationRevision,
@@ -74,7 +75,9 @@ export default async function PenawaranDetailPage({
 
   const isCurrent = selected?.id === quotation.revision_id;
   const isOwnerOrAdmin =
-    !!profile && (profile.role === 'admin' || quotation.owner_id === profile.id);
+    !!profile &&
+    (isSuperuser(profile.role) ||
+      (canWriteQuotations(profile.role) && quotation.owner_id === profile.id));
   const canEditStatus = isOwnerOrAdmin;
   // Penawaran yang sudah Deal tidak boleh direvisi — aturan yang sama
   // ditegakkan save_quotation() di database (Penawaran.gs:457).

@@ -4,6 +4,7 @@ import { updateCustomer, deleteCustomer } from '../actions';
 import { CustomerForm } from '../CustomerForm';
 import { DeleteForm } from '@/components/DeleteForm';
 import type { Customer } from '@/lib/types';
+import { canManageMaster } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export default async function KlienEditPage({
   const { id } = await params;
 
   const profile = await getCurrentProfile();
-  if (!profile || !['admin', 'sales'].includes(profile.role)) redirect('/klien');
+  if (!profile || !canManageMaster(profile.role)) redirect('/klien');
 
   const supabase = await createClient();
   const { data: customer } = await supabase

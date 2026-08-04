@@ -3,6 +3,7 @@ import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { parseListParams, rangeFor, likePattern } from '@/lib/query';
 import { Pagination } from '@/components/Pagination';
 import { SearchBox } from '@/components/SearchBox';
+import { canManageMaster } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function KlienPage({
   const [from, to] = rangeFor(params);
   const supabase = await createClient();
   const profile = await getCurrentProfile();
-  const canWrite = !!profile && ['admin', 'sales'].includes(profile.role);
+  const canWrite = !!profile && canManageMaster(profile.role);
 
   let query = supabase
     .from('customers')

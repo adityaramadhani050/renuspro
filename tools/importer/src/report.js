@@ -15,6 +15,7 @@ export class Report {
     this.unmatchedOwners = new Map();
     this.reconciliation = [];
     this.skippedValues = new Map();
+    this.roleTally = [];
   }
 
   add(entity, n) {
@@ -104,6 +105,23 @@ export class Report {
         const more = docs.length > 5 ? `, +${docs.length - 5} lainnya` : '';
         out.push(`  • "${name}"  (${docs.length} dokumen)`);
         out.push(`      ${sample}${more}`);
+      }
+    }
+
+    // ── Sebaran peran ──
+    if (this.roleTally.length) {
+      out.push('', rule, 'PERAN PENGGUNA DI MASTER_USER', rule);
+      for (const { role, count, known } of this.roleTally) {
+        const mark = known ? ' ' : '!';
+        out.push(`  ${mark} ${role.padEnd(16)} ${String(count).padStart(3)} user`);
+      }
+      if (this.roleTally.some((r) => !r.known)) {
+        out.push(
+          '',
+          '  Tanda ! menandai peran yang belum ada di skema. Peran itu sementara',
+          '  dijadikan sales — beri tahu peran apa yang seharusnya, agar bisa',
+          '  ditambahkan berikut hak aksesnya.'
+        );
       }
     }
 
