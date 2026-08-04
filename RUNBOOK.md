@@ -25,17 +25,16 @@ tombol.
 
 ### Sebelum mulai: jadikan repository PRIVAT
 
-Saat ini repository ini **publik**. Yang ikut terbaca siapa pun antara lain
-`SheetInit.gs`, yang memuat daftar harga **beserta HPP** — itu struktur margin
-Anda — dan `README.md` yang menyebut kredensial default `admin` / `admin123`.
-
-Terlepas dari soal tablet, kredensial database **tidak boleh** disimpan sebagai
-Actions secret pada repository publik.
+Kredensial database dan kunci `service_role` **tidak boleh** disimpan sebagai
+Actions secret pada repository publik. Pastikan repository sudah privat sebelum
+melanjutkan ke langkah berikutnya.
 
 > GitHub → **Settings** → gulir ke **Danger Zone** → **Change repository
 > visibility** → **Make private**
 
-Setelah privat, ganti juga password admin default kalau masih dipakai.
+Sekalian tinjau isi repository terhadap data yang sebaiknya tidak terbuka —
+data contoh pada berkas inisialisasi sheet, dan kredensial default yang
+disebut di dokumentasi.
 
 ### Sekali saja: isi Secrets
 
