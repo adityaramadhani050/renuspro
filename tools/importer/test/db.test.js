@@ -74,3 +74,40 @@ test('password yang sudah di-encode tetap diterima', () => {
   const encoded = 'postgresql://postgres.abc:pa%23ss@host:5432/postgres';
   assert.equal(assertValidPostgresUrl(encoded), encoded);
 });
+
+// ── Penjelasan kegagalan koneksi ────────────────────────────────────────────
+
+import { explainConnectionError } from '../src/db.js';
+
+const POOLER = 'postgresql://postgres:pw@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres';
+const POOLER_OK = 'postgresql://postgres.abcdef:pw@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres';
+const DIRECT = 'postgresql://postgres:pw@db.abcdef.supabase.co:5432/postgres';
+
+test('auth gagal pada pooler tanpa project-ref menunjuk ke username, bukan password', () => {
+  const e = explainConnectionError({ code: '28P01' }, POOLER);
+  assert.match(e.message, /postgres\.<project-ref>/);
+  assert.match(e.message, /Session pooler/);
+});
+
+test('auth gagal dengan username benar menunjuk ke password', () => {
+  const e = explainConnectionError({ code: '28P01' }, POOLER_OK);
+  assert.match(e.message, /Password pada DATABASE_URL/);
+  assert.doesNotMatch(e.message, /project-ref/, 'jangan menyalahkan username yang sudah benar');
+});
+
+test('jaringan tak terjangkau pada Direct connection menyebut IPv6', () => {
+  const e = explainConnectionError({ code: 'ENETUNREACH' }, DIRECT);
+  assert.match(e.message, /IPv6/);
+  assert.match(e.message, /Session pooler/);
+});
+
+test('jaringan tak terjangkau pada pooler menyarankan cek proyek dijeda', () => {
+  const e = explainConnectionError({ code: 'ETIMEDOUT' }, POOLER_OK);
+  assert.match(e.message, /dijeda/);
+  assert.doesNotMatch(e.message, /IPv6/, 'pooler melayani IPv4, jadi IPv6 bukan penyebabnya');
+});
+
+test('error yang tidak dikenali diteruskan apa adanya', () => {
+  const original = { code: 'SOMETHING_ELSE', message: 'boom' };
+  assert.equal(explainConnectionError(original, POOLER_OK), original);
+});
