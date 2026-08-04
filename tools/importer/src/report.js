@@ -71,6 +71,15 @@ export class Report {
         // Selisih yang sudah diketahui sebabnya jauh lebih tidak menakutkan
         // daripada selisih tanpa keterangan.
         if (r.note) out.push(`      SEBAB    : ${r.note}`);
+
+        // Menyebut dokumennya mengubah pertanyaan "kenapa kurang satu?"
+        // menjadi "oh, yang ini" — dan biasanya sekaligus menjawabnya, karena
+        // tanggal dokumen langsung memperlihatkan apakah ia dibuat setelah
+        // impor terakhir.
+        if (r.items?.length) {
+          out.push(`      RINCIAN  :`);
+          for (const item of r.items) out.push(`        · ${item}`);
+        }
       }
     }
 
