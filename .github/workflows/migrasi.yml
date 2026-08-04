@@ -54,7 +54,9 @@ concurrency:
 jobs:
   jalankan:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Impor penuh atas data produksi memakan waktu; batas ini adalah jaring
+    # pengaman, bukan target. Kalau sampai tersentuh, ada yang salah.
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4

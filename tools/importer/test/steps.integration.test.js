@@ -353,6 +353,29 @@ describe('importer → Postgres', { skip: available ? false : 'Postgres tidak te
     );
   });
 
+  test('kode ganda di sheet tidak menggagalkan penyisipan massal', async () => {
+    // Penyisipan massal dengan ON CONFLICT akan ditolak Postgres bila satu
+    // pernyataan menyentuh baris yang sama dua kali. Sheet nyata bisa saja
+    // memuat kode ganda, jadi importer harus tahan terhadapnya.
+    const data = sheets();
+    data.customer.rows.push(
+      ['K001', 'PT SUMMIT GLOBAL TEKNOLOGI (versi terbaru)', 'C&I', 'Jakarta', '0811'],
+    );
+
+    await runImport(data);
+
+    const { rows } = await client.query(
+      `select name, address from customers where legacy_code = 'K001'`
+    );
+    assert.equal(rows.length, 1, 'tetap satu baris, tidak digandakan');
+    assert.equal(
+      rows[0].name,
+      'PT SUMMIT GLOBAL TEKNOLOGI (versi terbaru)',
+      'baris terakhir yang menang — sama seperti perilaku penyisipan baris per baris'
+    );
+    assert.equal(rows[0].address, 'Jakarta');
+  });
+
   async function countAll() {
     const tables = [
       'customers', 'products', 'package_templates', 'package_template_items',
