@@ -1,0 +1,170 @@
+name: Migrasi RenusPro
+
+# ============================================================================
+# Menjalankan seluruh langkah migrasi TANPA komputer.
+#
+# Semuanya dipicu dari tombol "Run workflow" di tab Actions, yang bisa dibuka
+# dari browser tablet atau HP. Kredensial disimpan sebagai GitHub Secrets —
+# tidak pernah diketik ulang, tidak pernah ikut ter-commit, dan tidak terlihat
+# di log (GitHub menyensornya otomatis).
+#
+# PRASYARAT:
+#   1. Repository harus PRIVAT sebelum secrets diisi
+#   2. Berkas ini harus ada di branch default (main) agar tombolnya muncul
+#
+# Secrets yang perlu diisi di Settings → Secrets and variables → Actions:
+#   SUPABASE_PROJECT_REF        ref proyek Supabase (Settings → General)
+#   SUPABASE_ACCESS_TOKEN       token pribadi (supabase.com/dashboard/account/tokens)
+#   SUPABASE_DB_PASSWORD        password database yang ditetapkan saat provision
+#   DATABASE_URL                connection string Postgres
+#   SUPABASE_URL                https://xxxx.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY   kunci service_role
+#   SHEET_ID                    ID spreadsheet sumber
+#   GOOGLE_SERVICE_ACCOUNT_JSON isi lengkap berkas JSON service account
+#
+# Variable (bukan secret) di tab Variables:
+#   AUTH_EMAIL_DOMAIN           mis. renusglobal.co.id
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      langkah:
+        description: 'Langkah yang dijalankan'
+        required: true
+        default: '3-impor-percobaan'
+        type: choice
+        options:
+          - 1-terapkan-skema
+          - 2-buat-daftar-user
+          - 3-impor-percobaan
+          - 4-impor-sungguhan
+          - 5-rekonsiliasi-saja
+      konfirmasi:
+        description: 'Untuk langkah 4 saja — ketik: IMPOR'
+        required: false
+        default: ''
+        type: string
+
+# Dua impor yang berjalan bersamaan bisa saling menimpa; antrikan.
+concurrency:
+  group: migrasi-renuspro
+  cancel-in-progress: false
+
+jobs:
+  jalankan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Pengaman langkah 4 ────────────────────────────────────────────────
+      # Impor sungguhan menulis ke database produksi dan membuat user di
+      # Supabase Auth. Satu ketikan konfirmasi mencegahnya terpilih tidak
+      # sengaja dari menu dropdown di layar sentuh.
+      - name: Periksa konfirmasi impor sungguhan
+        if: inputs.langkah == '4-impor-sungguhan'
+        run: |
+          if [ "${{ inputs.konfirmasi }}" != "IMPOR" ]; then
+            echo "::error::Langkah 4 menulis ke database produksi."
+            echo "::error::Ketik IMPOR pada kolom konfirmasi untuk melanjutkan."
+            exit 1
+          fi
+
+      # ── Langkah 1: terapkan skema ─────────────────────────────────────────
+      - name: Pasang Supabase CLI
+        if: inputs.langkah == '1-terapkan-skema'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Terapkan migration ke Supabase
+        if: inputs.langkah == '1-terapkan-skema'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          supabase db push
+          echo "### Skema diterapkan" >> "$GITHUB_STEP_SUMMARY"
+          echo "Periksa di SQL Editor: harus ada 16 tabel, 9 view, 35 policy." >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Langkah 2–5: importer ─────────────────────────────────────────────
+      - name: Siapkan Node
+        if: inputs.langkah != '1-terapkan-skema'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tools/importer/package-lock.json
+
+      - name: Pasang dependensi importer
+        if: inputs.langkah != '1-terapkan-skema'
+        working-directory: tools/importer
+        run: npm ci
+
+      - name: Tulis kredensial service account
+        if: inputs.langkah != '1-terapkan-skema'
+        working-directory: tools/importer
+        env:
+          SA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          # Ditulis lewat variabel environment, bukan interpolasi langsung,
+          # supaya isinya tidak pernah muncul di perintah yang ter-log.
+          printf '%s' "$SA_JSON" > service-account.json
+          if ! node -e "JSON.parse(require('fs').readFileSync('service-account.json','utf8'))"; then
+            echo "::error::GOOGLE_SERVICE_ACCOUNT_JSON bukan JSON yang valid."
+            exit 1
+          fi
+
+      - name: Jalankan importer
+        if: inputs.langkah != '1-terapkan-skema'
+        working-directory: tools/importer
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ./service-account.json
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AUTH_EMAIL_DOMAIN: ${{ vars.AUTH_EMAIL_DOMAIN }}
+        run: |
+          set -o pipefail
+          case "${{ inputs.langkah }}" in
+            2-buat-daftar-user)  ARGS="--emit-user-template" ;;
+            3-impor-percobaan)   ARGS="--dry-run" ;;
+            4-impor-sungguhan)   ARGS="--create-auth-users" ;;
+            5-rekonsiliasi-saja) ARGS="--reconcile-only" ;;
+          esac
+
+          echo "Menjalankan: npm run import -- $ARGS"
+          npm run import -- $ARGS 2>&1 | tee hasil.txt
+
+      # Laporan ditaruh di ringkasan agar terbaca langsung di layar kecil,
+      # tanpa perlu menggulir log mentah yang panjang.
+      - name: Tampilkan laporan di ringkasan
+        if: always() && inputs.langkah != '1-terapkan-skema'
+        working-directory: tools/importer
+        run: |
+          {
+            echo "## Hasil: ${{ inputs.langkah }}"
+            echo ""
+            echo '```'
+            tail -n 120 hasil.txt 2>/dev/null || echo "(tidak ada keluaran)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Unggah users.csv
+        if: inputs.langkah == '2-buat-daftar-user'
+        uses: actions/upload-artifact@v4
+        with:
+          name: users-csv
+          path: tools/importer/users.csv
+          if-no-files-found: warn
+
+      # Kredensial dihapus walaupun runner memang dibuang setelah selesai —
+      # kebiasaan yang murah dan menutup kesalahan konfigurasi di masa depan.
+      - name: Bersihkan kredensial
+        if: always()
+        working-directory: tools/importer
+        run: rm -f service-account.json

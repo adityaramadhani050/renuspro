@@ -8,6 +8,119 @@ Script ke Supabase + Vercel. Latar belakang dan alasan setiap keputusan ada di
 menjadi sumber kebenaran dan tidak ada satu pun langkah yang tidak bisa
 dibatalkan. Yang perlu kehati-hatian sungguhan hanya Tahap 6.
 
+**Tidak punya komputer?** Seluruh langkah bisa dijalankan dari browser tablet
+atau HP — lihat [bagian berikutnya](#menjalankan-tanpa-komputer-tablet--hp).
+Perintah `npm`/`supabase` di tiap tahap punya padanan tombol di GitHub Actions.
+
+---
+
+---
+
+## Menjalankan tanpa komputer (tablet / HP)
+
+Seluruh runbook ini bisa dijalankan **hanya dari browser di tablet Android
+atau HP**. Dua langkah yang tampaknya butuh komputer — menerapkan skema dan
+menjalankan importer — dipindahkan ke GitHub Actions, jadi Anda cukup menekan
+tombol.
+
+### Sebelum mulai: jadikan repository PRIVAT
+
+Saat ini repository ini **publik**. Yang ikut terbaca siapa pun antara lain
+`SheetInit.gs`, yang memuat daftar harga **beserta HPP** — itu struktur margin
+Anda — dan `README.md` yang menyebut kredensial default `admin` / `admin123`.
+
+Terlepas dari soal tablet, kredensial database **tidak boleh** disimpan sebagai
+Actions secret pada repository publik.
+
+> GitHub → **Settings** → gulir ke **Danger Zone** → **Change repository
+> visibility** → **Make private**
+
+Setelah privat, ganti juga password admin default kalau masih dipakai.
+
+### Sekali saja: isi Secrets
+
+GitHub → **Settings** → **Secrets and variables** → **Actions** → tombol
+**New repository secret**, satu per satu:
+
+| Nama secret | Diambil dari |
+|-------------|--------------|
+| `SUPABASE_PROJECT_REF` | Supabase → Settings → General |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com/dashboard/account/tokens |
+| `SUPABASE_DB_PASSWORD` | password yang Anda tetapkan saat provision |
+| `DATABASE_URL` | Supabase → Settings → Database → Connection string |
+| `SUPABASE_URL` | Supabase → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API |
+| `SHEET_ID` | dari URL spreadsheet |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | **seluruh isi** berkas JSON service account |
+
+Lalu di tab **Variables** (bukan Secrets), tambahkan `AUTH_EMAIL_DOMAIN`
+berisi domain email perusahaan, mis. `renusglobal.co.id`.
+
+Nilai secret tidak bisa dibaca kembali setelah disimpan, tidak ikut ter-commit,
+dan disensor otomatis dari log. Anda cukup mengetiknya sekali.
+
+### Menjalankan tiap langkah
+
+GitHub → tab **Actions** → **Migrasi RenusPro** → tombol **Run workflow** →
+pilih langkah → **Run workflow**.
+
+| Pilihan | Menggantikan tahap |
+|---------|--------------------|
+| `1-terapkan-skema` | Tahap 1.3 (`supabase db push`) |
+| `2-buat-daftar-user` | Tahap 3.1 (`--emit-user-template`) |
+| `3-impor-percobaan` | Tahap 3.2 (`--dry-run`) |
+| `4-impor-sungguhan` | Tahap 4.1 (`--create-auth-users`) |
+| `5-rekonsiliasi-saja` | `npm run reconcile` |
+
+Laporan rekonsiliasi muncul di **halaman ringkasan** run tersebut — bukan di
+log mentah — supaya terbaca nyaman di layar kecil.
+
+**Langkah 4 minta konfirmasi:** ketik `IMPOR` di kolom konfirmasi. Itu satu-
+satunya langkah yang menulis ke database produksi, dan dropdown di layar
+sentuh terlalu mudah tersenggol.
+
+> ⚠ **Tombol "Run workflow" hanya muncul kalau berkas workflow sudah ada di
+> branch `main`.** Merge dulu branch migrasi ke `main` lewat Pull Request —
+> bisa dilakukan sepenuhnya dari browser.
+
+### Mengisi users.csv dari tablet
+
+Setelah menjalankan `2-buat-daftar-user`, daftar username tampil di ringkasan
+run. Buat berkasnya langsung di GitHub:
+
+**Add file** → **Create new file** → nama `tools/importer/users.csv` → isi:
+
+```
+username,email
+admin,direktur@renusglobal.co.id
+sales1,budi@renusglobal.co.id
+```
+
+Baris hanya perlu ditulis untuk user yang emailnya **berbeda** dari pola
+`username@AUTH_EMAIL_DOMAIN`. Commit, lalu jalankan ulang langkah 3.
+
+### Tahap lain yang memang sudah berbasis browser
+
+| Tahap | Cara di tablet |
+|-------|----------------|
+| 0 — Backup spreadsheet | Google Sheets: **File → Make a copy** |
+| 1.1 — Provision Supabase | dashboard Supabase di browser |
+| 2 — Service account Google | console.cloud.google.com; aktifkan **mode desktop** di browser, tampilannya padat |
+| 4.2 — Undangan password | Supabase → Authentication → Users → Send recovery |
+| 5 — Deploy Vercel | vercel.com/new, impor dari GitHub |
+| 6 — Cutover Apps Script | script.google.com; menyunting `.gs` di tablet bisa, tapi sempit |
+
+### Kalau butuh terminal sungguhan
+
+Untuk hal di luar runbook — memeriksa sesuatu secara langsung, menjalankan
+query ad-hoc — **Google Cloud Shell** ([shell.cloud.google.com](https://shell.cloud.google.com))
+memberi terminal Linux lengkap di dalam browser, gratis, sudah berisi Node,
+`git`, dan `psql`. Dari tablet ia berfungsi seperti komputer.
+
+Menyunting kode di tablet juga tidak perlu editor: buka repository di
+[github.dev](https://github.dev) — tekan tombol titik (`.`) pada halaman repo —
+dan Anda mendapat VS Code di browser.
+
 ---
 
 ## Tahap 0 — Persiapan (± 30 menit)
@@ -28,8 +141,13 @@ backup adalah syarat yang tidak dinegosiasikan.
 - Akun **Supabase** (Free cukup untuk uji coba; Pro $25/bln untuk produksi)
 - Akun **Vercel** (Hobby cukup untuk uji coba)
 - Akun **Google Cloud** untuk service account
-- **Node.js 20+** di komputer Anda
-- **Supabase CLI**: `npm install -g supabase`
+
+Kalau punya komputer:
+
+- **Node.js 20+** dan **Supabase CLI** (`npm install -g supabase`)
+
+Kalau hanya punya tablet/HP: lewati keduanya — lihat
+[Menjalankan tanpa komputer](#menjalankan-tanpa-komputer-tablet--hp) di atas.
 
 ### 0.3 Catat angka "sebelum"
 
