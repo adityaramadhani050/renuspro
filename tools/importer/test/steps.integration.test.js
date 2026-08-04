@@ -376,6 +376,58 @@ describe('importer → Postgres', { skip: available ? false : 'Postgres tidak te
     assert.equal(rows[0].address, 'Jakarta');
   });
 
+  test('baris revisi ganda menyatu, dan itu tidak dianggap data hilang', async () => {
+    const data = sheets();
+    // Salin baris rev 0 penawaran pertama — pasangan (No, Rev) jadi ganda.
+    data.quotation.rows.push([...data.quotation.rows[0]]);
+
+    const report = await runImport(data);
+
+    const reconReport = new Report();
+    await reconcileMod.reconcile(client, data, reconReport);
+
+    const revRow = reconReport.reconciliation.find((r) =>
+      r.label.startsWith('Jumlah revisi penawaran')
+    );
+    assert.equal(
+      revRow.ok,
+      true,
+      'pasangan yang menyatu memang seharusnya satu revisi — bukan kehilangan data'
+    );
+
+    assert.ok(
+      report.warnings.has('revisi_ganda'),
+      'kejadiannya tetap harus dilaporkan supaya bisa dibereskan di sumbernya'
+    );
+  });
+
+  test('klien pengganti tidak dihitung sebagai selisih', async () => {
+    const data = sheets();
+    // Penawaran yang merujuk klien di luar Master_Klien → importer membuat
+    // baris pengganti agar penawarannya tidak ikut hilang.
+    data.quotation.rows.push([
+      '003/QUOT/III/2026', 0, '19/03/2026', '19/04/2026', 'Proyek Klien Hilang',
+      'K999', 'Sales Executive', 1000000, 0, 110000, 1110000,
+      600000, 400000, 40, '{}',
+      JSON.stringify([{ kelompok: 'A', namaKelompok: 'X', subtotal: 1000000,
+        subItems: [{ noItem: 1, deskripsi: 'Item', qty: 1, harga: 1000000, hpp: 600000, total: 1000000 }] }]),
+      'On-Progress', '', '',
+    ]);
+
+    await runImport(data);
+
+    const reconReport = new Report();
+    await reconcileMod.reconcile(client, data, reconReport);
+
+    const custRow = reconReport.reconciliation.find((r) => r.label.startsWith('Jumlah klien'));
+    assert.equal(custRow.ok, true, 'klien dari sheet tetap cocok');
+    assert.match(
+      custRow.note ?? '',
+      /klien pengganti/,
+      'keberadaan klien pengganti dijelaskan, bukan disembunyikan'
+    );
+  });
+
   async function countAll() {
     const tables = [
       'customers', 'products', 'package_templates', 'package_template_items',
