@@ -14,6 +14,7 @@ export class Report {
     this.warnings = new Map();
     this.unmatchedOwners = new Map();
     this.reconciliation = [];
+    this.skippedValues = new Map();
   }
 
   add(entity, n) {
@@ -23,6 +24,15 @@ export class Report {
   warn(kind, message) {
     if (!this.warnings.has(kind)) this.warnings.set(kind, []);
     this.warnings.get(kind).push(message);
+  }
+
+  /** Nilai yang gagal diimpor, untuk menjelaskan selisih rekonsiliasi. */
+  addSkippedValue(entity, amount) {
+    this.skippedValues.set(entity, (this.skippedValues.get(entity) ?? 0) + amount);
+  }
+
+  skippedTotal(entity) {
+    return this.skippedValues.get(entity) ?? 0;
   }
 
   unmatchedOwner(name, docRef) {
@@ -57,6 +67,9 @@ export class Report {
         out.push(`      sheets   : ${fmt(r.sheet)}`);
         out.push(`      postgres : ${fmt(r.db)}`);
         if (!r.ok) out.push(`      SELISIH  : ${fmt(r.db - r.sheet)}`);
+        // Selisih yang sudah diketahui sebabnya jauh lebih tidak menakutkan
+        // daripada selisih tanpa keterangan.
+        if (r.note) out.push(`      SEBAB    : ${r.note}`);
       }
     }
 

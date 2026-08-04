@@ -11,8 +11,35 @@ import { parseNumber, parseText, parseWoNumber } from './parse.js';
 const IDR_TOLERANCE = 1; // toleransi pembulatan 1 rupiah
 
 export async function reconcile(client, sheets, report) {
-  // ── Jumlah baris master ──
-  await compareCount(client, report, 'Jumlah klien', 'customers', countRows(sheets.customer, 0));
+  // ── Klien ──
+  // Dibandingkan hanya terhadap klien yang MEMANG berasal dari sheet. Importer
+  // juga membuat baris pengganti untuk klien yang dirujuk penawaran tapi sudah
+  // dihapus dari master; menghitungnya di sini akan memunculkan selisih yang
+  // sebenarnya adalah perilaku yang diinginkan.
+  const sheetCustomerCodes = (sheets.customer.rows || [])
+    .map((r) => parseText(r[0]))
+    .filter(Boolean);
+
+  const { rows: [cust] } = await client.query(
+    'select count(*)::int as n from customers where legacy_code = any($1)',
+    [sheetCustomerCodes]
+  );
+  const { rows: [extra] } = await client.query(
+    'select count(*)::int as n from customers where legacy_code <> all($1)',
+    [sheetCustomerCodes]
+  );
+
+  report.addReconciliation({
+    label: 'Jumlah klien (dari Master_Klien)',
+    sheet: sheetCustomerCodes.length,
+    db: cust.n,
+    ok: cust.n === sheetCustomerCodes.length,
+    note: extra.n
+      ? `di luar ini ada ${extra.n} klien pengganti, dibuat untuk penawaran ` +
+        'yang merujuk klien yang sudah dihapus dari master'
+      : undefined,
+  });
+
   await compareCount(client, report, 'Jumlah produk', 'products', countRows(sheets.product, 0));
 
   // ── Penawaran: jumlah unik + jumlah revisi ──
@@ -20,13 +47,33 @@ export async function reconcile(client, sheets, report) {
     sheets.quotation.rows.map((r) => parseText(r[0])).filter(Boolean)
   ).size;
   await compareCount(client, report, 'Jumlah penawaran (unik)', 'quotations', uniqueQuotes);
+
+  // Yang dibandingkan pasangan (No Penawaran, Rev) yang UNIK, bukan jumlah
+  // baris. Dua baris dengan pasangan yang sama memang menyatu menjadi satu
+  // revisi — itu benar, dan tidak boleh dilaporkan sebagai data hilang.
+  // Kejadiannya sendiri tetap dilaporkan lewat peringatan revisi_ganda.
+  const uniqueRevisions = new Set(
+    (sheets.quotation.rows || [])
+      .filter((r) => parseText(r[0]))
+      .map((r) => `${parseText(r[0])}#${Math.trunc(parseNumber(r[1]))}`)
+  ).size;
+  const duplicateRevRows = countRows(sheets.quotation, 0) - uniqueRevisions;
+
   await compareCount(
     client,
     report,
-    'Jumlah revisi penawaran',
+    'Jumlah revisi penawaran (pasangan No+Rev unik)',
     'quotation_revisions',
-    countRows(sheets.quotation, 0)
+    uniqueRevisions
   );
+
+  if (duplicateRevRows > 0) {
+    report.warn(
+      'revisi_ganda_ringkasan',
+      `${duplicateRevRows} baris Penawaran_Main punya pasangan (No Penawaran, Rev) ` +
+        'yang sama dengan baris lain, sehingga menyatu menjadi satu revisi'
+    );
+  }
 
   // ── Nilai penawaran: hanya revisi TERTINGGI tiap nomor, karena itulah yang
   //    dipakai seluruh laporan. Menjumlahkan semua revisi akan menggandakan.
@@ -45,11 +92,30 @@ export async function reconcile(client, sheets, report) {
   await compareCount(client, report, 'Jumlah Work Order', 'work_orders', sheetWoCount);
 
   // ── Invoice ──
-  await compareCount(client, report, 'Jumlah invoice', 'invoices', countRows(sheets.invoice, 0));
+  // Invoice yang tidak bisa dikaitkan ke WO maupun penawaran dilewati, sehingga
+  // selisihnya sudah bisa diperkirakan. Menyebutkannya di sini membedakan
+  // "data hilang tanpa sebab" dari "data dilewati karena rujukannya rusak" —
+  // keduanya sama-sama harus dibereskan, tapi penanganannya berbeda.
+  const skippedInvoices = report.counts.get('invoices_dilewati') ?? 0;
+  const skippedValue = report.skippedTotal('invoices');
+  const invoiceNote = skippedInvoices
+    ? `${skippedInvoices} invoice dilewati karena rujukannya tidak ditemukan ` +
+      '(lihat peringatan invoice_yatim)'
+    : undefined;
+
+  await compareCount(
+    client, report, 'Jumlah invoice', 'invoices',
+    countRows(sheets.invoice, 0), invoiceNote
+  );
 
   const sheetInvoiceTotal = sumColumn(sheets.invoice, 14);
   const { rows: [i] } = await client.query('select coalesce(sum(total), 0) as total from invoices');
-  compareAmount(report, 'Total nilai invoice', sheetInvoiceTotal, i.total);
+  compareAmount(
+    report, 'Total nilai invoice', sheetInvoiceTotal, i.total,
+    skippedValue
+      ? `Rp ${skippedValue.toLocaleString('id-ID')} berasal dari invoice yang dilewati`
+      : undefined
+  );
 
   const sheetInvoiceDpp = sumColumn(sheets.invoice, 11);
   const { rows: [d] } = await client.query('select coalesce(sum(dpp), 0) as total from invoices');
@@ -96,21 +162,24 @@ function sumLatestRevision(sheet, columnIndex) {
   return [...latest.values()].reduce((s, x) => s + x.value, 0);
 }
 
-async function compareCount(client, report, label, table, sheetCount) {
+async function compareCount(client, report, label, table, sheetCount, note) {
   const { rows: [r] } = await client.query(`select count(*)::int as n from ${table}`);
   report.addReconciliation({
     label,
     sheet: sheetCount,
     db: r.n,
     ok: r.n === sheetCount,
+    note: r.n === sheetCount ? undefined : note,
   });
 }
 
-function compareAmount(report, label, sheetTotal, dbTotal) {
+function compareAmount(report, label, sheetTotal, dbTotal, note) {
+  const ok = Math.abs(dbTotal - sheetTotal) <= IDR_TOLERANCE;
   report.addReconciliation({
     label,
     sheet: sheetTotal,
     db: dbTotal,
-    ok: Math.abs(dbTotal - sheetTotal) <= IDR_TOLERANCE,
+    ok,
+    note: ok ? undefined : note,
   });
 }

@@ -178,6 +178,22 @@ export async function importQuotations(client, sheet, ctx, report) {
     rows.sort((a, b) => parseNumber(a[1]) - parseNumber(b[1]));
     const latest = rows[rows.length - 1];
 
+    // Dua baris dengan nomor penawaran DAN rev yang sama akan saling menimpa
+    // saat upsert, sehingga hilang tanpa jejak. Selisih jumlah revisi pada
+    // rekonsiliasi berasal dari sini — sebutkan mana penyebabnya.
+    const seenRevs = new Set();
+    for (const row of rows) {
+      const rev = Math.trunc(parseNumber(row[1]));
+      if (seenRevs.has(rev)) {
+        report.warn(
+          'revisi_ganda',
+          `${quoteNumber} punya lebih dari satu baris untuk Rev ${rev}; ` +
+            'hanya baris terakhir yang dipertahankan'
+        );
+      }
+      seenRevs.add(rev);
+    }
+
     // ── Klien ──
     const customerCode = parseText(latest[5]);
     let customerId = customerMap.get(customerCode);
@@ -457,7 +473,18 @@ export async function importInvoices(client, sheet, ctx, report) {
     const quotationId = quoteNumber ? quotationByNumber.get(quoteNumber) || null : null;
 
     if (!workOrderId && !quotationId) {
-      report.warn('invoice_yatim', `Invoice ${invoiceNumber} tidak bisa dikaitkan ke WO maupun penawaran — DILEWATI`);
+      // Sebutkan isi kedua kolom rujukannya. Tanpa itu, satu-satunya cara
+      // menyelidiki 32 invoice yang terlewat adalah membukanya satu per satu
+      // di spreadsheet — padahal informasinya sudah ada di tangan kita.
+      const total = parseNumber(row[14]);
+      report.warn(
+        'invoice_yatim',
+        `Invoice ${invoiceNumber} (Rp ${total.toLocaleString('id-ID')}) DILEWATI — ` +
+          `No WO: ${parseText(row[1]) ?? '(kosong)'}, ` +
+          `No Penawaran: ${parseText(row[2]) ?? '(kosong)'}`
+      );
+      report.add('invoices_dilewati', 1);
+      report.addSkippedValue('invoices', total);
       continue;
     }
 
