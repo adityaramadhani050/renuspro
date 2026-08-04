@@ -610,6 +610,41 @@ Untuk saat ini: tunggu sekitar satu jam. Untuk seterusnya: pasang SMTP sendiri
 lewat **Tahap 5.3**. Dengan 22 user yang harus diundang, langkah itu wajib, bukan
 penyempurnaan.
 
+### Perlu masuk sekarang, tanpa menunggu email
+
+Untuk **satu akun pengujian** — bukan untuk mengundang tim — password bisa
+ditetapkan langsung dari Dashboard Supabase → **SQL Editor**:
+
+```sql
+update auth.users
+   set encrypted_password = crypt('PasswordBaruAnda', gen_salt('bf', 10)),
+       email_confirmed_at = coalesce(email_confirmed_at, now()),
+       banned_until       = null,
+       updated_at         = now()
+ where email = 'alamat@renergynusantara.com';
+```
+
+Harus menjawab `UPDATE 1`. Kalau `UPDATE 0`, emailnya tidak cocok — periksa di
+**Authentication → Users**. Kalau muncul `function crypt does not exist`, tulis
+`extensions.crypt(...)` dan `extensions.gen_salt(...)`.
+
+`email_confirmed_at` ikut diisi karena importer membuat akun tanpa konfirmasi;
+tanpa baris itu, login bisa ditolak dengan gejala yang menyerupai password
+salah.
+
+Beberapa hal yang perlu disadari sebelum memakainya:
+
+- **Ini menulis langsung ke tabel internal Supabase**, melewati alur resmi.
+  Wajar untuk satu akun bootstrap; salah kalau dijadikan cara kerja tetap.
+- **Password akan tersimpan di riwayat SQL Editor.** Pakai password sementara,
+  lalu ganti lewat alur normal setelah SMTP siap.
+- **Bukan pengganti Tahap 5.3.** Untuk 22 user, SMTP tetap wajib — menjalankan
+  ini 22 kali berarti Anda yang memilihkan password semua orang, lalu harus
+  mengirimkannya satu per satu lewat jalur yang tidak lebih aman dari email.
+
+Sesi lama tidak otomatis gugur. Kalau tujuannya mencabut akses, tambahkan
+**Authentication → Users → Sign out user**.
+
 ### Undangan masuk ke folder spam
 
 Terjadi saat Sender email masih memakai alamat bawaan Supabase atau alamat yang
