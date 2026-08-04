@@ -63,12 +63,29 @@ export class Report {
     // ── Nama pemilik yang gagal dipetakan ──
     if (this.unmatchedOwners.size) {
       out.push('', rule, 'NAMA "DIBUAT OLEH" YANG TIDAK COCOK  — PERLU REVIEW MANUAL', rule);
-      out.push(
-        '  Penawaran berikut kehilangan kepemilikan karena namanya tidak ada di',
-        '  Master_User. Kolom owner_name_legacy tetap menyimpan nama aslinya,',
-        '  jadi ini bisa diperbaiki tanpa impor ulang.',
-        ''
-      );
+
+      // Kalau tidak ada satu pun profil yang masuk, SEMUA nama otomatis tidak
+      // cocok — dan daftar panjang di bawah menjadi menyesatkan. Sebutkan
+      // sebabnya lebih dulu supaya tidak disangka data yang bermasalah.
+      if (!this.counts.get('profiles')) {
+        out.push(
+          '  ⚠ Tidak ada user yang diimpor, sehingga SELURUH nama otomatis tidak',
+          '    cocok. Ini bukan masalah pada data Anda.',
+          '',
+          '    Penyebabnya: pembuatan user memerlukan Supabase Auth, yang hanya',
+          '    aktif dengan --create-auth-users. Jalankan sekali dengan opsi itu',
+          '    (aman diulang), lalu ulangi impor percobaan — daftar di bawah akan',
+          '    menyusut menjadi hanya nama yang benar-benar bermasalah.',
+          ''
+        );
+      } else {
+        out.push(
+          '  Penawaran berikut kehilangan kepemilikan karena namanya tidak ada di',
+          '  Master_User. Kolom owner_name_legacy tetap menyimpan nama aslinya,',
+          '  jadi ini bisa diperbaiki tanpa impor ulang.',
+          ''
+        );
+      }
       for (const [name, docs] of this.unmatchedOwners) {
         const sample = docs.slice(0, 5).join(', ');
         const more = docs.length > 5 ? `, +${docs.length - 5} lainnya` : '';

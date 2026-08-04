@@ -68,8 +68,17 @@ async function main() {
   }
 
   if (args.emitUserTemplate) {
-    const n = writeEmailTemplate(sheets.user, args.usersCsv);
-    console.log(`\n✓ ${args.usersCsv} ditulis dengan ${n} user. Isi kolom email, lalu impor ulang.`);
+    const { count, content } = writeEmailTemplate(sheets.user, args.usersCsv);
+
+    console.log(`\n✓ ${args.usersCsv} ditulis dengan ${count} user.\n`);
+    console.log('─'.repeat(72));
+    console.log(content.trimEnd());
+    console.log('─'.repeat(72));
+    console.log(
+      '\nSalin isi di atas, buat berkas tools/importer/users.csv di repository,\n' +
+        'lalu isi kolom email HANYA untuk user yang alamatnya berbeda dari pola\n' +
+        'username@AUTH_EMAIL_DOMAIN. Sisanya boleh dibiarkan kosong.'
+    );
     return;
   }
 

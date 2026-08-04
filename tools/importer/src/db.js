@@ -6,8 +6,69 @@ import { config } from './config.js';
 // sebagai string demi presisi. Untuk rekonsiliasi kita perlu angka.
 pg.types.setTypeParser(pg.types.builtins.NUMERIC, (v) => (v === null ? null : Number(v)));
 
+/**
+ * Periksa DATABASE_URL sebelum dipakai.
+ *
+ * Tanpa ini, connection string yang salah bentuk hanya menghasilkan pesan
+ * "Invalid URL" dari Node — yang tidak menyebut variabel mana yang salah,
+ * apalagi salahnya di mana. Padahal penyebabnya hampir selalu satu dari tiga
+ * hal yang sangat spesifik, dan semuanya bisa dikenali dari string-nya.
+ */
+export function assertValidPostgresUrl(raw) {
+  const url = (raw || '').trim();
+
+  if (!url) {
+    throw new Error('DATABASE_URL kosong. Isi dengan connection string Postgres dari Supabase.');
+  }
+
+  // Penyebab paling sering: placeholder dari dashboard Supabase belum diganti.
+  // Tanda kurung siku itu sendiri yang membuat URL tidak bisa diurai.
+  if (/\[.*\]/.test(url)) {
+    throw new Error(
+      'DATABASE_URL masih memuat placeholder dalam kurung siku (mis. [YOUR-PASSWORD]). ' +
+        'Ganti bagian itu dengan password database Anda yang sebenarnya.'
+    );
+  }
+
+  if (url.startsWith('psql ')) {
+    throw new Error(
+      'DATABASE_URL berisi perintah psql, bukan URL-nya saja. ' +
+        'Salin hanya bagian yang diawali postgresql://'
+    );
+  }
+
+  if (!/^postgres(ql)?:\/\//.test(url)) {
+    throw new Error(
+      'DATABASE_URL harus diawali postgresql:// — periksa apakah yang tersalin sudah benar.'
+    );
+  }
+
+  try {
+    new URL(url);
+  } catch {
+    // Sampai di sini bentuk umumnya sudah benar, jadi yang tersisa hampir pasti
+    // karakter pada password yang mengubah arti URL.
+    //
+    // Ketiga karakter di bawah dipilih dari perilaku parser yang sebenarnya,
+    // bukan dari daftar umum "karakter khusus": '#' memulai fragment, '/'
+    // memulai path, '?' memulai query — ketiganya membuat URL tidak bisa
+    // diurai. Sebaliknya '@' dan spasi justru ditangani parser dengan benar,
+    // jadi menyebutnya di sini hanya akan menyesatkan.
+    throw new Error(
+      'DATABASE_URL tidak bisa diurai. Penyebab tersering: password memuat ' +
+        'karakter #, /, atau ? — ketiganya punya arti khusus di dalam URL. ' +
+        'Cara tercepat: reset password database di Supabase (Settings → Database) ' +
+        'dengan kombinasi huruf dan angka saja, lalu perbarui secret DATABASE_URL ' +
+        'dan SUPABASE_DB_PASSWORD. Alternatifnya, percent-encode karakter tersebut ' +
+        '(# menjadi %23, / menjadi %2F, ? menjadi %3F).'
+    );
+  }
+
+  return url;
+}
+
 export async function connect() {
-  const client = new pg.Client({ connectionString: config.databaseUrl() });
+  const client = new pg.Client({ connectionString: assertValidPostgresUrl(config.databaseUrl()) });
   await client.connect();
   return client;
 }
