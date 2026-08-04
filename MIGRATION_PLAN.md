@@ -479,7 +479,7 @@ Full-time bisa ditekan ke ±8–10 minggu.
 
 | Bagian | Lokasi | Bukti |
 |--------|--------|-------|
-| Skema Postgres (16 tabel, 9 view, 35 policy RLS) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
+| Skema Postgres (16 tabel, 9 view, 35 policy RLS, 96 fungsi) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
 | Tes perilaku skema | `supabase/tests/10_behaviour.sql` | penomoran, otomasi Deal→WO, constraint invoice, isolasi RLS antar role |
 | Importer Sheets → Supabase | `tools/importer/` | 22 tes lulus (15 parser + 7 integrasi ke Postgres sungguhan) |
 | Aplikasi web: Dashboard, Penawaran, Work Order, Invoice, Kwitansi, Produk, Klien | `apps/web/` | `npm run build` lolos (18 route), termasuk pemeriksaan tipe |
@@ -491,9 +491,35 @@ Full-time bisa ditekan ke ±8–10 minggu.
 | Bagian | Fase |
 |--------|------|
 | Laporan Sales & Finance sebagai halaman (view SQL-nya sudah ada) | 3 |
+| Modul gudang, pengadaan, dan teknik (site/lead engineer, koordinator proyek) | 3 |
 | Service WhatsApp/Baileys di Railway | 4 |
 | PDF service (Puppeteer) | 5 |
 | Fase 0 — perbaikan cepat di Apps Script | 0 |
+
+### Ruang lingkup peran
+
+Yang sudah pindah ke RenusPro seluruhnya sisi penjualan dan keuangan:
+penawaran, Work Order, invoice, kwitansi, beserta data masternya. Karena itu
+hanya lima peran yang punya akses baca ke sistem ini:
+
+| Peran | Akses |
+|-------|-------|
+| `admin`, `owner` | seluruh modul, termasuk kelola pengguna & rekening bank |
+| `finance` | seluruh penawaran, terbitkan invoice & kwitansi |
+| `leadsales` | seluruh penawaran (baca), tulis miliknya sendiri |
+| `sales` | hanya penawaran miliknya sendiri |
+
+`warehouse`, `procurement`, `siteengineer`, `leadengineer`, dan
+`projectcoordinator` punya modulnya masing-masing yang masih dilayani sistem
+lama. Akun mereka tetap dibuat dan tetap bisa masuk — supaya siap saat modulnya
+menyusul — tetapi belum melihat data apa pun; aplikasi menampilkan layar
+penjelasan, bukan tabel kosong.
+
+Batas ini ditegakkan di `20260804160000_scope_to_sales_modules.sql` lewat
+`has_sales_module_access()`, bukan di antarmuka. Yang dijaga bukan sekadar menu:
+tabel `products` menyimpan HPP, sehingga membuka akses baca ke seluruh pengguna
+berarti membuka struktur margin perusahaan kepada tujuh site engineer yang tidak
+memerlukannya.
 
 **Belum diverifikasi saat dijalankan:** aplikasi web belum pernah dihubungkan ke
 Supabase sungguhan — itu butuh kredensial proyek. Yang sudah terbukti baru
