@@ -53,8 +53,8 @@ export default async function KwitansiPage({
   const { data, count, error } = await query.range(from, to).returns<ReceiptRow[]>();
 
   return (
-    <div className="card">
-      <div className="card-head">
+    <>
+      <div className="page-head">
         <h2>Kwitansi</h2>
         <SearchBox
           basePath="/kwitansi"
@@ -63,6 +63,8 @@ export default async function KwitansiPage({
           placeholder="Cari nomor kwitansi atau penerima…"
         />
       </div>
+
+      <div className="card">
 
       {error ? (
         <div className="empty">Gagal memuat data: {error.message}</div>
@@ -108,7 +110,8 @@ export default async function KwitansiPage({
         count={count ?? 0}
         q={params.q}
       />
-    </div>
+      </div>
+    </>
   );
 }
 

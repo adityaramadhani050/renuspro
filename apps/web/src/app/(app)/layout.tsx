@@ -1,9 +1,27 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { getCurrentProfile, pakaiPasswordDefault } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/Sidebar';
 import { SignOutButton } from '@/components/SignOutButton';
+import { Icon } from '@/components/Icon';
 import { roleLabel, hasSalesModuleAccess } from '@/lib/roles';
+
+/**
+ * Tanggal panjang berbahasa Indonesia, seperti di header sistem lama.
+ *
+ * Zona waktu dipatok ke Asia/Jakarta, bukan zona server. Vercel menjalankan
+ * ini di Singapura dan Supabase menyimpan waktu dalam UTC; tanpa patokan
+ * eksplisit, tanggal di header bisa berbeda satu hari dari tanggal yang
+ * dilihat pengguna — persis pada jam-jam mereka masih bekerja.
+ */
+function tanggalHariIni() {
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  }).format(new Date());
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
@@ -26,18 +44,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="shell">
-      {belumAdaModul ? null : <Sidebar role={profile.role} />}
+      {belumAdaModul ? null : (
+        <Sidebar role={profile.role} fullName={profile.full_name} />
+      )}
       <div className="main">
         <header className="topbar">
-          <h1>RenusPro</h1>
-          <div className="who">
-            <strong>{profile.full_name}</strong>
-            <span>
-              {roleLabel(profile.role)} ·{' '}
-              <Link href="/ganti-password">Ganti password</Link>
+          <div className="today">
+            <span className="ico">
+              <Icon name="calendar" size={15} />
             </span>
+            {tanggalHariIni()}
           </div>
-          <SignOutButton />
+          <div className="org">PT. Renus Global Indonesia</div>
+          {/* Tombol keluar biasanya ada di kaki sidebar. Peran yang modulnya
+              belum tersedia tidak mendapat sidebar sama sekali, jadi tanpa
+              baris ini mereka terjebak di layar penjelasan tanpa jalan keluar. */}
+          {belumAdaModul ? <SignOutButton /> : null}
         </header>
         <main className="content">
           {belumAdaModul ? <ModulBelumTersedia role={profile.role} /> : children}

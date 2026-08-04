@@ -38,9 +38,9 @@ export default async function KlienPage({
   const { data, count, error } = await query.range(from, to);
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Klien</h2>
+    <>
+      <div className="page-head">
+        <h2>Database Klien (CRM)</h2>
         <div className="filters">
           <SearchBox
             basePath="/klien"
@@ -55,6 +55,8 @@ export default async function KlienPage({
           ) : null}
         </div>
       </div>
+
+      <div className="card">
 
       {error ? (
         <div className="empty">Gagal memuat data: {error.message}</div>
@@ -100,6 +102,7 @@ export default async function KlienPage({
         count={count ?? 0}
         q={params.q}
       />
-    </div>
+      </div>
+    </>
   );
 }
