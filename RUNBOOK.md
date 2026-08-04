@@ -253,8 +253,15 @@ cp .env.example .env
 
 Isi `.env`:
 
+> **Ambil `DATABASE_URL` dari tombol hijau `Connect` di bar atas dashboard**,
+> bukan dari halaman Database Settings. Di modal itu pilih **Session pooler** —
+> bukan *Direct connection* (hanya IPv6, sedangkan runner GitHub hanya IPv4)
+> dan bukan *Transaction pooler* (tidak mendukung perintah tingkat sesi,
+> padahal importer perlu menonaktifkan trigger). Jangan lupa mengganti
+> `[YOUR-PASSWORD]` dengan password yang sebenarnya.
+
 ```bash
-DATABASE_URL=postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres.xxx:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
 SHEET_ID=<dari URL spreadsheet>
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 AUTH_EMAIL_DOMAIN=renusglobal.co.id      # domain email perusahaan Anda
@@ -508,6 +515,59 @@ perbaikan berikut bisa dikerjakan **bersamaan** dan tidak terbuang:
 2. Hapus `t&c.gs` (duplikat identik `TnC.gs`, masing-masing 611 KB)
 3. Pindahkan base64 PDF T&C ke file Drive, ambil lewat file ID
 4. Ganti `access: ANYONE_ANONYMOUS` di `appsscript.json`
+
+---
+
+---
+
+## Pemecahan masalah
+
+### `Invalid URL` atau `DATABASE_URL tidak bisa diurai`
+
+Sheets terbaca normal, lalu gagal saat menyambung ke database. Penyebabnya
+selalu pada isi `DATABASE_URL`, dan importer akan menyebutkan yang mana:
+
+| Gejala | Penyebab |
+|--------|----------|
+| menyebut *placeholder* | `[YOUR-PASSWORD]` belum diganti |
+| menyebut *perintah psql* | yang tersalin `psql postgresql://...`, bukan URL-nya saja |
+| menyebut *karakter #, /, atau ?* | password memuat salah satu karakter itu |
+
+Dua karakter itu — `#`, `/`, `?` — memulai bagian baru di dalam URL, sehingga
+sisa password terpotong. Cara tercepat mengatasinya bukan meng-encode manual,
+melainkan **reset password database** dengan kombinasi huruf dan angka saja:
+
+> Supabase → **Settings** → **Database** → **Reset database password**
+
+Lalu perbarui **dua** secret sekaligus: `DATABASE_URL` dan `SUPABASE_DB_PASSWORD`.
+
+Catatan: `@` dan spasi pada password justru **aman** — parser URL menanganinya
+dengan benar. Jadi kalau password Anda hanya memuat itu, masalahnya di tempat lain.
+
+### Koneksi timeout / `ENETUNREACH`
+
+`DATABASE_URL` memakai *Direct connection* yang hanya melayani IPv6, sedangkan
+runner GitHub Actions hanya punya IPv4. Ganti ke **Session pooler**.
+
+### `users.csv` tidak muncul di repository
+
+Memang tidak akan muncul — itu perilaku yang benar. Workflow berjalan di mesin
+sementara yang dibuang setelah selesai, jadi berkas yang ditulis di sana tidak
+ikut ter-commit.
+
+Daftar username-nya dicetak di **halaman ringkasan run** langkah
+`2-buat-daftar-user`. Salin dari sana, lalu buat berkasnya sendiri lewat
+**Add file → Create new file** dengan nama `tools/importer/users.csv`.
+
+### Semua nama "Dibuat Oleh" dilaporkan tidak cocok
+
+Wajar pada impor percobaan pertama. Pembuatan user memerlukan Supabase Auth,
+yang hanya aktif dengan `--create-auth-users` — tanpa itu tidak ada profil yang
+masuk, sehingga tidak ada nama yang bisa dicocokkan.
+
+Jalankan `4-impor-sungguhan` sekali (aman diulang), lalu ulangi impor percobaan.
+Daftar tersebut akan menyusut menjadi hanya nama yang benar-benar bermasalah.
+Laporan importer juga menyebutkan hal ini bila terdeteksi.
 
 ---
 

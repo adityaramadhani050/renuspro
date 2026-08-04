@@ -33,7 +33,13 @@ export function readEmailOverrides(path) {
   return map;
 }
 
-/** Tulis template users.csv agar operator tinggal mengisi kolom email. */
+/**
+ * Tulis template users.csv agar operator tinggal mengisi kolom email.
+ *
+ * Isinya juga dikembalikan, bukan hanya ditulis ke berkas: saat importer
+ * dijalankan lewat GitHub Actions, berkas di runner ikut terbuang, sehingga
+ * satu-satunya cara operator melihat daftarnya adalah lewat keluaran log.
+ */
 export function writeEmailTemplate(sheet, path) {
   const lines = ['username,email,# nama lengkap,# role'];
   for (const row of sheet.rows) {
@@ -41,8 +47,11 @@ export function writeEmailTemplate(sheet, path) {
     if (!username) continue;
     lines.push(`${username},,${parseText(row[1]) || ''},${parseText(row[4]) || 'sales'}`);
   }
-  fs.writeFileSync(path, lines.join('\n') + '\n', 'utf8');
-  return lines.length - 1;
+
+  const content = lines.join('\n') + '\n';
+  fs.writeFileSync(path, content, 'utf8');
+
+  return { count: lines.length - 1, content };
 }
 
 function resolveEmail(username, overrides) {
