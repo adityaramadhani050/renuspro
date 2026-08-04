@@ -482,17 +482,23 @@ Full-time bisa ditekan ke ±8–10 minggu.
 | Skema Postgres (16 tabel, 9 view, 35 policy RLS) | `supabase/migrations/` | `./tools/verify-schema.sh` — seluruh migrasi jalan pada database bersih |
 | Tes perilaku skema | `supabase/tests/10_behaviour.sql` | penomoran, otomasi Deal→WO, constraint invoice, isolasi RLS antar role |
 | Importer Sheets → Supabase | `tools/importer/` | 22 tes lulus (15 parser + 7 integrasi ke Postgres sungguhan) |
-| Aplikasi web + modul Produk & Klien | `apps/web/` | `npm run build` lolos, termasuk pemeriksaan tipe |
+| Aplikasi web: Dashboard, Produk, Klien (CRUD penuh), Penawaran (daftar/detail/revisi/status) | `apps/web/` | `npm run build` lolos, termasuk pemeriksaan tipe |
 
 ### Belum dikerjakan
 
 | Bagian | Fase |
 |--------|------|
-| Modul Penawaran, Work Order, Invoice, Kwitansi di aplikasi web | 3 |
-| Form tulis (create/edit) untuk Produk & Klien — saat ini baru daftar & pencarian | 3 |
+| Form buat/ubah penawaran (item berkelompok) | 3 |
+| Modul Work Order, Invoice, Kwitansi di aplikasi web | 3 |
+| Laporan Sales & Finance di aplikasi web (view-nya sudah ada) | 3 |
 | Service WhatsApp/Baileys di Railway | 4 |
 | PDF service (Puppeteer) | 5 |
 | Fase 0 — perbaikan cepat di Apps Script | 0 |
+
+**Belum diverifikasi saat dijalankan:** aplikasi web belum pernah dihubungkan ke
+Supabase sungguhan — itu butuh kredensial proyek. Yang sudah terbukti baru
+kompilasi dan pemeriksaan tipe; skema dan importer sudah teruji terhadap
+Postgres nyata.
 
 ### Yang perlu keputusan Anda
 

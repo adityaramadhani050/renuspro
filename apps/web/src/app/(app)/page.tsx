@@ -1,20 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { formatRupiah, formatNumber } from '@/lib/query';
+import type { DashboardSummary } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
-
-type Summary = {
-  total_quotations: number;
-  total_deal: number;
-  total_fail: number;
-  total_progress: number;
-  revenue: number;
-  pipeline_value: number;
-  total_cost: number;
-  est_profit: number;
-  avg_margin_pct: number;
-  win_rate_pct: number;
-};
 
 /**
  * Dashboard.
@@ -38,7 +26,7 @@ export default async function DashboardPage({
       p_to: to || null,
       p_owner_id: null, // RLS sudah membatasi sales ke penawarannya sendiri
     })
-    .single<Summary>();
+    .single<DashboardSummary>();
 
   if (error) {
     return (

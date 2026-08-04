@@ -7,6 +7,8 @@ type Props = {
   perPage: number;
   count: number;
   q: string;
+  /** Filter tambahan yang harus ikut terbawa antar halaman (mis. status). */
+  extra?: Record<string, string>;
 };
 
 /**
@@ -16,7 +18,7 @@ type Props = {
  * pencarian bisa di-bookmark dan dibagikan — dan tombol Back browser bekerja
  * sebagaimana mestinya.
  */
-export function Pagination({ basePath, page, perPage, count, q }: Props) {
+export function Pagination({ basePath, page, perPage, count, q, extra }: Props) {
   const pages = totalPages(count, perPage);
   const current = Math.min(page, pages);
   const from = count === 0 ? 0 : (current - 1) * perPage + 1;
@@ -25,6 +27,7 @@ export function Pagination({ basePath, page, perPage, count, q }: Props) {
   const href = (p: number, size = perPage) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
+    for (const [k, v] of Object.entries(extra ?? {})) params.set(k, v);
     if (p > 1) params.set('page', String(p));
     if (size !== 25) params.set('perPage', String(size));
     const qs = params.toString();
@@ -41,6 +44,9 @@ export function Pagination({ basePath, page, perPage, count, q }: Props) {
       <div className="pages">
         <form method="get" action={basePath} style={{ marginRight: 8 }}>
           {q ? <input type="hidden" name="q" value={q} /> : null}
+          {Object.entries(extra ?? {}).map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
           <select name="perPage" defaultValue={perPage} aria-label="Baris per halaman">
             {PAGE_SIZES.map((size) => (
               <option key={size} value={size}>

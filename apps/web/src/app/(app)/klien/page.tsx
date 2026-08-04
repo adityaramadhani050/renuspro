@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
+import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { parseListParams, rangeFor, likePattern } from '@/lib/query';
 import { Pagination } from '@/components/Pagination';
 import { SearchBox } from '@/components/SearchBox';
@@ -20,6 +21,8 @@ export default async function KlienPage({
   const params = parseListParams(await searchParams);
   const [from, to] = rangeFor(params);
   const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  const canWrite = !!profile && ['admin', 'sales'].includes(profile.role);
 
   let query = supabase
     .from('customers')
@@ -37,12 +40,19 @@ export default async function KlienPage({
     <div className="card">
       <div className="card-head">
         <h2>Klien</h2>
-        <SearchBox
-          basePath="/klien"
-          q={params.q}
-          perPage={params.perPage}
-          placeholder="Cari nama klien atau perusahaan…"
-        />
+        <div className="filters">
+          <SearchBox
+            basePath="/klien"
+            q={params.q}
+            perPage={params.perPage}
+            placeholder="Cari nama klien atau perusahaan…"
+          />
+          {canWrite ? (
+            <Link className="btn btn-primary" href="/klien/baru">
+              + Tambah Klien
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -60,6 +70,7 @@ export default async function KlienPage({
               <th style={{ width: 150 }}>Perusahaan</th>
               <th>Alamat</th>
               <th style={{ width: 150 }}>Kontak</th>
+              {canWrite ? <th style={{ width: 70 }} /> : null}
             </tr>
           </thead>
           <tbody>
@@ -70,6 +81,11 @@ export default async function KlienPage({
                 <td>{c.company ?? '—'}</td>
                 <td>{c.address ?? '—'}</td>
                 <td>{c.phone ?? '—'}</td>
+                {canWrite ? (
+                  <td className="row-actions">
+                    <Link href={`/klien/${c.id}`}>Ubah</Link>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

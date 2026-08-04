@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
+import { createClient, getCurrentProfile } from '@/lib/supabase/server';
 import { parseListParams, rangeFor, likePattern, formatRupiah } from '@/lib/query';
 import { Pagination } from '@/components/Pagination';
 import { SearchBox } from '@/components/SearchBox';
@@ -21,6 +22,8 @@ export default async function ProdukPage({
   const params = parseListParams(await searchParams);
   const [from, to] = rangeFor(params);
   const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  const canWrite = !!profile && ['admin', 'sales'].includes(profile.role);
 
   let query = supabase
     .from('products')
@@ -35,12 +38,19 @@ export default async function ProdukPage({
     <div className="card">
       <div className="card-head">
         <h2>Produk &amp; Jasa</h2>
-        <SearchBox
-          basePath="/produk"
-          q={params.q}
-          perPage={params.perPage}
-          placeholder="Cari nama produk/jasa…"
-        />
+        <div className="filters">
+          <SearchBox
+            basePath="/produk"
+            q={params.q}
+            perPage={params.perPage}
+            placeholder="Cari nama produk/jasa…"
+          />
+          {canWrite ? (
+            <Link className="btn btn-primary" href="/produk/baru">
+              + Tambah Produk
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -59,6 +69,7 @@ export default async function ProdukPage({
               <th className="num" style={{ width: 160 }}>Harga Satuan</th>
               <th className="num" style={{ width: 160 }}>HPP</th>
               <th className="num" style={{ width: 90 }}>Margin</th>
+              {canWrite ? <th style={{ width: 70 }} /> : null}
             </tr>
           </thead>
           <tbody>
@@ -70,6 +81,11 @@ export default async function ProdukPage({
                 <td className="num">{formatRupiah(p.price)}</td>
                 <td className="num">{formatRupiah(p.cost)}</td>
                 <td className="num">{margin(p.price, p.cost)}</td>
+                {canWrite ? (
+                  <td className="row-actions">
+                    <Link href={`/produk/${p.id}`}>Ubah</Link>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

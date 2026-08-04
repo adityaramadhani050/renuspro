@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
  */
 const NAV: { href: string; label: string; roles?: string[] }[] = [
   { href: '/', label: 'Dashboard' },
+  { href: '/penawaran', label: 'Penawaran' },
   { href: '/produk', label: 'Produk & Jasa' },
   { href: '/klien', label: 'Klien' },
 ];
@@ -45,8 +46,8 @@ export function Sidebar({ role }: { role: string }) {
       </nav>
 
       <div className="foot">
-        Penawaran, Work Order, Invoice &amp; Kwitansi masih di sistem lama —
-        dimigrasi pada tahap berikutnya.
+        Work Order, Invoice &amp; Kwitansi masih di sistem lama — dimigrasi
+        pada tahap berikutnya.
       </div>
     </aside>
   );
