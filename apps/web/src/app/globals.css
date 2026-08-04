@@ -430,3 +430,31 @@ input:focus, select:focus { outline: 2px solid var(--brand-soft); border-color: 
 .margin-ok   { color: var(--ok); font-weight: 700; }
 
 .totals .line input { padding: 5px 8px; font-size: 13px; }
+
+.amount-due { color: var(--danger); font-weight: 600; }
+.aging-gte30 { color: var(--warn); }
+.aging-gte60 { color: #d9480f; font-weight: 600; }
+.aging-gte90 { color: var(--danger); font-weight: 700; }
+
+.stack > * + * { margin-top: 18px; }
+.inline-form { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.inline-form textarea {
+  flex: 1;
+  min-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+.inline-form textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+
+.ok-msg {
+  background: #e7f6ee;
+  color: var(--ok);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}

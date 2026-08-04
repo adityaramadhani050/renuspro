@@ -11,6 +11,9 @@ import { usePathname } from 'next/navigation';
 const NAV: { href: string; label: string; roles?: string[] }[] = [
   { href: '/', label: 'Dashboard' },
   { href: '/penawaran', label: 'Penawaran' },
+  { href: '/work-order', label: 'Work Order' },
+  { href: '/invoice', label: 'Invoice' },
+  { href: '/kwitansi', label: 'Kwitansi' },
   { href: '/produk', label: 'Produk & Jasa' },
   { href: '/klien', label: 'Klien' },
 ];
@@ -46,8 +49,8 @@ export function Sidebar({ role }: { role: string }) {
       </nav>
 
       <div className="foot">
-        Work Order, Invoice &amp; Kwitansi masih di sistem lama — dimigrasi
-        pada tahap berikutnya.
+        Kwitansi terbit otomatis saat invoice dilunasi. Export PDF masih di
+        sistem lama.
       </div>
     </aside>
   );

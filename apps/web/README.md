@@ -12,8 +12,12 @@ satu tabel hanya boleh punya satu pemilik tulis.
 | Produk & Jasa (daftar + tambah/ubah/hapus) | `getProdukList`, `simpanProduk`, `editProduk`, `hapusProduk` (`Produk.gs`) |
 | Klien (daftar + tambah/ubah/hapus) | `getCustomerList`, `simpanCustomer`, `editCustomer`, `hapusCustomer` (`Customer.gs`) |
 | Penawaran (daftar, detail, buat, revisi, ubah status) | `getPenawaranList`, `getRiwayatRevisi`, `getInitialData`, `simpanPenawaranKeSheet`, `editPenawaran`, `updateStatusPenawaran` (`Penawaran.gs`) |
+| Work Order (daftar, detail, catatan, permintaan invoice) | `getWorkOrderList`, `getWorkOrderDashboard`, `simpanCatatanWO`, `requestInvoice` (`WorkOrder.gs`) |
+| Invoice (daftar, terbitkan, pelunasan, umur piutang) | `getInvoiceList`, `simpanInvoice`, `updateStatusBayarInvoice` (`Invoice.gs`), `_agingBucket` (`FinanceReport.gs`) |
+| Kwitansi (daftar, read-only) | `getKwitansiList` (`Kwitansi.gs`) |
 
-Work Order, Invoice, dan Kwitansi menyusul pada tahap berikutnya.
+Yang belum: export PDF (Fase 5) dan laporan Sales/Finance sebagai halaman
+tersendiri — view SQL-nya sudah ada, tinggal ditampilkan.
 
 ### Nilai uang dihitung server, bukan browser
 
@@ -25,7 +29,13 @@ Sistem lama menyimpan apa pun yang dikirim browser
 (`JS_Form_Penawaran.html:271` → `Penawaran.gs:475`), sehingga nilai kontrak di
 database hanya sebaik JavaScript yang mengirimnya.
 
-### Tiga perbedaan perilaku yang disengaja
+Hal yang sama berlaku untuk invoice: **sisa kontrak dihitung di dalam
+transaksi yang sama dengan penyisipan invoice** (`create_invoice()`). Kalau
+dihitung di form, dua orang finance yang membukanya bersamaan akan melihat sisa
+yang sama lalu keduanya menerbitkan invoice — dan kontrak tertagih melebihi
+nilainya.
+
+### Empat perbedaan perilaku yang disengaja
 
 **Menghapus klien yang masih punya penawaran ditolak.** Sistem lama
 (`Customer.gs:70`) menghapusnya begitu saja dan meninggalkan penawaran yang
@@ -34,6 +44,11 @@ merujuk klien tidak ada — di dashboard ia muncul sebagai kode mentah, bukan na
 **Keluar dari status Deal tidak menghapus Work Order.** Sistem lama
 menghapusnya (`Penawaran.gs:345`), padahal nomor WO itu mungkin sudah dipakai
 di invoice, yang lalu menjadi yatim.
+
+**Kwitansi tidak bisa dibuat manual.** Ia terbit otomatis saat invoice
+dilunasi, dalam transaksi yang sama. Sistem lama memanggil pencatatan tanggal
+bayar dan pembuatan kwitansi secara terpisah (`Invoice.gs:502`) — kalau salah
+satunya gagal, invoice tercatat lunas tanpa kwitansi.
 
 **Revisi tidak pernah menimpa revisi lama.** Tiap penyimpanan membuat revisi
 baru berikut seluruh itemnya, jadi riwayat penawaran bisa ditelusuri utuh —

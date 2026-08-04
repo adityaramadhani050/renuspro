@@ -156,3 +156,67 @@ export type QuotationDetail = Pick<
   | 'work_order_id'
   | 'wo_number'
 >;
+
+// ── Work Order & Invoice ────────────────────────────────────────────────────
+
+/** Satu baris view v_work_orders. */
+export type WorkOrderRow = {
+  id: string;
+  wo_number: string;
+  notes: string | null;
+  created_at: string;
+  quotation_id: string;
+  quote_number: string;
+  project_name: string;
+  deal_date: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  customer_id: string;
+  customer_name: string;
+  contract_value: number;
+  tax_amount: number;
+  contract_value_gross: number;
+  billed_dpp: number;
+  billed_total: number;
+  paid_total: number;
+  outstanding: number;
+  invoice_count: number;
+  remaining_dpp: number;
+  uninvoiced_gross: number;
+};
+
+/** Satu baris view v_invoices. */
+export type InvoiceRow = {
+  id: string;
+  invoice_number: string;
+  issue_date: string;
+  type: 'DP' | 'Termin' | 'Pelunasan' | 'Penuh';
+  percent: number;
+  po_number: string | null;
+  po_date: string | null;
+  dpp: number;
+  vat_percent: number;
+  vat_amount: number;
+  total: number;
+  payment_status: 'Belum Lunas' | 'Lunas';
+  paid_at: string | null;
+  notes: string | null;
+  scope: string | null;
+  contract_value: number;
+  work_order_id: string | null;
+  wo_number: string | null;
+  quotation_id: string | null;
+  quote_number: string | null;
+  is_predeal: boolean;
+  customer_id: string | null;
+  customer_name: string | null;
+  project_name: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  bank_name: string | null;
+  account_no: string | null;
+  account_name: string | null;
+  receipt_number: string | null;
+  days_outstanding: number | null;
+  aging_bucket: 'current' | 'gte30' | 'gte60' | 'gte90' | null;
+};

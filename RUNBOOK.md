@@ -300,9 +300,10 @@ pada satu waktu**.
 | 1 | Produk & Jasa | siap (CRUD lengkap) |
 | 2 | Klien | siap (CRUD lengkap) |
 | 3 | Penawaran (buat, revisi, ubah status) | siap |
-| 4 | Work Order, Invoice, Kwitansi | belum dibangun |
+| 4 | Work Order (catatan, permintaan invoice) | siap |
+| 5 | Invoice (terbitkan, pelunasan) + Kwitansi otomatis | siap |
 
-Modul 1–3 bisa di-cutover sekarang.
+Seluruh modul bisa di-cutover sekarang.
 
 > **Catatan untuk Penawaran:** export PDF belum ada di aplikasi baru. Selama
 > Fase 5 belum selesai, penawaran tetap dibuat di aplikasi baru tapi PDF-nya
