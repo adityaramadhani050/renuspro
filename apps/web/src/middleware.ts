@@ -40,12 +40,19 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+  const { pathname } = request.nextUrl;
+  const isLoginPage = pathname.startsWith('/login');
 
-  if (!user && !isLoginPage) {
+  // Halaman pemulihan password harus tetap terbuka. Tokennya ada di bagian
+  // hash URL, yang tidak pernah dikirim ke server — jadi pada pemuatan pertama
+  // middleware memang belum melihat sesi apa pun, dan mengalihkannya ke /login
+  // berarti membuang token itu sebelum sempat dipakai.
+  const isPublic = isLoginPage || pathname.startsWith('/reset-password');
+
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('next', request.nextUrl.pathname);
+    url.searchParams.set('next', pathname);
     return NextResponse.redirect(url);
   }
 

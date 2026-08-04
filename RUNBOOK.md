@@ -343,9 +343,19 @@ Supabase Auth (tanpa password).
 
 Aman dijalankan berkali-kali — impor bersifat idempoten, tidak menggandakan data.
 
-### 4.2 Kirim undangan password
+### 4.2 Kirim undangan password — **setelah Tahap 5, bukan sekarang**
 
-Dashboard Supabase → **Authentication → Users** → tiap user → **Send recovery**.
+> **Jangan kirim undangan sebelum aplikasi web dideploy dan Tahap 5.2 selesai.**
+>
+> Tautan pemulihan mengarah ke **Site URL** yang tersimpan di Supabase. Selama
+> Site URL masih bawaan (`http://localhost:3000`), tautan itu mendarat di alamat
+> yang tidak ada isinya di tablet maupun HP mana pun, dan penerima tidak bisa
+> menetapkan password. Tautannya hangus setelah satu jam dan hanya berlaku
+> sekali, jadi undangan yang dikirim terlalu awal harus dikirim ulang.
+
+Setelah Tahap 5 selesai: Dashboard Supabase → **Authentication → Users** → tiap
+user → **Send recovery**. Pengguna juga bisa memintanya sendiri lewat tombol
+**Lupa password?** di halaman masuk.
 
 Password lama dari sheet **tidak pernah** diimpor. Ia tersimpan plaintext
 (`Auth.gs:60`); memindahkannya berarti mewariskan kerentanannya.
@@ -389,10 +399,26 @@ dan pastikan:
 > melewati seluruh RLS; menaruhnya di aplikasi web membuat semua kebijakan
 > keamanan yang sudah dipasang jadi tidak ada artinya.
 
-### 5.2 Sambungkan URL ke Supabase
+### 5.2 Sambungkan URL ke Supabase ← **paling sering terlewat**
 
-Dashboard Supabase → **Authentication → URL Configuration** → isi **Site URL**
-dengan domain Vercel Anda, agar tautan reset password mengarah ke tempat yang benar.
+Dashboard Supabase → **Authentication → URL Configuration**:
+
+| Isian | Nilai |
+|-------|-------|
+| **Site URL** | `https://<domain-vercel-anda>` |
+| **Redirect URLs** | `https://<domain-vercel-anda>/**` |
+
+Bawaan Supabase adalah `http://localhost:3000` — alamat komputer pengembang,
+yang di tablet atau HP tidak mengarah ke mana-mana. Selama ini belum diubah,
+**setiap tautan reset password akan gagal**, dan gagalnya diam-diam: tautannya
+terkirim, terlihat normal, tapi mendarat di halaman kosong.
+
+Baris **Redirect URLs** juga wajib diisi. Tombol *Lupa password?* di halaman
+masuk meminta Supabase mengembalikan pengguna ke `/reset-password`; alamat yang
+tidak terdaftar di sini akan ditolak dan dialihkan ke Site URL.
+
+Kalau memakai domain sendiri, daftarkan keduanya — domain Vercel dan domain
+Anda.
 
 ### 5.3 Uji
 
@@ -543,6 +569,27 @@ Lalu perbarui **dua** secret sekaligus: `DATABASE_URL` dan `SUPABASE_DB_PASSWORD
 
 Catatan: `@` dan spasi pada password justru **aman** — parser URL menanganinya
 dengan benar. Jadi kalau password Anda hanya memuat itu, masalahnya di tempat lain.
+
+### Tautan reset password mengarah ke `localhost:3000`
+
+Gejalanya: email undangan tiba, tautannya diklik, lalu browser menampilkan
+halaman gagal dimuat — alamatnya panjang, diawali
+`http://localhost:3000/#access_token=…&type=recovery`.
+
+Tautannya sendiri **tidak rusak**. Yang salah hanya tujuannya: `localhost`
+berarti "perangkat ini sendiri", dan di tablet tidak ada apa pun yang melayani
+alamat itu. Perbaikannya ada di **Tahap 5.2** — isi Site URL dan Redirect URLs
+di Supabase, lalu kirim ulang undangannya. Tautan lama tidak bisa dipakai lagi
+setelah satu jam.
+
+> **Jangan menyalin isi alamat panjang itu ke mana pun** — tidak ke chat, tidak
+> ke catatan, tidak ke tiket. Setelah `#access_token=` ada token yang setara
+> dengan sesi login penuh selama satu jam: siapa pun yang memegangnya bisa masuk
+> sebagai Anda tanpa perlu password. Kalau terlanjur tersebar, buka Dashboard →
+> **Authentication → Users** → pilih user → **Sign out user** untuk mencabut
+> sesinya, lalu minta tautan baru.
+
+Yang perlu dibagikan saat melapor cukup bagian sebelum tanda `#`.
 
 ### Koneksi timeout / `ENETUNREACH`
 
