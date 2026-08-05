@@ -579,6 +579,79 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 4 (bootstrap penawaran + Template Paket)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── getInitialData: bundle klien + produk + templatePaket + nextNo ────
+      //  Dipakai form Penawaran & menu Template Paket. nextNo hanya PETUNJUK
+      //  tampilan (nomor asli ditetapkan Apps Script saat simpan) → aman.
+      window.gsRoute('getInitialData', {
+        mode: 'fn',
+        handler: async function () {
+          try {
+            var kq = await supa.from('klien').select('id,nama_klien,perusahaan,alamat,kontak').order('id');
+            var pq = await supa.from('produk').select('id,nama,unit,harga_satuan,hpp').order('id');
+            var tq = await supa.from('template_paket').select('id,nama_paket,daftar_item');
+            var nq = await supa.from('penawaran').select('no_penawaran');
+
+            var klienList = (kq.data || []).map(function (r) {
+              return {
+                id: r.id || '', nama: r.nama_klien || '', perusahaan: r.perusahaan || '',
+                alamat: r.alamat || '', kontak: r.kontak || ''
+              };
+            });
+
+            var produkMap = {}, produkList = [];
+            (pq.data || []).forEach(function (r) {
+              var pid = r.id || '';
+              var p = { nama: r.nama || '', unit: r.unit || '', harga: Number(r.harga_satuan) || 0, hpp: Number(r.hpp) || 0 };
+              produkMap[pid] = p;
+              produkList.push({ id: pid, nama: p.nama, unit: p.unit, harga: p.harga, hpp: p.hpp });
+            });
+
+            var templatePaket = {};
+            (tq.data || []).forEach(function (r) {
+              if (!r.id || !r.nama_paket) return;
+              var raw = _jsonObj(r.daftar_item);
+              if (!Array.isArray(raw)) { try { raw = JSON.parse(r.daftar_item || '[]'); } catch (e) { raw = []; } }
+              if (!Array.isArray(raw)) raw = [];
+              var items = raw.map(function (it) {
+                var p = produkMap[it.produkId] || {};
+                return {
+                  produkId: it.produkId, deskripsi: it.deskripsi || p.nama || '',
+                  qty: it.qty || 1, unit: p.unit || it.unit || '',
+                  harga: p.harga || it.harga || 0, hpp: p.hpp || it.hpp || 0
+                };
+              });
+              templatePaket[r.id.toString()] = { nama: r.nama_paket.toString(), items: items };
+            });
+
+            // nextNo — nomor penawaran berikutnya (petunjuk): cari NNN terbesar
+            // dari "NNN/QUOT..." lalu +1, format NNN/QUOT/{bulan romawi}/{tahun}.
+            var maxId = 0;
+            (nq.data || []).forEach(function (r) {
+              var m = (r.no_penawaran || '').toString().match(/^(\d+)\/QUOT/);
+              if (m) { var n = parseInt(m[1], 10); if (n > maxId) maxId = n; }
+            });
+            var roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+            var now = new Date();
+            var mo = now.getMonth(), yr = now.getFullYear();
+            try {
+              var parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'numeric' }).formatToParts(now);
+              mo = parseInt(parts.find(function (p) { return p.type === 'month'; }).value, 10) - 1;
+              yr = parseInt(parts.find(function (p) { return p.type === 'year'; }).value, 10);
+            } catch (e) {}
+            var nextNo = ('00' + (maxId + 1)).slice(-3) + '/QUOT/' + roman[mo] + '/' + yr;
+
+            return { klien: klienList, produk: produkList, templatePaket: templatePaket, nextNo: nextNo, success: true };
+          } catch (e) {
+            console.error('[getInitialData]', e);
+            return { klien: [], produk: [], templatePaket: {}, nextNo: '001/QUOT/I/' + (new Date().getFullYear()), success: false, error: String(e) };
+          }
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -609,7 +682,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1+b2+b3) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b4) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
