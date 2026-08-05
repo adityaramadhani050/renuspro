@@ -45,8 +45,12 @@ function expand(html, depth = 0, seen = new Set()) {
   });
 }
 
+const HAS_OVERRIDES = existsSync(join(ROOT, 'migrasi', 'supabase-overrides.js'));
+
 function injectShim(html) {
-  const tag = '<script src="./gs-run-shim.js"></script>\n';
+  let tag = '<script src="./gs-run-shim.js"></script>\n';
+  // Override Supabase (Milestone 4) — inert sampai dikonfigurasi di file itu.
+  if (HAS_OVERRIDES) tag += '<script src="./supabase-overrides.js"></script>\n';
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => m + '\n' + tag);
   }
@@ -69,6 +73,7 @@ if (leftover) {
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'index.html'), html, 'utf8');
 copyFileSync(join(ROOT, 'migrasi', 'gs-run-shim.js'), join(OUT_DIR, 'gs-run-shim.js'));
+if (HAS_OVERRIDES) copyFileSync(join(ROOT, 'migrasi', 'supabase-overrides.js'), join(OUT_DIR, 'supabase-overrides.js'));
 
 console.log(`[build] ✔ dist/index.html (${(html.length / 1024).toFixed(0)} KB) + dist/gs-run-shim.js`);
 console.log('[build]   Deploy folder dist/ ke Vercel (Output Directory = dist).');
