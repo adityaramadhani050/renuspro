@@ -12,8 +12,8 @@
   'use strict';
 
   // ── ISI DUA NILAI INI ──────────────────────────────────────────────────────
-  var SUPABASE_URL  = 'ISI_PROJECT_URL';   // contoh: https://abcd1234.supabase.co
-  var SUPABASE_ANON = 'ISI_ANON_KEY';      // anon public key (aman untuk frontend)
+  var SUPABASE_URL  = 'https://kekmetvugzwnxcpbqvfv.supabase.co';   // contoh: https://abcd1234.supabase.co
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtla21ldHZ1Z3p3bnhjcGJxdmZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTgyMDAsImV4cCI6MjEwMTQ5NDIwMH0.CACdZkn_uXCbDETd-pAj8YHfOQuhZ_Qje1X0Avlw_-c';      // anon public key (aman untuk frontend)
   // ───────────────────────────────────────────────────────────────────────────
 
   // Nyalakan jadi `true` HANYA SETELAH Edge Function 'get-stok-list' ter-deploy
