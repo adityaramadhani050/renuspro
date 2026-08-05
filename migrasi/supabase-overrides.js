@@ -127,6 +127,33 @@
         } catch (e) { return _fmtTgl(v); }
       }
 
+      // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
+      async function _invoiceList() {
+        var q = await supa.from('invoice').select('*');
+        if (q.error) { console.error('[invoiceList]', q.error); return []; }
+        var kwMap = {};
+        var kq = await supa.from('kwitansi').select('no_kwitansi,no_invoice');
+        if (!kq.error) (kq.data || []).forEach(function (k) {
+          if (k.no_invoice) kwMap[k.no_invoice] = k.no_kwitansi;
+        });
+        var list = (q.data || []).map(function (r) {
+          return {
+            id: r.no_invoice || '', noWO: r.no_wo || '', noPenawaran: r.no_penawaran || '',
+            tanggal: _fmtTgl(r.tanggal), jenis: r.jenis || 'Penuh',
+            persen: parseFloat(r.persen) || 0, noPO: r.no_po || '', tglPO: _fmtTgl(r.tgl_po),
+            klienId: r.klien_id || '', namaKlien: r.nama_klien || '', namaProject: r.nama_project || '',
+            dpp: parseFloat(r.dpp) || 0, ppnPersen: parseFloat(r.ppn_persen) || 0,
+            ppnNominal: parseFloat(r.ppn_nominal) || 0, total: parseFloat(r.total) || 0,
+            items: _jsonStr(r.rincian_item, '[]'), statusBayar: r.status_bayar || 'Belum Lunas',
+            catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', bankAccount: r.bank_account || '',
+            buktiFileId: r.bukti_file_id || '', buktiFileUrl: r.bukti_file_url || '',
+            buktiFileName: r.bukti_file_nama || '', kwitansiId: kwMap[r.no_invoice] || ''
+          };
+        });
+        list.sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+        return list;
+      }
+
       // ── Master Klien (Customer.gs → getCustomerList) ──────────────────────
       // Balikan lama: ARRAY [{ id, nama, perusahaan, kontak, alamat }]
       window.gsRoute('getCustomerList', {
@@ -246,35 +273,7 @@
       // ═══════════════════════════════════════════════════════════════════════
 
       // ── Invoice (Invoice.gs → getInvoiceList) — balik ARRAY ───────────────
-      window.gsRoute('getInvoiceList', {
-        mode: 'fn',
-        handler: async function () {
-          var q = await supa.from('invoice').select('*');
-          if (q.error) { console.error('[getInvoiceList]', q.error); return []; }
-          // Peta no_invoice → no_kwitansi (untuk kolom kwitansiId).
-          var kwMap = {};
-          var kq = await supa.from('kwitansi').select('no_kwitansi,no_invoice');
-          if (!kq.error) (kq.data || []).forEach(function (k) {
-            if (k.no_invoice) kwMap[k.no_invoice] = k.no_kwitansi;
-          });
-          var list = (q.data || []).map(function (r) {
-            return {
-              id: r.no_invoice || '', noWO: r.no_wo || '', noPenawaran: r.no_penawaran || '',
-              tanggal: _fmtTgl(r.tanggal), jenis: r.jenis || 'Penuh',
-              persen: parseFloat(r.persen) || 0, noPO: r.no_po || '', tglPO: _fmtTgl(r.tgl_po),
-              klienId: r.klien_id || '', namaKlien: r.nama_klien || '', namaProject: r.nama_project || '',
-              dpp: parseFloat(r.dpp) || 0, ppnPersen: parseFloat(r.ppn_persen) || 0,
-              ppnNominal: parseFloat(r.ppn_nominal) || 0, total: parseFloat(r.total) || 0,
-              items: _jsonStr(r.rincian_item, '[]'), statusBayar: r.status_bayar || 'Belum Lunas',
-              catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', bankAccount: r.bank_account || '',
-              buktiFileId: r.bukti_file_id || '', buktiFileUrl: r.bukti_file_url || '',
-              buktiFileName: r.bukti_file_nama || '', kwitansiId: kwMap[r.no_invoice] || ''
-            };
-          });
-          list.sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
-          return list;
-        }
-      });
+      window.gsRoute('getInvoiceList', { mode: 'fn', handler: function () { return _invoiceList(); } });
 
       // ── Kwitansi (Kwitansi.gs → getKwitansiList) — balik ARRAY ────────────
       window.gsRoute('getKwitansiList', {
@@ -652,6 +651,71 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 5 (Penawaran list + bootstrap Kwitansi)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Penawaran list (Penawaran.gs → getPenawaranList) — balik ARRAY ────
+      //  Ambil rev TERTINGGI per no_penawaran; kolom nama beda: valid_hingga,
+      //  total_hpp, estimasi_keuntungan. hoStatus dari hand_over.
+      window.gsRoute('getPenawaranList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('penawaran').select('*').order('no_penawaran').order('rev');
+          if (q.error) { console.error('[getPenawaranList]', q.error); return []; }
+          // Peta klien id→nama & hand_over no_wo→status.
+          var klienMap = {};
+          var kq = await supa.from('klien').select('id,nama_klien');
+          if (!kq.error) (kq.data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+          var hoMap = {};
+          var hq = await supa.from('hand_over').select('no_wo,status');
+          if (!hq.error) (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+
+          var orderMap = {}, latestMap = {}, counter = 0;
+          (q.data || []).forEach(function (r) {
+            var no = (r.no_penawaran || '').toString();
+            if (!no) return;
+            var rev = parseInt(r.rev) || 0;
+            if (!(no in orderMap)) orderMap[no] = counter++;
+            if (!(no in latestMap) || rev > (latestMap[no]._rev || 0)) {
+              latestMap[no] = {
+                _rev: rev, id: no, rev: rev.toString(),
+                tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_hingga),
+                namaProject: r.nama_project || '', klienId: r.klien_id || '',
+                namaKlien: klienMap[r.klien_id] || r.klien_id || '', dibuatOleh: r.dibuat_oleh || '',
+                subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0,
+                pajak: parseFloat(r.pajak) || 0, grandTotal: parseFloat(r.grand_total) || 0,
+                hpp: parseFloat(r.total_hpp) || 0, profit: parseFloat(r.estimasi_keuntungan) || 0,
+                marginPersen: parseFloat(r.margin_persen) || 0,
+                termConditions: _jsonStr(r.term_conditions, '{}'), items: _jsonStr(r.items, '[]'),
+                status: r.status || 'On-Progress', noWO: r.no_wo || '',
+                hoStatus: r.no_wo ? (hoMap[r.no_wo] || '') : '',
+                tanggalDeal: _fmtTgl(r.tanggal_deal), channelMarketing: r.channel_marketing || '',
+                catatanFail: r.catatan_fail || '', kodeWin: r.kode_win || '', catatanWin: r.catatan_win || '',
+                kodeLost: r.kode_lost || '', tanggalFail: _fmtTgl(r.tanggal_fail),
+                lessonLearned: r.lesson_learned || '', action: r.action || ''
+              };
+            }
+          });
+          return Object.keys(latestMap)
+            .sort(function (a, b) { return orderMap[b] - orderMap[a]; })
+            .map(function (no) { var it = Object.assign({}, latestMap[no]); delete it._rev; return it; });
+        }
+      });
+
+      // ── Bootstrap Kwitansi (Kwitansi.gs → getKwitansiInitialData) ─────────
+      //  { success, invoiceList, nextNo:'' } — nextNo dibuat saat simpan (Apps Script).
+      window.gsRoute('getKwitansiInitialData', {
+        mode: 'fn',
+        handler: async function () {
+          try {
+            return { success: true, invoiceList: await _invoiceList(), nextNo: '' };
+          } catch (e) {
+            return { success: false, error: String(e), invoiceList: [], nextNo: '' };
+          }
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -682,7 +746,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b4) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b5) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
