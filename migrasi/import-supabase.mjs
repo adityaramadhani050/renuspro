@@ -55,13 +55,29 @@ function toTs(v) {                    // → ISO | null
   if (m) return new Date(+m[3], +m[2]-1, +m[1]).toISOString();
   const d = new Date(x); return isNaN(d) ? null : d.toISOString();
 }
-function toNum(v) { const x = s(v).replace(/\./g,'').replace(/,/g,'.'); if (x==='') return null; const n = Number(x.replace(/[^0-9.\-]/g,'')); return isNaN(n) ? null : n; }
+function toNum(v) {                   // export Sheets sudah berupa angka → jangan
+  if (v === '' || v == null) return null;             // otak-atik titik desimal!
+  if (typeof v === 'number') return isNaN(v) ? null : v;
+  const x = String(v).replace(/[^0-9.\-]/g, '');
+  if (x === '' || x === '-' || x === '.') return null;
+  const n = Number(x);
+  return isNaN(n) ? null : n;
+}
 function toInt(v) { const n = toNum(v); return n==null ? null : Math.round(n); }
 function toBool(v){ const x = s(v).toLowerCase(); if (['ya','true','1','yes'].includes(x)) return true; if (['tidak','false','0','no',''].includes(x)) return false; return Boolean(v); }
 function toJson(v){ if (v==null || v==='') return null; if (typeof v==='object') return v; try { return JSON.parse(String(v)); } catch { return null; } }
 function toText(v){ const x = s(v); return x==='' ? null : x; }   // '' → null (aman utk FK)
+function toTime(v){                   // → 'HH:MM' | null (kolom Postgres type time)
+  const x = s(v); if (!x) return null;
+  let m = x.match(/^(\d{1,2}):(\d{2})/);                          // sudah "HH:MM"
+  if (m) return `${String(m[1]).padStart(2,'0')}:${m[2]}`;
+  const d = new Date(x);                                          // ISO (Sheets simpan jam sbg Date)
+  if (!isNaN(d)) { const j = new Date(d.getTime() + 7*3600*1000); // → jam lokal WIB (+7)
+    return `${String(j.getUTCHours()).padStart(2,'0')}:${String(j.getUTCMinutes()).padStart(2,'0')}`; }
+  return null;
+}
 
-const CONV = { t:toText, i:toInt, n:toNum, m:toNum, d:toDate, ts:toTs, b:toBool, j:toJson };
+const CONV = { t:toText, i:toInt, n:toNum, m:toNum, d:toDate, ts:toTs, b:toBool, j:toJson, tm:toTime };
 
 function transformRow(cols, row) {
   const obj = {};

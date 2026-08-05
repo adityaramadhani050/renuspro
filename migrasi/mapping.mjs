@@ -146,7 +146,7 @@ export const TABLES = [
     ['no_invoice_ref','t'],['id_referensi','t'],['deskripsi','t'],['jumlah','m'],['catatan','t'],['dibuat_oleh','t'],
     ['dibuat_pada','ts'],['diubah_oleh','t'],['diubah_pada','ts'] ]},
   { table:'hand_over', sheet:'HandOver', pk:'no_wo', cols:[
-    ['no_wo','t'],['status','t'],['diminta_oleh','t'],['diminta_pada','ts'],['tgl_jadwal','d'],['waktu','t'],
+    ['no_wo','t'],['status','t'],['diminta_oleh','t'],['diminta_pada','ts'],['tgl_jadwal','d'],['waktu','tm'],
     ['mode','t'],['link_meet','t'],['lokasi','t'],['peserta','t'],['catatan_undangan','t'],['dijadwalkan_oleh','t'],
     ['dijadwalkan_pada','ts'],['mom','t'],['selesai_oleh','t'],['selesai_pada','ts'],['meet_event_id','t'] ]},
   { table:'site_survey', sheet:'SiteSurvey_Main', pk:'id', cols:[

@@ -80,7 +80,7 @@ Buka Supabase → **Table Editor** → cek beberapa tabel (mis. `klien`, `produk
 | Pesan / gejala | Solusi |
 |---|---|
 | `Set env SUPABASE_URL...` | Langkah 5 belum dijalankan / salah ketik |
-| Banyak baris `✗ ... FK` gagal | Master belum masuk. Ulang tabel master, mis. `node migrasi/import-supabase.mjs ~/export.json --only=klien,produk,supplier,pricelist_kategori,pricelist,akun_pembayaran` lalu jalankan penuh lagi |
+| Banyak baris `✗ ... fkey` gagal (referensi yatim data lama) | Jalankan sekali `migrasi/fix-migrasi-import.sql` di Supabase SQL Editor (melepas semua Foreign Key), lalu `git pull` di Cloud Shell, lalu jalankan import lagi (aman diulang). |
 | Mau ulang 1 tabel saja | `node migrasi/import-supabase.mjs ~/export.json --only=namatabel` |
 | Tanggal kosong/aneh | Format sheet tak dikenal; kirim contoh nilainya, nanti disesuaikan |
 | Sesi Cloud Shell tertutup | Buka lagi; ulangi Langkah 5 (kunci `export` hilang tiap sesi baru) |
