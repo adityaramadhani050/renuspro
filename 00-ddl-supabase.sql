@@ -673,7 +673,7 @@ create table wo_dokumen (
 -- ── WORK ORDER = VIEW (proyeksi penawaran rev tertinggi, status Deal/Closed) ──
 --  Menggantikan sheet Work_Order + fungsi _syncWorkOrder. total_hpp sudah
 --  termasuk hidden cost (dari penawaran).
-create or replace view work_order as
+create or replace view work_order with (security_invoker = true) as
 select distinct on (p.no_penawaran)
   p.no_wo,
   p.no_penawaran,
