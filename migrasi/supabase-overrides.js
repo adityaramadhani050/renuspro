@@ -503,6 +503,82 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 3 (checklist DED, detail site survey, request bayar)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Checklist DED master (DED.gs → getDEDChecklist) ───────────────────
+      window.gsRoute('getDEDChecklist', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('ded_checklist').select('*').order('urutan');
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (r, i) {
+            return {
+              kode: r.kode || '', label: r.label || '', wajib: r.wajib === true,
+              urutan: Number(r.urutan) || (i + 1), instruksi: r.instruksi || ''
+            };
+          });
+          list.sort(function (a, b) { return a.urutan - b.urutan; });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Detail Site Survey (SiteSurvey.gs → getSiteSurveyDetail) ──────────
+      window.gsRoute('getSiteSurveyDetail', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var q = await supa.from('site_survey').select('*').eq('id', id).maybeSingle();
+          if (q.error) return { success: false, message: q.error.message };
+          if (!q.data) return { success: false, message: 'Survey tidak ditemukan.' };
+          var r = q.data, d = _jsonObj(r.data);
+          return {
+            success: true,
+            survey: {
+              id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey),
+              dibuatOleh: r.dibuat_oleh || '', dibuatOlehId: d.dibuatOlehId || '',
+              noWO: r.no_wo || d.noWO || '', namaSite: r.nama_site || '',
+              namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || '',
+              latitude: (r.latitude !== null && r.latitude !== undefined) ? Number(r.latitude) : null,
+              longitude: (r.longitude !== null && r.longitude !== undefined) ? Number(r.longitude) : null,
+              dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '',
+              arahBangunan: d.arahBangunan || '', tinggiBangunan: d.tinggiBangunan || 0,
+              fotoBangunan: d.fotoBangunan || null, kelistrikan: d.kelistrikan || {},
+              bos: d.bos || {}, atap: d.atap || {}, jalurKabel: d.jalurKabel || {}
+            }
+          };
+        }
+      });
+
+      // ── Request Pembayaran PO (PurchaseOrder.gs → getPaymentRequestList) ──
+      window.gsRoute('getPaymentRequestList', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var q = await supa.from('po_payment_request').select('*').order('id_request');
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (r) {
+            return {
+              idReq: r.id_request || '', noPO: r.no_po || '', noWO: r.no_wo || '',
+              namaSupplier: r.nama_supplier || '', grandTotalPO: parseFloat(r.grand_total_po) || 0,
+              tanggalRequest: _fmtTgl(r.tanggal_request), jumlah: parseFloat(r.jumlah) || 0,
+              persentase: parseFloat(r.persentase) || 0, catatan: r.catatan || '',
+              status: r.status || '', dibuatOleh: r.dibuat_oleh || '',
+              dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', namaAkun: r.nama_akun || '',
+              diapproveOleh: r.diapprove_oleh || '', tanggalApprove: _fmtTgl(r.tanggal_approve),
+              invoiceFileId: r.invoice_file_id || '', invoiceFileUrl: r.invoice_file_url || '',
+              invoiceFileName: r.invoice_file_nama || '', catatanTolak: r.catatan_tolak || '',
+              buktiFileId: r.bukti_file_id || '', buktiFileUrl: r.bukti_file_url || '',
+              buktiFileName: r.bukti_file_nama || ''
+            };
+          }).filter(function (row) { return params.status ? row.status === params.status : true; });
+          list.reverse();
+          return { success: true, list: list };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -533,7 +609,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1+b2) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1+b2+b3) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
