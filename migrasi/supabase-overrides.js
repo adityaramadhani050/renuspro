@@ -589,10 +589,20 @@
         mode: 'fn',
         handler: async function () {
           try {
-            var kq = await supa.from('klien').select('id,nama_klien,perusahaan,alamat,kontak').order('id');
-            var pq = await supa.from('produk').select('id,nama,unit,harga_satuan,hpp').order('id');
-            var tq = await supa.from('template_paket').select('id,nama_paket,daftar_item');
-            var nq = await supa.from('penawaran').select('no_penawaran');
+            // Jalankan PARALEL & tiap query tahan-error: kegagalan satu tabel
+            // (mis. penawaran/template) TIDAK boleh mengosongkan daftar klien.
+            var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+            var res = await Promise.all([
+              _safe(supa.from('klien').select('id,nama_klien,perusahaan,alamat,kontak').order('id')),
+              _safe(supa.from('produk').select('id,nama,unit,harga_satuan,hpp').order('id')),
+              _safe(supa.from('template_paket').select('id,nama_paket,daftar_item')),
+              _safe(supa.from('penawaran').select('no_penawaran'))
+            ]);
+            var kq = res[0], pq = res[1], tq = res[2], nq = res[3];
+            if (kq.error) console.error('[getInitialData] klien:', kq.error);
+            if (pq.error) console.error('[getInitialData] produk:', pq.error);
+            if (tq.error) console.error('[getInitialData] template:', tq.error);
+            if (nq.error) console.error('[getInitialData] penawaran:', nq.error);
 
             var klienList = (kq.data || []).map(function (r) {
               return {
@@ -643,6 +653,8 @@
             } catch (e) {}
             var nextNo = ('00' + (maxId + 1)).slice(-3) + '/QUOT/' + roman[mo] + '/' + yr;
 
+            // success:true selama tak ada exception fatal — klien tetap tampil
+            // walau template/penawaran gagal (mereka hanya memengaruhi menu lain).
             return { klien: klienList, produk: produkList, templatePaket: templatePaket, nextNo: nextNo, success: true };
           } catch (e) {
             console.error('[getInitialData]', e);
@@ -716,6 +728,82 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 6 (Detail Purchase Order — 5 sumber, paralel)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Detail PO (PurchaseOrder.gs → getPODetail) ────────────────────────
+      window.gsRoute('getPODetail', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noPO = (args[0] || '').toString().trim();
+          if (!noPO) return { success: false, message: 'No PO wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('purchase_order').select('*').eq('no_po', noPO).maybeSingle()),
+            _safe(supa.from('po_item').select('*').eq('no_po', noPO)),
+            _safe(supa.from('pembayaran_po').select('*').eq('no_po', noPO)),
+            _safe(supa.from('po_payment_request').select('*').eq('no_po', noPO)),
+            _safe(supa.from('penerimaan_po_log').select('*').eq('no_po', noPO))
+          ]);
+          var hq = res[0], iq = res[1], bq = res[2], pq = res[3], lq = res[4];
+          if (!hq.data) return { success: false, message: 'No PO tidak ditemukan.' };
+          var r = hq.data;
+          var header = {
+            noPO: r.no_po || '', tanggal: _fmtTgl(r.tanggal), idSupplier: r.id_supplier || '',
+            namaSupplier: r.nama_supplier || '', peruntukan: r.peruntukan || '', noWO: r.no_wo || '',
+            statusPO: r.status_po || '', subtotal: parseFloat(r.subtotal) || 0,
+            ppnPersen: parseFloat(r.ppn_persen) || 0, ppnNominal: parseFloat(r.ppn_nominal) || 0,
+            grandTotal: parseFloat(r.grand_total) || 0, catatan: r.catatan || '',
+            statusBayar: r.status_bayar || '', totalDibayar: parseFloat(r.total_dibayar) || 0,
+            dibuatOleh: r.dibuat_oleh || '', dibuatPada: _fmtTgl(r.dibuat_pada),
+            diubahOleh: r.diubah_oleh || '', diubahPada: _fmtTgl(r.diubah_pada),
+            diskonPersen: parseFloat(r.diskon_persen) || 0, diskonNominal: parseFloat(r.diskon_nominal) || 0,
+            quotNo: r.no_quotation || '', quotTanggal: _fmtTgl(r.tanggal_quotation),
+            termConditions: _jsonStr(r.term_conditions, ''), quotFileId: r.quot_file_id || '',
+            quotFileUrl: r.quot_file_url || '', quotFileName: r.quot_file_nama || ''
+          };
+          var items = (iq.data || []).map(function (ir) {
+            return {
+              idItem: ir.id_item || '', noPO: ir.no_po || '', namaItem: ir.nama_item || '',
+              qty: parseFloat(ir.qty) || 0, satuan: ir.satuan || '',
+              hargaBeli: parseFloat(ir.harga_beli_satuan) || 0, total: parseFloat(ir.total) || 0,
+              catatan: ir.catatan || '', qtyDiterima: parseFloat(ir.qty_diterima) || 0,
+              produkId: ir.id_produk || ''
+            };
+          });
+          var pembayaran = (bq.data || []).map(function (br) {
+            return {
+              idBayar: br.id_bayar || '', noPO: br.no_po || '', tanggalBayar: _fmtTgl(br.tanggal_bayar),
+              idAkun: br.id_akun || '', namaAkun: br.nama_akun || '', jumlah: parseFloat(br.jumlah) || 0,
+              catatan: br.catatan || '', dibuatOleh: br.dibuat_oleh || '', dibuatPada: _fmtTgl(br.dibuat_pada)
+            };
+          });
+          var paymentRequests = (pq.data || []).map(function (pr) {
+            return {
+              idReq: pr.id_request || '', tanggalRequest: _fmtTgl(pr.tanggal_request),
+              jumlah: parseFloat(pr.jumlah) || 0, persentase: parseFloat(pr.persentase) || 0,
+              catatan: pr.catatan || '', status: pr.status || '', dibuatOleh: pr.dibuat_oleh || '',
+              namaAkun: pr.nama_akun || '', tanggalApprove: _fmtTgl(pr.tanggal_approve),
+              invoiceFileUrl: pr.invoice_file_url || '', invoiceFileName: pr.invoice_file_nama || '',
+              catatanTolak: pr.catatan_tolak || '', buktiFileUrl: pr.bukti_file_url || '',
+              buktiFileName: pr.bukti_file_nama || ''
+            };
+          });
+          var riwayatPenerimaan = (lq.data || []).map(function (lr) {
+            var det = _jsonObj(lr.detail_item); if (!Array.isArray(det)) det = [];
+            return {
+              idLog: lr.id_log || '', noPO: lr.no_po || '', tanggal: _fmtTgl(lr.tanggal),
+              mode: lr.mode || '', jumlahItem: parseFloat(lr.jumlah_item) || 0, items: det,
+              dibuatOleh: lr.dibuat_oleh || '', dibuatPada: _fmtTgl(lr.dibuat_pada),
+              buktiFileId: lr.bukti_file_id || '', buktiFileUrl: lr.bukti_file_url || '',
+              buktiFileName: lr.bukti_file_nama || ''
+            };
+          });
+          return { success: true, po: header, items: items, pembayaran: pembayaran, paymentRequests: paymentRequests, riwayatPenerimaan: riwayatPenerimaan };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -746,7 +834,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b5) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b6) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
