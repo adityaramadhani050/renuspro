@@ -127,6 +127,17 @@
         } catch (e) { return _fmtTgl(v); }
       }
 
+      // Helper: filter rentang tanggal (tgl 'dd/MM/yyyy', dari/sampai 'yyyy-MM-dd').
+      function _inDateRange(tgl, dari, sampai) {
+        if (!dari && !sampai) return true;
+        var tp = (tgl || '').split('/');
+        if (tp.length !== 3) return true;
+        var ms = new Date(parseInt(tp[2]), parseInt(tp[1]) - 1, parseInt(tp[0])).getTime();
+        if (dari) { var fd = dari.split('-'); if (ms < new Date(parseInt(fd[0]), parseInt(fd[1]) - 1, parseInt(fd[2])).getTime()) return false; }
+        if (sampai) { var td = sampai.split('-'); if (ms > new Date(parseInt(td[0]), parseInt(td[1]) - 1, parseInt(td[2])).getTime()) return false; }
+        return true;
+      }
+
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
         var q = await supa.from('invoice').select('*');
@@ -804,6 +815,119 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 7 (Cash pemasukan/pengeluaran + Pengiriman)
+      //  Catatan: getAyatSilangList & getMutasiBundle TETAP Apps Script karena
+      //  tabel ayat_silang belum ada di skema Supabase.
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Pemasukan (Pengeluaran.gs → getPemasukanList) ─────────────────────
+      window.gsRoute('getPemasukanList', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var q = await supa.from('pemasukan').select('*');
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (r) {
+            return {
+              id: r.id_pemasukan || '', tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '',
+              kategori: r.kategori || '', idAkun: r.id_akun || '', namaAkun: r.nama_akun || '',
+              noRef: r.no_invoice_ref || '', idReferensi: r.id_referensi || '', deskripsi: r.deskripsi || '',
+              jumlah: parseFloat(r.jumlah) || 0, catatan: r.catatan || '',
+              dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '',
+              diubahOleh: r.diubah_oleh || '', diubahPada: r.diubah_pada ? r.diubah_pada.toString() : ''
+            };
+          }).filter(function (row) {
+            if (params.sumber && row.sumber !== params.sumber) return false;
+            if (params.kategori && row.kategori !== params.kategori) return false;
+            if (params.idAkun && row.idAkun !== params.idAkun.toString()) return false;
+            return _inDateRange(row.tanggal, params.tanggalDari, params.tanggalSampai);
+          });
+          list.reverse();
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Pengeluaran (Pengeluaran.gs → getPengeluaranList) ─────────────────
+      window.gsRoute('getPengeluaranList', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengeluaran').select('*')),
+            _safe(supa.from('penawaran').select('no_wo,nama_project,klien_id')),
+            _safe(supa.from('klien').select('id,nama_klien'))
+          ]);
+          var eq = res[0], pq = res[1], kq = res[2];
+          if (eq.error) return { success: false, list: [], message: eq.error.message };
+          var klienMap = {};
+          (kq.data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+          var woMap = {};
+          (pq.data || []).forEach(function (p) {
+            var w = (p.no_wo || '').toString().trim();
+            if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '', namaKlien: klienMap[p.klien_id] || p.klien_id || '' };
+          });
+          var list = (eq.data || []).map(function (r) {
+            var noWO = r.no_wo || '';
+            var wi = woMap[noWO] || { namaProject: '', namaKlien: '' };
+            return {
+              id: r.id_pengeluaran || '', noWO: noWO, namaProject: wi.namaProject, namaKlien: wi.namaKlien,
+              tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', noPO: r.no_po || '',
+              idReferensi: r.id_referensi || '', idAkun: r.id_akun || '', namaAkun: r.nama_akun || '',
+              deskripsi: r.deskripsi || '', qty: parseFloat(r.qty) || 0, satuan: r.satuan || '',
+              hargaSatuan: parseFloat(r.harga_satuan) || 0, total: parseFloat(r.total) || 0,
+              catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '',
+              dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '',
+              diubahOleh: r.diubah_oleh || '', diubahPada: r.diubah_pada ? r.diubah_pada.toString() : '',
+              kategori: r.kategori || ''
+            };
+          }).filter(function (row) {
+            if (params.noWO && row.noWO !== params.noWO.toString()) return false;
+            if (params.sumber && row.sumber !== params.sumber) return false;
+            if (params.idAkun && row.idAkun !== params.idAkun.toString()) return false;
+            if (params.noPO && row.noPO.toLowerCase().indexOf(params.noPO.toLowerCase()) === -1) return false;
+            return _inDateRange(row.tanggal, params.tanggalDari, params.tanggalSampai);
+          });
+          list.reverse();
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Pengiriman / Surat Jalan (Inventory.gs → getPengirimanList) ───────
+      window.gsRoute('getPengirimanList', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var fStatus = (params.status || '').toString();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengiriman').select('*')),
+            _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien'))
+          ]);
+          var gq = res[0], bq = res[1];
+          if (gq.error) return { success: false, list: [], message: gq.error.message };
+          var projMap = {};
+          (bq.data || []).forEach(function (r) { if (r.no_wo) projMap[r.no_wo] = r; });
+          var list = (gq.data || []).map(function (r) {
+            var noWO = r.no_wo || '';
+            var pj = projMap[noWO] || {};
+            var items = _jsonObj(r.items); if (!Array.isArray(items)) items = [];
+            return {
+              idKirim: r.id_kirim || '', noSuratJalan: r.no_surat_jalan || '', noWO: noWO,
+              namaProject: pj.nama_project || '', namaKlien: pj.nama_klien || '',
+              tanggalKirim: _fmtTgl(r.tanggal_kirim), status: r.status || '',
+              dikirimOleh: r.dikirim_oleh || '', alamat: r.alamat || '', kendaraan: r.kendaraan || '',
+              driver: r.driver || '', catatan: r.catatan || '', items: items,
+              diterimaOleh: r.diterima_oleh || '', diterimaPada: r.diterima_pada ? r.diterima_pada.toString() : '',
+              buktiFileUrl: r.bukti_file_url || '', buktiFileName: r.bukti_file_name || ''
+            };
+          }).filter(function (row) { return fStatus ? row.status === fStatus : true; });
+          list.reverse();
+          return { success: true, list: list };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -834,7 +958,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b6) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b7) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
