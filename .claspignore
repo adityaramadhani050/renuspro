@@ -1,0 +1,21 @@
+# File untuk migrasi ke Vercel/Supabase — BUKAN Apps Script. JANGAN di-push clasp.
+# (clasp hanya mem-push file yang TIDAK cocok pola di bawah)
+
+# Folder migrasi (berisi Node/ESM & panduan)
+migrasi/**
+migrasi/*
+**/migrasi/**
+
+# Artefak build & dependency
+dist/**
+node_modules/**
+
+# Dokumen & skrip non-Apps-Script (di mana pun)
+**/*.md
+**/*.sql
+**/*.mjs
+
+# Meta
+.git/**
+.gitignore
+.claspignore
