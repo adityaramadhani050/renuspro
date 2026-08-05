@@ -67,7 +67,14 @@ renuspro-web/
 
 ---
 
-## Langkah 5 — Buat repo GitHub baru & push (satu perintah)
+## Langkah 5 — Buat repo GitHub baru & push
+Pertama, kenalkan identitas git ke Cloud Shell (**sekali saja**, ganti dengan
+email & nama Anda). Kalau dilewati, `git commit` akan error "Please tell me who you are".
+```bash
+git config --global user.email "email-anda@contoh.com"
+git config --global user.name "Aditya Ramadhani"
+```
+Lalu:
 ```bash
 cd ~/renuspro-web
 git init -b main
@@ -77,6 +84,11 @@ gh repo create renuspro-web --private --source=. --remote=origin --push
 ```
 Perintah terakhir sekaligus **membuat repo di GitHub** dan **mengunggahnya**.
 Selesai — cek di GitHub, repo `renuspro-web` sudah ada.
+
+> Kalau `git commit` sempat gagal tadi (identitas belum diset), ulangi
+> `git add . && git commit -m "..."` setelah `git config`, lalu push.
+> Kalau `gh repo create` bilang **"Name already exists"**, cukup jalankan
+> `git push -u origin main`.
 
 ---
 
