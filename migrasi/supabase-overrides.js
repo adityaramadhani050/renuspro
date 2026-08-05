@@ -19,7 +19,7 @@
   // Nyalakan jadi `true` HANYA SETELAH Edge Function 'get-stok-list' ter-deploy
   // (lihat migrasi/PANDUAN-EDGE-FUNCTIONS.md). Selama false, getStokList tetap
   // memakai Apps Script lama supaya Inventory tidak rusak.
-  var ENABLE_EDGE_STOK = false;
+  var ENABLE_EDGE_STOK = true;
 
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
