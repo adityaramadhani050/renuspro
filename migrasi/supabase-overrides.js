@@ -165,6 +165,75 @@
         return list;
       }
 
+      // Helper bersama: PO menunggu penerimaan gudang (dipakai list & bundle).
+      async function _poMenunggu() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('purchase_order').select('no_po,tanggal,nama_supplier,peruntukan,no_wo,ppn_persen,status_po')),
+          _safe(supa.from('po_item').select('*')),
+          _safe(supa.from('penawaran').select('no_wo,nama_project'))
+        ]);
+        var pq = res[0], iq = res[1], nq = res[2];
+        var itemsByPO = {};
+        (iq.data || []).forEach(function (row) {
+          var noPO = (row.no_po || '').toString().trim();
+          if (!noPO) return;
+          var qtyPesan = Number(row.qty) || 0, qtyDiterima = Number(row.qty_diterima) || 0;
+          var qtySisa = qtyPesan - qtyDiterima;
+          if (qtySisa <= 0) return;
+          if (!itemsByPO[noPO]) itemsByPO[noPO] = [];
+          itemsByPO[noPO].push({
+            idItem: row.id_item || '', namaItem: row.nama_item || '', satuan: row.satuan || '',
+            hargaBeli: Number(row.harga_beli_satuan) || 0, qtyPesan: qtyPesan,
+            qtyDiterima: qtyDiterima, qtySisa: qtySisa
+          });
+        });
+        var woNama = {};
+        (nq.data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && p.nama_project) woNama[w] = p.nama_project; });
+        var out = [];
+        (pq.data || []).forEach(function (r) {
+          var status = (r.status_po || '').toString();
+          if (status !== 'Menunggu Gudang' && status !== 'Menunggu Penerimaan Gudang') return;
+          var noPO = (r.no_po || '').toString().trim();
+          var noWO = (r.no_wo || '').toString();
+          out.push({
+            noPO: noPO, tanggal: _fmtTgl(r.tanggal), namaSupplier: r.nama_supplier || '',
+            peruntukan: r.peruntukan || '', noWO: noWO, namaProject: noWO ? (woNama[noWO] || '') : '',
+            ppnPersen: parseFloat(r.ppn_persen) || 0,
+            jumlahItemPending: (itemsByPO[noPO] || []).length, items: itemsByPO[noPO] || []
+          });
+        });
+        return out;
+      }
+
+      // Helper bersama: riwayat penerimaan (dipakai list & bundle & filter noPO).
+      async function _riwayatPenerimaan(noPO) {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('purchase_order').select('no_po,nama_supplier,peruntukan,no_wo')),
+          _safe(supa.from('penerimaan_po_log').select('*'))
+        ]);
+        var pq = res[0], lq = res[1];
+        var poInfo = {};
+        (pq.data || []).forEach(function (p) {
+          if (p.no_po) poInfo[p.no_po] = { namaSupplier: p.nama_supplier || '', peruntukan: p.peruntukan || '', noWO: p.no_wo || '' };
+        });
+        var list = (lq.data || []).map(function (lr) {
+          var det = _jsonObj(lr.detail_item); if (!Array.isArray(det)) det = [];
+          var info = poInfo[(lr.no_po || '').toString().trim()] || {};
+          return {
+            idLog: lr.id_log || '', noPO: lr.no_po || '', namaSupplier: info.namaSupplier || '',
+            peruntukan: info.peruntukan || '', noWO: info.noWO || '', tanggal: _fmtTgl(lr.tanggal),
+            mode: lr.mode || '', jumlahItem: parseFloat(lr.jumlah_item) || 0, items: det,
+            dibuatOleh: lr.dibuat_oleh || '', dibuatPada: lr.dibuat_pada ? lr.dibuat_pada.toString() : '',
+            buktiFileId: lr.bukti_file_id || '', buktiFileUrl: lr.bukti_file_url || '',
+            buktiFileName: lr.bukti_file_nama || ''
+          };
+        }).filter(function (row) { return noPO ? row.noPO === noPO : true; });
+        list.reverse();
+        return list;
+      }
+
       // ── Master Klien (Customer.gs → getCustomerList) ──────────────────────
       // Balikan lama: ARRAY [{ id, nama, perusahaan, kontak, alamat }]
       window.gsRoute('getCustomerList', {
@@ -928,6 +997,36 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 8 (Penerimaan Barang: PO menunggu + riwayat + bundle)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── PO menunggu penerimaan (Inventory.gs → getPOMenungguPenerimaan) ───
+      window.gsRoute('getPOMenungguPenerimaan', {
+        mode: 'fn',
+        handler: async function () { return await _poMenunggu(); }
+      });
+
+      // ── Riwayat penerimaan (Inventory.gs → getRiwayatPenerimaanList) ──────
+      window.gsRoute('getRiwayatPenerimaanList', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          return { success: true, list: await _riwayatPenerimaan(params.noPO || null) };
+        }
+      });
+
+      // ── Bundle Penerimaan Barang (Inventory.gs → getPenerimaanBundle) ─────
+      window.gsRoute('getPenerimaanBundle', {
+        mode: 'fn',
+        handler: async function () {
+          var out = { success: true };
+          try { out.pending = await _poMenunggu(); } catch (e) { out.pending = []; }
+          try { out.riwayat = await _riwayatPenerimaan(null); } catch (e) { out.riwayat = []; }
+          return out;
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -958,7 +1057,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b7) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b8) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
