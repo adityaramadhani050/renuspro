@@ -128,92 +128,80 @@
       }
 
       // ── Master Klien (Customer.gs → getCustomerList) ──────────────────────
-      // Balikan lama: { id, nama, perusahaan, kontak, alamat }
+      // Balikan lama: ARRAY [{ id, nama, perusahaan, kontak, alamat }]
       window.gsRoute('getCustomerList', {
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('klien')
             .select('id,nama_klien,perusahaan,kontak,alamat').order('id');
-          if (q.error) return _fail(q.error);
-          return {
-            success: true,
-            list: (q.data || []).map(function (r) {
-              return {
-                id: r.id || '', nama: r.nama_klien || '', perusahaan: r.perusahaan || '',
-                kontak: r.kontak || '', alamat: r.alamat || ''
-              };
-            })
-          };
+          if (q.error) { console.error('[getCustomerList]', q.error); return []; }
+          return (q.data || []).map(function (r) {
+            return {
+              id: r.id || '', nama: r.nama_klien || '', perusahaan: r.perusahaan || '',
+              kontak: r.kontak || '', alamat: r.alamat || ''
+            };
+          });
         }
       });
 
       // ── Master Supplier (Supplier.gs → getSupplierList) ───────────────────
-      // Balikan lama: { id, nama, pic, telepon, email, alamat, catatan, status,
-      //                 dibuatOleh, dibuatPada, alias }
+      // Balikan lama: ARRAY [{ id, nama, pic, telepon, email, alamat, catatan,
+      //                 status, dibuatOleh, dibuatPada, alias }]
       window.gsRoute('getSupplierList', {
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('supplier')
             .select('id_supplier,nama,pic,telepon,email,alamat,catatan,status,dibuat_oleh,dibuat_pada,nama_alias')
             .order('id_supplier');
-          if (q.error) return _fail(q.error);
-          return {
-            success: true,
-            list: (q.data || []).map(function (r) {
-              return {
-                id: r.id_supplier || '', nama: r.nama || '', pic: r.pic || '',
-                telepon: r.telepon || '', email: r.email || '', alamat: r.alamat || '',
-                catatan: r.catatan || '', status: r.status || '',
-                dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada || '',
-                alias: r.nama_alias || ''
-              };
-            })
-          };
+          if (q.error) { console.error('[getSupplierList]', q.error); return []; }
+          return (q.data || []).map(function (r) {
+            return {
+              id: r.id_supplier || '', nama: r.nama || '', pic: r.pic || '',
+              telepon: r.telepon || '', email: r.email || '', alamat: r.alamat || '',
+              catatan: r.catatan || '', status: r.status || '',
+              dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada || '',
+              alias: r.nama_alias || ''
+            };
+          });
         }
       });
 
       // ── Master Produk/Jasa (Produk.gs → getProdukList) ────────────────────
-      // Balikan lama: { sku, nama, unit, harga, hpp, tipe, stokId, qtyTersedia }
+      // Balikan lama: ARRAY [{ sku, nama, unit, harga, hpp, tipe, stokId, qtyTersedia }]
       window.gsRoute('getProdukList', {
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('produk')
             .select('id,nama,unit,harga_satuan,hpp,tipe,stok_id,qty_tersedia').order('id');
-          if (q.error) return _fail(q.error);
-          return {
-            success: true,
-            list: (q.data || []).map(function (r) {
-              return {
-                sku: r.id || '', nama: r.nama || '', unit: r.unit || '',
-                harga: Number(r.harga_satuan) || 0, hpp: Number(r.hpp) || 0,
-                tipe: r.tipe || '', stokId: r.stok_id || '',
-                qtyTersedia: Number(r.qty_tersedia) || 0
-              };
-            })
-          };
+          if (q.error) { console.error('[getProdukList]', q.error); return []; }
+          return (q.data || []).map(function (r) {
+            return {
+              sku: r.id || '', nama: r.nama || '', unit: r.unit || '',
+              harga: Number(r.harga_satuan) || 0, hpp: Number(r.hpp) || 0,
+              tipe: r.tipe || '', stokId: r.stok_id || '',
+              qtyTersedia: Number(r.qty_tersedia) || 0
+            };
+          });
         }
       });
 
       // ── Manajemen User (Auth.gs → getUserList) ────────────────────────────
-      // Balikan lama: { id, nama, username, role, aktif, targetBulanan, leadId,
-      //                 noWa, email }
+      // Balikan lama: ARRAY [{ id, nama, username, role, aktif, targetBulanan,
+      //                 leadId, noWa, email }]
       window.gsRoute('getUserList', {
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('app_user')
             .select('id,nama,username,role,aktif,target_bulanan,lead_id,no_whatsapp,email').order('id');
-          if (q.error) return _fail(q.error);
-          return {
-            success: true,
-            list: (q.data || []).map(function (r) {
-              return {
-                id: r.id || '', nama: r.nama || '', username: r.username || '',
-                role: r.role || '', aktif: r.aktif !== false,
-                targetBulanan: Number(r.target_bulanan) || 0,
-                leadId: r.lead_id || '', noWa: r.no_whatsapp || '', email: r.email || ''
-              };
-            })
-          };
+          if (q.error) { console.error('[getUserList]', q.error); return []; }
+          return (q.data || []).map(function (r) {
+            return {
+              id: r.id || '', nama: r.nama || '', username: r.username || '',
+              role: r.role || '', aktif: r.aktif !== false,
+              targetBulanan: Number(r.target_bulanan) || 0,
+              leadId: r.lead_id || '', noWa: r.no_whatsapp || '', email: r.email || ''
+            };
+          });
         }
       });
 
