@@ -77,17 +77,35 @@ Vercel otomatis mendeploy ulang (~1 menit).
 
 ---
 
-## Setelah login beres — memindahkan modul berikutnya
-Pola sama untuk fungsi lain: tambah override di `supabase-overrides.js`, contoh:
+## Setelah login beres — modul MASTER DATA sudah ikut pindah
+`supabase-overrides.js` **sudah berisi** override untuk master data (aktif
+otomatis begitu URL/anon diisi & di-build):
+
+| Fungsi | Menu | Sumber Supabase |
+|---|---|---|
+| `getCustomerList` | Master Klien | tabel `klien` |
+| `getSupplierList` | Master Supplier | tabel `supplier` |
+| `getProdukList` | Master Produk/Jasa | tabel `produk` |
+| `getUserList` | Manajemen User | tabel `app_user` |
+| `getAkunPembayaranList` | Akun Pembayaran | tabel `akun_pembayaran` |
+| `getKategoriList` | Kategori Pricelist | tabel `pricelist_kategori` |
+
+Jadi cukup **build → salin → push** (Langkah 3–4) sekali lagi, dan menu-menu di
+atas langsung membaca dari Supabase. Fungsi yang belum di-override tetap lewat
+Apps Script — itu normal.
+
+### Menambah modul baca sederhana sendiri
+Pola sama, tambahkan di `supabase-overrides.js`:
 ```js
-window.gsRoute('getProdukList', { mode:'fn', handler: async () => {
-  var { data, error } = await supa.from('produk').select('*').order('id');
+window.gsRoute('namaFungsi', { mode:'fn', handler: async () => {
+  var { data, error } = await supa.from('nama_tabel').select('*').order('id');
   return error ? { success:false, message:error.message } : { success:true, list:data };
 }});
 ```
-lalu **build → salin → push** seperti Langkah 3–4. Yang belum di-override tetap
-lewat Apps Script.
+> **Bentuk balikan wajib sama persis** dengan Apps Script lama (nama field
+> camelCase). Petakan kolom snake_case → camelCase seperti contoh yang sudah ada.
 
-> Fungsi sederhana (baca/tulis tabel) bisa langsung `supa.from(...)`. Fungsi yang
-> rumit (hitung HPP/margin, transaksi banyak tabel) sebaiknya jadi **Edge
-> Function** Supabase — untuk ini minta saya bantu buatkan per modul.
+### Fungsi yang butuh hitungan → Edge Function
+Fungsi rumit (hitung HPP/margin/stok-hold, tulis banyak tabel) **tidak bisa**
+sekadar `supa.from(...)`. Itu jadi **Edge Function**. Contoh lengkap + panduan
+deploy via Cloud Shell: **`PANDUAN-EDGE-FUNCTIONS.md`** (mulai dari `getStokList`).

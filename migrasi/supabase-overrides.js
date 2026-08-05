@@ -16,6 +16,11 @@
   var SUPABASE_ANON = 'ISI_ANON_KEY';      // anon public key (aman untuk frontend)
   // ───────────────────────────────────────────────────────────────────────────
 
+  // Nyalakan jadi `true` HANYA SETELAH Edge Function 'get-stok-list' ter-deploy
+  // (lihat migrasi/PANDUAN-EDGE-FUNCTIONS.md). Selama false, getStokList tetap
+  // memakai Apps Script lama supaya Inventory tidak rusak.
+  var ENABLE_EDGE_STOK = false;
+
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
     return; // belum dikonfigurasi → biarkan login lama (Apps Script) tetap jalan
@@ -61,13 +66,165 @@
         }
       });
 
-      // ── (NANTI) tambah override modul lain di sini, mis:
-      // window.gsRoute('getProdukList', { mode:'fn', handler: async () => {
-      //   var { data, error } = await supa.from('produk').select('*').order('id');
-      //   return error ? { success:false, message:error.message } : { success:true, list:data };
-      // }});
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MASTER DATA (baca) — override sederhana `supa.from(...).select()`.
+      //  Semua memetakan kolom Supabase (snake_case) → nama field yang DIHARAPKAN
+      //  frontend (camelCase). Bentuk balikan HARUS sama persis dengan Apps Script
+      //  lama, kalau tidak UI bisa rusak. Semua balik: { success:true, list:[...] }.
+      // ═══════════════════════════════════════════════════════════════════════
 
-      console.log('[supabase-overrides] aktif — login memakai Supabase.');
+      // Helper: bungkus error jadi bentuk seragam.
+      function _fail(error) { return { success: false, message: error.message || String(error) }; }
+
+      // ── Master Klien (Customer.gs → getCustomerList) ──────────────────────
+      // Balikan lama: { id, nama, perusahaan, kontak, alamat }
+      window.gsRoute('getCustomerList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('klien')
+            .select('id,nama_klien,perusahaan,kontak,alamat').order('id');
+          if (q.error) return _fail(q.error);
+          return {
+            success: true,
+            list: (q.data || []).map(function (r) {
+              return {
+                id: r.id || '', nama: r.nama_klien || '', perusahaan: r.perusahaan || '',
+                kontak: r.kontak || '', alamat: r.alamat || ''
+              };
+            })
+          };
+        }
+      });
+
+      // ── Master Supplier (Supplier.gs → getSupplierList) ───────────────────
+      // Balikan lama: { id, nama, pic, telepon, email, alamat, catatan, status,
+      //                 dibuatOleh, dibuatPada, alias }
+      window.gsRoute('getSupplierList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('supplier')
+            .select('id_supplier,nama,pic,telepon,email,alamat,catatan,status,dibuat_oleh,dibuat_pada,nama_alias')
+            .order('id_supplier');
+          if (q.error) return _fail(q.error);
+          return {
+            success: true,
+            list: (q.data || []).map(function (r) {
+              return {
+                id: r.id_supplier || '', nama: r.nama || '', pic: r.pic || '',
+                telepon: r.telepon || '', email: r.email || '', alamat: r.alamat || '',
+                catatan: r.catatan || '', status: r.status || '',
+                dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada || '',
+                alias: r.nama_alias || ''
+              };
+            })
+          };
+        }
+      });
+
+      // ── Master Produk/Jasa (Produk.gs → getProdukList) ────────────────────
+      // Balikan lama: { sku, nama, unit, harga, hpp, tipe, stokId, qtyTersedia }
+      window.gsRoute('getProdukList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('produk')
+            .select('id,nama,unit,harga_satuan,hpp,tipe,stok_id,qty_tersedia').order('id');
+          if (q.error) return _fail(q.error);
+          return {
+            success: true,
+            list: (q.data || []).map(function (r) {
+              return {
+                sku: r.id || '', nama: r.nama || '', unit: r.unit || '',
+                harga: Number(r.harga_satuan) || 0, hpp: Number(r.hpp) || 0,
+                tipe: r.tipe || '', stokId: r.stok_id || '',
+                qtyTersedia: Number(r.qty_tersedia) || 0
+              };
+            })
+          };
+        }
+      });
+
+      // ── Manajemen User (Auth.gs → getUserList) ────────────────────────────
+      // Balikan lama: { id, nama, username, role, aktif, targetBulanan, leadId,
+      //                 noWa, email }
+      window.gsRoute('getUserList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('app_user')
+            .select('id,nama,username,role,aktif,target_bulanan,lead_id,no_whatsapp,email').order('id');
+          if (q.error) return _fail(q.error);
+          return {
+            success: true,
+            list: (q.data || []).map(function (r) {
+              return {
+                id: r.id || '', nama: r.nama || '', username: r.username || '',
+                role: r.role || '', aktif: r.aktif !== false,
+                targetBulanan: Number(r.target_bulanan) || 0,
+                leadId: r.lead_id || '', noWa: r.no_whatsapp || '', email: r.email || ''
+              };
+            })
+          };
+        }
+      });
+
+      // ── Akun Pembayaran (Settings.gs → getAkunPembayaranList) ─────────────
+      // Balikan lama: { id, namaAkun, tipe, keterangan, status, dibuatOleh,
+      //                 dibuatPada, locked }  (locked = id 'AP001')
+      window.gsRoute('getAkunPembayaranList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('akun_pembayaran')
+            .select('id,nama_akun,tipe,keterangan,status,dibuat_oleh,dibuat_pada').order('id');
+          if (q.error) return _fail(q.error);
+          return {
+            success: true,
+            list: (q.data || []).map(function (r) {
+              return {
+                id: r.id || '', namaAkun: r.nama_akun || '', tipe: r.tipe || '',
+                keterangan: r.keterangan || '', status: r.status || '',
+                dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada || '',
+                locked: (r.id === 'AP001')
+              };
+            })
+          };
+        }
+      });
+
+      // ── Kategori Pricelist (Pricelist.gs → getKategoriList) ────────────────
+      // Balikan lama: { success:true, list:[ "NamaKategori", ... ] } (string2)
+      window.gsRoute('getKategoriList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('pricelist_kategori').select('nama').order('nama');
+          if (q.error) return _fail(q.error);
+          return { success: true, list: (q.data || []).map(function (r) { return r.nama; }) };
+        }
+      });
+
+      // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
+      //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
+      //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
+      //  Balikan lama = ARRAY objek langsung (bukan {success,list}).
+      if (ENABLE_EDGE_STOK) {
+        window.gsRoute('getStokList', {
+          mode: 'fn',
+          handler: async function () {
+            var r = await supa.functions.invoke('get-stok-list', { body: {} });
+            if (r.error) { console.error('[get-stok-list]', r.error); return []; }
+            return Array.isArray(r.data) ? r.data : []; // setia: array langsung
+          }
+        });
+      }
+
+      // ── CATATAN untuk modul berikutnya (BELUM di-override) ─────────────────
+      //  Fungsi berikut punya FIELD HITUNGAN / logika multi-tabel, JANGAN dibuat
+      //  jadi `supa.from(...)` mentah — pindahkan sebagai EDGE FUNCTION / RPC:
+      //   • getStokList        → qtyHold/qtyAvailable dihitung dari reservasi
+      //   • getWorkOrderList/Dashboard → gabung penawaran+klien+WO + hpp/margin
+      //   • getRealisasiHPP    → agregasi 3 sumber pengeluaran
+      //   • savePenawaran      → hitung HPP/margin + tulis banyak baris
+      //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
+
+      console.log('[supabase-overrides] aktif — login + master data memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
