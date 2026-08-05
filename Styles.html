@@ -1,5 +1,17 @@
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+    /* Tinggi penuh pakai dynamic viewport (dvh) supaya di mobile/tablet —
+       yang bar alamatnya bisa muncul/hilang — bagian ATAS (logo RenusPro +
+       item teratas) tidak terpotong. Fallback ke vh untuk browser lama.
+       h-screen Tailwind = 100vh; kita timpa dengan 100dvh bila didukung. */
+    html, body { height: 100vh; }
+    @supports (height: 100dvh) {
+      html, body { height: 100dvh; }
+      body.h-screen { height: 100dvh; }
+      #main-sidebar { height: 100dvh; }
+    }
+
     body.login-active {
       overflow: hidden !important;
     }
