@@ -73,8 +73,11 @@ function _renderUserSidebar(user) {
   const avatarEl = document.getElementById('sidebar-avatar');
   if (!user) return;
 
-  nameEl.innerText   = user.nama;
-  avatarEl.innerText = user.nama.charAt(0).toUpperCase();
+  // Null-safe: nama bisa kosong/null (mis. profil dari Supabase belum lengkap) —
+  // jangan sampai .charAt() melempar error & memutus render sidebar/footer.
+  const nama = (user.nama || user.username || 'Pengguna').toString();
+  if (nameEl)   nameEl.innerText   = nama;
+  if (avatarEl) avatarEl.innerText = (nama.charAt(0) || 'U').toUpperCase();
 
   const role = (user.role || 'sales').toLowerCase();
   const badgeCls = _ROLE_BADGE[role] || _ROLE_BADGE.sales;
@@ -208,11 +211,13 @@ function _onLoginSuccess(user, message) {
   _saveSession(user);
   document.getElementById('login-screen').classList.add('hidden');
   document.body.classList.remove('login-active');
-  _renderUserSidebar(user);
-  showNotification(message || ('Selamat datang, ' + user.nama + '!'));
+  // Tiap langkah dibungkus supaya satu kegagalan tak memblankkan seluruh UI
+  // (nama/tombol sidebar tetap tampil walau navigate/notifikasi bermasalah).
+  try { _renderUserSidebar(user); } catch (e) { console.error('render sidebar:', e); }
+  try { showNotification(message || ('Selamat datang, ' + (user.nama || '') + '!')); } catch (e) {}
   // Tanpa "Sinkronisasi ERP" penuh di awal — data penawaran (klien/produk/
   // template) dimuat saat form penawaran dibuka; tiap menu punya loading lokal.
-  navigate(_defaultPage(user));
+  try { navigate(_defaultPage(user)); } catch (e) { console.error('navigate awal:', e); }
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────
