@@ -105,6 +105,28 @@
         try { return JSON.stringify(v); } catch (e) { return dflt; }
       }
 
+      // Helper: field JSON → OBJEK (kebalikan _jsonStr) untuk baca isinya.
+      function _jsonObj(v) {
+        if (!v) return {};
+        if (typeof v === 'object') return v;
+        try { return JSON.parse(v); } catch (e) { return {}; }
+      }
+
+      // Helper: timestamp → 'dd/MM/yyyy HH:mm' (Asia/Jakarta), meniru _hoTs.
+      function _fmtTs(v) {
+        if (!v) return '';
+        var d = new Date(v.toString());
+        if (isNaN(d.getTime())) return v.toString();
+        try {
+          var p = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).formatToParts(d);
+          var g = function (t) { var x = p.find(function (e) { return e.type === t; }); return x ? x.value : ''; };
+          return g('day') + '/' + g('month') + '/' + g('year') + ' ' + g('hour') + ':' + g('minute');
+        } catch (e) { return _fmtTgl(v); }
+      }
+
       // ── Master Klien (Customer.gs → getCustomerList) ──────────────────────
       // Balikan lama: { id, nama, perusahaan, kontak, alamat }
       window.gsRoute('getCustomerList', {
@@ -398,6 +420,101 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 2 (site survey, produk per-supplier, hand over)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Site Survey list (SiteSurvey.gs → getSiteSurveyList) ──────────────
+      window.gsRoute('getSiteSurveyList', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('site_survey').select('*');
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (r) {
+            var d = _jsonObj(r.data);
+            return {
+              id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey),
+              dibuatOleh: r.dibuat_oleh || '', dibuatOlehId: d.dibuatOlehId || '',
+              noWO: r.no_wo || d.noWO || '', namaSite: r.nama_site || '',
+              namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || '',
+              latitude: (r.latitude !== null && r.latitude !== undefined) ? Number(r.latitude) : null,
+              longitude: (r.longitude !== null && r.longitude !== undefined) ? Number(r.longitude) : null,
+              dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : ''
+            };
+          });
+          list.sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Site Survey per WO (SiteSurvey.gs → getSiteSurveysByWO) ───────────
+      window.gsRoute('getSiteSurveysByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, list: [] };
+          var q = await supa.from('site_survey').select('*').eq('no_wo', noWO);
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (r) {
+            return {
+              id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey),
+              dibuatOleh: r.dibuat_oleh || '', namaSite: r.nama_site || '',
+              namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || ''
+            };
+          });
+          list.sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Produk per Supplier (Supplier.gs → getProdukBySupplier) ───────────
+      //  = pricelist milik supplier (tanpa filter ready). leadTime di sumber
+      //  lama selalu kosong → dipertahankan '' agar sama persis.
+      window.gsRoute('getProdukBySupplier', {
+        mode: 'fn',
+        handler: async function (args) {
+          var idSupplier = (args[0] || '').toString().trim();
+          var q = await supa.from('pricelist')
+            .select('id,nama_material,spesifikasi,satuan,harga_beli').eq('id_supplier', idSupplier);
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          var list = (q.data || []).map(function (it) {
+            var label = (it.nama_material || '') + (it.spesifikasi ? ' - ' + it.spesifikasi : '');
+            return {
+              id: it.id || '', nama: label, unit: it.satuan || '',
+              hargaBeli: Number(it.harga_beli) || 0, leadTime: ''
+            };
+          }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Hand Over per WO (WorkOrder.gs → getHandOverByWO) ─────────────────
+      window.gsRoute('getHandOverByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var q = await supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle();
+          if (q.error) return { success: false, message: q.error.message };
+          if (!q.data) return { success: true, record: null };
+          var r = q.data;
+          return {
+            success: true,
+            record: {
+              noWO: noWO, status: r.status || '', dimintaOleh: r.diminta_oleh || '',
+              dimintaPada: _fmtTs(r.diminta_pada),
+              tglJadwal: r.tgl_jadwal ? r.tgl_jadwal.toString().slice(0, 10) : '',
+              waktu: r.waktu ? r.waktu.toString().slice(0, 5) : '',
+              mode: r.mode || '', linkMeet: r.link_meet || '', lokasi: r.lokasi || '',
+              peserta: r.peserta || '', catatanUndangan: r.catatan_undangan || '',
+              dijadwalkanOleh: r.dijadwalkan_oleh || '', dijadwalkanPada: _fmtTs(r.dijadwalkan_pada),
+              mom: r.mom || '', selesaiOleh: r.selesai_oleh || '', selesaiPada: _fmtTs(r.selesai_pada),
+              meetEventId: r.meet_event_id || ''
+            }
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -428,7 +545,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1+b2) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
