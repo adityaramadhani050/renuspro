@@ -3314,6 +3314,124 @@
       window.gsRoute('setDEDItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('ded_item', 'files', 'DEDI', a[0], a[1], a[2], a[3], 'Status dokumen diperbarui.'); } });
       window.gsRoute('setQCItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('qc_item', 'foto', 'QCI', a[0], a[1], a[2], a[3], 'Status item diperbarui.'); } });
 
+      // Helper: id berurut per-bulan (prefix-YYYYMM-###).
+      async function _nextSeqId(table, idField, prefix) {
+        var q = await _all(table, idField); var maxSeq = 0;
+        (q.data || []).forEach(function (r) { var id = (r[idField] || '').toString(); if (id.indexOf(prefix) === 0) { var s = parseInt(id.slice(prefix.length), 10) || 0; if (s > maxSeq) maxSeq = s; } });
+        return prefix + ('000' + (maxSeq + 1)).slice(-3);
+      }
+
+      // ── Cash: Pemasukan langsung (simpan/edit/hapus) ──────────────────────
+      window.gsRoute('simpanPemasukanLangsung', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!p.kategori) return { success: false, message: 'Kategori pemasukan wajib dipilih.' };
+          if (!p.deskripsi) return { success: false, message: 'Deskripsi wajib diisi.' };
+          if (!p.idAkun) return { success: false, message: 'Akun penerima wajib dipilih.' };
+          if (p.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih untuk pemasukan.' };
+          var jumlah = parseFloat(p.jumlah) || 0; if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
+          var id = await _nextSeqId('pemasukan', 'id_pemasukan', 'IN-' + _todayIso().slice(0, 7).replace('-', '') + '-');
+          var ins = await supa.from('pemasukan').insert({ id_pemasukan: id, tanggal: _isoDate(p.tanggal) || _todayIso(), sumber: 'Langsung', kategori: (p.kategori || '').toString(), id_akun: (p.idAkun || '').toString(), nama_akun: (p.namaAkun || '').toString(), no_invoice_ref: (p.noRef || '').toString(), id_referensi: '', deskripsi: (p.deskripsi || '').toString(), jumlah: jumlah, catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), diubah_oleh: '', diubah_pada: null });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Pemasukan ' + id + ' berhasil disimpan.', id: id };
+        }
+      });
+      window.gsRoute('editPemasukanLangsung', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString().trim();
+          if (!id) return { success: false, message: 'ID Pemasukan wajib diisi.' };
+          if (!p.kategori) return { success: false, message: 'Kategori pemasukan wajib dipilih.' };
+          if (!p.deskripsi) return { success: false, message: 'Deskripsi wajib diisi.' };
+          if (!p.idAkun) return { success: false, message: 'Akun penerima wajib dipilih.' };
+          if (p.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih untuk pemasukan.' };
+          var jumlah = parseFloat(p.jumlah) || 0; if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
+          var chk = await supa.from('pemasukan').select('sumber').eq('id_pemasukan', id).maybeSingle();
+          if (!chk.data) return { success: false, message: 'Pemasukan tidak ditemukan.' };
+          if ((chk.data.sumber || '') !== 'Langsung') return { success: false, message: 'Pemasukan bersumber "' + chk.data.sumber + '" tidak bisa diedit. Kelola dari sumbernya (mis. status invoice).' };
+          var upd = { kategori: (p.kategori || '').toString(), id_akun: (p.idAkun || '').toString(), nama_akun: (p.namaAkun || '').toString(), no_invoice_ref: (p.noRef || '').toString(), deskripsi: (p.deskripsi || '').toString(), jumlah: jumlah, catatan: (p.catatan || '').toString(), diubah_oleh: (p.dibuatOleh || '').toString(), diubah_pada: new Date().toISOString() };
+          if (p.tanggal) { var t = _isoDate(p.tanggal); if (t) upd.tanggal = t; }
+          var up = await supa.from('pemasukan').update(upd).eq('id_pemasukan', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Pemasukan ' + id + ' berhasil diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusPemasukan', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          var chk = await supa.from('pemasukan').select('sumber').eq('id_pemasukan', id).maybeSingle();
+          if (!chk.data) return { success: false, message: 'Pemasukan tidak ditemukan.' };
+          if ((chk.data.sumber || '') !== 'Langsung') return { success: false, message: 'Pemasukan bersumber "' + chk.data.sumber + '" tidak bisa dihapus di sini — batalkan dari sumbernya (mis. ubah status invoice ke Belum Lunas).' };
+          var del = await supa.from('pemasukan').delete().eq('id_pemasukan', id);
+          if (del.error) return { success: false, message: del.error.message };
+          return { success: true, message: 'Pemasukan ' + id + ' berhasil dihapus.' };
+        }
+      });
+
+      // ── Cash: Pengeluaran langsung (simpan/edit/hapus) ────────────────────
+      window.gsRoute('simpanPengeluaranLangsung', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          var noWO = (p.noWO || '').toString().trim(), kategori = (p.kategori || '').toString().trim();
+          if (!noWO && !kategori) return { success: false, message: 'Kategori pengeluaran wajib dipilih untuk pengeluaran non-project.' };
+          if (!p.deskripsi) return { success: false, message: 'Deskripsi wajib diisi.' };
+          if (!p.idAkun) return { success: false, message: 'Akun pembayaran wajib dipilih.' };
+          if (p.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih untuk pengeluaran langsung.' };
+          var qty = parseFloat(p.qty) || 0, hs = parseFloat(p.hargaSatuan) || 0;
+          if (qty <= 0) return { success: false, message: 'Qty harus lebih dari 0.' };
+          if (hs <= 0) return { success: false, message: 'Harga satuan harus lebih dari 0.' };
+          if (noWO) {
+            var wq = await supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1);
+            var st = (wq.data && wq.data[0]) ? (wq.data[0].status || '') : '';
+            if (!st) return { success: false, message: 'Work Order tidak ditemukan.' };
+            if (st === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa menambah pengeluaran.' };
+          }
+          var id = await _nextSeqId('pengeluaran', 'id_pengeluaran', 'EXP-' + _todayIso().slice(0, 7).replace('-', '') + '-');
+          var ins = await supa.from('pengeluaran').insert({ id_pengeluaran: id, no_wo: noWO, tanggal: _isoDate(p.tanggal) || _todayIso(), sumber: 'Langsung', no_po: (p.noPO || '').toString(), id_referensi: '', id_akun: (p.idAkun || '').toString(), nama_akun: (p.namaAkun || '').toString(), deskripsi: (p.deskripsi || '').toString(), qty: qty, satuan: (p.satuan || '').toString(), harga_satuan: hs, total: qty * hs, catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), diubah_oleh: '', diubah_pada: null, kategori: (noWO ? '' : kategori) });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Pengeluaran ' + id + ' berhasil disimpan.', id: id };
+        }
+      });
+      window.gsRoute('editPengeluaranLangsung', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString().trim();
+          if (!id) return { success: false, message: 'ID Pengeluaran wajib diisi.' };
+          if (!p.deskripsi) return { success: false, message: 'Deskripsi wajib diisi.' };
+          if (!p.idAkun) return { success: false, message: 'Akun pembayaran wajib dipilih.' };
+          if (p.idAkun === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipilih.' };
+          var qty = parseFloat(p.qty) || 0, hs = parseFloat(p.hargaSatuan) || 0;
+          if (qty <= 0) return { success: false, message: 'Qty harus lebih dari 0.' };
+          if (hs <= 0) return { success: false, message: 'Harga satuan harus lebih dari 0.' };
+          var chk = await supa.from('pengeluaran').select('sumber,no_wo').eq('id_pengeluaran', id).maybeSingle();
+          if (!chk.data) return { success: false, message: 'Pengeluaran tidak ditemukan.' };
+          if ((chk.data.sumber || '') !== 'Langsung') return { success: false, message: 'Pengeluaran bersumber "' + chk.data.sumber + '" tidak bisa diedit di sini.' };
+          var noWO = (chk.data.no_wo || '').toString();
+          var upd = { no_po: (p.noPO || '').toString(), id_akun: (p.idAkun || '').toString(), nama_akun: (p.namaAkun || '').toString(), deskripsi: (p.deskripsi || '').toString(), qty: qty, satuan: (p.satuan || '').toString(), harga_satuan: hs, total: qty * hs, catatan: (p.catatan || '').toString(), kategori: (noWO ? '' : (p.kategori || '').toString()), diubah_oleh: (p.dibuatOleh || '').toString(), diubah_pada: new Date().toISOString() };
+          if (p.tanggal) { var t = _isoDate(p.tanggal); if (t) upd.tanggal = t; }
+          var up = await supa.from('pengeluaran').update(upd).eq('id_pengeluaran', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Pengeluaran ' + id + ' berhasil diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusPengeluaran', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          var chk = await supa.from('pengeluaran').select('sumber').eq('id_pengeluaran', id).maybeSingle();
+          if (!chk.data) return { success: false, message: 'Pengeluaran tidak ditemukan.' };
+          var sumber = (chk.data.sumber || '');
+          if (sumber === 'Pembayaran PO') return { success: false, message: 'Pengeluaran bersumber Pembayaran PO tidak bisa dihapus di sini — hapus pembayarannya di detail PO.' };
+          if (sumber === 'Penggunaan Stok') return { success: false, message: 'Pengeluaran bersumber Penggunaan Stok — batalkan penggunaan stoknya (belum bisa dari sini).' };
+          var del = await supa.from('pengeluaran').delete().eq('id_pengeluaran', id);
+          if (del.error) return { success: false, message: del.error.message };
+          return { success: true, message: 'Pengeluaran ' + id + ' berhasil dihapus.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
