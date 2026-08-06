@@ -182,6 +182,66 @@
         return s;
       }
 
+      // Helper bersama: hitung dashboard DED/QC (struktur identik) dari
+      // master + item + project + assignment. Port dari get*Dashboard.
+      function _engDashCompute(master, items, projects, assigns, siteUserId) {
+        var masterCount = master.length, wajibTotal = 0, wajibKode = {}, labelMap = {};
+        master.forEach(function (m) { labelMap[m.kode] = m.label; if (m.wajib) { wajibTotal++; wajibKode[m.kode] = true; } });
+        var assignedMap = {};
+        (assigns || []).forEach(function (a) { var w = (a.no_wo || '').toString().trim(); if (!w) return; (assignedMap[w] = assignedMap[w] || []).push({ id: (a.id_user || '').toString(), nama: (a.nama_user || '').toString() }); });
+        var woList = (projects || []).map(function (r) {
+          return { noWO: (r.no_wo || '').toString().trim(), namaProject: r.nama_project || '', namaKlien: r.nama_klien || '', status: '', selesaiManual: r.selesai_manual === true };
+        }).filter(function (r) { return r.noWO; });
+        if (siteUserId) woList = woList.filter(function (wo) { return (assignedMap[wo.noWO] || []).some(function (a) { return a.id === siteUserId; }); });
+        var visible = {}, woName = {};
+        woList.forEach(function (wo) { visible[wo.noWO] = true; woName[wo.noWO] = wo.namaProject; });
+        var now = new Date();
+        var byWO = {}, reviewQueue = [], teamAgg = {};
+        (items || []).forEach(function (it) {
+          var w = (it.no_wo || '').toString().trim(); if (!w || !visible[w]) return;
+          if (!byWO[w]) byWO[w] = { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
+          var st = (it.status || '').toString();
+          var kd = (it.kode || '').toString().trim();
+          byWO[w].touched++;
+          if (st === 'Approved') { byWO[w].approved++; if (wajibKode[kd]) byWO[w].wajibApproved++; }
+          else if (st === 'Pending') byWO[w].pending++;
+          else if (st === 'Rejected') byWO[w].rejected++;
+          else if (st === 'NA') byWO[w].na++;
+          var upBy = (it.diupload_oleh || '').toString().trim();
+          var upPada = (it.diupload_pada || '').toString().trim();
+          var acts = _arr(it.aktivitas);
+          if (st === 'Pending') {
+            var ts = upPada ? new Date(upPada) : null;
+            reviewQueue.push({ noWO: w, namaProject: woName[w] || '', kode: kd, label: labelMap[kd] || kd, uploadedBy: upBy, uploadedPada: upPada, ageDays: (ts && !isNaN(ts.getTime())) ? Math.floor((now - ts) / 86400000) : null });
+          }
+          if (upBy) {
+            var t = teamAgg[upBy] || (teamAgg[upBy] = { nama: upBy, items: 0, approved: 0, pending: 0, rejected: 0, ftr: 0, reviewed: 0, everRejected: 0, wos: {} });
+            t.items++; t.wos[w] = true;
+            if (st === 'Approved') t.approved++; else if (st === 'Pending') t.pending++; else if (st === 'Rejected') t.rejected++;
+            var hasReject = acts.some(function (e) { return e.type === 'reject'; });
+            var hasReview = acts.some(function (e) { return e.type === 'reject' || e.type === 'approve'; });
+            if (hasReview) t.reviewed++;
+            if (hasReject) t.everRejected++;
+            if (st === 'Approved' && !hasReject) t.ftr++;
+          }
+        });
+        var global = { totalWO: 0, approved: 0, pending: 0, rejected: 0, belum: 0 };
+        var perWO = woList.map(function (wo) {
+          var g = byWO[wo.noWO] || { approved: 0, pending: 0, rejected: 0, na: 0, touched: 0, wajibApproved: 0 };
+          var belum = Math.max(0, masterCount - g.touched);
+          var pct = wajibTotal ? Math.round((g.wajibApproved / wajibTotal) * 100) : 0;
+          global.totalWO++; global.approved += g.approved; global.pending += g.pending; global.rejected += g.rejected; global.belum += belum;
+          return { noWO: wo.noWO, namaProject: wo.namaProject, namaKlien: wo.namaKlien, status: wo.status, total: masterCount, approved: g.approved, pending: g.pending, rejected: g.rejected, na: g.na, belum: belum, pct: pct, selesaiManual: !!wo.selesaiManual, assigned: assignedMap[wo.noWO] || [] };
+        });
+        perWO.sort(function (a, b) { return (b.noWO || '').localeCompare((a.noWO || ''), undefined, { numeric: true }); });
+        reviewQueue.sort(function (a, b) { return (b.ageDays == null ? -1 : b.ageDays) - (a.ageDays == null ? -1 : a.ageDays); });
+        var teamStats = Object.keys(teamAgg).map(function (name) {
+          var t = teamAgg[name];
+          return { nama: t.nama, items: t.items, approved: t.approved, pending: t.pending, rejected: t.rejected, woCount: Object.keys(t.wos).length, ftrPct: t.approved ? Math.round(t.ftr / t.approved * 100) : null, rejectRatePct: t.reviewed ? Math.round(t.everRejected / t.reviewed * 100) : null };
+        }).sort(function (a, b) { return b.items - a.items; });
+        return { success: true, global: global, perWO: perWO, reviewQueue: reviewQueue, teamStats: teamStats };
+      }
+
       // Helper bersama: master checklist QC (section + item) — dipakai
       // getQCChecklist & getQCByWO.
       async function _qcMaster() {
@@ -1437,6 +1497,97 @@
         }
       });
 
+      // ── BOM dashboard (BOM.gs → getBOMDashboard) — home BOM ───────────────
+      window.gsRoute('getBOMDashboard', {
+        mode: 'fn',
+        handler: async function (args) {
+          var opts = args[0] || {};
+          var siteUserId = (opts.siteUserId || '').toString().trim();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_assignment').select('no_wo,id_user,nama_user')),
+            _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien')),
+            _safe(supa.from('bom_item').select('no_wo,kategori,status,proc_status'))
+          ]);
+          var aq = res[0], pq = res[1], iq = res[2];
+          var assignedMap = {};
+          (aq.data || []).forEach(function (a) {
+            var w = (a.no_wo || '').toString().trim(); if (!w) return;
+            (assignedMap[w] = assignedMap[w] || []).push({ id: (a.id_user || '').toString(), nama: (a.nama_user || '').toString() });
+          });
+          var regs = (pq.data || []).map(function (r) {
+            return { noWO: (r.no_wo || '').toString().trim(), namaProject: r.nama_project || '', namaKlien: r.nama_klien || '' };
+          }).filter(function (r) { return r.noWO; });
+          if (siteUserId) regs = regs.filter(function (r) { return (assignedMap[r.noWO] || []).some(function (a) { return a.id === siteUserId; }); });
+          var visible = {}; regs.forEach(function (r) { visible[r.noWO] = true; });
+          var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {}, procPend = {}, procDone = {};
+          (iq.data || []).forEach(function (it) {
+            var w = (it.no_wo || '').toString().trim(); if (!w || !visible[w]) return;
+            cnt[w] = (cnt[w] || 0) + 1;
+            var kat = (it.kategori || 'Lainnya').toString().trim() || 'Lainnya';
+            if (!katSet[w]) katSet[w] = {}; katSet[w][kat] = true;
+            var st = (it.status || '').toString().trim() || 'Pending';
+            if (st === 'Approved') {
+              appr[w] = (appr[w] || 0) + 1;
+              if ((it.proc_status || '').toString().trim()) procDone[w] = (procDone[w] || 0) + 1;
+              else procPend[w] = (procPend[w] || 0) + 1;
+            } else if (st === 'Rejected') rej[w] = (rej[w] || 0) + 1;
+            else pend[w] = (pend[w] || 0) + 1;
+          });
+          var perWO = regs.map(function (r) {
+            var total = cnt[r.noWO] || 0, a = appr[r.noWO] || 0;
+            return {
+              noWO: r.noWO, namaProject: r.namaProject, namaKlien: r.namaKlien,
+              status: (total > 0 && a === total) ? 'Final' : 'Draft', jumlahItem: total,
+              jumlahKategori: katSet[r.noWO] ? Object.keys(katSet[r.noWO]).length : 0,
+              approved: a, pending: pend[r.noWO] || 0, rejected: rej[r.noWO] || 0,
+              procPending: procPend[r.noWO] || 0, procDone: procDone[r.noWO] || 0,
+              assigned: assignedMap[r.noWO] || []
+            };
+          });
+          var totalItem = 0, totalFinal = 0;
+          perWO.forEach(function (w) { totalItem += w.jumlahItem; if (w.status === 'Final') totalFinal++; });
+          return {
+            success: true, perWO: perWO,
+            global: { jumlahWO: perWO.length, jumlahItem: totalItem, jumlahFinal: totalFinal, jumlahDraft: perWO.length - totalFinal }
+          };
+        }
+      });
+
+      // ── DED dashboard (DED.gs → getDEDDashboard) — home DED ───────────────
+      window.gsRoute('getDEDDashboard', {
+        mode: 'fn',
+        handler: async function (args) {
+          var siteUserId = (args[0] && args[0].siteUserId) ? args[0].siteUserId.toString().trim() : '';
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('ded_checklist').select('kode,label,wajib')),
+            _safe(supa.from('ded_item').select('no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas')),
+            _safe(supa.from('ded_project').select('no_wo,nama_project,nama_klien,selesai_manual')),
+            _safe(supa.from('ded_assignment').select('no_wo,id_user,nama_user'))
+          ]);
+          var master = (res[0].data || []).map(function (r) { return { kode: r.kode || '', label: r.label || '', wajib: r.wajib === true }; });
+          return _engDashCompute(master, res[1].data || [], res[2].data || [], res[3].data || [], siteUserId);
+        }
+      });
+
+      // ── QC dashboard (QC.gs → getQCDashboard) — home QC ───────────────────
+      window.gsRoute('getQCDashboard', {
+        mode: 'fn',
+        handler: async function (args) {
+          var siteUserId = (args[0] && args[0].siteUserId) ? args[0].siteUserId.toString().trim() : '';
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var mres = await Promise.all([
+            _qcMaster(),
+            _safe(supa.from('qc_item').select('no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas')),
+            _safe(supa.from('qc_project').select('no_wo,nama_project,nama_klien,selesai_manual')),
+            _safe(supa.from('qc_assignment').select('no_wo,id_user,nama_user'))
+          ]);
+          var master = (mres[0].list || []).map(function (m) { return { kode: m.kode, label: m.label, wajib: m.wajib }; });
+          return _engDashCompute(master, mres[1].data || [], mres[2].data || [], mres[3].data || [], siteUserId);
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1467,7 +1618,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+BOM+QC+DED) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+BOM+QC+DED+dashboards) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
