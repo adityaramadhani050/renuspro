@@ -3432,6 +3432,44 @@
         }
       });
 
+      // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
+      //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
+      window.gsRoute('hapusInvoice', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString();
+          var del = await supa.from('invoice').delete().eq('no_invoice', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Invoice tidak ditemukan.' };
+          return { success: true, message: 'Invoice ' + id + ' dihapus.' };
+        }
+      });
+      window.gsRoute('hapusKwitansi', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString();
+          var del = await supa.from('kwitansi').delete().eq('no_kwitansi', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+          return { success: true, message: 'Kwitansi ' + id + ' dihapus.' };
+        }
+      });
+      window.gsRoute('editKwitansi', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString();
+          if (!id) return { success: false, message: 'ID kwitansi wajib.' };
+          var jumlah = parseFloat(p.jumlah) || 0;
+          if (jumlah <= 0) return { success: false, message: 'Jumlah kwitansi harus lebih dari 0.' };
+          var upd = { terima_dari: (p.terimaDari || '').toString(), jumlah: jumlah, untuk_pembayaran: (p.untuk || '').toString(), metode: (p.metode || 'Transfer').toString(), catatan: (p.catatan || '').toString() };
+          var t = _isoDate(p.tanggal); if (t) upd.tanggal = t;
+          var up = await supa.from('kwitansi').update(upd).eq('no_kwitansi', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+          return { success: true, message: 'Kwitansi ' + id + ' berhasil diperbarui!' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
