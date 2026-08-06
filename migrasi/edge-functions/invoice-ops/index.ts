@@ -114,6 +114,59 @@ Deno.serve(async (req: Request) => {
       return json({ success: true, message: 'Invoice ' + noInvoice + ' berhasil dibuat!', noInvoice });
     }
 
+    // ═══════════════════════ EDIT ═══════════════════════
+    if (action === 'edit') {
+      const p = body.payload || {};
+      const id = (p.id || '').toString();
+      const cur = await sb.from('invoice').select('*').eq('no_invoice', id).maybeSingle();
+      if (cur.error || !cur.data) return json({ success: false, message: 'Invoice tidak ditemukan.' });
+      const oldDpp = Number(cur.data.dpp) || 0;
+      const isStub = !(cur.data.no_wo || '') && !(cur.data.no_penawaran || '');
+      const resolvedNoWO = isStub ? (p.noWO || '') : (cur.data.no_wo || '');
+      const resolvedNoPen = isStub ? (p.noPenawaran || '') : (cur.data.no_penawaran || '');
+      const isPredeal = !resolvedNoWO;
+      let wo: any;
+      if (isPredeal) {
+        if (!resolvedNoPen) return json({ success: false, message: 'Pilih Work Order atau Penawaran terlebih dahulu.' });
+        const pen = await all('penawaran', 'no_penawaran,rev,subtotal,diskon,pajak,klien_id,nama_project,items');
+        const rows = pen.filter((r) => (r.no_penawaran || '') === resolvedNoPen).sort((a, b) => (parseInt(b.rev) || 0) - (parseInt(a.rev) || 0));
+        if (!rows.length) return json({ success: false, message: 'Penawaran tidak ditemukan.' });
+        const r = rows[0]; const k = await sb.from('klien').select('nama_klien').eq('id', r.klien_id || '').maybeSingle();
+        wo = { subtotal: r.subtotal, diskon: r.diskon, pajak: r.pajak, id: r.no_penawaran, klienId: r.klien_id, namaKlien: k.data?.nama_klien || '', namaProject: r.nama_project, items: r.items };
+        if (p.jenis !== 'DP') return json({ success: false, message: 'Invoice pre-deal hanya boleh jenis DP.' });
+      } else {
+        const w = await sb.from('work_order').select('subtotal,diskon,pajak,no_penawaran,klien_id,nama_klien,nama_project,items').eq('no_wo', resolvedNoWO).maybeSingle();
+        if (w.error || !w.data) return json({ success: false, message: 'Work Order sumber tidak ditemukan.' });
+        const r = w.data; wo = { subtotal: r.subtotal, diskon: r.diskon, pajak: r.pajak, id: r.no_penawaran, klienId: r.klien_id, namaKlien: r.nama_klien, namaProject: r.nama_project, items: r.items };
+      }
+      const nilaiKontrak = Math.max(0, (Number(wo.subtotal) || 0) - (Number(wo.diskon) || 0));
+      const ppnPersen = nilaiKontrak > 0 ? Math.round((Number(wo.pajak) || 0) / nilaiKontrak * 100) : 0;
+      const inv = await all('invoice', 'no_invoice,no_wo,no_penawaran,dpp');
+      let ditagih = 0;
+      for (const r of inv) { if (isPredeal) { if ((r.no_penawaran || '') === wo.id) ditagih += Number(r.dpp) || 0; } else { if ((r.no_wo || '') === resolvedNoWO) ditagih += Number(r.dpp) || 0; } }
+      const sisaDpp = Math.max(0, nilaiKontrak - (ditagih - oldDpp));
+      const jenis = p.jenis || 'Penuh';
+      let dpp: number, persen: number;
+      if (jenis === 'Pelunasan') { dpp = sisaDpp; persen = 0; }
+      else if (jenis === 'Penuh') { dpp = nilaiKontrak; persen = 100; }
+      else if (p.inputMode === 'nominal') { dpp = Math.round(parseFloat(p.dpp) || 0); persen = nilaiKontrak > 0 ? Math.round(dpp / nilaiKontrak * 100) : 0; }
+      else { persen = parseFloat(p.persen) || 0; dpp = Math.round(persen / 100 * nilaiKontrak); }
+      if (dpp <= 0) return json({ success: false, message: 'Nilai tagihan harus lebih dari 0.' });
+      if (dpp > sisaDpp + 1) return json({ success: false, message: `Nilai tagihan (Rp ${dpp.toLocaleString('id-ID')}) melebihi sisa kontrak (Rp ${Math.round(sisaDpp).toLocaleString('id-ID')}).` });
+      const ppnNominal = Math.round(dpp * ppnPersen / 100); const total = dpp + ppnNominal;
+      let scope: any = []; try { scope = typeof wo.items === 'string' ? JSON.parse(wo.items || '[]') : (wo.items || []); } catch (_) { scope = []; }
+      const meta = { scope, nilaiKontrak, inputMode: p.inputMode || 'persen' };
+      const upd: any = {
+        tanggal: (p.tanggal && /^\d{4}-\d{2}-\d{2}/.test(p.tanggal)) ? p.tanggal.slice(0, 10) : todayIso(),
+        jenis, persen, no_po: p.noPO || '', tgl_po: (p.tglPO && /^\d{4}-\d{2}-\d{2}/.test(p.tglPO)) ? p.tglPO.slice(0, 10) : null,
+        dpp, ppn_persen: ppnPersen, ppn_nominal: ppnNominal, total, rincian_item: meta, catatan: p.catatan || '', bank_account: p.bankAccount || '',
+      };
+      if (isStub) { upd.no_wo = isPredeal ? '' : resolvedNoWO; upd.no_penawaran = wo.id; upd.klien_id = wo.klienId; upd.nama_klien = wo.namaKlien; upd.nama_project = wo.namaProject; }
+      const u = await sb.from('invoice').update(upd).eq('no_invoice', id);
+      if (u.error) return json({ success: false, message: u.error.message });
+      return json({ success: true, message: 'Invoice ' + id + ' berhasil diperbarui!' });
+    }
+
     // ═══════════════════════ SET STATUS ═══════════════════════
     if (action === 'setStatus') {
       const idInvoice = (body.idInvoice || '').toString();
