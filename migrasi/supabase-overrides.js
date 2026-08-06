@@ -1838,6 +1838,69 @@
         }
       });
 
+      // ── Detail Kas Project per WO (Pengeluaran.gs → getDetailKasProjectWO) ─
+      window.gsRoute('getDetailKasProjectWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = args[0] ? args[0].toString().trim() : '';
+          if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengeluaran').select('id_pengeluaran,tanggal,sumber,no_po,nama_akun,deskripsi,total').eq('no_wo', noWO)),
+            _safe(supa.from('invoice').select('no_invoice').eq('no_wo', noWO)),
+            _safe(supa.from('pemasukan').select('id_pemasukan,tanggal,id_referensi,nama_akun,deskripsi,jumlah'))
+          ]);
+          var pengeluaran = [], totalKeluar = 0;
+          (res[0].data || []).forEach(function (r) {
+            var t = parseFloat(r.total) || 0; totalKeluar += t;
+            pengeluaran.push({ id: r.id_pengeluaran || '', tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', noPO: r.no_po || '', namaAkun: r.nama_akun || '', deskripsi: r.deskripsi || '', total: t });
+          });
+          var invSet = {}; (res[1].data || []).forEach(function (r) { if (r.no_invoice) invSet[r.no_invoice.toString().trim()] = true; });
+          var pemasukan = [], totalMasuk = 0;
+          (res[2].data || []).forEach(function (p) {
+            var ref = (p.id_referensi || '').toString().trim(); if (!ref || !invSet[ref]) return;
+            var jml = parseFloat(p.jumlah) || 0; totalMasuk += jml;
+            pemasukan.push({ id: p.id_pemasukan || '', tanggal: _fmtTgl(p.tanggal), noInvoice: ref, namaAkun: p.nama_akun || '', deskripsi: p.deskripsi || '', jumlah: jml });
+          });
+          return { success: true, noWO: noWO, pemasukan: pemasukan, pengeluaran: pengeluaran, totalMasuk: totalMasuk, totalKeluar: totalKeluar };
+        }
+      });
+
+      // ── Dokumen Project per WO (WorkOrder.gs → getWODokumen) ──────────────
+      window.gsRoute('getWODokumen', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('wo_dokumen').select('*').eq('no_wo', noWO).eq('jenis', 'kontrak').maybeSingle()),
+            _safe(supa.from('qc_item').select('kode,foto,status,diupload_oleh,diupload_pada').eq('no_wo', noWO))
+          ]);
+          var kr = res[0].data;
+          var kontrak = kr ? { fileId: kr.file_id || '', fileUrl: kr.file_url || '', fileName: kr.nama_file || '', by: kr.diupload_oleh || '', at: kr.diupload_pada ? kr.diupload_pada.toString() : '' } : null;
+          var byKode = {}; (res[1].data || []).forEach(function (r) { byKode[(r.kode || '').toString().trim()] = r; });
+          var docMap = [{ key: 'bast', kode: 'H1', label: 'BAST' }, { key: 'garansi', kode: 'H2', label: 'Surat Garansi' }, { key: 'commissioning', kode: 'H3', label: 'Hasil Commissioning' }];
+          var qc = {};
+          docMap.forEach(function (m) {
+            var doc = { kode: m.kode, label: m.label, status: 'Belum Upload', file: null, by: '', at: '' };
+            var row = byKode[m.kode];
+            if (row) {
+              doc.status = (row.status || '').toString() || 'Belum Upload';
+              var foto = _arr(row.foto);
+              if (foto.length) {
+                var f = foto[foto.length - 1];
+                doc.file = { fileId: f.fileId, fileUrl: f.fileUrl, fileName: f.fileName || '' };
+                doc.by = f.by || (row.diupload_oleh || '');
+                doc.at = f.at || (row.diupload_pada ? row.diupload_pada.toString() : '');
+              }
+            }
+            qc[m.key] = doc;
+          });
+          return { success: true, kontrak: kontrak, qc: qc };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
