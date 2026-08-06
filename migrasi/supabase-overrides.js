@@ -2962,6 +2962,104 @@
         }
       });
 
+      // Helper: normalisasi tanggal → 'YYYY-MM-DD' (untuk kolom date).
+      function _isoDate(v) {
+        var s = (v || '').toString().trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + '-' + m[2] + '-' + m[3];
+        var d = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (d) return d[3] + '-' + ('0' + d[2]).slice(-2) + '-' + ('0' + d[1]).slice(-2);
+        return null;
+      }
+      function _todayIso() {
+        try { var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()); var g = function (t) { var x = p.find(function (e) { return e.type === t; }); return x ? x.value : ''; }; return g('year') + '-' + g('month') + '-' + g('day'); } catch (e) { return new Date().toISOString().slice(0, 10); }
+      }
+
+      // ── Pricelist item: tambah / update / hapus / set ready ────────────────
+      window.gsRoute('tambahPricelistItem', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!p.idSupplier) return { success: false, message: 'Supplier wajib dipilih.' };
+          if (!p.namaMaterial) return { success: false, message: 'Nama material wajib diisi.' };
+          var q = await _all('pricelist', 'id');
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^PL(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var id = 'PL' + ('000' + (maxNum + 1)).slice(-3);
+          var ins = await supa.from('pricelist').insert({ id: id, id_supplier: p.idSupplier, kategori: p.kategori || '', nama_material: p.namaMaterial || '', spesifikasi: p.spesifikasi || '', merek: p.merek || '', satuan: p.satuan || '', harga_beli: Number(p.hargaBeli) || 0, termasuk_ppn: !!p.termasukPPN, lead_time: '', masa_berlaku_harga: '', dibuat_pada: new Date().toISOString(), ready: !!p.ready });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Item pricelist ' + id + ' ditambahkan.', id: id };
+        }
+      });
+      window.gsRoute('updatePricelistItem', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(); var p = args[1] || {};
+          if (!id) return { success: false, message: 'ID item wajib.' };
+          if (!p.namaMaterial) return { success: false, message: 'Nama material wajib diisi.' };
+          var upd = { kategori: p.kategori || '', nama_material: p.namaMaterial || '', spesifikasi: p.spesifikasi || '', merek: p.merek || '', satuan: p.satuan || '', harga_beli: Number(p.hargaBeli) || 0, dibuat_pada: new Date().toISOString() };
+          if (p.idSupplier) upd.id_supplier = p.idSupplier;
+          if (p.ready != null) upd.ready = !!p.ready;
+          var up = await supa.from('pricelist').update(upd).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Item tidak ditemukan.' };
+          return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusPricelistItem', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID item wajib.' };
+          var del = await supa.from('pricelist').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Item tidak ditemukan.' };
+          return { success: true, message: 'Item pricelist dihapus.' };
+        }
+      });
+      window.gsRoute('setPricelistReady', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(), ready = !!args[1];
+          if (!id) return { success: false, message: 'ID item wajib.' };
+          var up = await supa.from('pricelist').update({ ready: ready }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Item tidak ditemukan.' };
+          return { success: true, message: 'Status ready diperbarui.' };
+        }
+      });
+
+      // ── Ayat Silang: simpan / hapus ───────────────────────────────────────
+      window.gsRoute('simpanAyatSilang', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          var idAsal = (p.idAkunAsal || '').toString(), idTujuan = (p.idAkunTujuan || '').toString();
+          if (!idAsal || !idTujuan) return { success: false, message: 'Akun asal & tujuan wajib dipilih.' };
+          if (idAsal === idTujuan) return { success: false, message: 'Akun asal dan tujuan tidak boleh sama.' };
+          if (idAsal === 'AP001' || idTujuan === 'AP001') return { success: false, message: 'Akun Stok tidak bisa dipakai untuk ayat silang.' };
+          var jumlah = parseFloat(p.jumlah) || 0;
+          if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
+          var ym = _todayIso().slice(0, 7).replace('-', ''); // yyyyMM
+          var prefix = 'TF-' + ym + '-';
+          var q = await _all('ayat_silang', 'id');
+          var maxSeq = 0; (q.data || []).forEach(function (r) { var id = (r.id || '').toString(); if (id.indexOf(prefix) === 0) { var s = parseInt(id.slice(prefix.length), 10) || 0; if (s > maxSeq) maxSeq = s; } });
+          var id = prefix + ('000' + (maxSeq + 1)).slice(-3);
+          var ins = await supa.from('ayat_silang').insert({ id: id, tanggal: _isoDate(p.tanggal) || _todayIso(), id_akun_asal: idAsal, nama_asal: (p.namaAkunAsal || idAsal).toString(), id_akun_tujuan: idTujuan, nama_tujuan: (p.namaAkunTujuan || idTujuan).toString(), jumlah: jumlah, catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString() });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Ayat silang ' + id + ' berhasil dicatat.', id: id };
+        }
+      });
+      window.gsRoute('hapusAyatSilang', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID ayat silang wajib diisi.' };
+          var del = await supa.from('ayat_silang').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Ayat silang tidak ditemukan.' };
+          return { success: true, message: 'Ayat silang ' + id + ' berhasil dihapus.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
