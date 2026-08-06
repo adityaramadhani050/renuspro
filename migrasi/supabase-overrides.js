@@ -24,7 +24,7 @@
   // Nyalakan `true` HANYA SETELAH Edge Function 'invoice-ops' ter-deploy
   // (lihat PANDUAN-EDGE-FUNCTIONS.md). Selama false, simpan invoice & ubah
   // status bayar tetap lewat Apps Script (aman).
-  var ENABLE_EDGE_INVOICE = false;
+  var ENABLE_EDGE_INVOICE = true;
 
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
