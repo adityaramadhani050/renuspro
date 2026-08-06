@@ -3282,6 +3282,38 @@
       window.gsRoute('tandaiQCSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('qc_project', a[0], a[1], true); if (r.success) r.message = 'QC ' + (a[0] || '') + ' ditandai selesai.'; return r; } });
       window.gsRoute('batalkanQCSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('qc_project', a[0], a[1], false); if (r.success) r.message = 'Status selesai QC dibatalkan.'; return r; } });
 
+      // ── Tandai item N/A (DED/QC) — set status NA + aktivitas ──────────────
+      async function _setItemNA(itemTable, filesCol, idPrefix, noWO, kode, isNA, oleh, okMsg) {
+        noWO = (noWO || '').toString().trim(); kode = (kode || '').toString().trim();
+        var f = await supa.from(itemTable).select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+        if (f.error) return { success: false, message: f.error.message };
+        var found = f.data, whenIso = new Date().toISOString();
+        if (isNA) {
+          var naEv = { type: 'na', by: (oleh || '').toString(), at: _fmtTs(new Date()), note: '' };
+          if (found) {
+            var akt = _arr(found.aktivitas); akt.push(naEv);
+            var up = await supa.from(itemTable).update({ status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: akt }).eq('id', found.id);
+            if (up.error) return { success: false, message: up.error.message };
+          } else {
+            var q = await _all(itemTable, 'id'); var maxNum = 0;
+            var re = new RegExp('^' + idPrefix + '(\\d+)', 'i');
+            (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(re); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+            var id = idPrefix + ('000' + (maxNum + 1)).slice(-3);
+            var row = { id: id, no_wo: noWO, kode: kode, status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: [naEv] };
+            row[filesCol] = [];
+            var ins = await supa.from(itemTable).insert(row);
+            if (ins.error) return { success: false, message: ins.error.message };
+          }
+        } else if (found) {
+          var files = _arr(found[filesCol]);
+          var up2 = await supa.from(itemTable).update({ status: files.length ? 'Pending' : 'Belum Upload' }).eq('id', found.id);
+          if (up2.error) return { success: false, message: up2.error.message };
+        }
+        return { success: true, message: okMsg };
+      }
+      window.gsRoute('setDEDItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('ded_item', 'files', 'DEDI', a[0], a[1], a[2], a[3], 'Status dokumen diperbarui.'); } });
+      window.gsRoute('setQCItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('qc_item', 'foto', 'QCI', a[0], a[1], a[2], a[3], 'Status item diperbarui.'); } });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
