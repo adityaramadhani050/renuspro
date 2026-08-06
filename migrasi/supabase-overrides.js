@@ -3231,6 +3231,57 @@
         }
       });
 
+      // ── Assignment engineer (BOM/DED/QC) — ganti seluruh set penugasan ────
+      //  CATATAN: notifikasi WA penugasan TIDAK ikut (itu integrasi Apps Script).
+      async function _setAssignment(table, noWO, userIds, assignedBy) {
+        noWO = (noWO || '').toString().trim();
+        if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+        userIds = userIds || [];
+        var uq = await supa.from('app_user').select('id,nama');
+        var userMap = {}; (uq.data || []).forEach(function (u) { userMap[u.id] = u.nama; });
+        var d = await supa.from(table).delete().eq('no_wo', noWO); if (d.error) return { success: false, message: d.error.message };
+        var seen = {}, rows = [], when = new Date().toISOString();
+        for (var j = 0; j < userIds.length; j++) {
+          var uid = (userIds[j] || '').toString().trim(); if (!uid || seen[uid]) continue; seen[uid] = true;
+          rows.push({ no_wo: noWO, id_user: uid, nama_user: userMap[uid] || uid, assigned_by: (assignedBy || '').toString(), assigned_at: when });
+        }
+        if (rows.length) { var ins = await supa.from(table).insert(rows); if (ins.error) return { success: false, message: ins.error.message }; }
+        return { success: true, message: 'Penugasan diperbarui (' + Object.keys(seen).length + ' engineer).' };
+      }
+      window.gsRoute('setBOMAssignment', { mode: 'fn', handler: function (a) { return _setAssignment('bom_assignment', a[0], a[1], a[2]); } });
+      window.gsRoute('setDEDAssignment', { mode: 'fn', handler: function (a) { return _setAssignment('ded_assignment', a[0], a[1], a[2]); } });
+      window.gsRoute('setQCAssignment', { mode: 'fn', handler: function (a) { return _setAssignment('qc_assignment', a[0], a[1], a[2]); } });
+
+      // ── DED: set wajib checklist ──────────────────────────────────────────
+      window.gsRoute('setDEDWajib', {
+        mode: 'fn',
+        handler: async function (args) {
+          var kode = (args[0] || '').toString().trim(), wajib = !!args[1];
+          if (!kode) return { success: false, message: 'Kode wajib.' };
+          var up = await supa.from('ded_checklist').update({ wajib: wajib }).eq('kode', kode).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Dokumen tidak ditemukan.' };
+          return { success: true, message: 'Diperbarui.' };
+        }
+      });
+
+      // ── DED/QC: tandai / batalkan selesai (project) ───────────────────────
+      async function _tandaiSelesai(table, noWO, oleh, val) {
+        noWO = (noWO || '').toString().trim();
+        if (!noWO) return { success: false, message: 'No WO wajib.' };
+        var upd = val
+          ? { selesai_manual: true, ditandai_selesai_oleh: (oleh || '').toString(), ditandai_selesai_pada: new Date().toISOString() }
+          : { selesai_manual: false, ditandai_selesai_oleh: '', ditandai_selesai_pada: null };
+        var up = await supa.from(table).update(upd).eq('no_wo', noWO).select();
+        if (up.error) return { success: false, message: up.error.message };
+        if (!up.data || !up.data.length) return { success: false, message: 'WO tidak terdaftar.' };
+        return { success: true };
+      }
+      window.gsRoute('tandaiDEDSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('ded_project', a[0], a[1], true); if (r.success) r.message = 'DED ' + (a[0] || '') + ' ditandai Approved.'; return r; } });
+      window.gsRoute('batalkanDEDSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('ded_project', a[0], a[1], false); if (r.success) r.message = 'Status Approved DED dibatalkan.'; return r; } });
+      window.gsRoute('tandaiQCSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('qc_project', a[0], a[1], true); if (r.success) r.message = 'QC ' + (a[0] || '') + ' ditandai selesai.'; return r; } });
+      window.gsRoute('batalkanQCSelesai', { mode: 'fn', handler: async function (a) { var r = await _tandaiSelesai('qc_project', a[0], a[1], false); if (r.success) r.message = 'Status selesai QC dibatalkan.'; return r; } });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
