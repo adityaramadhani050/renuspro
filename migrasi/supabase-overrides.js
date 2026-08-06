@@ -2842,6 +2842,96 @@
         }
       });
 
+      // ── Kategori pricelist: tambah / update / hapus ───────────────────────
+      window.gsRoute('tambahKategori', {
+        mode: 'fn',
+        handler: async function (args) {
+          var nama = (args[0] || '').toString().trim();
+          if (!nama) return { success: false, message: 'Nama kategori wajib diisi.' };
+          var ex = await supa.from('pricelist_kategori').select('nama').ilike('nama', nama).limit(1);
+          if (!ex.error && ex.data && ex.data.length) return { success: false, message: 'Kategori "' + nama + '" sudah ada.' };
+          var ins = await supa.from('pricelist_kategori').insert({ nama: nama });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Kategori "' + nama + '" ditambahkan.' };
+        }
+      });
+      window.gsRoute('updateKategori', {
+        mode: 'fn',
+        handler: async function (args) {
+          var oldNama = (args[0] || '').toString().trim(), newNama = (args[1] || '').toString().trim();
+          if (!oldNama || !newNama) return { success: false, message: 'Nama kategori wajib.' };
+          if (oldNama.toLowerCase() !== newNama.toLowerCase()) {
+            var ex = await supa.from('pricelist_kategori').select('nama').ilike('nama', newNama).limit(1);
+            if (!ex.error && ex.data && ex.data.length) return { success: false, message: 'Kategori "' + newNama + '" sudah ada.' };
+          }
+          var chk = await supa.from('pricelist_kategori').select('nama').eq('nama', oldNama).maybeSingle();
+          if (!chk.data) return { success: false, message: 'Kategori tidak ditemukan.' };
+          await supa.from('pricelist_kategori').insert({ nama: newNama });          // buat baru
+          await supa.from('pricelist').update({ kategori: newNama }).eq('kategori', oldNama); // pindahkan item
+          if (oldNama !== newNama) await supa.from('pricelist_kategori').delete().eq('nama', oldNama);
+          return { success: true, message: 'Kategori diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusKategori', {
+        mode: 'fn',
+        handler: async function (args) {
+          var nama = (args[0] || '').toString().trim();
+          if (!nama) return { success: false, message: 'Nama kategori wajib.' };
+          var used = await supa.from('pricelist').select('id').eq('kategori', nama);
+          if (!used.error && used.data && used.data.length) return { success: false, message: 'Kategori dipakai ' + used.data.length + ' item pricelist — ubah item tersebut dulu.' };
+          var del = await supa.from('pricelist_kategori').delete().eq('nama', nama);
+          if (del.error) return { success: false, message: del.error.message };
+          return { success: true, message: 'Kategori "' + nama + '" dihapus.' };
+        }
+      });
+
+      // ── Kategori Pengeluaran (Pengeluaran.gs → saveKategoriPengeluaran) ────
+      window.gsRoute('saveKategoriPengeluaran', {
+        mode: 'fn',
+        handler: async function (args) {
+          var list = Array.isArray(args[0]) ? args[0] : null;
+          if (!list) return { success: false, message: 'Format kategori tidak valid.' };
+          var seen = {}, clean = [];
+          list.forEach(function (k) { var v = (k || '').toString().trim(); if (!v) return; var low = v.toLowerCase(); if (seen[low]) return; seen[low] = true; clean.push(v); });
+          if (!clean.length) return { success: false, message: 'Minimal satu kategori harus diisi.' };
+          await supa.from('kategori_pengeluaran').delete().neq('nama', ' '); // kosongkan
+          var rows = clean.map(function (n, i) { return { nama: n, urutan: i + 1 }; });
+          var ins = await supa.from('kategori_pengeluaran').insert(rows);
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Kategori pengeluaran berhasil disimpan.', list: clean };
+        }
+      });
+
+      // ── Catatan WO (WorkOrder.gs → simpanCatatanWO) ───────────────────────
+      window.gsRoute('simpanCatatanWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString(), catatan = (args[1] || '').toString(), who = (args[2] || 'Sales Executive').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var up = await supa.from('work_order_catatan').upsert({ no_wo: noWO, catatan: catatan, diupdate_oleh: who, diupdate_pada: new Date().toISOString() }, { onConflict: 'no_wo' });
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Catatan tersimpan.' };
+        }
+      });
+
+      // ── Jenis WO manual (WorkOrder.gs → setWorkOrderJenis) ────────────────
+      window.gsRoute('setWorkOrderJenis', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim(), jenis = (args[1] || '').toString().trim(), oleh = (args[2] || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          if (jenis && jenis !== 'Jasa' && jenis !== 'Material') return { success: false, message: 'Jenis tidak valid.' };
+          if (!jenis) {
+            var del = await supa.from('work_order_jenis_override').delete().eq('no_wo', noWO); // kembali Auto
+            if (del.error) return { success: false, message: del.error.message };
+          } else {
+            var up = await supa.from('work_order_jenis_override').upsert({ no_wo: noWO, jenis_manual: jenis, diubah_oleh: oleh || '', diubah_pada: new Date().toISOString() }, { onConflict: 'no_wo' });
+            if (up.error) return { success: false, message: up.error.message };
+          }
+          return { success: true, message: 'Jenis WO diperbarui menjadi ' + (jenis || 'Otomatis') + '.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
