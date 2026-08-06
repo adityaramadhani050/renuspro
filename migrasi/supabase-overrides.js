@@ -76,6 +76,23 @@
       // Helper: bungkus error jadi bentuk seragam.
       function _fail(error) { return { success: false, message: error.message || String(error) }; }
 
+      // Helper: ambil SEMUA baris via pagination (.range) — menembus batas 1000
+      // baris default Supabase/PostgREST. apply(qb) untuk .order()/.eq() dsb.
+      async function _all(table, sel, apply) {
+        var size = 1000, from = 0, out = [], error = null;
+        for (;;) {
+          var qb = supa.from(table).select(sel || '*');
+          if (apply) qb = apply(qb);
+          var r = await qb.range(from, from + size - 1);
+          if (r.error) { error = r.error; break; }
+          var rows = r.data || [];
+          out = out.concat(rows);
+          if (rows.length < size) break;
+          from += size;
+        }
+        return { data: out, error: error };
+      }
+
       // Helper: format tanggal → 'dd/MM/yyyy' (zona Asia/Jakarta), meniru _fmtTgl
       // Apps Script. Supabase `date` → 'YYYY-MM-DD'; `timestamptz` → ISO ...Z.
       function _fmtTgl(v) {
@@ -247,7 +264,7 @@
       async function _availableWO(regTable) {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
-          _safe(supa.from('work_order').select('no_wo,nama_project,nama_klien,status')),
+          _safe(_all('work_order', 'no_wo,nama_project,nama_klien,status')),
           _safe(supa.from('hand_over').select('no_wo,status')),
           _safe(supa.from(regTable).select('no_wo'))
         ]);
@@ -410,7 +427,7 @@
         list.reverse(); return list;
       }
       async function _pemArr() {
-        var q = await supa.from('pemasukan').select('*');
+        var q = await _all('pemasukan', '*');
         var list = (q.data || []).map(function (r) {
           return { id: r.id_pemasukan || '', tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', kategori: r.kategori || '', idAkun: r.id_akun || '', namaAkun: r.nama_akun || '', noRef: r.no_invoice_ref || '', idReferensi: r.id_referensi || '', deskripsi: r.deskripsi || '', jumlah: parseFloat(r.jumlah) || 0, catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', diubahOleh: r.diubah_oleh || '', diubahPada: r.diubah_pada ? r.diubah_pada.toString() : '' };
         });
@@ -418,7 +435,7 @@
       }
       async function _pengArr() {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
-        var res = await Promise.all([_safe(supa.from('pengeluaran').select('*')), _safe(supa.from('penawaran').select('no_wo,nama_project,klien_id')), _safe(supa.from('klien').select('id,nama_klien'))]);
+        var res = await Promise.all([_safe(_all('pengeluaran', '*')), _safe(_all('penawaran', 'no_wo,nama_project,klien_id')), _safe(supa.from('klien').select('id,nama_klien'))]);
         var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
         var woMap = {}; (res[1].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '', namaKlien: klienMap[p.klien_id] || p.klien_id || '' }; });
         var list = (res[0].data || []).map(function (r) {
@@ -431,8 +448,8 @@
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
           _safe(supa.from('bank_account').select('*').order('urutan')),
-          _safe(supa.from('pemasukan').select('id_akun,jumlah')),
-          _safe(supa.from('pengeluaran').select('id_akun,total')),
+          _safe(_all('pemasukan', 'id_akun,jumlah')),
+          _safe(_all('pengeluaran', 'id_akun,total')),
           _safe(supa.from('ayat_silang').select('id_akun_asal,id_akun_tujuan,jumlah'))
         ]);
         var akunMap = {}, akunOrder = [];
@@ -445,7 +462,7 @@
         return { success: true, akun: akunList, totalMasuk: tm, totalKeluar: tk, totalSaldo: ts };
       }
       async function _paymentReqArr() {
-        var q = await supa.from('po_payment_request').select('*').order('id_request');
+        var q = await _all('po_payment_request', '*', function(x){return x.order('id_request');});
         var list = (q.data || []).map(function (r) {
           return { idReq: r.id_request || '', noPO: r.no_po || '', noWO: r.no_wo || '', namaSupplier: r.nama_supplier || '', grandTotalPO: parseFloat(r.grand_total_po) || 0, tanggalRequest: _fmtTgl(r.tanggal_request), jumlah: parseFloat(r.jumlah) || 0, persentase: parseFloat(r.persentase) || 0, catatan: r.catatan || '', status: r.status || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', namaAkun: r.nama_akun || '', diapproveOleh: r.diapprove_oleh || '', tanggalApprove: _fmtTgl(r.tanggal_approve), invoiceFileId: r.invoice_file_id || '', invoiceFileUrl: r.invoice_file_url || '', invoiceFileName: r.invoice_file_nama || '', catatanTolak: r.catatan_tolak || '', buktiFileId: r.bukti_file_id || '', buktiFileUrl: r.bukti_file_url || '', buktiFileName: r.bukti_file_nama || '' };
         });
@@ -454,10 +471,10 @@
 
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
-        var q = await supa.from('invoice').select('*');
+        var q = await _all('invoice', '*');
         if (q.error) { console.error('[invoiceList]', q.error); return []; }
         var kwMap = {};
-        var kq = await supa.from('kwitansi').select('no_kwitansi,no_invoice');
+        var kq = await _all('kwitansi', 'no_kwitansi,no_invoice');
         if (!kq.error) (kq.data || []).forEach(function (k) {
           if (k.no_invoice) kwMap[k.no_invoice] = k.no_kwitansi;
         });
@@ -485,7 +502,7 @@
         var res = await Promise.all([
           _safe(supa.from('purchase_order').select('no_po,tanggal,nama_supplier,peruntukan,no_wo,ppn_persen,status_po')),
           _safe(supa.from('po_item').select('*')),
-          _safe(supa.from('penawaran').select('no_wo,nama_project'))
+          _safe(_all('penawaran', 'no_wo,nama_project'))
         ]);
         var pq = res[0], iq = res[1], nq = res[2];
         var itemsByPO = {};
@@ -673,7 +690,7 @@
       window.gsRoute('getKwitansiList', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('kwitansi').select('*');
+          var q = await _all('kwitansi', '*');
           if (q.error) { console.error('[getKwitansiList]', q.error); return []; }
           var list = (q.data || []).map(function (r) {
             return {
@@ -696,7 +713,7 @@
           if (q.error) { console.error('[getPOList]', q.error); return []; }
           // Peta no_wo → nama_project dari penawaran (nama project tidak kritikal).
           var woNama = {};
-          var pq = await supa.from('penawaran').select('no_wo,nama_project');
+          var pq = await _all('penawaran', 'no_wo,nama_project');
           if (!pq.error) (pq.data || []).forEach(function (p) {
             var w = (p.no_wo || '').toString().trim();
             if (w && p.nama_project) woNama[w] = p.nama_project;
@@ -728,7 +745,7 @@
         mode: 'fn',
         handler: async function (args) {
           var params = args[0] || {};
-          var q = await supa.from('mutasi_stok').select('*').order('id_mutasi');
+          var q = await _all('mutasi_stok', '*', function(x){return x.order('id_mutasi');});
           if (q.error) { console.error('[getMutasiStokList]', q.error); return []; }
           var list = (q.data || []).map(function (r) {
             return {
@@ -950,7 +967,7 @@
         mode: 'fn',
         handler: async function (args) {
           var params = args[0] || {};
-          var q = await supa.from('po_payment_request').select('*').order('id_request');
+          var q = await _all('po_payment_request', '*', function(x){return x.order('id_request');});
           if (q.error) return { success: false, list: [], message: q.error.message };
           var list = (q.data || []).map(function (r) {
             return {
@@ -990,7 +1007,7 @@
               _safe(supa.from('klien').select('id,nama_klien,perusahaan,alamat,kontak').order('id')),
               _safe(supa.from('produk').select('id,nama,unit,harga_satuan,hpp').order('id')),
               _safe(supa.from('template_paket').select('id,nama_paket,daftar_item')),
-              _safe(supa.from('penawaran').select('no_penawaran'))
+              _safe(_all('penawaran', 'no_penawaran'))
             ]);
             var kq = res[0], pq = res[1], tq = res[2], nq = res[3];
             if (kq.error) console.error('[getInitialData] klien:', kq.error);
@@ -1067,7 +1084,7 @@
       window.gsRoute('getPenawaranList', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('penawaran').select('*').order('no_penawaran').order('rev');
+          var q = await _all('penawaran', '*', function(x){return x.order('no_penawaran').order('rev');});
           if (q.error) { console.error('[getPenawaranList]', q.error); return []; }
           // Peta klien id→nama & hand_over no_wo→status.
           var klienMap = {};
@@ -1209,7 +1226,7 @@
         mode: 'fn',
         handler: async function (args) {
           var params = args[0] || {};
-          var q = await supa.from('pemasukan').select('*');
+          var q = await _all('pemasukan', '*');
           if (q.error) return { success: false, list: [], message: q.error.message };
           var list = (q.data || []).map(function (r) {
             return {
@@ -1238,8 +1255,8 @@
           var params = args[0] || {};
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('pengeluaran').select('*')),
-            _safe(supa.from('penawaran').select('no_wo,nama_project,klien_id')),
+            _safe(_all('pengeluaran', '*')),
+            _safe(_all('penawaran', 'no_wo,nama_project,klien_id')),
             _safe(supa.from('klien').select('id,nama_klien'))
           ]);
           var eq = res[0], pq = res[1], kq = res[2];
@@ -1354,7 +1371,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
             _safe(supa.from('pengiriman_request').select('*').eq('status', 'Diminta')),
-            _safe(supa.from('bom_item').select('id,no_wo,kategori,nama_material,merek,satuan,stok_id,qty_reserved,qty_dikirim')),
+            _safe(_all('bom_item', 'id,no_wo,kategori,nama_material,merek,satuan,stok_id,qty_reserved,qty_dikirim')),
             _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien'))
           ]);
           var rq = res[0], bq = res[1], pq = res[2];
@@ -1417,7 +1434,7 @@
       async function _woListData() {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
-          _safe(supa.from('work_order').select('*')),
+          _safe(_all('work_order', '*')),
           _safe(supa.from('produk').select('id,tipe')),
           _safe(supa.from('hand_over').select('no_wo,status')),
           _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
@@ -1741,7 +1758,7 @@
           var res = await Promise.all([
             _safe(supa.from('bom_assignment').select('no_wo,id_user,nama_user')),
             _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien')),
-            _safe(supa.from('bom_item').select('no_wo,kategori,status,proc_status'))
+            _safe(_all('bom_item', 'no_wo,kategori,status,proc_status'))
           ]);
           var aq = res[0], pq = res[1], iq = res[2];
           var assignedMap = {};
@@ -1920,7 +1937,7 @@
           var res = await Promise.all([
             _safe(supa.from('schedule_project').select('*')),
             _safe(supa.from('schedule_task').select('*')),
-            _safe(supa.from('work_order').select('no_wo,items')),
+            _safe(_all('work_order', 'no_wo,items')),
             _safe(supa.from('produk').select('id,tipe')),
             _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
           ]);
@@ -1966,7 +1983,7 @@
           var res = await Promise.all([
             _safe(supa.from('pengeluaran').select('id_pengeluaran,tanggal,sumber,no_po,nama_akun,deskripsi,total').eq('no_wo', noWO)),
             _safe(supa.from('invoice').select('no_invoice').eq('no_wo', noWO)),
-            _safe(supa.from('pemasukan').select('id_pemasukan,tanggal,id_referensi,nama_akun,deskripsi,jumlah'))
+            _safe(_all('pemasukan', 'id_pemasukan,tanggal,id_referensi,nama_akun,deskripsi,jumlah'))
           ]);
           var pengeluaran = [], totalKeluar = 0;
           (res[0].data || []).forEach(function (r) {
@@ -2103,8 +2120,8 @@
             var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
             var woList = await _woListData();
             var res = await Promise.all([
-              _safe(supa.from('invoice').select('no_wo,no_penawaran,dpp')),
-              _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,klien_id,subtotal,diskon,pajak,grand_total,items,status,no_wo')),
+              _safe(_all('invoice', 'no_wo,no_penawaran,dpp')),
+              _safe(_all('penawaran', 'no_penawaran,rev,tanggal,nama_project,klien_id,subtotal,diskon,pajak,grand_total,items,status,no_wo')),
               _safe(supa.from('klien').select('id,nama_klien'))
             ]);
             var tagihMap = {}, tagihByPen = {};
@@ -2167,8 +2184,8 @@
           var params = args[0] || {};
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('pengeluaran').select('no_wo,nama_akun,total')),
-            _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,dibuat_oleh,klien_id,subtotal,diskon,total_hpp,status,no_wo')),
+            _safe(_all('pengeluaran', 'no_wo,nama_akun,total')),
+            _safe(_all('penawaran', 'no_penawaran,rev,tanggal,nama_project,dibuat_oleh,klien_id,subtotal,diskon,total_hpp,status,no_wo')),
             _safe(supa.from('klien').select('id,nama_klien'))
           ]);
           var expByWO = {}, expByAkun = {};
@@ -2217,9 +2234,9 @@
           var tahun = parseInt(params.tahun, 10) || new Date().getFullYear();
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('invoice').select('tanggal,dpp')),
-            _safe(supa.from('pengeluaran').select('tanggal,no_wo,total,kategori')),
-            _safe(supa.from('penawaran').select('no_wo,nama_project'))
+            _safe(_all('invoice', 'tanggal,dpp')),
+            _safe(_all('pengeluaran', 'tanggal,no_wo,total,kategori')),
+            _safe(_all('penawaran', 'no_wo,nama_project'))
           ]);
           var woMap = {}; (res[2].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '' }; });
           var bulanData = []; for (var b = 0; b < 12; b++) bulanData.push({ bulan: _WO_BULAN[b], bulanIdx: b + 1, invoiceDPP: 0, pengeluaranProject: 0, pengeluaranNonProject: 0, kategoriProjectTotal: {}, kategoriNonProjectTotal: {} });
@@ -2261,7 +2278,7 @@
           if (dateTo) dateTo.setHours(23, 59, 59);
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var woList = await _woListData();
-          var iq = await _safe(supa.from('invoice').select('no_invoice,no_wo,no_penawaran,tanggal,jenis,dpp,ppn_persen,ppn_nominal,total,status_bayar,tanggal_bayar,bukti_file_id'));
+          var iq = await _safe(_all('invoice', 'no_invoice,no_wo,no_penawaran,tanggal,jenis,dpp,ppn_persen,ppn_nominal,total,status_bayar,tanggal_bayar,bukti_file_id'));
           var invByWO = {}, invByPen = {};
           var aging = { current: 0, gte30: 0, gte60: 0, gte90: 0 };
           var totalTagihan = 0, totalTerbayar = 0, totalTagihanDpp = 0, totalTerbayarDpp = 0;
@@ -2438,7 +2455,7 @@
         handler: async function () {
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('bom_item').select('id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty,stok_id,qty_reserved,qty_beli,qty_menunggu_bl')),
+            _safe(_all('bom_item', 'id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty,stok_id,qty_reserved,qty_beli,qty_menunggu_bl')),
             _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien')),
             _priceMap()
           ]);
@@ -2469,7 +2486,7 @@
           var fSup = (args[0] && args[0].idSupplier) ? args[0].idSupplier.toString().trim() : '';
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('bom_item').select('id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty_menunggu_bl')),
+            _safe(_all('bom_item', 'id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty_menunggu_bl')),
             _safe(supa.from('bom_project').select('no_wo,nama_project')),
             _priceMap()
           ]);
