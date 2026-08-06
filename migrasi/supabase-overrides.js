@@ -3493,29 +3493,160 @@
           } catch (e) { resolve({ base64: base64, mime: mime, name: name }); }
         });
       }
+      // Core: kompres (bila gambar) → unggah ke Storage → {ok,fileId,fileUrl,fileName}.
+      async function _putStorage(folder, base64, mime, fileName) {
+        var comp = await _compressImage(base64, mime, fileName);
+        var bytes;
+        try { var bin = atob(comp.base64); bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+        catch (e) { return { ok: false, message: 'Data file tidak valid.' }; }
+        var safe = comp.name.replace(/[^\w.\-]/g, '_');
+        var path = folder + '/' + Date.now() + '-' + Math.floor(Math.random() * 1e9) + '-' + safe;
+        var up = await supa.storage.from('uploads').upload(path, bytes, { contentType: comp.mime, upsert: false });
+        if (up.error) return { ok: false, message: 'Gagal unggah: ' + up.error.message };
+        var pub = supa.storage.from('uploads').getPublicUrl(path);
+        return { ok: true, fileId: path, fileUrl: (pub.data && pub.data.publicUrl) || '', fileName: comp.name };
+      }
       async function _storageUpload(folder, args) {
         var p = args[0] || {};
-        var base64 = (p.base64Data || '').toString();
-        if (!base64) return { success: false, message: 'File tidak boleh kosong.' };
-        var fileName = (p.fileName || 'file').toString();
-        var mime = (p.mimeType || 'application/octet-stream').toString();
-        var comp = await _compressImage(base64, mime, fileName);
-        base64 = comp.base64; mime = comp.mime; fileName = comp.name;
-        var bytes;
-        try { var bin = atob(base64); bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
-        catch (e) { return { success: false, message: 'Data file tidak valid.' }; }
-        var safe = fileName.replace(/[^\w.\-]/g, '_');
-        var path = folder + '/' + Date.now() + '-' + safe;
-        var up = await supa.storage.from('uploads').upload(path, bytes, { contentType: mime, upsert: false });
-        if (up.error) return { success: false, message: 'Gagal unggah: ' + up.error.message };
-        var pub = supa.storage.from('uploads').getPublicUrl(path);
-        return { success: true, fileId: path, fileUrl: (pub.data && pub.data.publicUrl) || '', fileName: fileName };
+        if (!(p.base64Data || '').toString()) return { success: false, message: 'File tidak boleh kosong.' };
+        var r = await _putStorage(folder, p.base64Data.toString(), (p.mimeType || 'application/octet-stream').toString(), (p.fileName || 'file').toString());
+        if (!r.ok) return { success: false, message: r.message };
+        return { success: true, fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName };
       }
       window.gsRoute('uploadFileBuktiBayarInvoice', { mode: 'fn', handler: function (a) { return _storageUpload('bukti-bayar-invoice', a); } });
       window.gsRoute('uploadFileBuktiBayarPO', { mode: 'fn', handler: function (a) { return _storageUpload('bukti-bayar-po', a); } });
       window.gsRoute('uploadFileBuktiPenerimaanPO', { mode: 'fn', handler: function (a) { return _storageUpload('penerimaan-po', a); } });
       window.gsRoute('uploadFileInvoiceSupplierPO', { mode: 'fn', handler: function (a) { return _storageUpload('invoice-supplier-po', a); } });
       window.gsRoute('uploadFilePOQuotationSupplier', { mode: 'fn', handler: function (a) { return _storageUpload('quotation-supplier', a); } });
+
+      // Site Survey foto: PURE upload (return {foto:{fileId,fileUrl}}) — disimpan
+      // saat survey di-save (updateSiteSurvey).
+      window.gsRoute('uploadSiteSurveyFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var sid = (p.surveyId || '').toString().trim();
+          if (!sid) return { success: false, message: 'ID survey wajib.' };
+          if (!(p.base64Data || '').toString()) return { success: false, message: 'File tidak boleh kosong.' };
+          var field = (p.fieldKey || 'foto').toString().replace(/[^a-zA-Z0-9_-]/g, '');
+          var r = await _putStorage('site-survey/' + sid.replace(/[^\w.\-]/g, '_'), p.base64Data.toString(), (p.mimeType || 'image/jpeg').toString(), field + '.jpg');
+          if (!r.ok) return { success: false, message: r.message };
+          return { success: true, foto: { fileId: r.fileId, fileUrl: r.fileUrl } };
+        }
+      });
+
+      // Helper: tambahkan file terunggah ke item DED/QC (foto/files) + aktivitas.
+      async function _engAppendFiles(table, filesCol, idPrefix, noWO, kode, added, oleh) {
+        var f = await supa.from(table).select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+        var found = f.data;
+        var all = (found ? _arr(found[filesCol]) : []).concat(added);
+        var evts = added.map(function (x) { return { type: 'upload', by: oleh, at: x.at, note: x.fileName }; });
+        var whenIso = new Date().toISOString();
+        if (found) {
+          var upd = { status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: _arr(found.aktivitas).concat(evts) };
+          upd[filesCol] = all;
+          var up = await supa.from(table).update(upd).eq('id', found.id);
+          if (up.error) return { ok: false, message: up.error.message };
+        } else {
+          var q = await _all(table, 'id'); var mx = 0; var re = new RegExp('^' + idPrefix + '(\\d+)', 'i');
+          (q.data || []).forEach(function (x) { var m = (x.id || '').toString().match(re); if (m) mx = Math.max(mx, parseInt(m[1], 10)); });
+          var row = { id: idPrefix + ('000' + (mx + 1)).slice(-3), no_wo: noWO, kode: kode, status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: evts };
+          row[filesCol] = all;
+          var ins = await supa.from(table).insert(row);
+          if (ins.error) return { ok: false, message: ins.error.message };
+        }
+        return { ok: true, list: all };
+      }
+
+      // QC foto: single + batch
+      window.gsRoute('uploadQCFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}; var noWO = (p.noWO || '').toString().trim(), kode = (p.kode || '').toString().trim(), oleh = (p.oleh || '').toString();
+          if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
+          if (!(p.base64Data || '').toString()) return { success: false, message: 'File tidak boleh kosong.' };
+          var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), p.base64Data.toString(), (p.mimeType || 'image/jpeg').toString(), kode + '.jpg');
+          if (!r.ok) return { success: false, message: r.message };
+          var foto = { fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) };
+          var res = await _engAppendFiles('qc_item', 'foto', 'QCI', noWO, kode, [foto], oleh);
+          if (!res.ok) return { success: false, message: res.message };
+          return { success: true, message: 'Foto tersimpan.', foto: foto, status: 'Pending', foto_list: res.list };
+        }
+      });
+      window.gsRoute('uploadQCFotoBatch', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}; var noWO = (p.noWO || '').toString().trim(), kode = (p.kode || '').toString().trim(), oleh = (p.oleh || '').toString();
+          var files = (p.files && p.files.length) ? p.files : [];
+          if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
+          if (!files.length) return { success: false, message: 'Tidak ada file untuk diupload.' };
+          var added = [];
+          for (var i = 0; i < files.length; i++) {
+            var fl = files[i] || {}; if (!(fl.base64Data || '').toString()) continue;
+            var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), fl.base64Data.toString(), (fl.mimeType || 'image/jpeg').toString(), kode + '.jpg');
+            if (!r.ok) return { success: false, message: r.message };
+            added.push({ fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) });
+          }
+          if (!added.length) return { success: false, message: 'Tidak ada file valid.' };
+          var res = await _engAppendFiles('qc_item', 'foto', 'QCI', noWO, kode, added, oleh);
+          if (!res.ok) return { success: false, message: res.message };
+          return { success: true, message: added.length + ' foto tersimpan.', status: 'Pending', foto_list: res.list };
+        }
+      });
+      window.gsRoute('hapusQCFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim(), kode = (a[1] || '').toString().trim(), fileId = (a[2] || '').toString();
+          var f = await supa.from('qc_item').select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+          if (!f.data) return { success: false, message: 'Item tidak ditemukan.' };
+          var arr = _arr(f.data.foto).filter(function (x) { return x.fileId !== fileId; });
+          var upd = { foto: arr }; if (!arr.length) upd.status = 'Belum Upload';
+          var up = await supa.from('qc_item').update(upd).eq('id', f.data.id);
+          if (up.error) return { success: false, message: up.error.message };
+          try { await supa.storage.from('uploads').remove([fileId]); } catch (e) {}
+          return { success: true, message: 'Foto dihapus.', foto_list: arr };
+        }
+      });
+
+      // DED dokumen: batch upload (WAJIB PDF) + hapus
+      window.gsRoute('uploadDEDBatch', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}; var noWO = (p.noWO || '').toString().trim(), kode = (p.kode || '').toString().trim(), oleh = (p.oleh || '').toString();
+          var files = (p.files && p.files.length) ? p.files : [];
+          if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
+          if (!files.length) return { success: false, message: 'Tidak ada file untuk diupload.' };
+          var added = [];
+          for (var i = 0; i < files.length; i++) {
+            var fl = files[i] || {}; var b64 = (fl.base64Data || '').toString(); if (!b64) continue;
+            // Validasi PDF (magic %PDF) dari isi file.
+            var ok = false; try { var head = atob(b64.slice(0, 8)); ok = head.charCodeAt(0) === 0x25 && head.charCodeAt(1) === 0x50 && head.charCodeAt(2) === 0x44 && head.charCodeAt(3) === 0x46; } catch (e) {}
+            if (!ok) return { success: false, message: 'Hanya file PDF yang diperbolehkan (' + (fl.fileName || 'file') + ').' };
+            var base = (fl.fileName || kode).toString().replace(/\.[a-zA-Z0-9]+$/, '');
+            var r = await _putStorage('ded/' + noWO.replace(/[^\w.\-]/g, '_'), b64, 'application/pdf', kode + '-' + base + '.pdf');
+            if (!r.ok) return { success: false, message: r.message };
+            added.push({ fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) });
+          }
+          if (!added.length) return { success: false, message: 'Tidak ada file valid.' };
+          var res = await _engAppendFiles('ded_item', 'files', 'DEDI', noWO, kode, added, oleh);
+          if (!res.ok) return { success: false, message: res.message };
+          return { success: true, message: added.length + ' dokumen tersimpan.', status: 'Pending', file_list: res.list };
+        }
+      });
+      window.gsRoute('hapusDEDFile', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim(), kode = (a[1] || '').toString().trim(), fileId = (a[2] || '').toString();
+          var f = await supa.from('ded_item').select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+          if (!f.data) return { success: false, message: 'Item tidak ditemukan.' };
+          var arr = _arr(f.data.files).filter(function (x) { return x.fileId !== fileId; });
+          var upd = { files: arr }; if (!arr.length) upd.status = 'Belum Upload';
+          var up = await supa.from('ded_item').update(upd).eq('id', f.data.id);
+          if (up.error) return { success: false, message: up.error.message };
+          try { await supa.storage.from('uploads').remove([fileId]); } catch (e) {}
+          return { success: true, message: 'Dokumen dihapus.', file_list: arr };
+        }
+      });
 
       // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
       //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
