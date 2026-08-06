@@ -242,6 +242,23 @@
         return { success: true, global: global, perWO: perWO, reviewQueue: reviewQueue, teamStats: teamStats };
       }
 
+      // Helper bersama: WO yang siap didaftarkan ke modul engineering
+      // (belum terdaftar & HO Selesai). regTable = bom/ded/qc_project.
+      async function _availableWO(regTable) {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('work_order').select('no_wo,nama_project,nama_klien,status')),
+          _safe(supa.from('hand_over').select('no_wo,status')),
+          _safe(supa.from(regTable).select('no_wo'))
+        ]);
+        var hoMap = {}; (res[1].data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+        var reg = {}; (res[2].data || []).forEach(function (r) { if (r.no_wo) reg[r.no_wo] = true; });
+        var list = (res[0].data || []).filter(function (wo) {
+          var w = (wo.no_wo || '').toString(); return !reg[w] && (hoMap[w] || '') === 'Selesai';
+        }).map(function (wo) { return { noWO: wo.no_wo || '', namaProject: wo.nama_project || '', namaKlien: wo.nama_klien || '', status: wo.status || '' }; });
+        return { success: true, list: list };
+      }
+
       // Helper bersama: master checklist QC (section + item) — dipakai
       // getQCChecklist & getQCByWO.
       async function _qcMaster() {
@@ -1587,6 +1604,96 @@
           return _engDashCompute(master, mres[1].data || [], mres[2].data || [], mres[3].data || [], siteUserId);
         }
       });
+
+      // ── Summary BOM per WO (badge di list WO) ─────────────────────────────
+      window.gsRoute('getBOMSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_project').select('difinalkan_oleh').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('bom_item').select('status,qty_reserved,qty_beli,qty_menunggu_bl,qty_beli_langsung,qty_dikirim').eq('no_wo', noWO))
+          ]);
+          if (!res[0].data) return { success: true, summary: null }; // belum terdaftar BOM
+          var items = res[1].data || [];
+          var total = items.length, approved = 0, rejected = 0, pending = 0;
+          var proc = { base: 0, reserved: 0, direct: 0, perluBeli: 0, tunggu: 0, dikirim: 0, tuntas: 0, pct: 0 };
+          items.forEach(function (it) {
+            var st = (it.status || '').toString().trim() || 'Pending';
+            if (st === 'Approved') approved++; else if (st === 'Rejected') rejected++; else pending++;
+            if (st !== 'Approved') return;
+            proc.base++;
+            var qr = Number(it.qty_reserved) || 0, qb = Number(it.qty_beli) || 0, qm = Number(it.qty_menunggu_bl) || 0, qbl = Number(it.qty_beli_langsung) || 0, qd = Number(it.qty_dikirim) || 0;
+            if (qr > 0) proc.reserved++; if (qbl > 0) proc.direct++; if (qb > 0) proc.perluBeli++;
+            if (qm > 0) proc.tunggu++; if (qd > 0) proc.dikirim++;
+            if (qb === 0 && qm === 0 && (qr > 0 || qbl > 0)) proc.tuntas++;
+          });
+          proc.pct = proc.base ? Math.round(proc.tuntas / proc.base * 100) : 0;
+          return { success: true, summary: {
+            total: total, approved: approved, pending: pending, rejected: rejected,
+            pct: total ? Math.round(approved / total * 100) : 0,
+            bomStatus: res[0].data.difinalkan_oleh ? 'Final' : 'Draft', proc: proc
+          } };
+        }
+      });
+
+      // ── Summary QC per WO ─────────────────────────────────────────────────
+      window.gsRoute('getQCSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null, assigned: [] };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _qcMaster(),
+            _safe(supa.from('qc_item').select('kode,status,foto').eq('no_wo', noWO)),
+            _safe(supa.from('qc_assignment').select('id_user,nama_user').eq('no_wo', noWO))
+          ]);
+          var master = res[0].list || [];
+          var rowMap = {}; (res[1].data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = master.map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var foto = it ? _arr(it.foto) : [];
+            var status = it && it.status ? it.status.toString() : (foto.length ? 'Pending' : 'Belum Upload');
+            return { wajib: m.wajib, status: status };
+          });
+          var assigned = (res[2].data || []).map(function (a) { return { id: (a.id_user || '').toString(), nama: (a.nama_user || '').toString() }; });
+          return { success: true, summary: _engCountSummary(list), assigned: assigned };
+        }
+      });
+
+      // ── Summary DED per WO (+ dokumen approved) ───────────────────────────
+      window.gsRoute('getDEDSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('ded_project').select('no_wo').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('ded_checklist').select('kode,label,wajib').order('urutan')),
+            _safe(supa.from('ded_item').select('kode,status,files').eq('no_wo', noWO))
+          ]);
+          if (!res[0].data) return { success: true, summary: null, approvedDocs: [] };
+          var rowMap = {}; (res[2].data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = (res[1].data || []).map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var files = it ? _arr(it.files) : [];
+            var status = it && it.status ? it.status.toString() : (files.length ? 'Pending' : 'Belum Upload');
+            return { label: m.label || '', wajib: m.wajib === true, status: status, files: files };
+          });
+          var approvedDocs = list.filter(function (it) { return it.status === 'Approved' && (it.files || []).length; })
+            .map(function (it) { return { label: it.label, files: (it.files || []).map(function (f) { return { fileUrl: f.fileUrl, fileName: f.fileName }; }) }; });
+          return { success: true, summary: _engCountSummary(list), approvedDocs: approvedDocs };
+        }
+      });
+
+      // ── WO tersedia untuk daftar BOM/DED/QC ───────────────────────────────
+      window.gsRoute('getAvailableWOForBOM', { mode: 'fn', handler: function () { return _availableWO('bom_project'); } });
+      window.gsRoute('getAvailableWOForDED', { mode: 'fn', handler: function () { return _availableWO('ded_project'); } });
+      window.gsRoute('getAvailableWOForQC', { mode: 'fn', handler: function () { return _availableWO('qc_project'); } });
 
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
