@@ -21,6 +21,11 @@
   // memakai Apps Script lama supaya Inventory tidak rusak.
   var ENABLE_EDGE_STOK = true;
 
+  // Nyalakan `true` HANYA SETELAH Edge Function 'invoice-ops' ter-deploy
+  // (lihat PANDUAN-EDGE-FUNCTIONS.md). Selama false, simpan invoice & ubah
+  // status bayar tetap lewat Apps Script (aman).
+  var ENABLE_EDGE_INVOICE = false;
+
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
     return; // belum dikonfigurasi → biarkan login lama (Apps Script) tetap jalan
@@ -3429,6 +3434,65 @@
           var del = await supa.from('pengeluaran').delete().eq('id_pengeluaran', id);
           if (del.error) return { success: false, message: del.error.message };
           return { success: true, message: 'Pengeluaran ' + id + ' berhasil dihapus.' };
+        }
+      });
+
+      // ── Invoice (finansial/multi-tabel) via EDGE FUNCTION invoice-ops ─────
+      //  Aktif hanya bila ENABLE_EDGE_INVOICE = true (setelah deploy).
+      if (ENABLE_EDGE_INVOICE) {
+        window.gsRoute('simpanInvoice', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'create', payload: a[0] || {} } });
+            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal menyimpan invoice.' }; }
+            return r.data;
+          }
+        });
+        window.gsRoute('updateStatusBayarInvoice', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'setStatus', idInvoice: a[0], statusBaru: a[1], bukti: a[2] || {} } });
+            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal mengubah status bayar.' }; }
+            return r.data;
+          }
+        });
+      }
+
+      // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
+      //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
+      window.gsRoute('hapusInvoice', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString();
+          var del = await supa.from('invoice').delete().eq('no_invoice', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Invoice tidak ditemukan.' };
+          return { success: true, message: 'Invoice ' + id + ' dihapus.' };
+        }
+      });
+      window.gsRoute('hapusKwitansi', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString();
+          var del = await supa.from('kwitansi').delete().eq('no_kwitansi', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+          return { success: true, message: 'Kwitansi ' + id + ' dihapus.' };
+        }
+      });
+      window.gsRoute('editKwitansi', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString();
+          if (!id) return { success: false, message: 'ID kwitansi wajib.' };
+          var jumlah = parseFloat(p.jumlah) || 0;
+          if (jumlah <= 0) return { success: false, message: 'Jumlah kwitansi harus lebih dari 0.' };
+          var upd = { terima_dari: (p.terimaDari || '').toString(), jumlah: jumlah, untuk_pembayaran: (p.untuk || '').toString(), metode: (p.metode || 'Transfer').toString(), catatan: (p.catatan || '').toString() };
+          var t = _isoDate(p.tanggal); if (t) upd.tanggal = t;
+          var up = await supa.from('kwitansi').update(upd).eq('no_kwitansi', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+          return { success: true, message: 'Kwitansi ' + id + ' berhasil diperbarui!' };
         }
       });
 
