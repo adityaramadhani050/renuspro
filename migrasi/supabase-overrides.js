@@ -1168,6 +1168,82 @@
         }
       });
 
+      // ── Realisasi HPP & Margin per WO (WorkOrder.gs → getRealisasiHPP) ────
+      //  Semua sumber difilter per-WO (data kecil) → aman di klien.
+      window.gsRoute('getRealisasiHPP', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = args[0] ? args[0].toString().trim() : '';
+          if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('penawaran').select('rev,subtotal,diskon,total_hpp,nama_project,klien_id').eq('no_wo', noWO)),
+            _safe(supa.from('klien').select('id,nama_klien')),
+            _safe(supa.from('pengeluaran').select('*').eq('no_wo', noWO)),
+            _safe(supa.from('purchase_order').select('no_po,nama_supplier,status_po,status_bayar,grand_total,total_dibayar').eq('no_wo', noWO))
+          ]);
+          var penq = res[0], kq = res[1], eq = res[2], poq = res[3];
+          var klienMap = {}; (kq.data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+
+          // Revisi tertinggi penawaran untuk WO ini.
+          var nilaiKontrak = 0, estimasiHPP = 0, namaProject = '', namaKlien = '', maxRev = -1;
+          (penq.data || []).forEach(function (p) {
+            var rev = parseInt(p.rev) || 0;
+            if (rev <= maxRev) return;
+            maxRev = rev;
+            nilaiKontrak = Math.max(0, (parseFloat(p.subtotal) || 0) - (parseFloat(p.diskon) || 0));
+            estimasiHPP = parseFloat(p.total_hpp) || 0;
+            namaProject = (p.nama_project || '').toString();
+            namaKlien = klienMap[p.klien_id] || p.klien_id || '';
+          });
+
+          var realisasiHPP = 0, akunMap = {}, sumberMap = { 'Pembayaran PO': 0, 'Penggunaan Stok': 0, 'Langsung': 0 };
+          var pengeluaranList = [];
+          (eq.data || []).forEach(function (r) {
+            var total = parseFloat(r.total) || 0;
+            var sumber = (r.sumber || '').toString();
+            var namaAkun = (r.nama_akun || '').toString();
+            realisasiHPP += total;
+            akunMap[namaAkun] = (akunMap[namaAkun] || 0) + total;
+            if (sumber in sumberMap) sumberMap[sumber] += total;
+            pengeluaranList.push({
+              id: r.id_pengeluaran || '', tanggal: _fmtTgl(r.tanggal), sumber: sumber,
+              noPO: r.no_po || '', idReferensi: r.id_referensi || '', idAkun: r.id_akun || '',
+              namaAkun: namaAkun, deskripsi: r.deskripsi || '', qty: parseFloat(r.qty) || 0,
+              satuan: r.satuan || '', hargaSatuan: parseFloat(r.harga_satuan) || 0, total: total,
+              catatan: r.catatan || ''
+            });
+          });
+
+          var selisih = estimasiHPP - realisasiHPP;
+          var selisihPersen = estimasiHPP > 0 ? Math.round(selisih / estimasiHPP * 100) : null;
+          var marginEstimasi = nilaiKontrak > 0 ? ((nilaiKontrak - estimasiHPP) / nilaiKontrak * 100) : null;
+          var marginRealisasi = nilaiKontrak > 0 ? ((nilaiKontrak - realisasiHPP) / nilaiKontrak * 100) : null;
+          var breakdownAkun = Object.keys(akunMap).map(function (nama) {
+            return { namaAkun: nama, total: akunMap[nama], persen: realisasiHPP > 0 ? Math.round(akunMap[nama] / realisasiHPP * 100) : 0 };
+          }).sort(function (a, b) { return b.total - a.total; });
+          var breakdownSumber = Object.keys(sumberMap).map(function (s) {
+            return { sumber: s, total: sumberMap[s], persen: realisasiHPP > 0 ? Math.round(sumberMap[s] / realisasiHPP * 100) : 0 };
+          });
+          var poTerkait = (poq.data || []).map(function (r) {
+            var gt = parseFloat(r.grand_total) || 0, tb = parseFloat(r.total_dibayar) || 0;
+            return {
+              noPO: r.no_po || '', namaSupplier: r.nama_supplier || '', statusPO: r.status_po || '',
+              statusBayar: r.status_bayar || '', grandTotal: gt, totalDibayar: tb, sisaTagihan: Math.max(0, gt - tb)
+            };
+          });
+          pengeluaranList.reverse();
+
+          return {
+            success: true, noWO: noWO, namaProject: namaProject, namaKlien: namaKlien,
+            nilaiKontrak: nilaiKontrak, estimasiHPP: estimasiHPP, realisasiHPP: realisasiHPP,
+            selisih: selisih, selisihPersen: selisihPersen, marginEstimasi: marginEstimasi,
+            marginRealisasi: marginRealisasi, breakdownAkun: breakdownAkun, breakdownSumber: breakdownSumber,
+            pengeluaranList: pengeluaranList, poTerkait: poTerkait
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1198,7 +1274,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
