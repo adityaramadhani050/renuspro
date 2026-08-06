@@ -1529,10 +1529,8 @@
 
       // ── Realisasi HPP & Margin per WO (WorkOrder.gs → getRealisasiHPP) ────
       //  Semua sumber difilter per-WO (data kecil) → aman di klien.
-      window.gsRoute('getRealisasiHPP', {
-        mode: 'fn',
-        handler: async function (args) {
-          var noWO = args[0] ? args[0].toString().trim() : '';
+      async function _realisasiHPP(noWO) {
+          noWO = (noWO || '').toString().trim();
           if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
@@ -1599,6 +1597,27 @@
             selisih: selisih, selisihPersen: selisihPersen, marginEstimasi: marginEstimasi,
             marginRealisasi: marginRealisasi, breakdownAkun: breakdownAkun, breakdownSumber: breakdownSumber,
             pengeluaranList: pengeluaranList, poTerkait: poTerkait
+          };
+      }
+      window.gsRoute('getRealisasiHPP', { mode: 'fn', handler: function (args) { return _realisasiHPP(args[0]); } });
+
+      // ── Export pengeluaran per WO (Pengeluaran.gs → getExportPengeluaranWO) ─
+      window.gsRoute('getExportPengeluaranWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var hpp = await _realisasiHPP(args[0]);
+          if (!hpp.success) return hpp;
+          var akunGroups = {};
+          hpp.pengeluaranList.forEach(function (p) { var key = p.namaAkun || '(Tanpa Akun)'; (akunGroups[key] = akunGroups[key] || []).push(p); });
+          var detailPerAkun = Object.keys(akunGroups).map(function (nama) {
+            var items = akunGroups[nama]; var subtotal = items.reduce(function (s, it) { return s + it.total; }, 0);
+            return { namaAkun: nama, items: items, subtotal: subtotal };
+          }).sort(function (a, b) { return b.subtotal - a.subtotal; });
+          return {
+            success: true,
+            header: { noWO: hpp.noWO, namaProject: hpp.namaProject, namaKlien: hpp.namaKlien, tanggalCetak: _fmtTgl(new Date()) },
+            ringkasan: { nilaiKontrak: hpp.nilaiKontrak, estimasiHPP: hpp.estimasiHPP, realisasiHPP: hpp.realisasiHPP, selisih: hpp.selisih, marginEstimasi: hpp.marginEstimasi, marginRealisasi: hpp.marginRealisasi },
+            rekapAkun: hpp.breakdownAkun, detailPerAkun: detailPerAkun
           };
         }
       });
