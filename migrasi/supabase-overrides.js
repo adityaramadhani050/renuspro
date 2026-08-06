@@ -1296,45 +1296,99 @@
       // ── Work Order list (WorkOrder.gs → getWorkOrderList) — balik ARRAY ───
       //  Sumber: view work_order + produk(tipe) + hand_over + work_order_catatan
       //  + work_order_jenis_override. jenisWO = override || auto(items+tipe+kata).
-      window.gsRoute('getWorkOrderList', {
+      async function _woListData() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('work_order').select('*')),
+          _safe(supa.from('produk').select('id,tipe')),
+          _safe(supa.from('hand_over').select('no_wo,status')),
+          _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
+          _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
+        ]);
+        var wq = res[0], pq = res[1], hq = res[2], cq = res[3], jq = res[4];
+        if (wq.error) { console.error('[getWorkOrderList]', wq.error); return []; }
+        var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+        var hoMap = {}; (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+        var catatanMap = {}; (cq.data || []).forEach(function (c) { if (c.no_wo) catatanMap[c.no_wo] = c.catatan || ''; });
+        var jenisOverride = {}; (jq.data || []).forEach(function (j) {
+          var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim();
+          if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v;
+        });
+        var list = (wq.data || []).map(function (r) {
+          var noWO = (r.no_wo || '').toString();
+          var jenisAuto = _woJenisAuto(r.items, tipeMap);
+          var jenisManual = jenisOverride[noWO] || '';
+          var jenisEfektif = jenisManual || jenisAuto;
+          return {
+            noWO: noWO, id: (r.no_penawaran || '').toString(), rev: (r.rev != null ? r.rev : '').toString(),
+            tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_until), namaProject: r.nama_project || '',
+            klienId: r.klien_id || '', namaKlien: r.nama_klien || '', dibuatOleh: r.dibuat_oleh || '',
+            subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0, pajak: parseFloat(r.pajak) || 0,
+            grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.hpp) || 0, profit: parseFloat(r.profit) || 0,
+            marginPersen: parseFloat(r.margin_persen) || 0, termConditions: _jsonStr(r.term_conditions, '{}'),
+            items: _jsonStr(r.items, '[]'), status: (r.status || '').toString(), hoStatus: hoMap[noWO] || '',
+            catatanCustomer: catatanMap[noWO] || '', jenisWO: jenisEfektif, jenisWOAuto: jenisAuto,
+            jenisWOManual: jenisManual, adaJasa: jenisEfektif === 'Jasa'
+          };
+        });
+        list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
+        return list;
+      }
+      window.gsRoute('getWorkOrderList', { mode: 'fn', handler: function () { return _woListData(); } });
+
+      // ── Work Order dashboard (WorkOrder.gs → getWorkOrderDashboard) ───────
+      //  = _woListData + agregasi invoice/pembayaran per WO (menu Work Order).
+      window.gsRoute('getWorkOrderDashboard', {
         mode: 'fn',
         handler: async function () {
-          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
-          var res = await Promise.all([
-            _safe(supa.from('work_order').select('*')),
-            _safe(supa.from('produk').select('id,tipe')),
-            _safe(supa.from('hand_over').select('no_wo,status')),
-            _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
-            _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
-          ]);
-          var wq = res[0], pq = res[1], hq = res[2], cq = res[3], jq = res[4];
-          if (wq.error) { console.error('[getWorkOrderList]', wq.error); return []; }
-          var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
-          var hoMap = {}; (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
-          var catatanMap = {}; (cq.data || []).forEach(function (c) { if (c.no_wo) catatanMap[c.no_wo] = c.catatan || ''; });
-          var jenisOverride = {}; (jq.data || []).forEach(function (j) {
-            var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim();
-            if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v;
+          var woList = await _woListData();
+          var invList = await _invoiceList();
+          var invByWO = {};
+          invList.forEach(function (inv) {
+            var noWO = inv.noWO || ''; if (!noWO) return;
+            (invByWO[noWO] = invByWO[noWO] || []).push({
+              id: inv.id, tanggal: inv.tanggal, jenis: inv.jenis, persen: inv.persen,
+              dpp: inv.dpp, ppnNominal: inv.ppnNominal, total: inv.total,
+              statusBayar: inv.statusBayar, kwitansiId: inv.kwitansiId
+            });
           });
-          var list = (wq.data || []).map(function (r) {
-            var noWO = (r.no_wo || '').toString();
-            var jenisAuto = _woJenisAuto(r.items, tipeMap);
-            var jenisManual = jenisOverride[noWO] || '';
-            var jenisEfektif = jenisManual || jenisAuto;
+          var sumKontrak = 0, sumDitagih = 0, sumLunas = 0;
+          var woDashboard = woList.map(function (w) {
+            var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+            var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+            var invoices = invByWO[w.noWO] || [];
+            var totalDitagihDpp = 0, totalLunasDpp = 0, totalLunasTotal = 0;
+            invoices.forEach(function (inv) {
+              totalDitagihDpp += inv.dpp;
+              if (inv.statusBayar === 'Lunas') { totalLunasDpp += inv.dpp; totalLunasTotal += inv.total; }
+            });
+            var sisaDpp = Math.max(0, nilaiKontrak - totalDitagihDpp);
+            var pctDitagih = nilaiKontrak > 0 ? Math.min(100, Math.round(totalDitagihDpp / nilaiKontrak * 100)) : 0;
+            var pctLunas = nilaiKontrak > 0 ? Math.min(100, Math.round(totalLunasDpp / nilaiKontrak * 100)) : 0;
+            var paymentStatus;
+            if (invoices.length === 0) paymentStatus = 'Belum Ditagih';
+            else if (pctLunas >= 100 && pctDitagih >= 100) paymentStatus = 'Lunas';
+            else if (totalLunasDpp > 0) paymentStatus = 'Lunas Sebagian';
+            else paymentStatus = 'Ditagih';
+            sumKontrak += nilaiKontrak;
+            sumDitagih += totalDitagihDpp + Math.round(totalDitagihDpp * ppnRate / 100);
+            sumLunas += totalLunasTotal;
             return {
-              noWO: noWO, id: (r.no_penawaran || '').toString(), rev: (r.rev != null ? r.rev : '').toString(),
-              tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_until), namaProject: r.nama_project || '',
-              klienId: r.klien_id || '', namaKlien: r.nama_klien || '', dibuatOleh: r.dibuat_oleh || '',
-              subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0, pajak: parseFloat(r.pajak) || 0,
-              grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.hpp) || 0, profit: parseFloat(r.profit) || 0,
-              marginPersen: parseFloat(r.margin_persen) || 0, termConditions: _jsonStr(r.term_conditions, '{}'),
-              items: _jsonStr(r.items, '[]'), status: (r.status || '').toString(), hoStatus: hoMap[noWO] || '',
-              catatanCustomer: catatanMap[noWO] || '', jenisWO: jenisEfektif, jenisWOAuto: jenisAuto,
-              jenisWOManual: jenisManual, adaJasa: jenisEfektif === 'Jasa'
+              noWO: w.noWO, id: w.id, rev: w.rev, tanggal: w.tanggal, namaProject: w.namaProject,
+              namaKlien: w.namaKlien, dibuatOleh: w.dibuatOleh, subtotal: w.subtotal, diskon: w.diskon,
+              pajak: w.pajak, grandTotal: w.grandTotal, hpp: w.hpp, profit: w.profit, marginPersen: w.marginPersen,
+              items: w.items, termConditions: w.termConditions, catatanCustomer: w.catatanCustomer,
+              nilaiKontrak: nilaiKontrak, ppnRate: ppnRate, totalDitagihDpp: totalDitagihDpp,
+              totalLunasDpp: totalLunasDpp, totalLunasTotal: totalLunasTotal, sisaDpp: sisaDpp,
+              pctDitagih: pctDitagih, pctLunas: pctLunas, paymentStatus: paymentStatus, invoices: invoices,
+              hoStatus: w.hoStatus || '', jenisWO: w.jenisWO || 'Material', jenisWOAuto: w.jenisWOAuto || 'Material',
+              jenisWOManual: w.jenisWOManual || '', adaJasa: !!w.adaJasa
             };
           });
-          list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
-          return list;
+          return {
+            success: true, woList: woDashboard,
+            summary: { totalWO: woDashboard.length, totalKontrak: sumKontrak, totalDitagih: sumDitagih, totalLunas: sumLunas }
+          };
         }
       });
 
