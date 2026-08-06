@@ -2158,6 +2158,46 @@
         }
       });
 
+      // ── Laporan Keuntungan Bulanan (Pengeluaran.gs → getLaporanKeuntunganBulanan) ─
+      window.gsRoute('getLaporanKeuntunganBulanan', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var tahun = parseInt(params.tahun, 10) || new Date().getFullYear();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('invoice').select('tanggal,dpp')),
+            _safe(supa.from('pengeluaran').select('tanggal,no_wo,total,kategori')),
+            _safe(supa.from('penawaran').select('no_wo,nama_project'))
+          ]);
+          var woMap = {}; (res[2].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '' }; });
+          var bulanData = []; for (var b = 0; b < 12; b++) bulanData.push({ bulan: _WO_BULAN[b], bulanIdx: b + 1, invoiceDPP: 0, pengeluaranProject: 0, pengeluaranNonProject: 0, kategoriProjectTotal: {}, kategoriNonProjectTotal: {} });
+          (res[0].data || []).forEach(function (r) { var tp = _fmtTgl(r.tanggal).split('/'); if (tp.length !== 3) return; if (parseInt(tp[2], 10) !== tahun) return; bulanData[parseInt(tp[1], 10) - 1].invoiceDPP += parseFloat(r.dpp) || 0; });
+          (res[1].data || []).forEach(function (r) {
+            var tp = _fmtTgl(r.tanggal).split('/'); if (tp.length !== 3) return; if (parseInt(tp[2], 10) !== tahun) return;
+            var total = parseFloat(r.total) || 0; var noWO = (r.no_wo || '').toString().trim(); var d = bulanData[parseInt(tp[1], 10) - 1];
+            if (noWO) { d.pengeluaranProject += total; var wi = woMap[noWO] || { namaProject: '' }; var label = noWO + (wi.namaProject ? ' - ' + wi.namaProject : ''); d.kategoriProjectTotal[label] = (d.kategoriProjectTotal[label] || 0) + total; }
+            else { d.pengeluaranNonProject += total; var kat = (r.kategori || 'Lainnya').toString(); d.kategoriNonProjectTotal[kat] = (d.kategoriNonProjectTotal[kat] || 0) + total; }
+          });
+          var _sortKat = function (m) { return Object.keys(m).map(function (k) { return { kategori: k, total: m[k] }; }).sort(function (a, b) { return b.total - a.total; }); };
+          var kpTahun = {}, knpTahun = {};
+          bulanData.forEach(function (d) { Object.keys(d.kategoriProjectTotal).forEach(function (k) { kpTahun[k] = (kpTahun[k] || 0) + d.kategoriProjectTotal[k]; }); Object.keys(d.kategoriNonProjectTotal).forEach(function (k) { knpTahun[k] = (knpTahun[k] || 0) + d.kategoriNonProjectTotal[k]; }); });
+          var totInv = 0, totPP = 0, totPNP = 0;
+          var rows = bulanData.map(function (d) {
+            var keuntungan = d.invoiceDPP - d.pengeluaranProject - d.pengeluaranNonProject;
+            var margin = d.invoiceDPP > 0 ? (keuntungan / d.invoiceDPP * 100) : null;
+            totInv += d.invoiceDPP; totPP += d.pengeluaranProject; totPNP += d.pengeluaranNonProject;
+            return { bulan: d.bulan, bulanIdx: d.bulanIdx, invoiceDPP: d.invoiceDPP, pengeluaranProject: d.pengeluaranProject, pengeluaranNonProject: d.pengeluaranNonProject, keuntungan: keuntungan, margin: margin, kategoriProject: _sortKat(d.kategoriProjectTotal), kategoriNonProject: _sortKat(d.kategoriNonProjectTotal) };
+          });
+          var totalKeuntungan = totInv - totPP - totPNP; var totalMargin = totInv > 0 ? (totalKeuntungan / totInv * 100) : null;
+          return {
+            success: true, tahun: tahun, rows: rows,
+            summary: { totalInvoiceDPP: totInv, totalPengeluaranProject: totPP, totalPengeluaranNonProject: totPNP, totalPengeluaran: totPP + totPNP, totalKeuntungan: totalKeuntungan, totalMargin: totalMargin },
+            kategoriProjectTahunan: _sortKat(kpTahun), kategoriNonProjectTahunan: _sortKat(knpTahun)
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
