@@ -62,16 +62,28 @@ sistem lama** (angka, tanggal, kolom cocok). Fokus: apakah data **tampil benar**
 
 ---
 
+Tambahan yang juga sudah dipindah:
+- [ ] **Work Order** menu (dashboard) — status ditagih/lunas per WO benar
+- [ ] **Detail Kas Project** per WO (pemasukan vs pengeluaran)
+- [ ] **Dokumen Project** panel di detail WO (kontrak + BAST/garansi/commissioning)
+- [ ] **Schedule** detail per WO (timeline + progress)
+
 ## Belum dimigrasi (masih Apps Script — WAJAR bila lebih lambat)
-Kelompok agregasi berat & dokumen (fase berikutnya, kemungkinan View/RPC SQL):
-- Dashboard utama (`getDashboardData`), Dashboard WO (`getWorkOrderDashboard`)
+Kelompok **laporan/agregasi berat** — paling tepat jadi **View/RPC SQL** nanti,
+bukan replikasi di browser (getSalesReportData saja 529 baris):
+- Dashboard utama (`getDashboardData` → sales report + raw)
 - Laporan: Keuangan, Sales, Profitabilitas, Keuntungan Bulanan
-- Cash bootstrap (`getCashManagerBootstrap`), Saldo Akun, Detail Kas Project
-- Dokumen WO: Kontrak/SPK, BAST, Garansi, Dokumen Project (`getWODokumen`)
-- Bootstrap Invoice (`getInvoiceInitialData`)
+- `getSiteSurveyReportData`, `getQCReportData` (data untuk PDF laporan)
+
+Bergantung sumber non-tabel / gap skema (tetap Apps Script):
+- **Saldo Akun** & **Cash Manager bootstrap** — akun dari ScriptProperties
+  (BANK_ACCOUNTS) + tabel `ayat_silang` belum ada di Supabase
+- **Ayat Silang / mutasi antar-akun** — tabel belum dibuat
+- Dokumen **Kontrak/SPK, BAST, Garansi** (generator nomor+tanggal, terkait PDF)
+- Bootstrap Invoice (`getInvoiceInitialData` — butuh peta tagihan)
 
 Tetap Apps Script permanen (bukan tabel): konfigurasi WA, opsi T&C, PDF (base64),
-foto QC besar, + Ayat Silang (tabel belum dibuat).
+foto QC besar.
 
 ## Kalau ada yang salah
 Untuk tiap item yang **tidak cocok/kosong/error**, catat:
