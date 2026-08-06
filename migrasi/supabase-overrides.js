@@ -2198,6 +2198,67 @@
         }
       });
 
+      // ── Laporan Keuangan (Invoice.gs → getFinanceReportData) ──────────────
+      window.gsRoute('getFinanceReportData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var filter = args[0] || {};
+          var _frParse = function (s) { if (!s) return null; var p = s.split('-'); if (p.length !== 3) return null; return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2])); };
+          var _aging = function (t) { if (!t) return null; var pr = t.split('/'); if (pr.length !== 3) return null; var d = new Date(parseInt(pr[2]), parseInt(pr[1]) - 1, parseInt(pr[0])); if (isNaN(d.getTime())) return null; return Math.floor((new Date() - d) / 86400000); };
+          var dateFrom = filter.from ? _frParse(filter.from) : null;
+          var dateTo = filter.to ? _frParse(filter.to) : null;
+          if (dateTo) dateTo.setHours(23, 59, 59);
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var woList = await _woListData();
+          var iq = await _safe(supa.from('invoice').select('no_invoice,no_wo,no_penawaran,tanggal,jenis,dpp,ppn_persen,ppn_nominal,total,status_bayar,tanggal_bayar,bukti_file_id'));
+          var invByWO = {}, invByPen = {};
+          var aging = { current: 0, gte30: 0, gte60: 0, gte90: 0 };
+          var totalTagihan = 0, totalTerbayar = 0, totalTagihanDpp = 0, totalTerbayarDpp = 0;
+          (iq.data || []).forEach(function (r) {
+            var noInv = (r.no_invoice || '').toString(); if (!noInv) return;
+            var noWO = (r.no_wo || '').toString(); var noPen = (r.no_penawaran || '').toString();
+            var tgl = _fmtTgl(r.tanggal); var jenis = (r.jenis || '').toString();
+            var dpp = parseFloat(r.dpp) || 0, ppnPct = parseFloat(r.ppn_persen) || 0, ppnNom = parseFloat(r.ppn_nominal) || 0, total = parseFloat(r.total) || 0;
+            var status = (r.status_bayar || 'Belum Lunas').toString();
+            var tglBayar = r.tanggal_bayar ? _fmtTgl(r.tanggal_bayar) : '';
+            if (!tglBayar) { var legacy = (r.bukti_file_id || '').toString(); if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(legacy)) tglBayar = _fmtTgl(legacy); }
+            if (dateFrom || dateTo) {
+              var invDate = null; var s = (r.tanggal || '').toString();
+              if (s.indexOf('T') > 0) invDate = new Date(s);
+              else { var dp = s.split('-'); if (dp.length === 3) invDate = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2])); }
+              if (invDate) { if (dateFrom && invDate < dateFrom) return; if (dateTo && invDate > dateTo) return; } else return;
+            }
+            var inv = { noInv: noInv, noWO: noWO, noPen: noPen, tgl: tgl, jenis: jenis, dpp: dpp, ppnPct: ppnPct, ppnNom: ppnNom, total: total, status: status, tglBayar: tglBayar };
+            totalTagihan += total; totalTagihanDpp += dpp;
+            if (status === 'Lunas') { totalTerbayar += total; totalTerbayarDpp += dpp; }
+            if (status !== 'Lunas') { var days = _aging(tgl); if (days !== null) { if (days >= 90) aging.gte90 += total; else if (days >= 60) aging.gte60 += total; else if (days >= 30) aging.gte30 += total; else aging.current += total; } }
+            if (noWO) { (invByWO[noWO] = invByWO[noWO] || []).push(inv); } else if (noPen) { (invByPen[noPen] = invByPen[noPen] || []).push(inv); }
+          });
+          var woRows = woList.map(function (w) {
+            var invoices = invByWO[w.noWO] || [];
+            invoices.sort(function (a, b) { return a.noInv.localeCompare(b.noInv, undefined, { numeric: true }); });
+            var tagihan = 0, terbayar = 0; invoices.forEach(function (inv) { tagihan += inv.total; if (inv.status === 'Lunas') terbayar += inv.total; });
+            var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+            var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+            var bruto = nilaiKontrak + (w.pajak || 0);
+            return { noWO: w.noWO, noPenawaran: w.id, namaKlien: w.namaKlien, namaProject: w.namaProject, nilaiKontrak: nilaiKontrak, ppnRate: ppnRate, invoices: invoices, tagihan: tagihan, terbayar: terbayar, outstanding: tagihan - terbayar, belumDitagih: Math.max(0, bruto - tagihan) };
+          });
+          var preDealRows = [];
+          Object.keys(invByPen).forEach(function (noPen) {
+            var invList = invByPen[noPen].filter(function (inv) { return !inv.noWO; });
+            if (!invList.length) return;
+            invList.sort(function (a, b) { return a.noInv.localeCompare(b.noInv, undefined, { numeric: true }); });
+            var tagihan = 0, terbayar = 0; invList.forEach(function (inv) { tagihan += inv.total; if (inv.status === 'Lunas') terbayar += inv.total; });
+            preDealRows.push({ noWO: '', noPenawaran: noPen, namaKlien: invList[0].namaKlien || '', namaProject: invList[0].namaProject || '', nilaiKontrak: 0, ppnRate: 0, invoices: invList, tagihan: tagihan, terbayar: terbayar, outstanding: tagihan - terbayar, belumDitagih: 0, isPredeal: true });
+          });
+          return {
+            success: true,
+            summary: { totalTagihanDpp: totalTagihanDpp, totalTerbayarDpp: totalTerbayarDpp, totalOutstandingDpp: totalTagihanDpp - totalTerbayarDpp, totalTagihan: totalTagihan, totalTerbayar: totalTerbayar, totalOutstanding: totalTagihan - totalTerbayar, aging: aging },
+            rows: woRows.concat(preDealRows)
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
