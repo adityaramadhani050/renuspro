@@ -3648,6 +3648,52 @@
         }
       });
 
+      // ── QC master: foto contoh subitem checklist (qc_checklist.contoh_foto) ─
+      //  Kolom contoh_foto bertipe TEXT (JSON string) → tulis via JSON.stringify.
+      window.gsRoute('uploadQCContohFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}; var kode = (p.kode || '').toString().trim();
+          if (!kode) return { success: false, message: 'Kode subitem wajib.' };
+          if (!(p.base64Data || '').toString()) return { success: false, message: 'File tidak boleh kosong.' };
+          var f = await supa.from('qc_checklist').select('kode,contoh_foto').eq('kode', kode).maybeSingle();
+          if (!f.data) return { success: false, message: 'Subitem tidak ditemukan.' };
+          var existing = _arr(f.data.contoh_foto);
+          var r = await _putStorage('qc-contoh/' + kode.replace(/[^\w.\-]/g, '_'), p.base64Data.toString(), (p.mimeType || 'image/jpeg').toString(), kode + '-contoh-' + (existing.length + 1) + '.jpg');
+          if (!r.ok) return { success: false, message: r.message };
+          existing.push({ fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName });
+          var up = await supa.from('qc_checklist').update({ contoh_foto: JSON.stringify(existing) }).eq('kode', kode);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Foto contoh tersimpan.', contohFoto: existing };
+        }
+      });
+      window.gsRoute('hapusQCContohFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var kode = (a[0] || '').toString().trim(), fileId = (a[1] || '').toString().trim();
+          var f = await supa.from('qc_checklist').select('kode,contoh_foto').eq('kode', kode).maybeSingle();
+          if (!f.data) return { success: false, message: 'Subitem tidak ditemukan.' };
+          var arr = _arr(f.data.contoh_foto).filter(function (x) { return x.fileId !== fileId; });
+          var up = await supa.from('qc_checklist').update({ contoh_foto: JSON.stringify(arr) }).eq('kode', kode);
+          if (up.error) return { success: false, message: up.error.message };
+          try { await supa.storage.from('uploads').remove([fileId]); } catch (e) {}
+          return { success: true, message: 'Foto contoh dihapus.', contohFoto: arr };
+        }
+      });
+
+      // Site Survey: hapus 1 foto terunggah (retake sebelum submit). fileId =
+      //  path objek Storage (dari uploadSiteSurveyFoto). Data lama = id Drive →
+      //  remove() gagal diam-diam (try/catch), sesuai perilaku lama.
+      window.gsRoute('hapusSiteSurveyFoto', {
+        mode: 'fn',
+        handler: async function (a) {
+          var fileId = (a[0] || '').toString().trim();
+          if (!fileId) return { success: false, message: 'fileId wajib.' };
+          try { await supa.storage.from('uploads').remove([fileId]); } catch (e) {}
+          return { success: true };
+        }
+      });
+
       // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
       //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
       window.gsRoute('hapusInvoice', {
