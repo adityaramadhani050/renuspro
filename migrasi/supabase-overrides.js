@@ -138,6 +138,32 @@
         return true;
       }
 
+      // Helper: deteksi jenis WO (Jasa vs Material) — port dari Apps Script.
+      var _WO_JASA_KEYWORDS = ['jasa', 'instalasi', 'komisioning', 'commissioning', 'pemasangan', 'pasang', 'instal', 'install'];
+      function _woKeywordHitJasa(text) {
+        if (!text) return false;
+        for (var i = 0; i < _WO_JASA_KEYWORDS.length; i++) { if (text.indexOf(_WO_JASA_KEYWORDS[i]) !== -1) return true; }
+        return false;
+      }
+      function _woJenisAuto(items, tipeMap) {
+        try {
+          var kel = Array.isArray(items) ? items : (function () { try { return JSON.parse(items || '[]'); } catch (e) { return []; } })();
+          for (var a = 0; a < kel.length; a++) {
+            var k = kel[a] || {};
+            if (_woKeywordHitJasa((k.namaKelompok || '').toString().toLowerCase())) return 'Jasa';
+            var subs = k.subItems || [];
+            for (var b = 0; b < subs.length; b++) {
+              var s = subs[b] || {};
+              var pid = (s.produkId || '').toString().trim();
+              var tipe = pid ? (tipeMap[pid] || '') : '';
+              if (tipe === 'jasa') return 'Jasa';
+              if ((!pid || !tipe) && _woKeywordHitJasa((s.deskripsi || '').toString().toLowerCase())) return 'Jasa';
+            }
+          }
+          return 'Material';
+        } catch (e) { return 'Material'; }
+      }
+
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
         var q = await supa.from('invoice').select('*');
@@ -1090,6 +1116,58 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 6 — COMPUTE READS (override client, TANPA Edge Function).
+      //  Fungsi "berhitung" ternyata cukup dikerjakan di sisi klien: beberapa
+      //  query + gabung/olah di JS. Edge Function hanya perlu untuk TULIS
+      //  (atomik) atau agregasi sangat berat. Bentuk balikan tetap disamakan.
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Work Order list (WorkOrder.gs → getWorkOrderList) — balik ARRAY ───
+      //  Sumber: view work_order + produk(tipe) + hand_over + work_order_catatan
+      //  + work_order_jenis_override. jenisWO = override || auto(items+tipe+kata).
+      window.gsRoute('getWorkOrderList', {
+        mode: 'fn',
+        handler: async function () {
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('work_order').select('*')),
+            _safe(supa.from('produk').select('id,tipe')),
+            _safe(supa.from('hand_over').select('no_wo,status')),
+            _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
+            _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
+          ]);
+          var wq = res[0], pq = res[1], hq = res[2], cq = res[3], jq = res[4];
+          if (wq.error) { console.error('[getWorkOrderList]', wq.error); return []; }
+          var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+          var hoMap = {}; (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+          var catatanMap = {}; (cq.data || []).forEach(function (c) { if (c.no_wo) catatanMap[c.no_wo] = c.catatan || ''; });
+          var jenisOverride = {}; (jq.data || []).forEach(function (j) {
+            var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim();
+            if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v;
+          });
+          var list = (wq.data || []).map(function (r) {
+            var noWO = (r.no_wo || '').toString();
+            var jenisAuto = _woJenisAuto(r.items, tipeMap);
+            var jenisManual = jenisOverride[noWO] || '';
+            var jenisEfektif = jenisManual || jenisAuto;
+            return {
+              noWO: noWO, id: (r.no_penawaran || '').toString(), rev: (r.rev != null ? r.rev : '').toString(),
+              tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_until), namaProject: r.nama_project || '',
+              klienId: r.klien_id || '', namaKlien: r.nama_klien || '', dibuatOleh: r.dibuat_oleh || '',
+              subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0, pajak: parseFloat(r.pajak) || 0,
+              grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.hpp) || 0, profit: parseFloat(r.profit) || 0,
+              marginPersen: parseFloat(r.margin_persen) || 0, termConditions: _jsonStr(r.term_conditions, '{}'),
+              items: _jsonStr(r.items, '[]'), status: (r.status || '').toString(), hoStatus: hoMap[noWO] || '',
+              catatanCustomer: catatanMap[noWO] || '', jenisWO: jenisEfektif, jenisWOAuto: jenisAuto,
+              jenisWOManual: jenisManual, adaJasa: jenisEfektif === 'Jasa'
+            };
+          });
+          list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
+          return list;
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1120,7 +1198,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
