@@ -448,15 +448,30 @@
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
           _safe(supa.from('akun_pembayaran').select('id,nama_akun,tipe,status').order('id')),
-          _safe(_all('pemasukan', 'id_akun,jumlah')),
-          _safe(_all('pengeluaran', 'id_akun,total')),
-          _safe(supa.from('ayat_silang').select('id_akun_asal,id_akun_tujuan,jumlah'))
+          _safe(_all('pemasukan', 'id_akun,nama_akun,jumlah')),
+          _safe(_all('pengeluaran', 'id_akun,nama_akun,total')),
+          _safe(supa.from('ayat_silang').select('id_akun_asal,nama_asal,id_akun_tujuan,nama_tujuan,jumlah'))
         ]);
-        var akunMap = {}, akunOrder = [];
-        (res[0].data || []).forEach(function (b) { var aid = (b.id || '').toString(); if (!aid || akunMap[aid]) return; akunMap[aid] = { id: aid, nama: (b.nama_akun || '').toString(), tipe: (b.tipe || 'Bank').toString(), status: (b.status || 'Aktif').toString(), masuk: 0, keluar: 0, saldo: 0 }; akunOrder.push(aid); });
-        (res[1].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].masuk += parseFloat(r.jumlah) || 0; });
-        (res[2].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].keluar += parseFloat(r.total) || 0; });
-        (res[3].data || []).forEach(function (r) { var jml = parseFloat(r.jumlah) || 0; var as = (r.id_akun_asal || '').toString(), tj = (r.id_akun_tujuan || '').toString(); if (akunMap[as]) akunMap[as].keluar += jml; if (akunMap[tj]) akunMap[tj].masuk += jml; });
+        var akunMap = {}, akunOrder = [], nameMap = {};
+        (res[0].data || []).forEach(function (b) {
+          var aid = (b.id || '').toString(); if (!aid || akunMap[aid]) return;
+          akunMap[aid] = { id: aid, nama: (b.nama_akun || '').toString(), tipe: (b.tipe || 'Bank').toString(), status: (b.status || 'Aktif').toString(), masuk: 0, keluar: 0, saldo: 0 };
+          akunOrder.push(aid);
+          var nm = (b.nama_akun || '').toString().trim().toLowerCase(); if (nm && !nameMap[nm]) nameMap[nm] = aid;
+        });
+        // Cocokkan transaksi ke akun by ID, lalu fallback by NAMA (data lama
+        // sering menyimpan id_akun beda skema, tapi nama_akun konsisten).
+        var _acc = function (id, nama) {
+          var a = (id || '').toString(); if (akunMap[a]) return akunMap[a];
+          var nm = (nama || '').toString().trim().toLowerCase(); var mid = nameMap[nm]; return mid ? akunMap[mid] : null;
+        };
+        (res[1].data || []).forEach(function (r) { var acc = _acc(r.id_akun, r.nama_akun); if (acc) acc.masuk += parseFloat(r.jumlah) || 0; });
+        (res[2].data || []).forEach(function (r) { var acc = _acc(r.id_akun, r.nama_akun); if (acc) acc.keluar += parseFloat(r.total) || 0; });
+        (res[3].data || []).forEach(function (r) {
+          var jml = parseFloat(r.jumlah) || 0;
+          var as = _acc(r.id_akun_asal, r.nama_asal), tj = _acc(r.id_akun_tujuan, r.nama_tujuan);
+          if (as) as.keluar += jml; if (tj) tj.masuk += jml;
+        });
         var akunList = [], tm = 0, tk = 0, ts = 0;
         akunOrder.forEach(function (id) { var it = akunMap[id]; it.saldo = it.masuk - it.keluar; tm += it.masuk; tk += it.keluar; ts += it.saldo; akunList.push(it); });
         return { success: true, akun: akunList, totalMasuk: tm, totalKeluar: tk, totalSaldo: ts };
