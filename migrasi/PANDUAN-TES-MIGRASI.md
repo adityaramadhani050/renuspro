@@ -68,12 +68,18 @@ Tambahan yang juga sudah dipindah:
 - [ ] **Dokumen Project** panel di detail WO (kontrak + BAST/garansi/commissioning)
 - [ ] **Schedule** detail per WO (timeline + progress)
 
+Laporan yang SUDAH dipindah:
+- [ ] **Laporan Profitabilitas** — per project (estimasi vs realisasi HPP, margin)
+- [ ] **Laporan Keuntungan Bulanan** — invoice DPP vs pengeluaran per bulan
+- [ ] **Laporan Keuangan** — tagihan/terbayar/outstanding + aging + bootstrap Invoice
+- [ ] **Bootstrap modal Invoice** — daftar WO + penawaran pre-deal (DP)
+
 ## Belum dimigrasi (masih Apps Script — WAJAR bila lebih lambat)
-Kelompok **laporan/agregasi berat** — paling tepat jadi **View/RPC SQL** nanti,
-bukan replikasi di browser (getSalesReportData saja 529 baris):
-- Dashboard utama (`getDashboardData` → sales report + raw)
-- Laporan: Keuangan, Sales, Profitabilitas, Keuntungan Bulanan
-- `getSiteSurveyReportData`, `getQCReportData` (data untuk PDF laporan)
+Kelompok **paling besar/berisiko** — sengaja belum, agar tetap akurat:
+- **Dashboard utama** (`getDashboardData`) + **Laporan Sales**
+  (`getSalesReportData`, **529 baris**: analisis win/lost, tren, target) →
+  paling tepat dikerjakan hati-hati / sebagai RPC SQL, bukan buru-buru
+- `getDashboardRawData`, `getSiteSurveyReportData`, `getQCReportData`
 
 Bergantung sumber non-tabel / gap skema (tetap Apps Script):
 - **Saldo Akun** & **Cash Manager bootstrap** — akun dari ScriptProperties
