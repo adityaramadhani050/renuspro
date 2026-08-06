@@ -2042,6 +2042,73 @@
         }
       });
 
+      // ── Bootstrap Invoice (Invoice.gs → getInvoiceInitialData) ────────────
+      //  woList (dari _woListData) diperkaya nilai tagihan + daftar penawaran
+      //  pre-deal (untuk invoice DP sebelum deal). nextNo dibuat saat simpan.
+      window.gsRoute('getInvoiceInitialData', {
+        mode: 'fn',
+        handler: async function () {
+          try {
+            var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+            var woList = await _woListData();
+            var res = await Promise.all([
+              _safe(supa.from('invoice').select('no_wo,no_penawaran,dpp')),
+              _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,klien_id,subtotal,diskon,pajak,grand_total,items,status,no_wo')),
+              _safe(supa.from('klien').select('id,nama_klien'))
+            ]);
+            var tagihMap = {}, tagihByPen = {};
+            (res[0].data || []).forEach(function (r) {
+              var dpp = parseFloat(r.dpp) || 0;
+              if (r.no_wo) tagihMap[r.no_wo] = (tagihMap[r.no_wo] || 0) + dpp;
+              if (r.no_penawaran) tagihByPen[r.no_penawaran] = (tagihByPen[r.no_penawaran] || 0) + dpp;
+            });
+            var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+
+            var woEnriched = woList.map(function (w) {
+              var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+              var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+              var ditagihDpp = tagihMap[w.noWO] || 0;
+              return {
+                noWO: w.noWO, isPredeal: false, id: w.id, rev: w.rev, tanggal: w.tanggal,
+                namaProject: w.namaProject, namaKlien: w.namaKlien, klienId: w.klienId,
+                subtotal: w.subtotal, diskon: w.diskon, pajak: w.pajak, grandTotal: w.grandTotal,
+                items: w.items, nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
+                ditagihDpp: ditagihDpp, sisaDpp: Math.max(0, nilaiKontrak - ditagihDpp)
+              };
+            });
+
+            // Penawaran pre-deal: bukan status Deal & belum punya WO, rev tertinggi.
+            var latestRev = {};
+            (res[1].data || []).forEach(function (r, i) {
+              var id = (r.no_penawaran || '').toString(); if (!id) return;
+              var status = (r.status || '').toString(); var noWO = (r.no_wo || '').toString();
+              if (status === 'Deal' || noWO) return;
+              var rev = parseInt(r.rev) || 0;
+              if (!latestRev[id] || rev > latestRev[id].rev) latestRev[id] = { rev: rev, row: r };
+            });
+            var penawaranPreDeal = Object.keys(latestRev).map(function (id) {
+              var r = latestRev[id].row;
+              var subtotal = parseFloat(r.subtotal) || 0, diskon = parseFloat(r.diskon) || 0, pajak = parseFloat(r.pajak) || 0;
+              var nilaiKontrak = Math.max(0, subtotal - diskon);
+              var ppnRate = nilaiKontrak > 0 ? Math.round(pajak / nilaiKontrak * 100) : 0;
+              var ditagihDpp = tagihByPen[id] || 0;
+              return {
+                noWO: '', isPredeal: true, id: id, rev: (r.rev != null ? r.rev : '0').toString(),
+                tanggal: _fmtTgl(r.tanggal), namaProject: r.nama_project || '',
+                namaKlien: klienMap[r.klien_id] || r.klien_id || '', klienId: r.klien_id || '',
+                subtotal: subtotal, diskon: diskon, pajak: pajak, grandTotal: parseFloat(r.grand_total) || 0,
+                items: _jsonStr(r.items, '[]'), nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
+                ditagihDpp: ditagihDpp, sisaDpp: Math.max(0, nilaiKontrak - ditagihDpp), status: r.status || ''
+              };
+            }).sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+
+            return { success: true, woList: woEnriched, penawaranPreDeal: penawaranPreDeal, nextNo: '' };
+          } catch (e) {
+            return { success: false, error: String(e), woList: [], penawaranPreDeal: [], nextNo: '' };
+          }
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
