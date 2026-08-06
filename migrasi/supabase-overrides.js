@@ -289,6 +289,51 @@
         return { list: list, sections: sections };
       }
 
+      // Helper: Schedule — format tanggal, durasi, ringkasan, peta tugas.
+      function _schIso(v) {
+        if (!v) return '';
+        var s = v.toString(); var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          if (/[T ]\d{2}:\d{2}/.test(s) || s.indexOf('Z') !== -1) {
+            try {
+              var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(s));
+              var g = function (t) { var x = p.find(function (e) { return e.type === t; }); return x ? x.value : ''; };
+              return g('year') + '-' + g('month') + '-' + g('day');
+            } catch (e) {}
+          }
+          return m[1] + '-' + m[2] + '-' + m[3];
+        }
+        return s;
+      }
+      function _schDurasi(a, b) {
+        try { var x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); if (isNaN(x.getTime()) || isNaN(y.getTime())) return 1; return Math.max(1, Math.round((y - x) / 86400000) + 1); } catch (e) { return 1; }
+      }
+      function _schSummary(tasks) {
+        var minStart = '', maxEnd = '', totDur = 0, wProg = 0;
+        (tasks || []).forEach(function (t) {
+          if (t.mulai && (!minStart || t.mulai < minStart)) minStart = t.mulai;
+          if (t.selesai && (!maxEnd || t.selesai > maxEnd)) maxEnd = t.selesai;
+          var d = _schDurasi(t.mulai, t.selesai); totDur += d; wProg += (t.progress || 0) * d;
+        });
+        return { jumlahTugas: (tasks || []).length, tanggalMulai: minStart, tanggalSelesai: maxEnd, progress: totDur ? Math.round(wProg / totDur) : 0 };
+      }
+      function _schTasksMap(taskRows) {
+        var map = {};
+        (taskRows || []).forEach(function (r) {
+          if (!r.id) return;
+          var noWO = (r.no_wo || '').toString().trim();
+          if (!map[noWO]) map[noWO] = [];
+          map[noWO].push({
+            id: (r.id || '').toString(), noWO: noWO, namaTugas: r.nama_tugas || '', fase: r.fase || '',
+            mulai: _schIso(r.tanggal_mulai), selesai: _schIso(r.tanggal_selesai),
+            progress: Math.max(0, Math.min(100, Number(r.progress) || 0)), warna: r.warna || '',
+            urutan: Number(r.urutan) || 0, catatan: r.catatan || ''
+          });
+        });
+        Object.keys(map).forEach(function (k) { map[k].sort(function (a, b) { return (a.urutan - b.urutan) || (a.mulai < b.mulai ? -1 : a.mulai > b.mulai ? 1 : 0); }); });
+        return map;
+      }
+
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
         var q = await supa.from('invoice').select('*');
@@ -1694,6 +1739,50 @@
       window.gsRoute('getAvailableWOForBOM', { mode: 'fn', handler: function () { return _availableWO('bom_project'); } });
       window.gsRoute('getAvailableWOForDED', { mode: 'fn', handler: function () { return _availableWO('ded_project'); } });
       window.gsRoute('getAvailableWOForQC', { mode: 'fn', handler: function () { return _availableWO('qc_project'); } });
+
+      // ── Schedule: daftar WO (Schedule.gs → getScheduleWOList) ─────────────
+      window.gsRoute('getScheduleWOList', {
+        mode: 'fn',
+        handler: async function () {
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('schedule_project').select('*')),
+            _safe(supa.from('schedule_task').select('*')),
+            _safe(supa.from('work_order').select('no_wo,items')),
+            _safe(supa.from('produk').select('id,tipe')),
+            _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
+          ]);
+          var taskMap = _schTasksMap(res[1].data || []);
+          var tipeMap = {}; (res[3].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+          var jenisOverride = {}; (res[4].data || []).forEach(function (j) { var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim(); if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v; });
+          var jenisMap = {}; (res[2].data || []).forEach(function (w) { var no = (w.no_wo || '').toString(); jenisMap[no] = jenisOverride[no] || _woJenisAuto(w.items, tipeMap); });
+          var list = (res[0].data || []).map(function (p) {
+            var noWO = (p.no_wo || '').toString().trim();
+            var tasks = taskMap[noWO] || [];
+            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: _schSummary(tasks) };
+          }).filter(function (x) { return x.noWO; });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Schedule: per WO (Schedule.gs → getScheduleByWO) ──────────────────
+      window.gsRoute('getScheduleByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('schedule_project').select('*').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('schedule_task').select('*').eq('no_wo', noWO)),
+            _safe(supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1))
+          ]);
+          if (!res[0].data) return { success: false, message: 'Proyek belum terdaftar di Schedule.' };
+          var p = res[0].data;
+          var tasks = (_schTasksMap(res[1].data || [])[noWO]) || [];
+          var woStatus = (res[2].data && res[2].data[0]) ? (res[2].data[0].status || '') : '';
+          return { success: true, project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' }, tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus };
+        }
+      });
 
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
