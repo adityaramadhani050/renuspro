@@ -2675,6 +2675,136 @@
         }
       });
 
+      // Helper: info stok (qty + harga beli terakhir) untuk produk terkait stok.
+      async function _stokInfo(stokId) {
+        if (!stokId) return { qty: 0, harga: 0 };
+        var q = await supa.from('stok').select('qty_tersedia,harga_beli_terakhir').eq('id_produk', stokId).maybeSingle();
+        if (q.error || !q.data) return { qty: 0, harga: 0 };
+        return { qty: Number(q.data.qty_tersedia) || 0, harga: Number(q.data.harga_beli_terakhir) || 0 };
+      }
+
+      // ── Supplier: simpan / edit / hapus ───────────────────────────────────
+      window.gsRoute('simpanSupplier', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!p.nama) return { success: false, message: 'Nama supplier tidak boleh kosong.' };
+          var q = await _all('supplier', 'id_supplier');
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id_supplier || '').toString().match(/^S(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var id = 'S' + ('000' + (maxNum + 1)).slice(-3);
+          var ins = await supa.from('supplier').insert({ id_supplier: id, nama: p.nama || '', pic: p.pic || '', telepon: p.telepon || '', email: p.email || '', alamat: p.alamat || '', catatan: p.catatan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString(), nama_alias: p.alias || '' });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Supplier (' + id + ') berhasil ditambahkan!', newId: id };
+        }
+      });
+      window.gsRoute('editSupplier', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString().trim();
+          if (!id) return { success: false, message: 'ID supplier wajib.' };
+          var up = await supa.from('supplier').update({ nama: p.nama || '', pic: p.pic || '', telepon: p.telepon || '', email: p.email || '', alamat: p.alamat || '', catatan: p.catatan || '', status: p.status || '', diubah_oleh: p.diubahOleh || '', diubah_pada: new Date().toISOString(), nama_alias: p.alias || '' }).eq('id_supplier', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'ID supplier tidak ditemukan.' };
+          return { success: true, message: 'Supplier ' + id + ' berhasil diperbarui!' };
+        }
+      });
+      window.gsRoute('hapusSupplier', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var ref = await supa.from('purchase_order').select('no_po').eq('id_supplier', id).limit(1);
+          if (!ref.error && ref.data && ref.data.length) return { success: false, message: 'Supplier ' + id + ' tidak dapat dihapus karena masih digunakan di Purchase Order.' };
+          var del = await supa.from('supplier').delete().eq('id_supplier', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'ID supplier tidak ditemukan.' };
+          return { success: true, message: 'Supplier ' + id + ' berhasil dihapus.' };
+        }
+      });
+
+      // ── Akun Pembayaran: simpan / edit / hapus ────────────────────────────
+      window.gsRoute('simpanAkunPembayaran', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!p.namaAkun) return { success: false, message: 'Nama akun wajib diisi.' };
+          var q = await _all('akun_pembayaran', 'id');
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^AP(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var id = 'AP' + ('000' + (maxNum + 1)).slice(-3);
+          var ins = await supa.from('akun_pembayaran').insert({ id: id, nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString() });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Akun ' + id + ' berhasil ditambahkan.', newId: id };
+        }
+      });
+      window.gsRoute('editAkunPembayaran', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString();
+          if (id === 'AP001') return { success: false, message: 'Akun Stok default tidak bisa diubah.' };
+          var up = await supa.from('akun_pembayaran').update({ nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: p.status || 'Aktif' }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'ID akun tidak ditemukan.' };
+          return { success: true, message: 'Akun berhasil diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusAkunPembayaran', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString();
+          if (id === 'AP001') return { success: false, message: 'Akun Stok default tidak bisa dihapus.' };
+          var ref = await supa.from('pembayaran_po').select('id_bayar').eq('id_akun', id).limit(1);
+          if (!ref.error && ref.data && ref.data.length) return { success: false, message: 'Akun sudah digunakan di riwayat pembayaran PO.' };
+          var del = await supa.from('akun_pembayaran').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'ID akun tidak ditemukan.' };
+          return { success: true, message: 'Akun berhasil dihapus.' };
+        }
+      });
+
+      // ── Produk/Jasa: simpan / edit / hapus ────────────────────────────────
+      window.gsRoute('simpanProduk', {
+        mode: 'fn',
+        handler: async function (args) {
+          var nama = (args[0] || '').toString(), unit = (args[1] || '').toString(), harga = args[2], hpp = args[3], tipe = (args[4] || '').toString(), stokId = (args[5] || '').toString();
+          if (!nama || !unit) return { success: false, message: 'Data nama/unit tidak boleh kosong.' };
+          var q = await _all('produk', 'id');
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^P(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var id = 'P' + ('000' + (maxNum + 1)).slice(-3);
+          var hppFinal = Number(hpp) || 0, qty = 0;
+          if (stokId) { var si = await _stokInfo(stokId); qty = si.qty; if (!hppFinal) hppFinal = si.harga; }
+          var ins = await supa.from('produk').insert({ id: id, nama: nama, unit: unit, harga_satuan: Number(harga) || 0, hpp: hppFinal, tipe: tipe || '', stok_id: stokId || '', qty_tersedia: qty });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Produk ' + id + ' berhasil ditambahkan!', id: id };
+        }
+      });
+      window.gsRoute('editProduk', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(), nama = (args[1] || '').toString(), unit = (args[2] || '').toString(), harga = args[3], hpp = args[4], tipe = (args[5] || '').toString(), stokId = (args[6] || '').toString();
+          if (!id) return { success: false, message: 'ID produk wajib.' };
+          var hppFinal = Number(hpp) || 0, qty = 0;
+          if (stokId) { var si = await _stokInfo(stokId); qty = si.qty; if (!hppFinal) hppFinal = si.harga; }
+          var up = await supa.from('produk').update({ nama: nama, unit: unit, harga_satuan: Number(harga) || 0, hpp: hppFinal, tipe: tipe || '', stok_id: stokId || '', qty_tersedia: qty }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'ID produk tidak ditemukan.' };
+          return { success: true, message: 'Produk ' + id + ' berhasil diperbarui!' };
+        }
+      });
+      window.gsRoute('hapusProduk', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var del = await supa.from('produk').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'ID tidak ditemukan.' };
+          return { success: true, message: 'Produk ' + id + ' berhasil dihapus.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
