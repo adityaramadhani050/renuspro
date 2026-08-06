@@ -95,6 +95,33 @@ Vercel deploy ulang (~1 menit). Buka menu **Inventory** → stok kini dari Supab
 
 ---
 
+## Edge Function `invoice-ops` (simpan invoice + pelunasan)
+Operasi Invoice bersifat finansial & multi-tabel (nomor invoice, hitung DPP/PPN,
+saat Lunas otomatis buat Kwitansi + Pemasukan). Karena itu dijadikan Edge
+Function (atomik, di server).
+
+1. Salin folder function + shared (sekali):
+   ```bash
+   cd ~/renuspro
+   mkdir -p supabase/functions/_shared
+   cp migrasi/edge-functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
+   cp -r migrasi/edge-functions/invoice-ops     supabase/functions/invoice-ops
+   ```
+2. Deploy:
+   ```bash
+   supabase functions deploy invoice-ops
+   ```
+   > Function ini memakai **service_role** (otomatis tersedia di runtime sebagai
+   > `SUPABASE_SERVICE_ROLE_KEY`) agar bisa menulis banyak tabel dengan konsisten.
+   > Tak perlu set env manual.
+3. Nyalakan di frontend: `cloudshell edit migrasi/supabase-overrides.js` →
+   ubah `var ENABLE_EDGE_INVOICE = false;` jadi `true` → **Ctrl+S**.
+4. Build & push seperti biasa (`node migrasi/build.mjs` → salin `dist/` → push).
+
+Uji: buat Invoice baru & tandai **Lunas** → cek invoice, kwitansi, dan pemasukan
+otomatis muncul di Supabase. Bandingkan nomor & nilai dengan sistem lama.
+Bila salah: balik `ENABLE_EDGE_INVOICE = false`, build & push → kembali Apps Script.
+
 ## Membuat Edge Function baru (pola)
 1. Bikin folder `supabase/functions/nama-fungsi/index.ts`.
 2. Tiru struktur `get-stok-list/index.ts`: import `createClient` + `corsHeaders`,

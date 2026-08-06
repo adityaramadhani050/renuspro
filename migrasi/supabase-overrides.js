@@ -21,6 +21,11 @@
   // memakai Apps Script lama supaya Inventory tidak rusak.
   var ENABLE_EDGE_STOK = false;
 
+  // Nyalakan `true` HANYA SETELAH Edge Function 'invoice-ops' ter-deploy
+  // (lihat PANDUAN-EDGE-FUNCTIONS.md). Selama false, simpan invoice & ubah
+  // status bayar tetap lewat Apps Script (aman).
+  var ENABLE_EDGE_INVOICE = false;
+
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
     return; // belum dikonfigurasi → biarkan login lama (Apps Script) tetap jalan
@@ -3431,6 +3436,27 @@
           return { success: true, message: 'Pengeluaran ' + id + ' berhasil dihapus.' };
         }
       });
+
+      // ── Invoice (finansial/multi-tabel) via EDGE FUNCTION invoice-ops ─────
+      //  Aktif hanya bila ENABLE_EDGE_INVOICE = true (setelah deploy).
+      if (ENABLE_EDGE_INVOICE) {
+        window.gsRoute('simpanInvoice', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'create', payload: a[0] || {} } });
+            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal menyimpan invoice.' }; }
+            return r.data;
+          }
+        });
+        window.gsRoute('updateStatusBayarInvoice', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'setStatus', idInvoice: a[0], statusBaru: a[1], bukti: a[2] || {} } });
+            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal mengubah status bayar.' }; }
+            return r.data;
+          }
+        });
+      }
 
       // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
       //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
