@@ -3456,7 +3456,40 @@
             return r.data;
           }
         });
+        window.gsRoute('editInvoice', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'edit', payload: a[0] || {} } });
+            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal mengubah invoice.' }; }
+            return r.data;
+          }
+        });
       }
+
+      // ── Upload file → Supabase Storage (ganti Google Drive) ───────────────
+      //  Perlu bucket PUBLIK 'uploads' (lihat panduan). Kembalikan {fileId,
+      //  fileUrl, fileName} sama seperti versi Drive.
+      async function _storageUpload(folder, args) {
+        var p = args[0] || {};
+        var base64 = (p.base64Data || '').toString();
+        if (!base64) return { success: false, message: 'File tidak boleh kosong.' };
+        var fileName = (p.fileName || 'file').toString();
+        var mime = (p.mimeType || 'application/octet-stream').toString();
+        var bytes;
+        try { var bin = atob(base64); bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+        catch (e) { return { success: false, message: 'Data file tidak valid.' }; }
+        var safe = fileName.replace(/[^\w.\-]/g, '_');
+        var path = folder + '/' + Date.now() + '-' + safe;
+        var up = await supa.storage.from('uploads').upload(path, bytes, { contentType: mime, upsert: false });
+        if (up.error) return { success: false, message: 'Gagal unggah: ' + up.error.message };
+        var pub = supa.storage.from('uploads').getPublicUrl(path);
+        return { success: true, fileId: path, fileUrl: (pub.data && pub.data.publicUrl) || '', fileName: fileName };
+      }
+      window.gsRoute('uploadFileBuktiBayarInvoice', { mode: 'fn', handler: function (a) { return _storageUpload('bukti-bayar-invoice', a); } });
+      window.gsRoute('uploadFileBuktiBayarPO', { mode: 'fn', handler: function (a) { return _storageUpload('bukti-bayar-po', a); } });
+      window.gsRoute('uploadFileBuktiPenerimaanPO', { mode: 'fn', handler: function (a) { return _storageUpload('penerimaan-po', a); } });
+      window.gsRoute('uploadFileInvoiceSupplierPO', { mode: 'fn', handler: function (a) { return _storageUpload('invoice-supplier-po', a); } });
+      window.gsRoute('uploadFilePOQuotationSupplier', { mode: 'fn', handler: function (a) { return _storageUpload('quotation-supplier', a); } });
 
       // ── Invoice/Kwitansi: hapus & edit sederhana (aman client) ────────────
       //  simpanInvoice / updateStatusBayarInvoice → Edge Function (finansial).
