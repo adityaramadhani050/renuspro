@@ -2818,6 +2818,30 @@
         }
       });
 
+      // ── Simpan Bank Account (Settings.gs → saveBankAccounts) ──────────────
+      //  Frontend kirim SELURUH daftar → sinkronkan tabel bank_account
+      //  (upsert semua yang dikirim + hapus yang tak ada lagi).
+      window.gsRoute('saveBankAccounts', {
+        mode: 'fn',
+        handler: async function (args) {
+          var payload = Array.isArray(args[0]) ? args[0] : [];
+          var rows = payload.map(function (a, i) {
+            return { id: (a.id || '').toString(), label: (a.label || '').toString(), detail: (a.detail || '').toString(), urutan: i + 1 };
+          }).filter(function (r) { return r.id; });
+          if (rows.length) {
+            var up = await supa.from('bank_account').upsert(rows, { onConflict: 'id' });
+            if (up.error) return { success: false, message: up.error.message };
+          }
+          var keep = rows.map(function (r) { return r.id; });
+          var ex = await supa.from('bank_account').select('id');
+          if (!ex.error) {
+            var toDel = (ex.data || []).map(function (r) { return (r.id || '').toString(); }).filter(function (id) { return keep.indexOf(id) === -1; });
+            if (toDel.length) { var del = await supa.from('bank_account').delete().in('id', toDel); if (del.error) return { success: false, message: del.error.message }; }
+          }
+          return { success: true, message: 'Bank Account berhasil disimpan.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
