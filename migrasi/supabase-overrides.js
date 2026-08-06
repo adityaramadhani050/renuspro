@@ -447,13 +447,13 @@
       async function _saldoAkun() {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
-          _safe(supa.from('bank_account').select('*').order('urutan')),
+          _safe(supa.from('akun_pembayaran').select('id,nama_akun,tipe,status').order('id')),
           _safe(_all('pemasukan', 'id_akun,jumlah')),
           _safe(_all('pengeluaran', 'id_akun,total')),
           _safe(supa.from('ayat_silang').select('id_akun_asal,id_akun_tujuan,jumlah'))
         ]);
         var akunMap = {}, akunOrder = [];
-        (res[0].data || []).forEach(function (b) { var aid = (b.id || '').toString(); if (!aid || akunMap[aid]) return; akunMap[aid] = { id: aid, nama: (b.label || '').toString(), tipe: 'Bank', status: 'Aktif', masuk: 0, keluar: 0, saldo: 0 }; akunOrder.push(aid); });
+        (res[0].data || []).forEach(function (b) { var aid = (b.id || '').toString(); if (!aid || akunMap[aid]) return; akunMap[aid] = { id: aid, nama: (b.nama_akun || '').toString(), tipe: (b.tipe || 'Bank').toString(), status: (b.status || 'Aktif').toString(), masuk: 0, keluar: 0, saldo: 0 }; akunOrder.push(aid); });
         (res[1].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].masuk += parseFloat(r.jumlah) || 0; });
         (res[2].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].keluar += parseFloat(r.total) || 0; });
         (res[3].data || []).forEach(function (r) { var jml = parseFloat(r.jumlah) || 0; var as = (r.id_akun_asal || '').toString(), tj = (r.id_akun_tujuan || '').toString(); if (akunMap[as]) akunMap[as].keluar += jml; if (akunMap[tj]) akunMap[tj].masuk += jml; });
@@ -650,7 +650,7 @@
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('akun_pembayaran')
-            .select('id,nama_akun,tipe,keterangan,status,dibuat_oleh,dibuat_pada').order('id');
+            .select('id,nama_akun,tipe,keterangan,status,dibuat_oleh,dibuat_pada,detail').order('id');
           if (q.error) return _fail(q.error);
           return {
             success: true,
@@ -659,7 +659,7 @@
                 id: r.id || '', namaAkun: r.nama_akun || '', tipe: r.tipe || '',
                 keterangan: r.keterangan || '', status: r.status || '',
                 dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada || '',
-                locked: (r.id === 'AP001')
+                detail: r.detail || '', locked: (r.id === 'AP001')
               };
             })
           };
@@ -2586,13 +2586,16 @@
       //  Ayat silang, bank account, kategori, saldo akun, bundle, bootstrap.
       // ═══════════════════════════════════════════════════════════════════════
       window.gsRoute('getAyatSilangList', { mode: 'fn', handler: async function () { return { success: true, list: await _ayatArr() }; } });
+      // getBankAccounts kini bersumber dari akun_pembayaran (SATU master).
+      // label = nama_akun, detail = detail rekening. Dipakai dropdown Invoice.
+      async function _bankFromAkun() {
+        var q = await supa.from('akun_pembayaran').select('id,nama_akun,detail,status').order('id');
+        return (q.data || []).filter(function (r) { return (r.id || '').toString() !== 'AP001'; }) // Stok bukan bank
+          .map(function (r) { return { id: (r.id || '').toString(), label: r.nama_akun || '', detail: r.detail || '' }; });
+      }
       window.gsRoute('getBankAccounts', {
         mode: 'fn',
-        handler: async function () {
-          var q = await supa.from('bank_account').select('*').order('urutan');
-          if (q.error) return { success: false, message: q.error.message };
-          return { success: true, accounts: (q.data || []).map(function (r) { return { id: (r.id || '').toString(), label: r.label || '', detail: r.detail || '' }; }) };
-        }
+        handler: async function () { return { success: true, accounts: await _bankFromAkun() }; }
       });
       window.gsRoute('getKategoriPengeluaran', {
         mode: 'fn',
@@ -2616,7 +2619,7 @@
           var out = { success: true };
           try { out.paymentRequests = await _paymentReqArr(); } catch (e) { out.paymentRequests = []; }
           try { out.workOrders = await _woListData(); } catch (e) { out.workOrders = []; }
-          try { var ba = await supa.from('bank_account').select('*').order('urutan'); out.bankAccounts = (ba.data || []).map(function (r) { return { id: (r.id || '').toString(), label: r.label || '', detail: r.detail || '' }; }); } catch (e) { out.bankAccounts = []; }
+          try { out.bankAccounts = await _bankFromAkun(); } catch (e) { out.bankAccounts = []; }
           try { var kt = await supa.from('kategori_pengeluaran').select('nama').order('urutan'); out.kategori = (kt.data || []).map(function (r) { return r.nama; }); } catch (e) { out.kategori = []; }
           try { out.saldo = await _saldoAkun(); } catch (e) { out.saldo = { success: false }; }
           try { out.pemasukan = await _pemArr(); } catch (e) { out.pemasukan = []; }
@@ -2733,7 +2736,7 @@
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^AP(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
           var id = 'AP' + ('000' + (maxNum + 1)).slice(-3);
-          var ins = await supa.from('akun_pembayaran').insert({ id: id, nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString() });
+          var ins = await supa.from('akun_pembayaran').insert({ id: id, nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString(), detail: p.detail || '' });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Akun ' + id + ' berhasil ditambahkan.', newId: id };
         }
@@ -2743,7 +2746,7 @@
         handler: async function (args) {
           var p = args[0] || {}; var id = (p.id || '').toString();
           if (id === 'AP001') return { success: false, message: 'Akun Stok default tidak bisa diubah.' };
-          var up = await supa.from('akun_pembayaran').update({ nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: p.status || 'Aktif' }).eq('id', id).select();
+          var up = await supa.from('akun_pembayaran').update({ nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: p.status || 'Aktif', detail: p.detail || '' }).eq('id', id).select();
           if (up.error) return { success: false, message: up.error.message };
           if (!up.data || !up.data.length) return { success: false, message: 'ID akun tidak ditemukan.' };
           return { success: true, message: 'Akun berhasil diperbarui.' };
@@ -2821,22 +2824,34 @@
       // ── Simpan Bank Account (Settings.gs → saveBankAccounts) ──────────────
       //  Frontend kirim SELURUH daftar → sinkronkan tabel bank_account
       //  (upsert semua yang dikirim + hapus yang tak ada lagi).
+      //  Simpan ke SATU master akun_pembayaran (Bank Account = akun kas).
+      //  id baru → AP###. AP001 (Stok) & akun yang dipakai transaksi TIDAK dihapus.
       window.gsRoute('saveBankAccounts', {
         mode: 'fn',
         handler: async function (args) {
           var payload = Array.isArray(args[0]) ? args[0] : [];
-          var rows = payload.map(function (a, i) {
-            return { id: (a.id || '').toString(), label: (a.label || '').toString(), detail: (a.detail || '').toString(), urutan: i + 1 };
-          }).filter(function (r) { return r.id; });
-          if (rows.length) {
-            var up = await supa.from('bank_account').upsert(rows, { onConflict: 'id' });
-            if (up.error) return { success: false, message: up.error.message };
+          var cur = await _all('akun_pembayaran', 'id');
+          if (cur.error) return { success: false, message: cur.error.message };
+          var curIds = {}, maxNum = 0;
+          (cur.data || []).forEach(function (r) { var id = (r.id || '').toString(); curIds[id] = true; var m = id.match(/^AP(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var keep = {};
+          for (var i = 0; i < payload.length; i++) {
+            var a = payload[i] || {};
+            var id = (a.id || '').toString();
+            if (!id || !/^AP\d+/i.test(id)) { maxNum++; id = 'AP' + ('000' + maxNum).slice(-3); } // id baru
+            keep[id] = true;
+            var label = (a.label || '').toString(), detail = (a.detail || '').toString();
+            if (curIds[id]) { var u = await supa.from('akun_pembayaran').update({ nama_akun: label, detail: detail }).eq('id', id); if (u.error) return { success: false, message: u.error.message }; }
+            else { var ins = await supa.from('akun_pembayaran').insert({ id: id, nama_akun: label, detail: detail, tipe: 'Bank', status: 'Aktif', dibuat_pada: new Date().toISOString() }); if (ins.error) return { success: false, message: ins.error.message }; }
           }
-          var keep = rows.map(function (r) { return r.id; });
-          var ex = await supa.from('bank_account').select('id');
-          if (!ex.error) {
-            var toDel = (ex.data || []).map(function (r) { return (r.id || '').toString(); }).filter(function (id) { return keep.indexOf(id) === -1; });
-            if (toDel.length) { var del = await supa.from('bank_account').delete().in('id', toDel); if (del.error) return { success: false, message: del.error.message }; }
+          // Hapus akun yang dibuang — lindungi AP001 & yang dipakai transaksi.
+          var toCheck = (cur.data || []).map(function (r) { return (r.id || '').toString(); }).filter(function (id) { return id && id !== 'AP001' && !keep[id]; });
+          for (var j = 0; j < toCheck.length; j++) {
+            var idc = toCheck[j], used = false;
+            var u1 = await supa.from('pemasukan').select('id_pemasukan').eq('id_akun', idc).limit(1); if (!u1.error && u1.data && u1.data.length) used = true;
+            if (!used) { var u2 = await supa.from('pengeluaran').select('id_pengeluaran').eq('id_akun', idc).limit(1); if (!u2.error && u2.data && u2.data.length) used = true; }
+            if (!used) { var u3 = await supa.from('pembayaran_po').select('id_bayar').eq('id_akun', idc).limit(1); if (!u3.error && u3.data && u3.data.length) used = true; }
+            if (!used) await supa.from('akun_pembayaran').delete().eq('id', idc);
           }
           return { success: true, message: 'Bank Account berhasil disimpan.' };
         }

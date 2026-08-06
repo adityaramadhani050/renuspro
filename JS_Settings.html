@@ -552,6 +552,7 @@ function bukaModalTambahAkunPembayaran() {
   document.getElementById('akun-nama').value = '';
   document.getElementById('akun-tipe').value = 'Bank';
   document.getElementById('akun-keterangan').value = '';
+  if (document.getElementById('akun-detail')) document.getElementById('akun-detail').value = '';
   document.getElementById('akun-status-wrap').classList.add('hidden');
   document.getElementById('modal-akun-pembayaran').classList.remove('hidden');
   document.getElementById('akun-nama').focus();
@@ -563,6 +564,7 @@ function bukaModalEditAkunPembayaran(akun) {
   document.getElementById('akun-nama').value = akun.namaAkun || '';
   document.getElementById('akun-tipe').value = akun.tipe || 'Bank';
   document.getElementById('akun-keterangan').value = akun.keterangan || '';
+  if (document.getElementById('akun-detail')) document.getElementById('akun-detail').value = akun.detail || '';
   document.getElementById('akun-status').value = akun.status || 'Aktif';
   document.getElementById('akun-status-wrap').classList.remove('hidden');
   document.getElementById('modal-akun-pembayaran').classList.remove('hidden');
@@ -573,6 +575,7 @@ function simpanAkunPembayaranModal() {
   var namaAkun   = document.getElementById('akun-nama').value.trim();
   var tipe       = document.getElementById('akun-tipe').value;
   var keterangan = document.getElementById('akun-keterangan').value.trim();
+  var detail     = (document.getElementById('akun-detail') || {}).value ? document.getElementById('akun-detail').value.trim() : '';
   var status     = id ? document.getElementById('akun-status').value : 'Aktif';
 
   if (!namaAkun) { showToast('Nama akun wajib diisi.', 'error'); return; }
@@ -583,8 +586,8 @@ function simpanAkunPembayaranModal() {
 
   var fn      = id ? 'editAkunPembayaran' : 'simpanAkunPembayaran';
   var payload = id
-    ? { id: id, namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, status: status }
-    : { namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, dibuatOleh: _currentUser ? _currentUser.nama : '' };
+    ? { id: id, namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, detail: detail, status: status }
+    : { namaAkun: namaAkun, tipe: tipe, keterangan: keterangan, detail: detail, dibuatOleh: _currentUser ? _currentUser.nama : '' };
 
   google.script.run
     .withSuccessHandler(function(res) {
