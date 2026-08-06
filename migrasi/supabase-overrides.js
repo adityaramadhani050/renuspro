@@ -2317,6 +2317,183 @@
         }
       });
 
+      // ── ID Site Survey berikutnya (SiteSurvey.gs → getNextSiteSurveyId) ───
+      window.gsRoute('getNextSiteSurveyId', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('site_survey').select('id');
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0;
+          (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^SVY(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          return { success: true, id: 'SVY' + ('000' + (maxNum + 1)).slice(-3) };
+        }
+      });
+
+      // ── Konteks WO untuk engineering (BOM.gs → getWOContextByWO) ──────────
+      window.gsRoute('getWOContextByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var woList = await _woListData();
+          var wo = woList.filter(function (w) { return w.noWO === noWO; })[0];
+          if (!wo) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var res = await Promise.all([
+            _safe(supa.from('produk').select('id,tipe')),
+            _safe(supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('site_survey').select('*').eq('no_wo', noWO))
+          ]);
+          var tipeMap = {}; (res[0].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+          var kelompokList = []; try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
+          var budMaterial = 0, budJasa = 0, kelompok = [];
+          kelompokList.forEach(function (k) {
+            var disp = { nama: (k.namaKelompok || '').toString(), items: [] };
+            (k.subItems || []).forEach(function (s) {
+              var pid = (s.produkId || '').toString().trim();
+              var tipe = pid ? (tipeMap[pid] || '') : '';
+              var isJasa = (tipe === 'jasa') || ((!pid || !tipe) && _woKeywordHitJasa((s.deskripsi || '').toString().toLowerCase()));
+              var qty = Number(s.qty) || 0, hpp = Number(s.hpp) || 0;
+              if (isJasa) budJasa += qty * hpp; else budMaterial += qty * hpp;
+              disp.items.push({ deskripsi: (s.deskripsi || '').toString(), qty: qty, unit: (s.unit || '').toString(), hpp: hpp, totalHpp: qty * hpp });
+            });
+            kelompok.push(disp);
+          });
+          var ho = null;
+          var hr = res[1].data;
+          if (hr) ho = { status: hr.status || '', mom: hr.mom || '', tglJadwal: hr.tgl_jadwal ? hr.tgl_jadwal.toString().slice(0, 10) : '', waktu: hr.waktu ? hr.waktu.toString().slice(0, 5) : '', mode: hr.mode || '', selesaiOleh: hr.selesai_oleh || '', selesaiPada: _fmtTs(hr.selesai_pada) };
+          var surveys = (res[2].data || []).map(function (r) {
+            return { id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey), dibuatOleh: r.dibuat_oleh || '', namaSite: r.nama_site || '', namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || '' };
+          }).sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+          return {
+            success: true, noWO: noWO, id: wo.id || '', rev: wo.rev != null ? wo.rev : '', tanggal: wo.tanggal || '',
+            dibuatOleh: wo.dibuatOleh || '', namaProject: wo.namaProject || '', namaKlien: wo.namaKlien || '',
+            jenisWO: wo.jenisWO || 'Material', status: wo.status || '', catatanCustomer: wo.catatanCustomer || '',
+            kelompok: kelompok, budget: { material: budMaterial, jasa: budJasa, total: budMaterial + budJasa }, ho: ho, surveys: surveys
+          };
+        }
+      });
+
+      // ── Helper bersama: peta pricelist id → {idSupplier, hargaBeli} ────────
+      async function _priceMap() {
+        var q = await supa.from('pricelist').select('id,id_supplier,harga_beli');
+        var m = {}; (q.data || []).forEach(function (p) { m[(p.id || '').toString()] = { idSupplier: (p.id_supplier || '').toString(), hargaBeli: Number(p.harga_beli) || 0 }; });
+        return m;
+      }
+
+      // ── BOM perlu dibeli (BOM.gs → getBOMNeedPurchase) ────────────────────
+      window.gsRoute('getBOMNeedPurchase', {
+        mode: 'fn',
+        handler: async function () {
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_item').select('id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty,stok_id,qty_reserved,qty_beli,qty_menunggu_bl')),
+            _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien')),
+            _priceMap()
+          ]);
+          var projMap = {}; (res[1].data || []).forEach(function (r) { if (r.no_wo) projMap[r.no_wo] = { namaProject: r.nama_project || '', namaKlien: r.nama_klien || '' }; });
+          var priceMap = res[2];
+          var list = [];
+          (res[0].data || []).forEach(function (r) {
+            var qtyBeli = Number(r.qty_beli) || 0, qtyMenunggu = Number(r.qty_menunggu_bl) || 0;
+            if (qtyBeli <= 0 && qtyMenunggu <= 0) return;
+            var noWO = (r.no_wo || '').toString().trim(); var pj = projMap[noWO] || {};
+            var plId = (r.pricelist_id || '').toString(); var pm = priceMap[plId] || {};
+            list.push({
+              id: (r.id || '').toString(), noWO: noWO, namaProject: pj.namaProject || '', namaKlien: pj.namaKlien || '',
+              kategori: (r.kategori || 'Lainnya').toString(), namaMaterial: r.nama_material || '', merek: r.merek || '',
+              supplier: (r.supplier || '').toString() || '(tanpa supplier)', satuan: r.satuan || '', qty: Number(r.qty) || 0,
+              qtyReserved: Number(r.qty_reserved) || 0, idStok: (r.stok_id || '').toString(), qtyBeli: qtyBeli, qtyMenunggu: qtyMenunggu,
+              pricelistId: plId, idSupplier: pm.idSupplier || '', hargaBeli: pm.hargaBeli || 0
+            });
+          });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── BOM menunggu beli langsung (BOM.gs → getBOMMenungguBL) ────────────
+      window.gsRoute('getBOMMenungguBL', {
+        mode: 'fn',
+        handler: async function (args) {
+          var fSup = (args[0] && args[0].idSupplier) ? args[0].idSupplier.toString().trim() : '';
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_item').select('id,no_wo,kategori,pricelist_id,nama_material,merek,supplier,satuan,qty_menunggu_bl')),
+            _safe(supa.from('bom_project').select('no_wo,nama_project')),
+            _priceMap()
+          ]);
+          var projMap = {}; (res[1].data || []).forEach(function (r) { if (r.no_wo) projMap[r.no_wo] = r.nama_project || ''; });
+          var priceMap = res[2];
+          var list = [];
+          (res[0].data || []).forEach(function (r) {
+            var qMen = Number(r.qty_menunggu_bl) || 0; if (qMen <= 0) return;
+            var plId = (r.pricelist_id || '').toString(); var pm = priceMap[plId] || {};
+            if (fSup && (pm.idSupplier || '') !== fSup) return;
+            var noWO = (r.no_wo || '').toString().trim();
+            list.push({
+              id: (r.id || '').toString(), noWO: noWO, namaProject: projMap[noWO] || '', kategori: (r.kategori || 'Lainnya').toString(),
+              namaMaterial: r.nama_material || '', merek: r.merek || '', supplier: r.supplier || '', satuan: r.satuan || '',
+              qtyMenunggu: qMen, pricelistId: plId, idSupplier: pm.idSupplier || '', hargaBeli: pm.hargaBeli || 0
+            });
+          });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Riwayat revisi penawaran (Penawaran.gs → getRiwayatRevisi) ────────
+      window.gsRoute('getRiwayatRevisi', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noPen = (args[0] || '').toString().trim();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('penawaran').select('*').eq('no_penawaran', noPen)),
+            _safe(supa.from('klien').select('id,nama_klien'))
+          ]);
+          var klienMap = {}; (res[1].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+          var list = (res[0].data || []).map(function (r) {
+            return {
+              id: (r.no_penawaran || '').toString(), rev: (parseInt(r.rev) || 0).toString(),
+              tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_hingga), namaProject: r.nama_project || '',
+              klienId: (r.klien_id || '').toString(), namaKlien: klienMap[r.klien_id] || r.klien_id || '',
+              dibuatOleh: r.dibuat_oleh || '', subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0,
+              pajak: parseFloat(r.pajak) || 0, grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.total_hpp) || 0,
+              profit: parseFloat(r.estimasi_keuntungan) || 0, marginPersen: parseFloat(r.margin_persen) || 0,
+              termConditions: _jsonStr(r.term_conditions, '{}'), items: _jsonStr(r.items, '[]'),
+              status: r.status || 'On-Progress', noWO: r.no_wo || '', channelMarketing: r.channel_marketing || ''
+            };
+          });
+          list.sort(function (a, b) { return parseInt(b.rev) - parseInt(a.rev); });
+          return list;
+        }
+      });
+
+      // ── Item PO untuk penerimaan (PurchaseOrder.gs → getPOItemsUntukPenerimaan) ─
+      window.gsRoute('getPOItemsUntukPenerimaan', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noPO = (args[0] || '').toString().trim();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('purchase_order').select('status_po').eq('no_po', noPO).maybeSingle()),
+            _safe(supa.from('po_item').select('id_item,nama_item,satuan,harga_beli_satuan,qty,qty_diterima,id_produk').eq('no_po', noPO))
+          ]);
+          if (!res[0].data) return { success: false, message: 'PO tidak ditemukan.' };
+          var statusPO = (res[0].data.status_po || '').toString();
+          var ok = ['Aktif', 'Diterima Sebagian', 'Menunggu Gudang', 'Menunggu Penerimaan Gudang'];
+          if (ok.indexOf(statusPO) === -1) return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa diterima.' };
+          var items = (res[1].data || []).map(function (r) {
+            var qty = Number(r.qty) || 0, qtyDiterima = Number(r.qty_diterima) || 0;
+            return {
+              idItem: (r.id_item || '').toString(), namaItem: (r.nama_item || '').toString(), satuan: (r.satuan || '').toString(),
+              hargaBeli: Number(r.harga_beli_satuan) || 0, qtyPesan: qty, qtyDiterima: qtyDiterima,
+              qtySisa: Math.max(0, qty - qtyDiterima), idProduk: (r.id_produk || '').toString()
+            };
+          });
+          return { success: true, items: items, statusPO: statusPO };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
