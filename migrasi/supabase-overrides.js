@@ -2109,6 +2109,55 @@
         }
       });
 
+      // ── Laporan Profitabilitas (Pengeluaran.gs → getLaporanProfitabilitas) ─
+      window.gsRoute('getLaporanProfitabilitas', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengeluaran').select('no_wo,nama_akun,total')),
+            _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,dibuat_oleh,klien_id,subtotal,diskon,total_hpp,status,no_wo')),
+            _safe(supa.from('klien').select('id,nama_klien'))
+          ]);
+          var expByWO = {}, expByAkun = {};
+          (res[0].data || []).forEach(function (r) {
+            var noWO = (r.no_wo || '').toString().trim(); var total = parseFloat(r.total) || 0; var akun = (r.nama_akun || '').toString();
+            expByWO[noWO] = (expByWO[noWO] || 0) + total; expByAkun[akun] = (expByAkun[akun] || 0) + total;
+          });
+          var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+          var latestRev = {};
+          (res[1].data || []).forEach(function (r) { var noPen = (r.no_penawaran || '').toString(); if (!noPen) return; var rev = parseInt(r.rev) || 0; if (!latestRev[noPen] || rev > latestRev[noPen].rev) latestRev[noPen] = { rev: rev, row: r }; });
+          var rows = [];
+          Object.keys(latestRev).forEach(function (noPen) {
+            var r = latestRev[noPen].row;
+            var status = (r.status || '').toString();
+            var noWO = (r.no_wo || '').toString().trim();
+            if (!noWO || (status !== 'Deal' && status !== 'Closed')) return;
+            if (params.status && params.status !== status) return;
+            var tanggal = _fmtTgl(r.tanggal);
+            if (!_inDateRange(tanggal, params.tanggalDari, params.tanggalSampai)) return;
+            var nilaiKontrak = Math.max(0, (parseFloat(r.subtotal) || 0) - (parseFloat(r.diskon) || 0));
+            var estimasiHPP = parseFloat(r.total_hpp) || 0;
+            var realisasiHPP = expByWO[noWO] || 0;
+            var margEst = nilaiKontrak > 0 ? (nilaiKontrak - estimasiHPP) / nilaiKontrak * 100 : null;
+            var margReal = nilaiKontrak > 0 ? (nilaiKontrak - realisasiHPP) / nilaiKontrak * 100 : null;
+            rows.push({
+              noWO: noWO, namaProject: r.nama_project || '', namaKlien: klienMap[r.klien_id] || r.klien_id || '',
+              namaSales: r.dibuat_oleh || '', tanggal: tanggal, status: status, nilaiKontrak: nilaiKontrak,
+              estimasiHPP: estimasiHPP, realisasiHPP: realisasiHPP, selisih: estimasiHPP - realisasiHPP,
+              marginEstimasi: margEst, marginRealisasi: margReal,
+              isOverBudget: margReal !== null && margEst !== null && margReal < margEst
+            });
+          });
+          rows.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
+          var totalKontrak = 0, totalRealisasi = 0, sumMargReal = 0, countMarg = 0;
+          rows.forEach(function (r2) { totalKontrak += r2.nilaiKontrak; totalRealisasi += r2.realisasiHPP; if (r2.marginRealisasi !== null) { sumMargReal += r2.marginRealisasi; countMarg++; } });
+          var rekapAkun = Object.keys(expByAkun).map(function (nama) { return { namaAkun: nama, total: expByAkun[nama] }; }).sort(function (a, b) { return b.total - a.total; });
+          return { success: true, rows: rows, summary: { totalKontrak: totalKontrak, totalRealisasiHPP: totalRealisasi, rataMarginRealisasi: countMarg > 0 ? sumMargReal / countMarg : null }, rekapAkun: rekapAkun };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
