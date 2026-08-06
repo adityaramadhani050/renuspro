@@ -1383,6 +1383,60 @@
         }
       });
 
+      // ── BOM per WO (BOM.gs → getBOMByWO) — gabung item+status+assign+kirim ─
+      window.gsRoute('getBOMByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_item').select('*').eq('no_wo', noWO).order('id')),
+            _safe(supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1)),
+            _safe(supa.from('bom_assignment').select('id_user,nama_user').eq('no_wo', noWO)),
+            _safe(supa.from('bom_project').select('difinalkan_oleh,difinalkan_pada').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('pengiriman_request').select('status,items').eq('no_wo', noWO).maybeSingle())
+          ]);
+          var iq = res[0], wq = res[1], aq = res[2], pq = res[3], rq = res[4];
+          var sum = { total: 0, approved: 0, pending: 0, rejected: 0 };
+          var items = (iq.data || []).map(function (r) {
+            var st = (r.status || '').toString().trim() || 'Pending';
+            sum.total++;
+            if (st === 'Approved') sum.approved++; else if (st === 'Rejected') sum.rejected++; else sum.pending++;
+            return {
+              id: (r.id || '').toString(), kategori: (r.kategori || 'Lainnya').toString().trim() || 'Lainnya',
+              pricelistId: r.pricelist_id || '', namaMaterial: r.nama_material || '', merek: r.merek || '',
+              supplier: r.supplier || '', satuan: r.satuan || '', qty: Number(r.qty) || 0, catatan: r.catatan || '',
+              dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', status: st,
+              catatanReview: r.catatan_review || '', reviewedBy: r.direview_oleh || '',
+              reviewedAt: r.direview_pada ? r.direview_pada.toString() : '', procStatus: r.proc_status || '',
+              idStok: r.stok_id || '', qtyReserved: Number(r.qty_reserved) || 0, mutasiReserved: r.mutasi_reserved || '',
+              qtyBeli: Number(r.qty_beli) || 0, diprosesOleh: r.diproses_oleh || '',
+              diprosesPada: r.diproses_pada ? r.diproses_pada.toString() : '',
+              qtyMenungguBL: Number(r.qty_menunggu_bl) || 0, qtyBeliLangsung: Number(r.qty_beli_langsung) || 0,
+              refBeliLangsung: r.ref_beli_langsung || '', qtyDikirim: Number(r.qty_dikirim) || 0,
+              qtyDiterima: Number(r.qty_diterima) || 0, kirimRef: r.kirim_ref || ''
+            };
+          });
+          var woStatus = (wq.data && wq.data[0]) ? (wq.data[0].status || '') : '';
+          var assigned = (aq.data || []).map(function (a) { return { id: (a.id_user || '').toString(), nama: (a.nama_user || '').toString() }; });
+          var proj = pq.data || {};
+          var reqRow = rq.data || null;
+          var kirimRequest = reqRow ? (reqRow.status || '') : '';
+          var kirimReqMap = {};
+          if (reqRow && reqRow.status === 'Diminta') {
+            var arr = _arr(reqRow.items);
+            arr.forEach(function (x) { kirimReqMap[(x.bomItemId || '').toString()] = Number(x.target) || 0; });
+          }
+          return {
+            success: true, status: (sum.total > 0 && sum.approved === sum.total) ? 'Final' : 'Draft',
+            summary: sum, woStatus: woStatus, assigned: assigned,
+            finalizedBy: proj.difinalkan_oleh || '', finalizedAt: proj.difinalkan_pada ? _fmtTs(proj.difinalkan_pada) : '',
+            kirimRequest: kirimRequest, kirimReqMap: kirimReqMap, items: items
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1413,7 +1467,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+DED+QC) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+BOM+QC+DED) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
