@@ -2259,6 +2259,64 @@
         }
       });
 
+      // ── Detail reserve stok per WO (Inventory.gs → getReserveDetailByStok) ─
+      window.gsRoute('getReserveDetailByStok', {
+        mode: 'fn',
+        handler: async function (args) {
+          var idStok = (args[0] || '').toString().trim();
+          if (!idStok) return { success: false, list: [], total: 0, message: 'ID Stok wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_item').select('no_wo,nama_material,satuan,qty_reserved,qty_dikirim').eq('stok_id', idStok)),
+            _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien'))
+          ]);
+          var projMap = {}; (res[1].data || []).forEach(function (r) { if (r.no_wo) projMap[r.no_wo] = r; });
+          var byWO = {};
+          (res[0].data || []).forEach(function (r) {
+            var held = (Number(r.qty_reserved) || 0) - (Number(r.qty_dikirim) || 0);
+            if (held <= 0) return;
+            var noWO = (r.no_wo || '').toString().trim();
+            if (!byWO[noWO]) byWO[noWO] = { qty: 0, items: [] };
+            byWO[noWO].qty += held;
+            byWO[noWO].items.push({ namaMaterial: (r.nama_material || '').toString(), satuan: (r.satuan || '').toString(), qty: held });
+          });
+          var list = [], total = 0;
+          Object.keys(byWO).forEach(function (w) {
+            var pj = projMap[w] || {};
+            list.push({ noWO: w, namaProject: pj.nama_project || '', namaKlien: pj.nama_klien || '', qty: byWO[w].qty, items: byWO[w].items });
+            total += byWO[w].qty;
+          });
+          list.sort(function (a, b) { return b.qty - a.qty; });
+          return { success: true, list: list, total: total };
+        }
+      });
+
+      // ── Rincian lot produk (Inventory.gs → getRincianLotProduk) — FIFO ────
+      window.gsRoute('getRincianLotProduk', {
+        mode: 'fn',
+        handler: async function (args) {
+          var idProduk = (args[0] || '').toString().trim();
+          var q = await supa.from('mutasi_stok').select('qty_masuk,qty_keluar,harga_satuan').eq('id_produk', idProduk).order('id_mutasi');
+          if (q.error) return { success: false, message: q.error.message };
+          // Replay FIFO lots (port _replayLotsFromRows).
+          var lots = [];
+          (q.data || []).forEach(function (r) {
+            var masuk = Number(r.qty_masuk) || 0, keluar = Number(r.qty_keluar) || 0, harga = Number(r.harga_satuan) || 0;
+            if (masuk > 0) { lots.push({ qty: masuk, harga: harga }); }
+            else if (keluar > 0) {
+              var sisa = keluar;
+              while (sisa > 0 && lots.length > 0) {
+                var lot = lots[0];
+                if (lot.qty <= sisa) { sisa -= lot.qty; lots.shift(); } else { lot.qty -= sisa; sisa = 0; }
+              }
+            }
+          });
+          var qtyTotal = 0, nilaiTotal = 0;
+          var rincian = lots.map(function (lot) { qtyTotal += lot.qty; nilaiTotal += lot.qty * lot.harga; return { qty: lot.qty, harga: lot.harga, nilai: lot.qty * lot.harga }; });
+          return { success: true, lots: rincian, qtyTotal: qtyTotal, nilaiTotal: nilaiTotal };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
