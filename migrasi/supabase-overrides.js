@@ -3060,6 +3060,150 @@
         }
       });
 
+      // ── Template Paket: simpan / hapus ────────────────────────────────────
+      window.gsRoute('simpanTemplatePaket', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(), nama = (args[1] || '').toString(), itemsJson = args[2], editId = (args[3] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID template wajib.' };
+          var items; try { items = typeof itemsJson === 'string' ? JSON.parse(itemsJson || '[]') : (itemsJson || []); } catch (e) { items = []; }
+          if (editId) {
+            var up = await supa.from('template_paket').update({ id: id, nama_paket: nama, daftar_item: items }).eq('id', editId).select();
+            if (up.error) return { success: false, message: up.error.message };
+            if (up.data && up.data.length) return { success: true, message: 'Template ' + id + ' berhasil diperbarui!' };
+            // editId tak ditemukan → lanjut tambah
+          }
+          var dup = await supa.from('template_paket').select('id').eq('id', id).maybeSingle();
+          if (dup.data) return { success: false, message: 'ID Template ' + id + ' sudah digunakan.' };
+          var ins = await supa.from('template_paket').insert({ id: id, nama_paket: nama, daftar_item: items });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Template ' + id + ' berhasil ditambahkan!' };
+        }
+      });
+      window.gsRoute('hapusTemplatePaket', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          var del = await supa.from('template_paket').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Template tidak ditemukan.' };
+          return { success: true, message: 'Template ' + id + ' berhasil dihapus.' };
+        }
+      });
+
+      // ── Schedule: tugas (tambah/edit/hapus/batch) + site engineer ─────────
+      function _schTaskRow(p, id) {
+        return { id: id, no_wo: (p.noWO || '').toString().trim(), nama_tugas: (p.namaTugas || '').toString().trim(), fase: (p.fase || '').toString(), tanggal_mulai: _schIso(p.mulai), tanggal_selesai: _schIso(p.selesai), progress: Math.max(0, Math.min(100, Number(p.progress) || 0)), warna: (p.warna || '').toString(), urutan: Number(p.urutan) || 0, catatan: (p.catatan || '').toString(), dibuat_oleh: (p.oleh || '').toString(), dibuat_pada: new Date().toISOString() };
+      }
+      window.gsRoute('saveScheduleTask', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!(p.noWO || '').toString().trim()) return { success: false, message: 'No WO wajib.' };
+          if (!(p.namaTugas || '').toString().trim()) return { success: false, message: 'Nama tugas wajib.' };
+          var mulai = _schIso(p.mulai), selesai = _schIso(p.selesai);
+          if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib.' };
+          if (selesai < mulai) return { success: false, message: 'Tanggal selesai tidak boleh sebelum mulai.' };
+          var id = 'TSK-' + new Date().getTime();
+          var ins = await supa.from('schedule_task').insert(_schTaskRow(p, id));
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Tugas ditambahkan.', id: id };
+        }
+      });
+      window.gsRoute('updateScheduleTask', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString().trim();
+          if (!id) return { success: false, message: 'ID tugas wajib.' };
+          var mulai = _schIso(p.mulai), selesai = _schIso(p.selesai);
+          if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib.' };
+          if (selesai < mulai) return { success: false, message: 'Tanggal selesai tidak boleh sebelum mulai.' };
+          var up = await supa.from('schedule_task').update({ nama_tugas: (p.namaTugas || '').toString(), fase: (p.fase || '').toString(), tanggal_mulai: mulai, tanggal_selesai: selesai, progress: Math.max(0, Math.min(100, Number(p.progress) || 0)), warna: (p.warna || '').toString(), urutan: Number(p.urutan) || 0, catatan: (p.catatan || '').toString() }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Tugas tidak ditemukan.' };
+          return { success: true, message: 'Tugas diperbarui.' };
+        }
+      });
+      window.gsRoute('saveScheduleTasksBatch', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          if (!(p.noWO || '').toString().trim()) return { success: false, message: 'No WO wajib.' };
+          var arr = p.tasks || []; if (!arr.length) return { success: false, message: 'Tidak ada tugas untuk ditambahkan.' };
+          var t0 = new Date().getTime(), rows = [];
+          for (var i = 0; i < arr.length; i++) {
+            var it = arr[i] || {}; var nama = (it.namaTugas || '').toString().trim(); if (!nama) continue;
+            var mulai = _schIso(it.mulai), selesai = _schIso(it.selesai);
+            if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib untuk "' + nama + '".' };
+            if (selesai < mulai) return { success: false, message: 'Tanggal selesai sebelum mulai untuk "' + nama + '".' };
+            rows.push(_schTaskRow({ noWO: p.noWO, namaTugas: nama, fase: it.fase, mulai: it.mulai, selesai: it.selesai, progress: it.progress, warna: it.warna, urutan: it.urutan, catatan: it.catatan, oleh: p.oleh }, 'TSK-' + t0 + '-' + i));
+          }
+          if (!rows.length) return { success: false, message: 'Tidak ada tugas valid (nama kosong).' };
+          var ins = await supa.from('schedule_task').insert(rows);
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: rows.length + ' tugas ditambahkan.', count: rows.length };
+        }
+      });
+      window.gsRoute('hapusScheduleTask', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID tugas wajib.' };
+          var del = await supa.from('schedule_task').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Tugas tidak ditemukan.' };
+          return { success: true, message: 'Tugas dihapus.' };
+        }
+      });
+      window.gsRoute('updateScheduleSiteEngineer', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim(), se = (args[1] || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var up = await supa.from('schedule_project').update({ site_engineer: se }).eq('no_wo', noWO).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'WO tidak ditemukan.' };
+          return { success: true, message: 'Site Engineer diperbarui.' };
+        }
+      });
+
+      // ── Site Survey: update / hapus ───────────────────────────────────────
+      window.gsRoute('updateSiteSurvey', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {}; var id = (p.id || '').toString().trim(); var namaSite = (p.namaSite || '').toString().trim();
+          if (!id) return { success: false, message: 'ID survey wajib.' };
+          if (!namaSite) return { success: false, message: 'Nama Site wajib diisi.' };
+          var cur = await supa.from('site_survey').select('no_wo,data').eq('id', id).maybeSingle();
+          if (cur.error) return { success: false, message: cur.error.message };
+          if (!cur.data) return { success: false, message: 'Survey tidak ditemukan.' };
+          var ex = _jsonObj(cur.data.data);
+          var dataObj = {
+            dibuatOlehId: ex.dibuatOlehId || '', noWO: ex.noWO || cur.data.no_wo || '',
+            arahBangunan: p.arahBangunan || '', tinggiBangunan: Number(p.tinggiBangunan) || 0,
+            fotoBangunan: p.fotoBangunan || null, kelistrikan: p.kelistrikan || {},
+            bos: p.bos || {}, atap: p.atap || {}, jalurKabel: p.jalurKabel || {}
+          };
+          var upd = { nama_site: namaSite, nama_pic: (p.namaPIC || '').toString(), no_telepon: (p.telepon || '').toString(), alamat: (p.alamat || '').toString(), latitude: (p.latitude != null ? Number(p.latitude) : null), longitude: (p.longitude != null ? Number(p.longitude) : null), data: dataObj };
+          if (p.tanggalSurvey) { var t = _isoDate(p.tanggalSurvey); if (t) upd.tanggal_survey = t; }
+          var up = await supa.from('site_survey').update(upd).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Survey tidak ditemukan.' };
+          return { success: true, message: 'Site Survey ' + id + ' berhasil diperbarui.', id: id };
+        }
+      });
+      window.gsRoute('hapusSiteSurvey', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var del = await supa.from('site_survey').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Survey tidak ditemukan.' };
+          return { success: true, message: 'Site Survey ' + id + ' dihapus.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
