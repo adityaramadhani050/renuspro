@@ -164,6 +164,54 @@
         } catch (e) { return 'Material'; }
       }
 
+      // Helper: normalisasi jsonb → array (files/aktivitas checklist).
+      function _arr(v) { if (Array.isArray(v)) return v; try { var a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+
+      // Helper: ringkasan checklist DED/QC (identik) — port _dedCountSummary.
+      function _engCountSummary(list) {
+        var s = { total: list.length, approved: 0, pending: 0, rejected: 0, belum: 0, na: 0, wajibTotal: 0, wajibSelesai: 0 };
+        list.forEach(function (it) {
+          if (it.status === 'Approved') s.approved++;
+          else if (it.status === 'Pending') s.pending++;
+          else if (it.status === 'Rejected') s.rejected++;
+          else if (it.status === 'NA') s.na++;
+          else s.belum++;
+          if (it.wajib) { s.wajibTotal++; if (it.status === 'Approved') s.wajibSelesai++; }
+        });
+        s.pct = s.wajibTotal ? Math.round((s.wajibSelesai / s.wajibTotal) * 100) : 0;
+        return s;
+      }
+
+      // Helper bersama: master checklist QC (section + item) — dipakai
+      // getQCChecklist & getQCByWO.
+      async function _qcMaster() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('qc_section').select('*')),
+          _safe(supa.from('qc_checklist').select('*'))
+        ]);
+        var sq = res[0], iq = res[1];
+        var secMap = {}, sections = [];
+        (sq.data || []).forEach(function (s, i) {
+          var k = (s.kode || '').toString(); if (!k) return;
+          secMap[k] = { label: s.label || '', urutan: Number(s.urutan) || i };
+          sections.push({ kode: k, label: secMap[k].label, urutan: secMap[k].urutan });
+        });
+        sections.sort(function (a, b) { return a.urutan - b.urutan; });
+        var list = (iq.data || []).filter(function (r) { return r.kode; }).map(function (r, j) {
+          var sc = (r.section_kode || '').toString();
+          var s = secMap[sc] || { label: '', urutan: 999 };
+          return {
+            kode: (r.kode || '').toString(), section: sc, sectionLabel: s.label, label: r.label || '',
+            wajib: r.wajib === true, sectionUrutan: s.urutan, urutan: Number(r.urutan) || (j + 1),
+            instruksi: r.instruksi || '', contohFoto: _arr(r.contoh_foto),
+            tipeUpload: (r.tipe_upload && r.tipe_upload.toString().trim().toLowerCase() === 'file') ? 'file' : 'foto'
+          };
+        });
+        list.sort(function (a, b) { return (a.sectionUrutan - b.sectionUrutan) || (a.urutan - b.urutan); });
+        return { list: list, sections: sections };
+      }
+
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
         var q = await supa.from('invoice').select('*');
@@ -1244,6 +1292,97 @@
         }
       });
 
+      // ── DED per WO (DED.gs → getDEDByWO) — gabung master + item ───────────
+      window.gsRoute('getDEDByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, list: [], message: 'No WO wajib diisi.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('ded_checklist').select('*').order('urutan')),
+            _safe(supa.from('ded_item').select('*').eq('no_wo', noWO)),
+            _safe(supa.from('ded_project').select('*').eq('no_wo', noWO).maybeSingle())
+          ]);
+          var cq = res[0], iq = res[1], pq = res[2];
+          var master = (cq.data || []).map(function (r, i) {
+            return { kode: r.kode || '', label: r.label || '', wajib: r.wajib === true, urutan: Number(r.urutan) || (i + 1), instruksi: r.instruksi || '' };
+          }).sort(function (a, b) { return a.urutan - b.urutan; });
+          var rowMap = {}; (iq.data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = master.map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var files = it ? _arr(it.files) : [];
+            var status = it && it.status ? it.status.toString() : (files.length ? 'Pending' : 'Belum Upload');
+            return {
+              kode: m.kode, label: m.label, wajib: m.wajib, urutan: m.urutan, instruksi: m.instruksi,
+              files: files, status: status,
+              catatanReview: it && it.catatan_review ? it.catatan_review.toString() : '',
+              uploadedBy: it && it.diupload_oleh ? it.diupload_oleh.toString() : '',
+              uploadedPada: it && it.diupload_pada ? it.diupload_pada.toString() : '',
+              reviewedBy: it && it.direview_oleh ? it.direview_oleh.toString() : '',
+              reviewedPada: it && it.direview_pada ? it.direview_pada.toString() : '',
+              activity: it ? _arr(it.aktivitas) : []
+            };
+          });
+          var proj = pq.data || {};
+          return {
+            success: true, list: list, summary: _engCountSummary(list),
+            selesaiManual: proj.selesai_manual === true,
+            ditandaiOleh: proj.ditandai_selesai_oleh || '',
+            ditandaiPada: proj.ditandai_selesai_pada ? proj.ditandai_selesai_pada.toString() : ''
+          };
+        }
+      });
+
+      // ── Checklist QC master (QC.gs → getQCChecklist) ──────────────────────
+      window.gsRoute('getQCChecklist', {
+        mode: 'fn',
+        handler: async function () {
+          try { var m = await _qcMaster(); return { success: true, list: m.list, sections: m.sections }; }
+          catch (e) { return { success: false, list: [], sections: [], message: String(e) }; }
+        }
+      });
+
+      // ── QC per WO (QC.gs → getQCByWO) — gabung master + item + foto ───────
+      window.gsRoute('getQCByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, list: [], message: 'No WO wajib diisi.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var mres = await Promise.all([
+            _qcMaster(),
+            _safe(supa.from('qc_item').select('*').eq('no_wo', noWO)),
+            _safe(supa.from('qc_project').select('*').eq('no_wo', noWO).maybeSingle())
+          ]);
+          var master = mres[0].list, iq = mres[1], pq = mres[2];
+          var rowMap = {}; (iq.data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = master.map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var foto = it ? _arr(it.foto) : [];
+            var status = it && it.status ? it.status.toString() : (foto.length ? 'Pending' : 'Belum Upload');
+            return {
+              kode: m.kode, section: m.section, sectionLabel: m.sectionLabel, label: m.label,
+              wajib: m.wajib, urutan: m.urutan, instruksi: m.instruksi, contohFoto: m.contohFoto || [],
+              tipeUpload: m.tipeUpload || 'foto', foto: foto, status: status,
+              catatanSPV: it && it.catatan_spv ? it.catatan_spv.toString() : '',
+              uploadedBy: it && it.diupload_oleh ? it.diupload_oleh.toString() : '',
+              uploadedPada: it && it.diupload_pada ? it.diupload_pada.toString() : '',
+              reviewedBy: it && it.direview_oleh ? it.direview_oleh.toString() : '',
+              reviewedPada: it && it.direview_pada ? it.direview_pada.toString() : '',
+              activity: it ? _arr(it.aktivitas) : []
+            };
+          });
+          var proj = pq.data || {};
+          return {
+            success: true, list: list, summary: _engCountSummary(list),
+            selesaiManual: proj.selesai_manual === true,
+            ditandaiOleh: proj.ditandai_selesai_oleh || '',
+            ditandaiPada: proj.ditandai_selesai_pada ? proj.ditandai_selesai_pada.toString() : ''
+          };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1274,7 +1413,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+DED+QC) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
