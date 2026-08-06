@@ -2626,6 +2626,55 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 7 — TULIS (write). Data BARU kini masuk Supabase, BUKAN Sheets.
+      //  ⚠ Setelah ini, tambah/ubah data lewat aplikasi Vercel = ke Supabase.
+      //  Jangan input data yang sama lewat app lama (Sheets) → nanti berbeda.
+      //  Pilot: Master Customer (klien).
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Tambah customer (Customer.gs → simpanCustomer) ────────────────────
+      window.gsRoute('simpanCustomer', {
+        mode: 'fn',
+        handler: async function (args) {
+          var nama = (args[0] || '').toString(), perusahaan = (args[1] || '').toString(), telepon = (args[2] || '').toString(), alamat = (args[3] || '').toString();
+          if (!nama) return { success: false, message: 'Nama klien tidak boleh kosong.' };
+          var q = await _all('klien', 'id');   // ambil semua id → cari nomor terbesar
+          if (q.error) return { success: false, message: q.error.message };
+          var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^K(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+          var nextId = 'K' + ('000' + (maxNum + 1)).slice(-3);
+          var ins = await supa.from('klien').insert({ id: nextId, nama_klien: nama, perusahaan: perusahaan, alamat: alamat, kontak: telepon });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Klien (' + nextId + ') berhasil ditambahkan!', newId: nextId };
+        }
+      });
+
+      // ── Ubah customer (Customer.gs → editCustomer) ────────────────────────
+      window.gsRoute('editCustomer', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(), nama = (args[1] || '').toString(), perusahaan = (args[2] || '').toString(), telepon = (args[3] || '').toString(), alamat = (args[4] || '').toString();
+          if (!id) return { success: false, message: 'ID klien wajib.' };
+          var up = await supa.from('klien').update({ nama_klien: nama, perusahaan: perusahaan, alamat: alamat, kontak: telepon }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'ID klien tidak ditemukan.' };
+          return { success: true, message: 'Klien ' + id + ' berhasil diperbarui!' };
+        }
+      });
+
+      // ── Hapus customer (Customer.gs → hapusCustomer) ──────────────────────
+      window.gsRoute('hapusCustomer', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var del = await supa.from('klien').delete().eq('id', id).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'ID tidak ditemukan.' };
+          return { success: true, message: 'Klien ' + id + ' berhasil dihapus.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
