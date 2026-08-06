@@ -3469,12 +3469,38 @@
       // ── Upload file → Supabase Storage (ganti Google Drive) ───────────────
       //  Perlu bucket PUBLIK 'uploads' (lihat panduan). Kembalikan {fileId,
       //  fileUrl, fileName} sama seperti versi Drive.
+      // Kompres gambar di browser (resize maks 1600px + JPEG 0.82) → hemat
+      // storage 80-90%. Non-gambar dibiarkan. Kembalikan {base64, mime, name}.
+      function _compressImage(base64, mime, name) {
+        return new Promise(function (resolve) {
+          if (!/^image\/(jpe?g|png|webp)/i.test(mime)) return resolve({ base64: base64, mime: mime, name: name });
+          try {
+            var img = new Image();
+            img.onload = function () {
+              try {
+                var maxDim = 1600, w = img.width, h = img.height, scale = Math.min(1, maxDim / Math.max(w, h));
+                var nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
+                var c = document.createElement('canvas'); c.width = nw; c.height = nh;
+                c.getContext('2d').drawImage(img, 0, 0, nw, nh);
+                var durl = c.toDataURL('image/jpeg', 0.82);
+                var b64 = durl.split(',')[1];
+                if (b64 && b64.length < base64.length) { var nm = name.replace(/\.[^.]+$/, '') + '.jpg'; return resolve({ base64: b64, mime: 'image/jpeg', name: nm }); }
+                resolve({ base64: base64, mime: mime, name: name }); // hasil lebih besar → pakai asli
+              } catch (e) { resolve({ base64: base64, mime: mime, name: name }); }
+            };
+            img.onerror = function () { resolve({ base64: base64, mime: mime, name: name }); };
+            img.src = 'data:' + mime + ';base64,' + base64;
+          } catch (e) { resolve({ base64: base64, mime: mime, name: name }); }
+        });
+      }
       async function _storageUpload(folder, args) {
         var p = args[0] || {};
         var base64 = (p.base64Data || '').toString();
         if (!base64) return { success: false, message: 'File tidak boleh kosong.' };
         var fileName = (p.fileName || 'file').toString();
         var mime = (p.mimeType || 'application/octet-stream').toString();
+        var comp = await _compressImage(base64, mime, fileName);
+        base64 = comp.base64; mime = comp.mime; fileName = comp.name;
         var bytes;
         try { var bin = atob(base64); bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
         catch (e) { return { success: false, message: 'Data file tidak valid.' }; }
