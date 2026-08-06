@@ -3204,6 +3204,33 @@
         }
       });
 
+      // ── Schedule: daftar / keluarkan WO (project) ─────────────────────────
+      window.gsRoute('addScheduleProject', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim(), addedBy = (args[1] || '').toString(), se = (args[2] || '').toString();
+          if (!noWO) return { success: false, message: 'Pilih Work Order dulu.' };
+          var ex = await supa.from('schedule_project').select('no_wo').eq('no_wo', noWO).maybeSingle();
+          if (ex.data) return { success: false, message: 'Work Order sudah ada di Schedule.' };
+          var proj = '', klien = '';
+          try { var wl = await _woListData(); var wo = wl.filter(function (w) { return w.noWO === noWO; })[0]; if (wo) { proj = wo.namaProject || ''; klien = wo.namaKlien || ''; } } catch (e) {}
+          var ins = await supa.from('schedule_project').insert({ no_wo: noWO, nama_project: proj, nama_klien: klien, ditambahkan_oleh: addedBy, ditambahkan_pada: new Date().toISOString(), site_engineer: se });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Work Order ditambahkan ke Schedule.' };
+        }
+      });
+      window.gsRoute('removeScheduleProject', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var del = await supa.from('schedule_project').delete().eq('no_wo', noWO).select();
+          if (del.error) return { success: false, message: del.error.message };
+          var removed = del.data && del.data.length > 0;
+          return { success: removed, message: removed ? 'Dikeluarkan dari Schedule (tugas tidak dihapus).' : 'WO tidak ditemukan.' };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
