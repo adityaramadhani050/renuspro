@@ -289,6 +289,73 @@
         return { list: list, sections: sections };
       }
 
+      // Helper: dokumen WO — konstanta + basis (row WO + alamat klien).
+      var _WO_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      var _WO_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      var _WO_ROMAWI = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      function _woAnyDate(v) {
+        if (!v) return null; var s = v.toString();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+        var d = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (d) return new Date(+d[3], +d[2] - 1, +d[1]);
+        var x = new Date(s); return isNaN(x.getTime()) ? null : x;
+      }
+      function _woSeq(noWO) { var digits = (noWO.match(/\d/g) || []).join(''); return digits.length >= 3 ? digits.slice(-3) : (digits || noWO); }
+      async function _woDocBase(noWO) {
+        var wq = await supa.from('work_order').select('nama_project,klien_id,nama_klien,subtotal,term_conditions,tanggal_deal').eq('no_wo', noWO).maybeSingle();
+        if (wq.error || !wq.data) return null;
+        var alamat = '';
+        try { var kq = await supa.from('klien').select('alamat').eq('id', wq.data.klien_id || '').maybeSingle(); if (kq.data) alamat = kq.data.alamat || ''; } catch (e) {}
+        return { row: wq.data, alamat: alamat };
+      }
+
+      // Helper: teks bank dari invoice WO (utamakan DP) + parser rekening.
+      async function _woInvoiceBankText(noWO) {
+        try {
+          var q = await supa.from('invoice').select('jenis,bank_account').eq('no_wo', noWO);
+          var dpBank = '', anyBank = '';
+          (q.data || []).forEach(function (r) {
+            var bank = (r.bank_account || '').toString().trim(); if (!bank) return;
+            if ((r.jenis || '').toString() === 'DP' && !dpBank) dpBank = bank;
+            if (!anyBank) anyBank = bank;
+          });
+          return dpBank || anyBank;
+        } catch (e) { return ''; }
+      }
+      function _woParseBank(t) {
+        var raw = (t || '').toString();
+        var lines = raw.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+        var bank = '', noRek = '', atasNama = '';
+        lines.forEach(function (l) {
+          if (/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:/i.test(l)) atasNama = atasNama || l.replace(/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:\s*/i, '').trim();
+          else if (/^\s*(no\.?\s*rek(ening)?|rekening)\s*:/i.test(l)) noRek = noRek || l.replace(/^\s*(no\.?\s*rek(ening)?|rekening)\s*:\s*/i, '').trim().replace(/[^\d]/g, '');
+          else if (/^\s*bank\s*:/i.test(l)) bank = bank || l.replace(/^\s*bank\s*:\s*/i, '').trim();
+        });
+        if (!bank && !noRek && !atasNama && (lines.length === 1 || /\(/.test(raw))) {
+          var s = raw.replace(/\r?\n/g, ' ').trim();
+          var mParen = s.match(/\(([^)]*)\)/);
+          if (mParen) { atasNama = mParen[1].trim(); s = (s.slice(0, mParen.index) + ' ' + s.slice(mParen.index + mParen[0].length)).trim(); }
+          if (!atasNama) {
+            var mAn = s.match(/(?:^|\s)(?:a\.n\.?|a\/n|atas\s+nama)\s*:?\s*(.+)$/i);
+            if (mAn) { atasNama = mAn[1].trim(); s = s.slice(0, mAn.index).trim(); }
+          }
+          var groups = s.match(/\d[\d.\- ]*\d|\d+/g);
+          if (groups) {
+            var best = '', bestLen = -1;
+            groups.forEach(function (g) { var d = (g.match(/\d/g) || []).length; if (d > bestLen) { bestLen = d; best = g; } });
+            if (bestLen >= 5) { noRek = best.replace(/[^\d]/g, ''); s = s.replace(best, ' ').trim(); }
+          }
+          bank = s.replace(/[,;]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        }
+        if (!bank && !noRek && !atasNama && lines.length) {
+          bank = lines[0] || '';
+          var maxi = -1, maxd = -1;
+          lines.forEach(function (l, idx) { var dc = (l.match(/\d/g) || []).length; if (dc > maxd) { maxd = dc; maxi = idx; } });
+          if (maxi > 0) noRek = lines[maxi].replace(/[^\d]/g, '');
+          atasNama = lines.filter(function (l, idx) { return idx !== 0 && idx !== maxi; }).join(' ');
+        }
+        return { bank: bank, noRek: noRek, atasNama: atasNama, raw: raw };
+      }
+
       // Helper: Schedule — format tanggal, durasi, ringkasan, peta tugas.
       function _schIso(v) {
         if (!v) return '';
@@ -1898,6 +1965,80 @@
             qc[m.key] = doc;
           });
           return { success: true, kontrak: kontrak, qc: qc };
+        }
+      });
+
+      // ── Data BAST per WO (WorkOrder.gs → getBASTData) ─────────────────────
+      window.gsRoute('getBASTData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row, d = new Date();
+          var bast = _woSeq(noWO) + '/RGI/BAST/' + _WO_ROMAWI[d.getMonth() + 1] + '/' + d.getFullYear();
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', bastNomor: bast,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, lokasi: base.alamat,
+            tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() }
+          };
+        }
+      });
+
+      // ── Data Garansi per WO (WorkOrder.gs → getGaransiData) ───────────────
+      window.gsRoute('getGaransiData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row;
+          var tc = _jsonObj(row.term_conditions); var k = tc.kontrak || {};
+          var dealD = _woAnyDate(row.tanggal_deal) || new Date();
+          var spk = _woSeq(noWO) + '/RGI/SPK/' + _WO_ROMAWI[dealD.getMonth() + 1] + '/' + dealD.getFullYear();
+          var t = new Date();
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', spkNomor: spk,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, lokasi: base.alamat,
+            tanggal: { hari: _WO_HARI[t.getDay()], tgl: t.getDate(), bulan: _WO_BULAN[t.getMonth()], tahun: t.getFullYear() },
+            garansi: { panel: Number(k.garansiPanel) || 0, inverter: Number(k.garansiInverter) || 0, baterai: Number(k.garansiBaterai) || 0, instalasi: Number(k.garansiInstalasi) || 0 }
+          };
+        }
+      });
+
+      // ── Data Kontrak/SPK per WO (WorkOrder.gs → getKontrakData) ───────────
+      window.gsRoute('getKontrakData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row;
+          var nilaiKontrak = parseFloat(row.subtotal) || 0;
+          var tc = _jsonObj(row.term_conditions); var k = tc.kontrak || {};
+          var d = _woAnyDate(row.tanggal_deal) || new Date();
+          var spk = _woSeq(noWO) + '/RGI/SPK/' + _WO_ROMAWI[d.getMonth() + 1] + '/' + d.getFullYear();
+          var termins;
+          if (Array.isArray(k.termins) && k.termins.length) {
+            termins = k.termins.map(function (t) { return { persen: Number(t.persen) || 0, ket: String(t.ket || '') }; });
+          } else {
+            termins = [
+              { persen: Number(k.terminDP) || 0, ket: 'From PO' },
+              { persen: Number(k.terminTermin) || 0, ket: 'Material On Site' },
+              { persen: Number(k.terminPelunasan) || 0, ket: 'After BAST' }
+            ];
+          }
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', spkNomor: spk,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, nilaiKontrak: nilaiKontrak,
+            tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() },
+            termins: termins, leadTimeHari: Number(k.leadTimeHari) || 0,
+            garansi: { instalasi: Number(k.garansiInstalasi) || 0, panel: Number(k.garansiPanel) || 0, inverter: Number(k.garansiInverter) || 0, baterai: Number(k.garansiBaterai) || 0 },
+            rekening: _woParseBank(await _woInvoiceBankText(noWO))
+          };
         }
       });
 
