@@ -1027,6 +1027,69 @@
         }
       });
 
+      // ═══════════════════════════════════════════════════════════════════════
+      //  MILESTONE 5 — BATCH 9 (Request pengiriman — bikin tab Pengiriman lambat)
+      // ═══════════════════════════════════════════════════════════════════════
+
+      // ── Request pengiriman material (Inventory.gs → getPengirimanRequests) ─
+      //  Gabung pengiriman_request (status Diminta) + bom_item (reserved-dikirim)
+      //  + bom_project (nama). reqMap membatasi qty sesuai target request (parsial).
+      window.gsRoute('getPengirimanRequests', {
+        mode: 'fn',
+        handler: async function () {
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengiriman_request').select('*').eq('status', 'Diminta')),
+            _safe(supa.from('bom_item').select('id,no_wo,kategori,nama_material,merek,satuan,stok_id,qty_reserved,qty_dikirim')),
+            _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien'))
+          ]);
+          var rq = res[0], bq = res[1], pq = res[2];
+          if (rq.error) return { success: false, list: [], message: rq.error.message };
+          var projMap = {};
+          (pq.data || []).forEach(function (r) { if (r.no_wo) projMap[r.no_wo] = r; });
+          var bomByWO = {};
+          (bq.data || []).forEach(function (it) {
+            var w = (it.no_wo || '').toString().trim(); if (!w) return;
+            (bomByWO[w] = bomByWO[w] || []).push(it);
+          });
+          var out = [];
+          (rq.data || []).forEach(function (req) {
+            var noWO = (req.no_wo || '').toString().trim();
+            var pj = projMap[noWO] || {};
+            // reqMap: null = legacy (semua reserved). Array (termasuk kosong) =
+            // material terpilih PC (parsial) — meniru perilaku Apps Script lama.
+            var reqMap = null;
+            var arr = _jsonObj(req.items);
+            if (Array.isArray(arr)) { reqMap = {}; arr.forEach(function (x) { reqMap[(x.bomItemId || '').toString()] = Number(x.target) || 0; }); }
+            var mats = [];
+            (bomByWO[noWO] || []).forEach(function (it) {
+              var reserved = Number(it.qty_reserved) || 0;
+              var dikirim = Number(it.qty_dikirim) || 0;
+              var sisa = reserved - dikirim;
+              if (sisa <= 0) return;
+              var bid = (it.id || '').toString();
+              if (reqMap) {
+                if (!(bid in reqMap)) return;
+                var byTarget = reqMap[bid] - dikirim;
+                if (byTarget <= 0) return;
+                if (byTarget < sisa) sisa = byTarget;
+              }
+              mats.push({
+                id: bid, kategori: it.kategori || '', namaMaterial: it.nama_material || '',
+                merek: it.merek || '', satuan: it.satuan || '', idStok: it.stok_id || '',
+                qtyReserved: reserved, qtyDikirim: dikirim, qtySisa: sisa
+              });
+            });
+            out.push({
+              noWO: noWO, namaProject: pj.nama_project || '', namaKlien: pj.nama_klien || '',
+              alamat: req.alamat || '', dimintaOleh: req.diminta_oleh || '',
+              dimintaPada: req.diminta_pada ? req.diminta_pada.toString() : '', items: mats
+            });
+          });
+          return { success: true, list: out };
+        }
+      });
+
       // ── Stok/Inventory (Inventory.gs → getStokList) via EDGE FUNCTION ─────
       //  qtyHold/qtyAvailable DIHITUNG di server (bukan kolom) → pakai Edge
       //  Function 'get-stok-list'. Aktif hanya bila ENABLE_EDGE_STOK = true.
@@ -1057,7 +1120,7 @@
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
       //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
-      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b8) memakai Supabase.');
+      console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9) memakai Supabase.');
     })
     .catch(function (e) { console.error('[supabase-overrides] gagal memuat supabase-js:', e); });
 })();
