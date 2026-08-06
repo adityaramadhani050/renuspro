@@ -242,6 +242,23 @@
         return { success: true, global: global, perWO: perWO, reviewQueue: reviewQueue, teamStats: teamStats };
       }
 
+      // Helper bersama: WO yang siap didaftarkan ke modul engineering
+      // (belum terdaftar & HO Selesai). regTable = bom/ded/qc_project.
+      async function _availableWO(regTable) {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('work_order').select('no_wo,nama_project,nama_klien,status')),
+          _safe(supa.from('hand_over').select('no_wo,status')),
+          _safe(supa.from(regTable).select('no_wo'))
+        ]);
+        var hoMap = {}; (res[1].data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+        var reg = {}; (res[2].data || []).forEach(function (r) { if (r.no_wo) reg[r.no_wo] = true; });
+        var list = (res[0].data || []).filter(function (wo) {
+          var w = (wo.no_wo || '').toString(); return !reg[w] && (hoMap[w] || '') === 'Selesai';
+        }).map(function (wo) { return { noWO: wo.no_wo || '', namaProject: wo.nama_project || '', namaKlien: wo.nama_klien || '', status: wo.status || '' }; });
+        return { success: true, list: list };
+      }
+
       // Helper bersama: master checklist QC (section + item) — dipakai
       // getQCChecklist & getQCByWO.
       async function _qcMaster() {
@@ -270,6 +287,118 @@
         });
         list.sort(function (a, b) { return (a.sectionUrutan - b.sectionUrutan) || (a.urutan - b.urutan); });
         return { list: list, sections: sections };
+      }
+
+      // Helper: dokumen WO — konstanta + basis (row WO + alamat klien).
+      var _WO_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      var _WO_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      var _WO_ROMAWI = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      function _woAnyDate(v) {
+        if (!v) return null; var s = v.toString();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+        var d = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (d) return new Date(+d[3], +d[2] - 1, +d[1]);
+        var x = new Date(s); return isNaN(x.getTime()) ? null : x;
+      }
+      function _woSeq(noWO) { var digits = (noWO.match(/\d/g) || []).join(''); return digits.length >= 3 ? digits.slice(-3) : (digits || noWO); }
+      async function _woDocBase(noWO) {
+        var wq = await supa.from('work_order').select('nama_project,klien_id,nama_klien,subtotal,term_conditions,tanggal_deal').eq('no_wo', noWO).maybeSingle();
+        if (wq.error || !wq.data) return null;
+        var alamat = '';
+        try { var kq = await supa.from('klien').select('alamat').eq('id', wq.data.klien_id || '').maybeSingle(); if (kq.data) alamat = kq.data.alamat || ''; } catch (e) {}
+        return { row: wq.data, alamat: alamat };
+      }
+
+      // Helper: teks bank dari invoice WO (utamakan DP) + parser rekening.
+      async function _woInvoiceBankText(noWO) {
+        try {
+          var q = await supa.from('invoice').select('jenis,bank_account').eq('no_wo', noWO);
+          var dpBank = '', anyBank = '';
+          (q.data || []).forEach(function (r) {
+            var bank = (r.bank_account || '').toString().trim(); if (!bank) return;
+            if ((r.jenis || '').toString() === 'DP' && !dpBank) dpBank = bank;
+            if (!anyBank) anyBank = bank;
+          });
+          return dpBank || anyBank;
+        } catch (e) { return ''; }
+      }
+      function _woParseBank(t) {
+        var raw = (t || '').toString();
+        var lines = raw.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+        var bank = '', noRek = '', atasNama = '';
+        lines.forEach(function (l) {
+          if (/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:/i.test(l)) atasNama = atasNama || l.replace(/^\s*(atas\s*nama|a\.?\s*n\.?|a\/n)\s*:\s*/i, '').trim();
+          else if (/^\s*(no\.?\s*rek(ening)?|rekening)\s*:/i.test(l)) noRek = noRek || l.replace(/^\s*(no\.?\s*rek(ening)?|rekening)\s*:\s*/i, '').trim().replace(/[^\d]/g, '');
+          else if (/^\s*bank\s*:/i.test(l)) bank = bank || l.replace(/^\s*bank\s*:\s*/i, '').trim();
+        });
+        if (!bank && !noRek && !atasNama && (lines.length === 1 || /\(/.test(raw))) {
+          var s = raw.replace(/\r?\n/g, ' ').trim();
+          var mParen = s.match(/\(([^)]*)\)/);
+          if (mParen) { atasNama = mParen[1].trim(); s = (s.slice(0, mParen.index) + ' ' + s.slice(mParen.index + mParen[0].length)).trim(); }
+          if (!atasNama) {
+            var mAn = s.match(/(?:^|\s)(?:a\.n\.?|a\/n|atas\s+nama)\s*:?\s*(.+)$/i);
+            if (mAn) { atasNama = mAn[1].trim(); s = s.slice(0, mAn.index).trim(); }
+          }
+          var groups = s.match(/\d[\d.\- ]*\d|\d+/g);
+          if (groups) {
+            var best = '', bestLen = -1;
+            groups.forEach(function (g) { var d = (g.match(/\d/g) || []).length; if (d > bestLen) { bestLen = d; best = g; } });
+            if (bestLen >= 5) { noRek = best.replace(/[^\d]/g, ''); s = s.replace(best, ' ').trim(); }
+          }
+          bank = s.replace(/[,;]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        }
+        if (!bank && !noRek && !atasNama && lines.length) {
+          bank = lines[0] || '';
+          var maxi = -1, maxd = -1;
+          lines.forEach(function (l, idx) { var dc = (l.match(/\d/g) || []).length; if (dc > maxd) { maxd = dc; maxi = idx; } });
+          if (maxi > 0) noRek = lines[maxi].replace(/[^\d]/g, '');
+          atasNama = lines.filter(function (l, idx) { return idx !== 0 && idx !== maxi; }).join(' ');
+        }
+        return { bank: bank, noRek: noRek, atasNama: atasNama, raw: raw };
+      }
+
+      // Helper: Schedule — format tanggal, durasi, ringkasan, peta tugas.
+      function _schIso(v) {
+        if (!v) return '';
+        var s = v.toString(); var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          if (/[T ]\d{2}:\d{2}/.test(s) || s.indexOf('Z') !== -1) {
+            try {
+              var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(s));
+              var g = function (t) { var x = p.find(function (e) { return e.type === t; }); return x ? x.value : ''; };
+              return g('year') + '-' + g('month') + '-' + g('day');
+            } catch (e) {}
+          }
+          return m[1] + '-' + m[2] + '-' + m[3];
+        }
+        return s;
+      }
+      function _schDurasi(a, b) {
+        try { var x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); if (isNaN(x.getTime()) || isNaN(y.getTime())) return 1; return Math.max(1, Math.round((y - x) / 86400000) + 1); } catch (e) { return 1; }
+      }
+      function _schSummary(tasks) {
+        var minStart = '', maxEnd = '', totDur = 0, wProg = 0;
+        (tasks || []).forEach(function (t) {
+          if (t.mulai && (!minStart || t.mulai < minStart)) minStart = t.mulai;
+          if (t.selesai && (!maxEnd || t.selesai > maxEnd)) maxEnd = t.selesai;
+          var d = _schDurasi(t.mulai, t.selesai); totDur += d; wProg += (t.progress || 0) * d;
+        });
+        return { jumlahTugas: (tasks || []).length, tanggalMulai: minStart, tanggalSelesai: maxEnd, progress: totDur ? Math.round(wProg / totDur) : 0 };
+      }
+      function _schTasksMap(taskRows) {
+        var map = {};
+        (taskRows || []).forEach(function (r) {
+          if (!r.id) return;
+          var noWO = (r.no_wo || '').toString().trim();
+          if (!map[noWO]) map[noWO] = [];
+          map[noWO].push({
+            id: (r.id || '').toString(), noWO: noWO, namaTugas: r.nama_tugas || '', fase: r.fase || '',
+            mulai: _schIso(r.tanggal_mulai), selesai: _schIso(r.tanggal_selesai),
+            progress: Math.max(0, Math.min(100, Number(r.progress) || 0)), warna: r.warna || '',
+            urutan: Number(r.urutan) || 0, catatan: r.catatan || ''
+          });
+        });
+        Object.keys(map).forEach(function (k) { map[k].sort(function (a, b) { return (a.urutan - b.urutan) || (a.mulai < b.mulai ? -1 : a.mulai > b.mulai ? 1 : 0); }); });
+        return map;
       }
 
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
@@ -1234,45 +1363,99 @@
       // ── Work Order list (WorkOrder.gs → getWorkOrderList) — balik ARRAY ───
       //  Sumber: view work_order + produk(tipe) + hand_over + work_order_catatan
       //  + work_order_jenis_override. jenisWO = override || auto(items+tipe+kata).
-      window.gsRoute('getWorkOrderList', {
+      async function _woListData() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('work_order').select('*')),
+          _safe(supa.from('produk').select('id,tipe')),
+          _safe(supa.from('hand_over').select('no_wo,status')),
+          _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
+          _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
+        ]);
+        var wq = res[0], pq = res[1], hq = res[2], cq = res[3], jq = res[4];
+        if (wq.error) { console.error('[getWorkOrderList]', wq.error); return []; }
+        var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+        var hoMap = {}; (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
+        var catatanMap = {}; (cq.data || []).forEach(function (c) { if (c.no_wo) catatanMap[c.no_wo] = c.catatan || ''; });
+        var jenisOverride = {}; (jq.data || []).forEach(function (j) {
+          var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim();
+          if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v;
+        });
+        var list = (wq.data || []).map(function (r) {
+          var noWO = (r.no_wo || '').toString();
+          var jenisAuto = _woJenisAuto(r.items, tipeMap);
+          var jenisManual = jenisOverride[noWO] || '';
+          var jenisEfektif = jenisManual || jenisAuto;
+          return {
+            noWO: noWO, id: (r.no_penawaran || '').toString(), rev: (r.rev != null ? r.rev : '').toString(),
+            tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_until), namaProject: r.nama_project || '',
+            klienId: r.klien_id || '', namaKlien: r.nama_klien || '', dibuatOleh: r.dibuat_oleh || '',
+            subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0, pajak: parseFloat(r.pajak) || 0,
+            grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.hpp) || 0, profit: parseFloat(r.profit) || 0,
+            marginPersen: parseFloat(r.margin_persen) || 0, termConditions: _jsonStr(r.term_conditions, '{}'),
+            items: _jsonStr(r.items, '[]'), status: (r.status || '').toString(), hoStatus: hoMap[noWO] || '',
+            catatanCustomer: catatanMap[noWO] || '', jenisWO: jenisEfektif, jenisWOAuto: jenisAuto,
+            jenisWOManual: jenisManual, adaJasa: jenisEfektif === 'Jasa'
+          };
+        });
+        list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
+        return list;
+      }
+      window.gsRoute('getWorkOrderList', { mode: 'fn', handler: function () { return _woListData(); } });
+
+      // ── Work Order dashboard (WorkOrder.gs → getWorkOrderDashboard) ───────
+      //  = _woListData + agregasi invoice/pembayaran per WO (menu Work Order).
+      window.gsRoute('getWorkOrderDashboard', {
         mode: 'fn',
         handler: async function () {
-          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
-          var res = await Promise.all([
-            _safe(supa.from('work_order').select('*')),
-            _safe(supa.from('produk').select('id,tipe')),
-            _safe(supa.from('hand_over').select('no_wo,status')),
-            _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
-            _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
-          ]);
-          var wq = res[0], pq = res[1], hq = res[2], cq = res[3], jq = res[4];
-          if (wq.error) { console.error('[getWorkOrderList]', wq.error); return []; }
-          var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
-          var hoMap = {}; (hq.data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
-          var catatanMap = {}; (cq.data || []).forEach(function (c) { if (c.no_wo) catatanMap[c.no_wo] = c.catatan || ''; });
-          var jenisOverride = {}; (jq.data || []).forEach(function (j) {
-            var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim();
-            if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v;
+          var woList = await _woListData();
+          var invList = await _invoiceList();
+          var invByWO = {};
+          invList.forEach(function (inv) {
+            var noWO = inv.noWO || ''; if (!noWO) return;
+            (invByWO[noWO] = invByWO[noWO] || []).push({
+              id: inv.id, tanggal: inv.tanggal, jenis: inv.jenis, persen: inv.persen,
+              dpp: inv.dpp, ppnNominal: inv.ppnNominal, total: inv.total,
+              statusBayar: inv.statusBayar, kwitansiId: inv.kwitansiId
+            });
           });
-          var list = (wq.data || []).map(function (r) {
-            var noWO = (r.no_wo || '').toString();
-            var jenisAuto = _woJenisAuto(r.items, tipeMap);
-            var jenisManual = jenisOverride[noWO] || '';
-            var jenisEfektif = jenisManual || jenisAuto;
+          var sumKontrak = 0, sumDitagih = 0, sumLunas = 0;
+          var woDashboard = woList.map(function (w) {
+            var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+            var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+            var invoices = invByWO[w.noWO] || [];
+            var totalDitagihDpp = 0, totalLunasDpp = 0, totalLunasTotal = 0;
+            invoices.forEach(function (inv) {
+              totalDitagihDpp += inv.dpp;
+              if (inv.statusBayar === 'Lunas') { totalLunasDpp += inv.dpp; totalLunasTotal += inv.total; }
+            });
+            var sisaDpp = Math.max(0, nilaiKontrak - totalDitagihDpp);
+            var pctDitagih = nilaiKontrak > 0 ? Math.min(100, Math.round(totalDitagihDpp / nilaiKontrak * 100)) : 0;
+            var pctLunas = nilaiKontrak > 0 ? Math.min(100, Math.round(totalLunasDpp / nilaiKontrak * 100)) : 0;
+            var paymentStatus;
+            if (invoices.length === 0) paymentStatus = 'Belum Ditagih';
+            else if (pctLunas >= 100 && pctDitagih >= 100) paymentStatus = 'Lunas';
+            else if (totalLunasDpp > 0) paymentStatus = 'Lunas Sebagian';
+            else paymentStatus = 'Ditagih';
+            sumKontrak += nilaiKontrak;
+            sumDitagih += totalDitagihDpp + Math.round(totalDitagihDpp * ppnRate / 100);
+            sumLunas += totalLunasTotal;
             return {
-              noWO: noWO, id: (r.no_penawaran || '').toString(), rev: (r.rev != null ? r.rev : '').toString(),
-              tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_until), namaProject: r.nama_project || '',
-              klienId: r.klien_id || '', namaKlien: r.nama_klien || '', dibuatOleh: r.dibuat_oleh || '',
-              subtotal: parseFloat(r.subtotal) || 0, diskon: parseFloat(r.diskon) || 0, pajak: parseFloat(r.pajak) || 0,
-              grandTotal: parseFloat(r.grand_total) || 0, hpp: parseFloat(r.hpp) || 0, profit: parseFloat(r.profit) || 0,
-              marginPersen: parseFloat(r.margin_persen) || 0, termConditions: _jsonStr(r.term_conditions, '{}'),
-              items: _jsonStr(r.items, '[]'), status: (r.status || '').toString(), hoStatus: hoMap[noWO] || '',
-              catatanCustomer: catatanMap[noWO] || '', jenisWO: jenisEfektif, jenisWOAuto: jenisAuto,
-              jenisWOManual: jenisManual, adaJasa: jenisEfektif === 'Jasa'
+              noWO: w.noWO, id: w.id, rev: w.rev, tanggal: w.tanggal, namaProject: w.namaProject,
+              namaKlien: w.namaKlien, dibuatOleh: w.dibuatOleh, subtotal: w.subtotal, diskon: w.diskon,
+              pajak: w.pajak, grandTotal: w.grandTotal, hpp: w.hpp, profit: w.profit, marginPersen: w.marginPersen,
+              items: w.items, termConditions: w.termConditions, catatanCustomer: w.catatanCustomer,
+              nilaiKontrak: nilaiKontrak, ppnRate: ppnRate, totalDitagihDpp: totalDitagihDpp,
+              totalLunasDpp: totalLunasDpp, totalLunasTotal: totalLunasTotal, sisaDpp: sisaDpp,
+              pctDitagih: pctDitagih, pctLunas: pctLunas, paymentStatus: paymentStatus, invoices: invoices,
+              hoStatus: w.hoStatus || '', jenisWO: w.jenisWO || 'Material', jenisWOAuto: w.jenisWOAuto || 'Material',
+              jenisWOManual: w.jenisWOManual || '', adaJasa: !!w.adaJasa
             };
           });
-          list.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
-          return list;
+          return {
+            success: true, woList: woDashboard,
+            summary: { totalWO: woDashboard.length, totalKontrak: sumKontrak, totalDitagih: sumDitagih, totalLunas: sumLunas }
+          };
         }
       });
 
@@ -1585,6 +1768,494 @@
           ]);
           var master = (mres[0].list || []).map(function (m) { return { kode: m.kode, label: m.label, wajib: m.wajib }; });
           return _engDashCompute(master, mres[1].data || [], mres[2].data || [], mres[3].data || [], siteUserId);
+        }
+      });
+
+      // ── Summary BOM per WO (badge di list WO) ─────────────────────────────
+      window.gsRoute('getBOMSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('bom_project').select('difinalkan_oleh').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('bom_item').select('status,qty_reserved,qty_beli,qty_menunggu_bl,qty_beli_langsung,qty_dikirim').eq('no_wo', noWO))
+          ]);
+          if (!res[0].data) return { success: true, summary: null }; // belum terdaftar BOM
+          var items = res[1].data || [];
+          var total = items.length, approved = 0, rejected = 0, pending = 0;
+          var proc = { base: 0, reserved: 0, direct: 0, perluBeli: 0, tunggu: 0, dikirim: 0, tuntas: 0, pct: 0 };
+          items.forEach(function (it) {
+            var st = (it.status || '').toString().trim() || 'Pending';
+            if (st === 'Approved') approved++; else if (st === 'Rejected') rejected++; else pending++;
+            if (st !== 'Approved') return;
+            proc.base++;
+            var qr = Number(it.qty_reserved) || 0, qb = Number(it.qty_beli) || 0, qm = Number(it.qty_menunggu_bl) || 0, qbl = Number(it.qty_beli_langsung) || 0, qd = Number(it.qty_dikirim) || 0;
+            if (qr > 0) proc.reserved++; if (qbl > 0) proc.direct++; if (qb > 0) proc.perluBeli++;
+            if (qm > 0) proc.tunggu++; if (qd > 0) proc.dikirim++;
+            if (qb === 0 && qm === 0 && (qr > 0 || qbl > 0)) proc.tuntas++;
+          });
+          proc.pct = proc.base ? Math.round(proc.tuntas / proc.base * 100) : 0;
+          return { success: true, summary: {
+            total: total, approved: approved, pending: pending, rejected: rejected,
+            pct: total ? Math.round(approved / total * 100) : 0,
+            bomStatus: res[0].data.difinalkan_oleh ? 'Final' : 'Draft', proc: proc
+          } };
+        }
+      });
+
+      // ── Summary QC per WO ─────────────────────────────────────────────────
+      window.gsRoute('getQCSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null, assigned: [] };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _qcMaster(),
+            _safe(supa.from('qc_item').select('kode,status,foto').eq('no_wo', noWO)),
+            _safe(supa.from('qc_assignment').select('id_user,nama_user').eq('no_wo', noWO))
+          ]);
+          var master = res[0].list || [];
+          var rowMap = {}; (res[1].data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = master.map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var foto = it ? _arr(it.foto) : [];
+            var status = it && it.status ? it.status.toString() : (foto.length ? 'Pending' : 'Belum Upload');
+            return { wajib: m.wajib, status: status };
+          });
+          var assigned = (res[2].data || []).map(function (a) { return { id: (a.id_user || '').toString(), nama: (a.nama_user || '').toString() }; });
+          return { success: true, summary: _engCountSummary(list), assigned: assigned };
+        }
+      });
+
+      // ── Summary DED per WO (+ dokumen approved) ───────────────────────────
+      window.gsRoute('getDEDSummaryByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: true, summary: null };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('ded_project').select('no_wo').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('ded_checklist').select('kode,label,wajib').order('urutan')),
+            _safe(supa.from('ded_item').select('kode,status,files').eq('no_wo', noWO))
+          ]);
+          if (!res[0].data) return { success: true, summary: null, approvedDocs: [] };
+          var rowMap = {}; (res[2].data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+          var list = (res[1].data || []).map(function (m) {
+            var it = rowMap[m.kode] || null;
+            var files = it ? _arr(it.files) : [];
+            var status = it && it.status ? it.status.toString() : (files.length ? 'Pending' : 'Belum Upload');
+            return { label: m.label || '', wajib: m.wajib === true, status: status, files: files };
+          });
+          var approvedDocs = list.filter(function (it) { return it.status === 'Approved' && (it.files || []).length; })
+            .map(function (it) { return { label: it.label, files: (it.files || []).map(function (f) { return { fileUrl: f.fileUrl, fileName: f.fileName }; }) }; });
+          return { success: true, summary: _engCountSummary(list), approvedDocs: approvedDocs };
+        }
+      });
+
+      // ── WO tersedia untuk daftar BOM/DED/QC ───────────────────────────────
+      window.gsRoute('getAvailableWOForBOM', { mode: 'fn', handler: function () { return _availableWO('bom_project'); } });
+      window.gsRoute('getAvailableWOForDED', { mode: 'fn', handler: function () { return _availableWO('ded_project'); } });
+      window.gsRoute('getAvailableWOForQC', { mode: 'fn', handler: function () { return _availableWO('qc_project'); } });
+
+      // ── Schedule: daftar WO (Schedule.gs → getScheduleWOList) ─────────────
+      window.gsRoute('getScheduleWOList', {
+        mode: 'fn',
+        handler: async function () {
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('schedule_project').select('*')),
+            _safe(supa.from('schedule_task').select('*')),
+            _safe(supa.from('work_order').select('no_wo,items')),
+            _safe(supa.from('produk').select('id,tipe')),
+            _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
+          ]);
+          var taskMap = _schTasksMap(res[1].data || []);
+          var tipeMap = {}; (res[3].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+          var jenisOverride = {}; (res[4].data || []).forEach(function (j) { var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim(); if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v; });
+          var jenisMap = {}; (res[2].data || []).forEach(function (w) { var no = (w.no_wo || '').toString(); jenisMap[no] = jenisOverride[no] || _woJenisAuto(w.items, tipeMap); });
+          var list = (res[0].data || []).map(function (p) {
+            var noWO = (p.no_wo || '').toString().trim();
+            var tasks = taskMap[noWO] || [];
+            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: _schSummary(tasks) };
+          }).filter(function (x) { return x.noWO; });
+          return { success: true, list: list };
+        }
+      });
+
+      // ── Schedule: per WO (Schedule.gs → getScheduleByWO) ──────────────────
+      window.gsRoute('getScheduleByWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('schedule_project').select('*').eq('no_wo', noWO).maybeSingle()),
+            _safe(supa.from('schedule_task').select('*').eq('no_wo', noWO)),
+            _safe(supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1))
+          ]);
+          if (!res[0].data) return { success: false, message: 'Proyek belum terdaftar di Schedule.' };
+          var p = res[0].data;
+          var tasks = (_schTasksMap(res[1].data || [])[noWO]) || [];
+          var woStatus = (res[2].data && res[2].data[0]) ? (res[2].data[0].status || '') : '';
+          return { success: true, project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' }, tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus };
+        }
+      });
+
+      // ── Detail Kas Project per WO (Pengeluaran.gs → getDetailKasProjectWO) ─
+      window.gsRoute('getDetailKasProjectWO', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = args[0] ? args[0].toString().trim() : '';
+          if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengeluaran').select('id_pengeluaran,tanggal,sumber,no_po,nama_akun,deskripsi,total').eq('no_wo', noWO)),
+            _safe(supa.from('invoice').select('no_invoice').eq('no_wo', noWO)),
+            _safe(supa.from('pemasukan').select('id_pemasukan,tanggal,id_referensi,nama_akun,deskripsi,jumlah'))
+          ]);
+          var pengeluaran = [], totalKeluar = 0;
+          (res[0].data || []).forEach(function (r) {
+            var t = parseFloat(r.total) || 0; totalKeluar += t;
+            pengeluaran.push({ id: r.id_pengeluaran || '', tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', noPO: r.no_po || '', namaAkun: r.nama_akun || '', deskripsi: r.deskripsi || '', total: t });
+          });
+          var invSet = {}; (res[1].data || []).forEach(function (r) { if (r.no_invoice) invSet[r.no_invoice.toString().trim()] = true; });
+          var pemasukan = [], totalMasuk = 0;
+          (res[2].data || []).forEach(function (p) {
+            var ref = (p.id_referensi || '').toString().trim(); if (!ref || !invSet[ref]) return;
+            var jml = parseFloat(p.jumlah) || 0; totalMasuk += jml;
+            pemasukan.push({ id: p.id_pemasukan || '', tanggal: _fmtTgl(p.tanggal), noInvoice: ref, namaAkun: p.nama_akun || '', deskripsi: p.deskripsi || '', jumlah: jml });
+          });
+          return { success: true, noWO: noWO, pemasukan: pemasukan, pengeluaran: pengeluaran, totalMasuk: totalMasuk, totalKeluar: totalKeluar };
+        }
+      });
+
+      // ── Dokumen Project per WO (WorkOrder.gs → getWODokumen) ──────────────
+      window.gsRoute('getWODokumen', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('wo_dokumen').select('*').eq('no_wo', noWO).eq('jenis', 'kontrak').maybeSingle()),
+            _safe(supa.from('qc_item').select('kode,foto,status,diupload_oleh,diupload_pada').eq('no_wo', noWO))
+          ]);
+          var kr = res[0].data;
+          var kontrak = kr ? { fileId: kr.file_id || '', fileUrl: kr.file_url || '', fileName: kr.nama_file || '', by: kr.diupload_oleh || '', at: kr.diupload_pada ? kr.diupload_pada.toString() : '' } : null;
+          var byKode = {}; (res[1].data || []).forEach(function (r) { byKode[(r.kode || '').toString().trim()] = r; });
+          var docMap = [{ key: 'bast', kode: 'H1', label: 'BAST' }, { key: 'garansi', kode: 'H2', label: 'Surat Garansi' }, { key: 'commissioning', kode: 'H3', label: 'Hasil Commissioning' }];
+          var qc = {};
+          docMap.forEach(function (m) {
+            var doc = { kode: m.kode, label: m.label, status: 'Belum Upload', file: null, by: '', at: '' };
+            var row = byKode[m.kode];
+            if (row) {
+              doc.status = (row.status || '').toString() || 'Belum Upload';
+              var foto = _arr(row.foto);
+              if (foto.length) {
+                var f = foto[foto.length - 1];
+                doc.file = { fileId: f.fileId, fileUrl: f.fileUrl, fileName: f.fileName || '' };
+                doc.by = f.by || (row.diupload_oleh || '');
+                doc.at = f.at || (row.diupload_pada ? row.diupload_pada.toString() : '');
+              }
+            }
+            qc[m.key] = doc;
+          });
+          return { success: true, kontrak: kontrak, qc: qc };
+        }
+      });
+
+      // ── Data BAST per WO (WorkOrder.gs → getBASTData) ─────────────────────
+      window.gsRoute('getBASTData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row, d = new Date();
+          var bast = _woSeq(noWO) + '/RGI/BAST/' + _WO_ROMAWI[d.getMonth() + 1] + '/' + d.getFullYear();
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', bastNomor: bast,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, lokasi: base.alamat,
+            tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() }
+          };
+        }
+      });
+
+      // ── Data Garansi per WO (WorkOrder.gs → getGaransiData) ───────────────
+      window.gsRoute('getGaransiData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row;
+          var tc = _jsonObj(row.term_conditions); var k = tc.kontrak || {};
+          var dealD = _woAnyDate(row.tanggal_deal) || new Date();
+          var spk = _woSeq(noWO) + '/RGI/SPK/' + _WO_ROMAWI[dealD.getMonth() + 1] + '/' + dealD.getFullYear();
+          var t = new Date();
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', spkNomor: spk,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, lokasi: base.alamat,
+            tanggal: { hari: _WO_HARI[t.getDay()], tgl: t.getDate(), bulan: _WO_BULAN[t.getMonth()], tahun: t.getFullYear() },
+            garansi: { panel: Number(k.garansiPanel) || 0, inverter: Number(k.garansiInverter) || 0, baterai: Number(k.garansiBaterai) || 0, instalasi: Number(k.garansiInstalasi) || 0 }
+          };
+        }
+      });
+
+      // ── Data Kontrak/SPK per WO (WorkOrder.gs → getKontrakData) ───────────
+      window.gsRoute('getKontrakData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var base = await _woDocBase(noWO);
+          if (!base) return { success: false, message: 'Work Order tidak ditemukan.' };
+          var row = base.row;
+          var nilaiKontrak = parseFloat(row.subtotal) || 0;
+          var tc = _jsonObj(row.term_conditions); var k = tc.kontrak || {};
+          var d = _woAnyDate(row.tanggal_deal) || new Date();
+          var spk = _woSeq(noWO) + '/RGI/SPK/' + _WO_ROMAWI[d.getMonth() + 1] + '/' + d.getFullYear();
+          var termins;
+          if (Array.isArray(k.termins) && k.termins.length) {
+            termins = k.termins.map(function (t) { return { persen: Number(t.persen) || 0, ket: String(t.ket || '') }; });
+          } else {
+            termins = [
+              { persen: Number(k.terminDP) || 0, ket: 'From PO' },
+              { persen: Number(k.terminTermin) || 0, ket: 'Material On Site' },
+              { persen: Number(k.terminPelunasan) || 0, ket: 'After BAST' }
+            ];
+          }
+          return {
+            success: true, noWO: noWO, namaProject: row.nama_project || '', spkNomor: spk,
+            klien: { nama: row.nama_klien || '', alamat: base.alamat }, nilaiKontrak: nilaiKontrak,
+            tanggal: { hari: _WO_HARI[d.getDay()], tgl: d.getDate(), bulan: _WO_BULAN[d.getMonth()], tahun: d.getFullYear() },
+            termins: termins, leadTimeHari: Number(k.leadTimeHari) || 0,
+            garansi: { instalasi: Number(k.garansiInstalasi) || 0, panel: Number(k.garansiPanel) || 0, inverter: Number(k.garansiInverter) || 0, baterai: Number(k.garansiBaterai) || 0 },
+            rekening: _woParseBank(await _woInvoiceBankText(noWO))
+          };
+        }
+      });
+
+      // ── Bootstrap Invoice (Invoice.gs → getInvoiceInitialData) ────────────
+      //  woList (dari _woListData) diperkaya nilai tagihan + daftar penawaran
+      //  pre-deal (untuk invoice DP sebelum deal). nextNo dibuat saat simpan.
+      window.gsRoute('getInvoiceInitialData', {
+        mode: 'fn',
+        handler: async function () {
+          try {
+            var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+            var woList = await _woListData();
+            var res = await Promise.all([
+              _safe(supa.from('invoice').select('no_wo,no_penawaran,dpp')),
+              _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,klien_id,subtotal,diskon,pajak,grand_total,items,status,no_wo')),
+              _safe(supa.from('klien').select('id,nama_klien'))
+            ]);
+            var tagihMap = {}, tagihByPen = {};
+            (res[0].data || []).forEach(function (r) {
+              var dpp = parseFloat(r.dpp) || 0;
+              if (r.no_wo) tagihMap[r.no_wo] = (tagihMap[r.no_wo] || 0) + dpp;
+              if (r.no_penawaran) tagihByPen[r.no_penawaran] = (tagihByPen[r.no_penawaran] || 0) + dpp;
+            });
+            var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+
+            var woEnriched = woList.map(function (w) {
+              var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+              var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+              var ditagihDpp = tagihMap[w.noWO] || 0;
+              return {
+                noWO: w.noWO, isPredeal: false, id: w.id, rev: w.rev, tanggal: w.tanggal,
+                namaProject: w.namaProject, namaKlien: w.namaKlien, klienId: w.klienId,
+                subtotal: w.subtotal, diskon: w.diskon, pajak: w.pajak, grandTotal: w.grandTotal,
+                items: w.items, nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
+                ditagihDpp: ditagihDpp, sisaDpp: Math.max(0, nilaiKontrak - ditagihDpp)
+              };
+            });
+
+            // Penawaran pre-deal: bukan status Deal & belum punya WO, rev tertinggi.
+            var latestRev = {};
+            (res[1].data || []).forEach(function (r, i) {
+              var id = (r.no_penawaran || '').toString(); if (!id) return;
+              var status = (r.status || '').toString(); var noWO = (r.no_wo || '').toString();
+              if (status === 'Deal' || noWO) return;
+              var rev = parseInt(r.rev) || 0;
+              if (!latestRev[id] || rev > latestRev[id].rev) latestRev[id] = { rev: rev, row: r };
+            });
+            var penawaranPreDeal = Object.keys(latestRev).map(function (id) {
+              var r = latestRev[id].row;
+              var subtotal = parseFloat(r.subtotal) || 0, diskon = parseFloat(r.diskon) || 0, pajak = parseFloat(r.pajak) || 0;
+              var nilaiKontrak = Math.max(0, subtotal - diskon);
+              var ppnRate = nilaiKontrak > 0 ? Math.round(pajak / nilaiKontrak * 100) : 0;
+              var ditagihDpp = tagihByPen[id] || 0;
+              return {
+                noWO: '', isPredeal: true, id: id, rev: (r.rev != null ? r.rev : '0').toString(),
+                tanggal: _fmtTgl(r.tanggal), namaProject: r.nama_project || '',
+                namaKlien: klienMap[r.klien_id] || r.klien_id || '', klienId: r.klien_id || '',
+                subtotal: subtotal, diskon: diskon, pajak: pajak, grandTotal: parseFloat(r.grand_total) || 0,
+                items: _jsonStr(r.items, '[]'), nilaiKontrak: nilaiKontrak, ppnRate: ppnRate,
+                ditagihDpp: ditagihDpp, sisaDpp: Math.max(0, nilaiKontrak - ditagihDpp), status: r.status || ''
+              };
+            }).sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
+
+            return { success: true, woList: woEnriched, penawaranPreDeal: penawaranPreDeal, nextNo: '' };
+          } catch (e) {
+            return { success: false, error: String(e), woList: [], penawaranPreDeal: [], nextNo: '' };
+          }
+        }
+      });
+
+      // ── Laporan Profitabilitas (Pengeluaran.gs → getLaporanProfitabilitas) ─
+      window.gsRoute('getLaporanProfitabilitas', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('pengeluaran').select('no_wo,nama_akun,total')),
+            _safe(supa.from('penawaran').select('no_penawaran,rev,tanggal,nama_project,dibuat_oleh,klien_id,subtotal,diskon,total_hpp,status,no_wo')),
+            _safe(supa.from('klien').select('id,nama_klien'))
+          ]);
+          var expByWO = {}, expByAkun = {};
+          (res[0].data || []).forEach(function (r) {
+            var noWO = (r.no_wo || '').toString().trim(); var total = parseFloat(r.total) || 0; var akun = (r.nama_akun || '').toString();
+            expByWO[noWO] = (expByWO[noWO] || 0) + total; expByAkun[akun] = (expByAkun[akun] || 0) + total;
+          });
+          var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+          var latestRev = {};
+          (res[1].data || []).forEach(function (r) { var noPen = (r.no_penawaran || '').toString(); if (!noPen) return; var rev = parseInt(r.rev) || 0; if (!latestRev[noPen] || rev > latestRev[noPen].rev) latestRev[noPen] = { rev: rev, row: r }; });
+          var rows = [];
+          Object.keys(latestRev).forEach(function (noPen) {
+            var r = latestRev[noPen].row;
+            var status = (r.status || '').toString();
+            var noWO = (r.no_wo || '').toString().trim();
+            if (!noWO || (status !== 'Deal' && status !== 'Closed')) return;
+            if (params.status && params.status !== status) return;
+            var tanggal = _fmtTgl(r.tanggal);
+            if (!_inDateRange(tanggal, params.tanggalDari, params.tanggalSampai)) return;
+            var nilaiKontrak = Math.max(0, (parseFloat(r.subtotal) || 0) - (parseFloat(r.diskon) || 0));
+            var estimasiHPP = parseFloat(r.total_hpp) || 0;
+            var realisasiHPP = expByWO[noWO] || 0;
+            var margEst = nilaiKontrak > 0 ? (nilaiKontrak - estimasiHPP) / nilaiKontrak * 100 : null;
+            var margReal = nilaiKontrak > 0 ? (nilaiKontrak - realisasiHPP) / nilaiKontrak * 100 : null;
+            rows.push({
+              noWO: noWO, namaProject: r.nama_project || '', namaKlien: klienMap[r.klien_id] || r.klien_id || '',
+              namaSales: r.dibuat_oleh || '', tanggal: tanggal, status: status, nilaiKontrak: nilaiKontrak,
+              estimasiHPP: estimasiHPP, realisasiHPP: realisasiHPP, selisih: estimasiHPP - realisasiHPP,
+              marginEstimasi: margEst, marginRealisasi: margReal,
+              isOverBudget: margReal !== null && margEst !== null && margReal < margEst
+            });
+          });
+          rows.sort(function (a, b) { return b.noWO.localeCompare(a.noWO, undefined, { numeric: true }); });
+          var totalKontrak = 0, totalRealisasi = 0, sumMargReal = 0, countMarg = 0;
+          rows.forEach(function (r2) { totalKontrak += r2.nilaiKontrak; totalRealisasi += r2.realisasiHPP; if (r2.marginRealisasi !== null) { sumMargReal += r2.marginRealisasi; countMarg++; } });
+          var rekapAkun = Object.keys(expByAkun).map(function (nama) { return { namaAkun: nama, total: expByAkun[nama] }; }).sort(function (a, b) { return b.total - a.total; });
+          return { success: true, rows: rows, summary: { totalKontrak: totalKontrak, totalRealisasiHPP: totalRealisasi, rataMarginRealisasi: countMarg > 0 ? sumMargReal / countMarg : null }, rekapAkun: rekapAkun };
+        }
+      });
+
+      // ── Laporan Keuntungan Bulanan (Pengeluaran.gs → getLaporanKeuntunganBulanan) ─
+      window.gsRoute('getLaporanKeuntunganBulanan', {
+        mode: 'fn',
+        handler: async function (args) {
+          var params = args[0] || {};
+          var tahun = parseInt(params.tahun, 10) || new Date().getFullYear();
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var res = await Promise.all([
+            _safe(supa.from('invoice').select('tanggal,dpp')),
+            _safe(supa.from('pengeluaran').select('tanggal,no_wo,total,kategori')),
+            _safe(supa.from('penawaran').select('no_wo,nama_project'))
+          ]);
+          var woMap = {}; (res[2].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '' }; });
+          var bulanData = []; for (var b = 0; b < 12; b++) bulanData.push({ bulan: _WO_BULAN[b], bulanIdx: b + 1, invoiceDPP: 0, pengeluaranProject: 0, pengeluaranNonProject: 0, kategoriProjectTotal: {}, kategoriNonProjectTotal: {} });
+          (res[0].data || []).forEach(function (r) { var tp = _fmtTgl(r.tanggal).split('/'); if (tp.length !== 3) return; if (parseInt(tp[2], 10) !== tahun) return; bulanData[parseInt(tp[1], 10) - 1].invoiceDPP += parseFloat(r.dpp) || 0; });
+          (res[1].data || []).forEach(function (r) {
+            var tp = _fmtTgl(r.tanggal).split('/'); if (tp.length !== 3) return; if (parseInt(tp[2], 10) !== tahun) return;
+            var total = parseFloat(r.total) || 0; var noWO = (r.no_wo || '').toString().trim(); var d = bulanData[parseInt(tp[1], 10) - 1];
+            if (noWO) { d.pengeluaranProject += total; var wi = woMap[noWO] || { namaProject: '' }; var label = noWO + (wi.namaProject ? ' - ' + wi.namaProject : ''); d.kategoriProjectTotal[label] = (d.kategoriProjectTotal[label] || 0) + total; }
+            else { d.pengeluaranNonProject += total; var kat = (r.kategori || 'Lainnya').toString(); d.kategoriNonProjectTotal[kat] = (d.kategoriNonProjectTotal[kat] || 0) + total; }
+          });
+          var _sortKat = function (m) { return Object.keys(m).map(function (k) { return { kategori: k, total: m[k] }; }).sort(function (a, b) { return b.total - a.total; }); };
+          var kpTahun = {}, knpTahun = {};
+          bulanData.forEach(function (d) { Object.keys(d.kategoriProjectTotal).forEach(function (k) { kpTahun[k] = (kpTahun[k] || 0) + d.kategoriProjectTotal[k]; }); Object.keys(d.kategoriNonProjectTotal).forEach(function (k) { knpTahun[k] = (knpTahun[k] || 0) + d.kategoriNonProjectTotal[k]; }); });
+          var totInv = 0, totPP = 0, totPNP = 0;
+          var rows = bulanData.map(function (d) {
+            var keuntungan = d.invoiceDPP - d.pengeluaranProject - d.pengeluaranNonProject;
+            var margin = d.invoiceDPP > 0 ? (keuntungan / d.invoiceDPP * 100) : null;
+            totInv += d.invoiceDPP; totPP += d.pengeluaranProject; totPNP += d.pengeluaranNonProject;
+            return { bulan: d.bulan, bulanIdx: d.bulanIdx, invoiceDPP: d.invoiceDPP, pengeluaranProject: d.pengeluaranProject, pengeluaranNonProject: d.pengeluaranNonProject, keuntungan: keuntungan, margin: margin, kategoriProject: _sortKat(d.kategoriProjectTotal), kategoriNonProject: _sortKat(d.kategoriNonProjectTotal) };
+          });
+          var totalKeuntungan = totInv - totPP - totPNP; var totalMargin = totInv > 0 ? (totalKeuntungan / totInv * 100) : null;
+          return {
+            success: true, tahun: tahun, rows: rows,
+            summary: { totalInvoiceDPP: totInv, totalPengeluaranProject: totPP, totalPengeluaranNonProject: totPNP, totalPengeluaran: totPP + totPNP, totalKeuntungan: totalKeuntungan, totalMargin: totalMargin },
+            kategoriProjectTahunan: _sortKat(kpTahun), kategoriNonProjectTahunan: _sortKat(knpTahun)
+          };
+        }
+      });
+
+      // ── Laporan Keuangan (Invoice.gs → getFinanceReportData) ──────────────
+      window.gsRoute('getFinanceReportData', {
+        mode: 'fn',
+        handler: async function (args) {
+          var filter = args[0] || {};
+          var _frParse = function (s) { if (!s) return null; var p = s.split('-'); if (p.length !== 3) return null; return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2])); };
+          var _aging = function (t) { if (!t) return null; var pr = t.split('/'); if (pr.length !== 3) return null; var d = new Date(parseInt(pr[2]), parseInt(pr[1]) - 1, parseInt(pr[0])); if (isNaN(d.getTime())) return null; return Math.floor((new Date() - d) / 86400000); };
+          var dateFrom = filter.from ? _frParse(filter.from) : null;
+          var dateTo = filter.to ? _frParse(filter.to) : null;
+          if (dateTo) dateTo.setHours(23, 59, 59);
+          var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+          var woList = await _woListData();
+          var iq = await _safe(supa.from('invoice').select('no_invoice,no_wo,no_penawaran,tanggal,jenis,dpp,ppn_persen,ppn_nominal,total,status_bayar,tanggal_bayar,bukti_file_id'));
+          var invByWO = {}, invByPen = {};
+          var aging = { current: 0, gte30: 0, gte60: 0, gte90: 0 };
+          var totalTagihan = 0, totalTerbayar = 0, totalTagihanDpp = 0, totalTerbayarDpp = 0;
+          (iq.data || []).forEach(function (r) {
+            var noInv = (r.no_invoice || '').toString(); if (!noInv) return;
+            var noWO = (r.no_wo || '').toString(); var noPen = (r.no_penawaran || '').toString();
+            var tgl = _fmtTgl(r.tanggal); var jenis = (r.jenis || '').toString();
+            var dpp = parseFloat(r.dpp) || 0, ppnPct = parseFloat(r.ppn_persen) || 0, ppnNom = parseFloat(r.ppn_nominal) || 0, total = parseFloat(r.total) || 0;
+            var status = (r.status_bayar || 'Belum Lunas').toString();
+            var tglBayar = r.tanggal_bayar ? _fmtTgl(r.tanggal_bayar) : '';
+            if (!tglBayar) { var legacy = (r.bukti_file_id || '').toString(); if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(legacy)) tglBayar = _fmtTgl(legacy); }
+            if (dateFrom || dateTo) {
+              var invDate = null; var s = (r.tanggal || '').toString();
+              if (s.indexOf('T') > 0) invDate = new Date(s);
+              else { var dp = s.split('-'); if (dp.length === 3) invDate = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2])); }
+              if (invDate) { if (dateFrom && invDate < dateFrom) return; if (dateTo && invDate > dateTo) return; } else return;
+            }
+            var inv = { noInv: noInv, noWO: noWO, noPen: noPen, tgl: tgl, jenis: jenis, dpp: dpp, ppnPct: ppnPct, ppnNom: ppnNom, total: total, status: status, tglBayar: tglBayar };
+            totalTagihan += total; totalTagihanDpp += dpp;
+            if (status === 'Lunas') { totalTerbayar += total; totalTerbayarDpp += dpp; }
+            if (status !== 'Lunas') { var days = _aging(tgl); if (days !== null) { if (days >= 90) aging.gte90 += total; else if (days >= 60) aging.gte60 += total; else if (days >= 30) aging.gte30 += total; else aging.current += total; } }
+            if (noWO) { (invByWO[noWO] = invByWO[noWO] || []).push(inv); } else if (noPen) { (invByPen[noPen] = invByPen[noPen] || []).push(inv); }
+          });
+          var woRows = woList.map(function (w) {
+            var invoices = invByWO[w.noWO] || [];
+            invoices.sort(function (a, b) { return a.noInv.localeCompare(b.noInv, undefined, { numeric: true }); });
+            var tagihan = 0, terbayar = 0; invoices.forEach(function (inv) { tagihan += inv.total; if (inv.status === 'Lunas') terbayar += inv.total; });
+            var nilaiKontrak = Math.max(0, (w.subtotal || 0) - (w.diskon || 0));
+            var ppnRate = nilaiKontrak > 0 ? Math.round((w.pajak || 0) / nilaiKontrak * 100) : 0;
+            var bruto = nilaiKontrak + (w.pajak || 0);
+            return { noWO: w.noWO, noPenawaran: w.id, namaKlien: w.namaKlien, namaProject: w.namaProject, nilaiKontrak: nilaiKontrak, ppnRate: ppnRate, invoices: invoices, tagihan: tagihan, terbayar: terbayar, outstanding: tagihan - terbayar, belumDitagih: Math.max(0, bruto - tagihan) };
+          });
+          var preDealRows = [];
+          Object.keys(invByPen).forEach(function (noPen) {
+            var invList = invByPen[noPen].filter(function (inv) { return !inv.noWO; });
+            if (!invList.length) return;
+            invList.sort(function (a, b) { return a.noInv.localeCompare(b.noInv, undefined, { numeric: true }); });
+            var tagihan = 0, terbayar = 0; invList.forEach(function (inv) { tagihan += inv.total; if (inv.status === 'Lunas') terbayar += inv.total; });
+            preDealRows.push({ noWO: '', noPenawaran: noPen, namaKlien: invList[0].namaKlien || '', namaProject: invList[0].namaProject || '', nilaiKontrak: 0, ppnRate: 0, invoices: invList, tagihan: tagihan, terbayar: terbayar, outstanding: tagihan - terbayar, belumDitagih: 0, isPredeal: true });
+          });
+          return {
+            success: true,
+            summary: { totalTagihanDpp: totalTagihanDpp, totalTerbayarDpp: totalTerbayarDpp, totalOutstandingDpp: totalTagihanDpp - totalTerbayarDpp, totalTagihan: totalTagihan, totalTerbayar: totalTerbayar, totalOutstanding: totalTagihan - totalTerbayar, aging: aging },
+            rows: woRows.concat(preDealRows)
+          };
         }
       });
 
