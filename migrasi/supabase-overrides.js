@@ -2793,6 +2793,19 @@
           return { success: true, message: 'Produk ' + id + ' berhasil diperbarui!' };
         }
       });
+      // updateProdukKatalog = fungsi EDIT produk yang DIPAKAI form master
+      // (editProduk di atas tak dipanggil frontend). Args: id,nama,unit,tipe,harga,hpp.
+      window.gsRoute('updateProdukKatalog', {
+        mode: 'fn',
+        handler: async function (args) {
+          var id = (args[0] || '').toString().trim(), nama = (args[1] || '').toString(), unit = (args[2] || '').toString(), tipe = (args[3] || '').toString(), hargaJual = args[4], hpp = args[5];
+          if (!nama || !unit) return { success: false, message: 'Nama/unit tidak boleh kosong.' };
+          var up = await supa.from('produk').update({ nama: nama, unit: unit, harga_satuan: Number(hargaJual) || 0, hpp: Number(hpp) || 0, tipe: tipe || '' }).eq('id', id).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'ID produk tidak ditemukan.' };
+          return { success: true, message: 'Item ' + id + ' berhasil diperbarui.' };
+        }
+      });
       window.gsRoute('hapusProduk', {
         mode: 'fn',
         handler: async function (args) {
