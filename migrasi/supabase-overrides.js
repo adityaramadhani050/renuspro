@@ -26,6 +26,11 @@
   // status bayar tetap lewat Apps Script (aman).
   var ENABLE_EDGE_INVOICE = false;
 
+  // Nyalakan `true` HANYA SETELAH Edge Function 'user-ops' ter-deploy. Selama
+  // false, tambah/edit/hapus user tetap lewat Apps Script (aman). Manajemen user
+  // butuh Supabase Auth admin (service_role) → wajib di server.
+  var ENABLE_EDGE_USER = false;
+
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
     return; // belum dikonfigurasi → biarkan login lama (Apps Script) tetap jalan
@@ -3466,6 +3471,35 @@
         });
       }
 
+      // ── Manajemen user (auth admin) via EDGE FUNCTION user-ops ────────────
+      //  Aktif hanya bila ENABLE_EDGE_USER = true (setelah deploy user-ops).
+      if (ENABLE_EDGE_USER) {
+        window.gsRoute('simpanUser', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('user-ops', { body: { action: 'create', payload: { nama: a[0], username: a[1], password: a[2], role: a[3], leadId: a[4], noWa: a[5], email: a[6] } } });
+            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal menyimpan user.' }; }
+            return r.data;
+          }
+        });
+        window.gsRoute('editUser', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('user-ops', { body: { action: 'edit', payload: { id: a[0], nama: a[1], username: a[2], password: a[3], role: a[4], aktif: a[5], targetBulanan: a[6], leadId: a[7], noWa: a[8], email: a[9] } } });
+            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal mengubah user.' }; }
+            return r.data;
+          }
+        });
+        window.gsRoute('hapusUser', {
+          mode: 'fn',
+          handler: async function (a) {
+            var r = await supa.functions.invoke('user-ops', { body: { action: 'delete', payload: { id: a[0] } } });
+            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal menghapus user.' }; }
+            return r.data;
+          }
+        });
+      }
+
       // ── Upload file → Supabase Storage (ganti Google Drive) ───────────────
       //  Perlu bucket PUBLIK 'uploads' (lihat panduan). Kembalikan {fileId,
       //  fileUrl, fileName} sama seperti versi Drive.
@@ -4383,6 +4417,52 @@
           var up = await supa.from('hand_over').update({ status: 'Batal' }).eq('no_wo', noWO);
           if (up.error) return { success: false, message: up.error.message };
           return { success: true, message: 'Hand Over WO ' + noWO + ' dibatalkan.' };
+        }
+      });
+
+      // ── Group G: Config Syarat & Ketentuan (app_config) ───────────────────
+      //  Aman dimigrasi karena hanya memengaruhi DEFAULT form penawaran (TC per
+      //  dokumen tersimpan di kolomnya sendiri). WA & tanda tangan/DocSign TIDAK
+      //  dimigrasi di sini — pengirim WA & generator PDF masih di Apps Script
+      //  (memindah tulisnya saja → config di Supabase tapi konsumen baca lama).
+      var _TC_FIELDS = [
+        { key: 'material_status', label: 'Status Material' },
+        { key: 'dp_status', label: 'Down Payment' },
+        { key: 'term_pay', label: 'Term 2 Payment' },
+        { key: 'final_pay', label: 'Final Payment' },
+        { key: 'delivery_time', label: 'Pengiriman' },
+        { key: 'delivery_cond', label: 'Kondisi Pengiriman' },
+        { key: 'warranty', label: 'Garansi Material' },
+        { key: 'bonus', label: 'Paket Bonus' }
+      ];
+      var _TC_DEFAULTS = {
+        material_status: ['Ready Stock', 'Indent', '-'],
+        dp_status: ['From PO', 'Cover GIRO 30 days', '-'],
+        term_pay: ['Material On Site', 'Before Shipping', '-'],
+        final_pay: ['After BAST', 'Before Shipping', '-'],
+        delivery_time: ['Days After PO', 'Weeks After PO', '-'],
+        delivery_cond: ['Franco SBY/JKT', 'DDP Site', '-'],
+        warranty: ['Back to Back from Manufacture', 'Exclude', '-'],
+        bonus: ['-', 'Free Packing', 'Free Shipping Cost']
+      };
+      window.gsRoute('getTCOptions', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('app_config').select('value').eq('key', 'TC_OPTIONS').maybeSingle();
+          var opts = (q.data && q.data.value) ? q.data.value : {};
+          if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch (e) { opts = {}; } }
+          if (!opts || typeof opts !== 'object') opts = {};
+          _TC_FIELDS.forEach(function (f) { if (!opts[f.key]) opts[f.key] = _TC_DEFAULTS[f.key] || ['-']; });
+          return { success: true, fields: _TC_FIELDS, options: opts };
+        }
+      });
+      window.gsRoute('saveTCOptions', {
+        mode: 'fn',
+        handler: async function (a) {
+          var payload = a[0] || {};
+          var up = await supa.from('app_config').upsert({ key: 'TC_OPTIONS', value: payload, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Syarat & Ketentuan berhasil disimpan.' };
         }
       });
 
