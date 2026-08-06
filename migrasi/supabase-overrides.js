@@ -401,6 +401,57 @@
         return map;
       }
 
+      // ── Helper Cash Manager (gap ayat_silang/bank/kategori) ───────────────
+      async function _ayatArr() {
+        var q = await supa.from('ayat_silang').select('*');
+        var list = (q.data || []).map(function (r) {
+          return { id: r.id || '', tanggal: _fmtTgl(r.tanggal), idAkunAsal: r.id_akun_asal || '', namaAsal: r.nama_asal || '', idAkunTujuan: r.id_akun_tujuan || '', namaTujuan: r.nama_tujuan || '', jumlah: parseFloat(r.jumlah) || 0, catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '' };
+        });
+        list.reverse(); return list;
+      }
+      async function _pemArr() {
+        var q = await supa.from('pemasukan').select('*');
+        var list = (q.data || []).map(function (r) {
+          return { id: r.id_pemasukan || '', tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', kategori: r.kategori || '', idAkun: r.id_akun || '', namaAkun: r.nama_akun || '', noRef: r.no_invoice_ref || '', idReferensi: r.id_referensi || '', deskripsi: r.deskripsi || '', jumlah: parseFloat(r.jumlah) || 0, catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', diubahOleh: r.diubah_oleh || '', diubahPada: r.diubah_pada ? r.diubah_pada.toString() : '' };
+        });
+        list.reverse(); return list;
+      }
+      async function _pengArr() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([_safe(supa.from('pengeluaran').select('*')), _safe(supa.from('penawaran').select('no_wo,nama_project,klien_id')), _safe(supa.from('klien').select('id,nama_klien'))]);
+        var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
+        var woMap = {}; (res[1].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '', namaKlien: klienMap[p.klien_id] || p.klien_id || '' }; });
+        var list = (res[0].data || []).map(function (r) {
+          var noWO = r.no_wo || ''; var wi = woMap[noWO] || { namaProject: '', namaKlien: '' };
+          return { id: r.id_pengeluaran || '', noWO: noWO, namaProject: wi.namaProject, namaKlien: wi.namaKlien, tanggal: _fmtTgl(r.tanggal), sumber: r.sumber || '', noPO: r.no_po || '', idReferensi: r.id_referensi || '', idAkun: r.id_akun || '', namaAkun: r.nama_akun || '', deskripsi: r.deskripsi || '', qty: parseFloat(r.qty) || 0, satuan: r.satuan || '', hargaSatuan: parseFloat(r.harga_satuan) || 0, total: parseFloat(r.total) || 0, catatan: r.catatan || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', diubahOleh: r.diubah_oleh || '', diubahPada: r.diubah_pada ? r.diubah_pada.toString() : '', kategori: r.kategori || '' };
+        });
+        list.reverse(); return list;
+      }
+      async function _saldoAkun() {
+        var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
+        var res = await Promise.all([
+          _safe(supa.from('bank_account').select('*').order('urutan')),
+          _safe(supa.from('pemasukan').select('id_akun,jumlah')),
+          _safe(supa.from('pengeluaran').select('id_akun,total')),
+          _safe(supa.from('ayat_silang').select('id_akun_asal,id_akun_tujuan,jumlah'))
+        ]);
+        var akunMap = {}, akunOrder = [];
+        (res[0].data || []).forEach(function (b) { var aid = (b.id || '').toString(); if (!aid || akunMap[aid]) return; akunMap[aid] = { id: aid, nama: (b.label || '').toString(), tipe: 'Bank', status: 'Aktif', masuk: 0, keluar: 0, saldo: 0 }; akunOrder.push(aid); });
+        (res[1].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].masuk += parseFloat(r.jumlah) || 0; });
+        (res[2].data || []).forEach(function (r) { var a = (r.id_akun || '').toString(); if (akunMap[a]) akunMap[a].keluar += parseFloat(r.total) || 0; });
+        (res[3].data || []).forEach(function (r) { var jml = parseFloat(r.jumlah) || 0; var as = (r.id_akun_asal || '').toString(), tj = (r.id_akun_tujuan || '').toString(); if (akunMap[as]) akunMap[as].keluar += jml; if (akunMap[tj]) akunMap[tj].masuk += jml; });
+        var akunList = [], tm = 0, tk = 0, ts = 0;
+        akunOrder.forEach(function (id) { var it = akunMap[id]; it.saldo = it.masuk - it.keluar; tm += it.masuk; tk += it.keluar; ts += it.saldo; akunList.push(it); });
+        return { success: true, akun: akunList, totalMasuk: tm, totalKeluar: tk, totalSaldo: ts };
+      }
+      async function _paymentReqArr() {
+        var q = await supa.from('po_payment_request').select('*').order('id_request');
+        var list = (q.data || []).map(function (r) {
+          return { idReq: r.id_request || '', noPO: r.no_po || '', noWO: r.no_wo || '', namaSupplier: r.nama_supplier || '', grandTotalPO: parseFloat(r.grand_total_po) || 0, tanggalRequest: _fmtTgl(r.tanggal_request), jumlah: parseFloat(r.jumlah) || 0, persentase: parseFloat(r.persentase) || 0, catatan: r.catatan || '', status: r.status || '', dibuatOleh: r.dibuat_oleh || '', dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', namaAkun: r.nama_akun || '', diapproveOleh: r.diapprove_oleh || '', tanggalApprove: _fmtTgl(r.tanggal_approve), invoiceFileId: r.invoice_file_id || '', invoiceFileUrl: r.invoice_file_url || '', invoiceFileName: r.invoice_file_nama || '', catatanTolak: r.catatan_tolak || '', buktiFileId: r.bukti_file_id || '', buktiFileUrl: r.bukti_file_url || '', buktiFileName: r.bukti_file_nama || '' };
+        });
+        list.reverse(); return list;
+      }
+
       // Helper bersama: daftar invoice (dipakai getInvoiceList & getKwitansiInitialData).
       async function _invoiceList() {
         var q = await supa.from('invoice').select('*');
@@ -2491,6 +2542,51 @@
             };
           });
           return { success: true, items: items, statusPO: statusPO };
+        }
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════
+      //  GAP CASH MANAGER (perlu 00-ddl-gap-cashmanager.sql dijalankan dulu)
+      //  Ayat silang, bank account, kategori, saldo akun, bundle, bootstrap.
+      // ═══════════════════════════════════════════════════════════════════════
+      window.gsRoute('getAyatSilangList', { mode: 'fn', handler: async function () { return { success: true, list: await _ayatArr() }; } });
+      window.gsRoute('getBankAccounts', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('bank_account').select('*').order('urutan');
+          if (q.error) return { success: false, message: q.error.message };
+          return { success: true, accounts: (q.data || []).map(function (r) { return { id: (r.id || '').toString(), label: r.label || '', detail: r.detail || '' }; }) };
+        }
+      });
+      window.gsRoute('getKategoriPengeluaran', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('kategori_pengeluaran').select('nama').order('urutan');
+          if (q.error) return { success: false, list: [], message: q.error.message };
+          return { success: true, list: (q.data || []).map(function (r) { return r.nama; }) };
+        }
+      });
+      window.gsRoute('getSaldoAkun', { mode: 'fn', handler: function () { return _saldoAkun(); } });
+      window.gsRoute('getMutasiBundle', {
+        mode: 'fn',
+        handler: async function () {
+          var r = await Promise.all([_pemArr(), _pengArr(), _ayatArr()]);
+          return { success: true, pemasukan: r[0], pengeluaran: r[1], ayatSilang: r[2] };
+        }
+      });
+      window.gsRoute('getCashManagerBootstrap', {
+        mode: 'fn',
+        handler: async function () {
+          var out = { success: true };
+          try { out.paymentRequests = await _paymentReqArr(); } catch (e) { out.paymentRequests = []; }
+          try { out.workOrders = await _woListData(); } catch (e) { out.workOrders = []; }
+          try { var ba = await supa.from('bank_account').select('*').order('urutan'); out.bankAccounts = (ba.data || []).map(function (r) { return { id: (r.id || '').toString(), label: r.label || '', detail: r.detail || '' }; }); } catch (e) { out.bankAccounts = []; }
+          try { var kt = await supa.from('kategori_pengeluaran').select('nama').order('urutan'); out.kategori = (kt.data || []).map(function (r) { return r.nama; }); } catch (e) { out.kategori = []; }
+          try { out.saldo = await _saldoAkun(); } catch (e) { out.saldo = { success: false }; }
+          try { out.pemasukan = await _pemArr(); } catch (e) { out.pemasukan = []; }
+          try { out.pengeluaran = await _pengArr(); } catch (e) { out.pengeluaran = []; }
+          try { out.ayatSilang = await _ayatArr(); } catch (e) { out.ayatSilang = []; }
+          return out;
         }
       });
 

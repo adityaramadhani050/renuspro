@@ -21,7 +21,7 @@ function exportSemuaSheetKeJSON() {
     'Purchase_Order','PO_Item','Pembayaran_PO','PO_PaymentRequest',
     'Penerimaan_PO_Log','Penerimaan_Tanpa_PO',
     'Pengiriman','Pengiriman_Request',
-    'Pengeluaran','Pemasukan','HandOver','SiteSurvey_Main','WO_Dokumen'
+    'Pengeluaran','Pemasukan','AyatSilang','HandOver','SiteSurvey_Main','WO_Dokumen'
   ];
   var out = {};
   SHEETS.forEach(function (name) {

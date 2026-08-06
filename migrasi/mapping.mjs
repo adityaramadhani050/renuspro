@@ -145,6 +145,10 @@ export const TABLES = [
     ['id_pemasukan','t'],['tanggal','d'],['sumber','t'],['kategori','t'],['id_akun','t'],['nama_akun','t'],
     ['no_invoice_ref','t'],['id_referensi','t'],['deskripsi','t'],['jumlah','m'],['catatan','t'],['dibuat_oleh','t'],
     ['dibuat_pada','ts'],['diubah_oleh','t'],['diubah_pada','ts'] ]},
+
+  { table:'ayat_silang', sheet:'AyatSilang', pk:'id', cols:[
+    ['id','t'],['tanggal','d'],['id_akun_asal','t'],['nama_asal','t'],['id_akun_tujuan','t'],['nama_tujuan','t'],
+    ['jumlah','m'],['catatan','t'],['dibuat_oleh','t'],['dibuat_pada','ts'] ]},
   { table:'hand_over', sheet:'HandOver', pk:'no_wo', cols:[
     ['no_wo','t'],['status','t'],['diminta_oleh','t'],['diminta_pada','ts'],['tgl_jadwal','d'],['waktu','tm'],
     ['mode','t'],['link_meet','t'],['lokasi','t'],['peserta','t'],['catatan_undangan','t'],['dijadwalkan_oleh','t'],

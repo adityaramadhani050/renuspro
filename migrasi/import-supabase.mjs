@@ -100,26 +100,37 @@ for (const def of TABLES) {
   const dataRows = grid.slice(1);        // buang header
   const pkKeys = Array.isArray(def.pk) ? def.pk : [def.pk];
   const rows = [];
+  let skippedPk = 0;
   for (const r of dataRows) {
-    if (!r || r.every(c => s(c) === '')) continue;          // baris kosong
+    if (!r || r.every(c => s(c) === '')) continue;          // baris kosong (bukan skip)
     const o = transformRow(def.cols, r);
-    if (pkKeys.some(k => o[k] == null || o[k] === '')) continue; // PK wajib
+    if (pkKeys.some(k => o[k] == null || o[k] === '')) { skippedPk++; continue; } // PK tak lengkap
     rows.push(o);
   }
-  if (!rows.length) { console.log(`— ${def.table.padEnd(26)} : 0 baris`); continue; }
 
-  if (DRY) { console.log(`✓ ${def.table.padEnd(26)} : ${rows.length} baris (dry) contoh:`, JSON.stringify(rows[0]).slice(0,120)); totalOk += rows.length; continue; }
+  // De-duplikasi berdasarkan PK (ambil baris TERAKHIR). Tanpa ini, dua baris ber-PK
+  // sama dalam satu batch upsert bikin error "cannot affect row a second time"
+  // yang menggagalkan SELURUH batch → banyak baris hilang.
+  const byKey = new Map();
+  for (const o of rows) byKey.set(pkKeys.map(k => o[k]).join(''), o);
+  const deduped = [...byKey.values()];
+  const dupes = rows.length - deduped.length;
+
+  const note = (skippedPk ? `, ${skippedPk} PK-kosong dilewati` : '') + (dupes ? `, ${dupes} duplikat-PK digabung` : '');
+  if (!deduped.length) { console.log(`— ${def.table.padEnd(26)} : 0 baris${note}`); continue; }
+
+  if (DRY) { console.log(`✓ ${def.table.padEnd(26)} : ${deduped.length} baris (dry)${note} contoh:`, JSON.stringify(deduped[0]).slice(0,120)); totalOk += deduped.length; continue; }
 
   const onConflict = pkKeys.join(',');
   let ok = 0, err = 0;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const batch = rows.slice(i, i + CHUNK);
+  for (let i = 0; i < deduped.length; i += CHUNK) {
+    const batch = deduped.slice(i, i + CHUNK);
     const { error } = await sb.from(def.table).upsert(batch, { onConflict });
     if (error) { err += batch.length; console.error(`  ✗ ${def.table} batch@${i}: ${error.message}`); }
     else ok += batch.length;
   }
   totalOk += ok; totalErr += err;
-  console.log(`${err? '⚠':'✓'} ${def.table.padEnd(26)} : ${ok} ok${err?`, ${err} gagal`:''}`);
+  console.log(`${err? '⚠':'✓'} ${def.table.padEnd(26)} : ${ok} ok${err?`, ${err} gagal`:''}${note}`);
 }
 
 console.log(`\nSelesai. Total ${totalOk} baris${totalErr?`, ${totalErr} gagal`:''}.` + (DRY?' (DRY-RUN)':''));
