@@ -46,11 +46,16 @@ function expand(html, depth = 0, seen = new Set()) {
 }
 
 const HAS_OVERRIDES = existsSync(join(ROOT, 'migrasi', 'supabase-overrides.js'));
+const HAS_CONFIG = existsSync(join(ROOT, 'migrasi', 'config.local.js'));
 
 function injectShim(html) {
   let tag = '<script src="./gs-run-shim.js"></script>\n';
-  // Override Supabase (Milestone 4) — inert sampai dikonfigurasi di file itu.
-  if (HAS_OVERRIDES) tag += '<script src="./supabase-overrides.js"></script>\n';
+  // Override Supabase (Milestone 4) — inert sampai dikonfigurasi di config.local.js.
+  if (HAS_OVERRIDES) {
+    // config.local.js (window.__SUPA_CFG__) WAJIB dimuat SEBELUM overrides.
+    if (HAS_CONFIG) tag += '<script src="./config.local.js"></script>\n';
+    tag += '<script src="./supabase-overrides.js"></script>\n';
+  }
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => m + '\n' + tag);
   }
@@ -74,6 +79,8 @@ mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'index.html'), html, 'utf8');
 copyFileSync(join(ROOT, 'migrasi', 'gs-run-shim.js'), join(OUT_DIR, 'gs-run-shim.js'));
 if (HAS_OVERRIDES) copyFileSync(join(ROOT, 'migrasi', 'supabase-overrides.js'), join(OUT_DIR, 'supabase-overrides.js'));
+if (HAS_CONFIG) copyFileSync(join(ROOT, 'migrasi', 'config.local.js'), join(OUT_DIR, 'config.local.js'));
 
 console.log(`[build] ✔ dist/index.html (${(html.length / 1024).toFixed(0)} KB) + dist/gs-run-shim.js`);
+if (!HAS_CONFIG) console.warn('[build] ⚠ migrasi/config.local.js belum ada → override Supabase inert. Salin dari config.local.example.js.');
 console.log('[build]   Deploy folder dist/ ke Vercel (Output Directory = dist).');

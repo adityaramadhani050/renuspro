@@ -4,13 +4,15 @@
  *  agar memakai Supabase, tanpa mengubah tampilan. Fungsi lain yang BELUM
  *  di-override tetap jalan lewat backend Apps Script lama.
  *
- *  CARA PAKAI: isi 2 nilai di bawah (Project URL & anon key dari Supabase →
- *  Settings → API). Bila belum diisi, file ini TIDAK berbuat apa-apa (login
- *  lama tetap dipakai).
+ *  CARA PAKAI: isi konfigurasi di file TERPISAH migrasi/config.local.js
+ *  (salin dari migrasi/config.local.example.js). File itu TIDAK ikut git → tidak
+ *  pernah bentrok saat `git pull`. Bila belum diisi, file ini TIDAK berbuat
+ *  apa-apa (login lama tetap dipakai).
  * ========================================================================== */
 (function () {
   'use strict';
 
+<<<<<<< HEAD
   // ── ISI DUA NILAI INI ──────────────────────────────────────────────────────
   var SUPABASE_URL  = 'https://kekmetvugzwnxcpbqvfv.supabase.co';   // contoh: https://abcd1234.supabase.co
   var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtla21ldHZ1Z3p3bnhjcGJxdmZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MTgyMDAsImV4cCI6MjEwMTQ5NDIwMH0.CACdZkn_uXCbDETd-pAj8YHfOQuhZ_Qje1X0Avlw_-c';      // anon public key (aman untuk frontend)
@@ -30,6 +32,17 @@
   // false, tambah/edit/hapus user tetap lewat Apps Script (aman). Manajemen user
   // butuh Supabase Auth admin (service_role) → wajib di server.
   var ENABLE_EDGE_USER = false;
+=======
+  // ── Konfigurasi dari migrasi/config.local.js (window.__SUPA_CFG__) ──────────
+  //  Salin migrasi/config.local.example.js → migrasi/config.local.js lalu isi.
+  //  ENABLE_EDGE_* → true HANYA setelah Edge Function terkait ter-deploy.
+  var _CFG = (typeof window !== 'undefined' && window.__SUPA_CFG__) || {};
+  var SUPABASE_URL  = (_CFG.url  || 'ISI_PROJECT_URL').toString();
+  var SUPABASE_ANON = (_CFG.anon || 'ISI_ANON_KEY').toString();
+  var ENABLE_EDGE_STOK    = _CFG.enableEdgeStok    === true;
+  var ENABLE_EDGE_INVOICE = _CFG.enableEdgeInvoice === true;
+  var ENABLE_EDGE_USER    = _CFG.enableEdgeUser    === true;
+>>>>>>> 4a2bcae4266e11ff762b3efb2020e386656273f3
 
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {

@@ -4,3 +4,7 @@
 # Kredensial clasp
 .clasprc.json
 dist/
+
+# Konfigurasi Supabase lokal (URL + anon key) — jangan di-commit agar git pull
+# tak pernah bentrok. Salin dari migrasi/config.local.example.js.
+migrasi/config.local.js
