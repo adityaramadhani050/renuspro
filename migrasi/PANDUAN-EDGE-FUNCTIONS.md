@@ -122,6 +122,29 @@ Uji: buat Invoice baru & tandai **Lunas** → cek invoice, kwitansi, dan pemasuk
 otomatis muncul di Supabase. Bandingkan nomor & nilai dengan sistem lama.
 Bila salah: balik `ENABLE_EDGE_INVOICE = false`, build & push → kembali Apps Script.
 
+## Edge Function `user-ops` (tambah/edit/hapus user)
+Login RenusPro memakai **Supabase Auth** (email+password); profil ada di
+`app_user` (dikaitkan lewat `auth_uid`). Membuat/menghapus akun butuh **Auth
+admin** (service_role) → wajib di server.
+
+1. Salin folder function + shared (sekali):
+   ```bash
+   cd ~/renuspro
+   mkdir -p supabase/functions/_shared
+   cp migrasi/edge-functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
+   cp -r migrasi/edge-functions/user-ops        supabase/functions/user-ops
+   ```
+2. Deploy: `supabase functions deploy user-ops`
+3. Nyalakan di frontend: `cloudshell edit migrasi/supabase-overrides.js` →
+   ubah `var ENABLE_EDGE_USER = false;` jadi `true` → **Ctrl+S**.
+4. Build & push seperti biasa.
+
+Catatan:
+- **Email wajib** saat tambah user (dipakai untuk login). Password minimal 6 char.
+- Edit user: isi password hanya bila ingin mengganti; kosong = password lama tetap.
+- Uji: tambah user baru → coba login pakai email+password itu. Bila salah, balik
+  `ENABLE_EDGE_USER = false`, build & push → kembali Apps Script.
+
 ## Membuat Edge Function baru (pola)
 1. Bikin folder `supabase/functions/nama-fungsi/index.ts`.
 2. Tiru struktur `get-stok-list/index.ts`: import `createClient` + `corsHeaders`,
