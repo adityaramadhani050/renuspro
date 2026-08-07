@@ -4602,6 +4602,181 @@
         }
       });
 
+      // ── Group #2a: PO request pembayaran + ubah status ────────────────────
+      window.gsRoute('requestPembayaranPO', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var noPO = (p.noPO || '').toString().trim(), jumlah = parseFloat(p.jumlah) || 0, invUrl = (p.invoiceFileUrl || '').toString().trim();
+          if (!noPO) return { success: false, message: 'No PO wajib.' };
+          if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
+          if (!invUrl) return { success: false, message: 'Invoice supplier wajib diunggah.' };
+          var po = await supa.from('purchase_order').select('status_po,grand_total,no_wo,nama_supplier').eq('no_po', noPO).maybeSingle();
+          if (!po.data) return { success: false, message: 'No PO tidak ditemukan.' };
+          var statusPO = (po.data.status_po || '').toString();
+          if (statusPO === 'Selesai' || statusPO === 'Batal') return { success: false, message: 'Request pembayaran tidak bisa dibuat untuk PO berstatus "' + statusPO + '".' };
+          var grandTotal = Number(po.data.grand_total) || 0;
+          var idReq = await _nextRomanSeq('po_payment_request', 'id_request', 'RGI/PR');
+          var persentase = grandTotal > 0 ? Math.round(jumlah / grandTotal * 10000) / 100 : 0;
+          var ins = await supa.from('po_payment_request').insert({
+            id_request: idReq, no_po: noPO, no_wo: (po.data.no_wo || '').toString(), nama_supplier: (po.data.nama_supplier || '').toString(), grand_total_po: grandTotal,
+            tanggal_request: _isoDate(p.tanggalRequest) || _todayIso(), jumlah: jumlah, persentase: persentase, catatan: (p.catatan || '').toString(), status: 'Menunggu',
+            dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), nama_akun: '', diapprove_oleh: '', tanggal_approve: null,
+            invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: invUrl, invoice_file_nama: (p.invoiceFileName || '').toString()
+          });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
+        }
+      });
+      window.gsRoute('requestPembayaranNonPO', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var keterangan = (p.keterangan || '').toString().trim(), jumlah = parseFloat(p.jumlah) || 0, noWO = (p.noWO || '').toString().trim(), kategori = (p.kategori || '').toString().trim();
+          if (!keterangan) return { success: false, message: 'Keterangan wajib diisi.' };
+          if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
+          if (!noWO && !kategori) return { success: false, message: 'Pilih kategori untuk pengeluaran non-project.' };
+          var idReq = await _nextRomanSeq('po_payment_request', 'id_request', 'RGI/PR');
+          var ins = await supa.from('po_payment_request').insert({
+            id_request: idReq, no_po: '', no_wo: noWO, nama_supplier: keterangan, grand_total_po: 0,
+            tanggal_request: _isoDate(p.tanggalRequest) || _todayIso(), jumlah: jumlah, persentase: 0, catatan: (p.catatan || '').toString(), status: 'Menunggu',
+            dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), nama_akun: '', diapprove_oleh: '', tanggal_approve: null,
+            invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: (p.invoiceFileUrl || '').toString(), invoice_file_nama: (p.invoiceFileName || '').toString(), kategori_non_po: kategori
+          });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
+        }
+      });
+      window.gsRoute('submitPOKeGudang', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noPO = (a[0] || '').toString().trim(), namaUser = (a[1] || '').toString();
+          var po = await supa.from('purchase_order').select('status_po').eq('no_po', noPO).maybeSingle();
+          if (!po.data) return { success: false, message: 'PO tidak ditemukan.' };
+          var statusPO = (po.data.status_po || '').toString();
+          if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
+          var up = await supa.from('purchase_order').update({ status_po: 'Menunggu Gudang', diubah_oleh: namaUser, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'PO ' + noPO + ' berhasil dikirim ke gudang.' };
+        }
+      });
+      window.gsRoute('ubahStatusPO', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noPO = (a[0] || '').toString().trim(), statusBaru = (a[1] || '').toString(), namaUser = (a[2] || '').toString();
+          var po = await supa.from('purchase_order').select('status_po,status_bayar,total_dibayar').eq('no_po', noPO).maybeSingle();
+          if (!po.data) return { success: false, message: 'No PO tidak ditemukan.' };
+          var statusLama = (po.data.status_po || '').toString(), statusBayar = (po.data.status_bayar || '').toString(), totalDibayar = Number(po.data.total_dibayar) || 0;
+          if (statusLama === 'Selesai' || statusLama === 'Batal') return { success: false, message: 'PO berstatus "' + statusLama + '" tidak bisa diubah lagi.' };
+          if (statusBaru === 'Selesai') {
+            if (statusLama !== 'Diterima') return { success: false, message: 'PO harus berstatus "Diterima" untuk diselesaikan (saat ini: "' + statusLama + '").' };
+            if (statusBayar !== 'Lunas') return { success: false, message: 'PO tidak bisa diselesaikan — status pembayaran belum Lunas (saat ini: "' + statusBayar + '").' };
+          } else if (statusBaru === 'Batal') {
+            if (statusLama !== 'Aktif') return { success: false, message: 'PO berstatus "' + statusLama + '" tidak bisa dibatalkan — barang sudah dalam proses penerimaan.' };
+            if (totalDibayar > 0) return { success: false, message: 'PO tidak bisa dibatalkan — sudah ada pembayaran sebesar Rp ' + totalDibayar.toLocaleString('id-ID') + '.' };
+          } else {
+            return { success: false, message: 'Status yang bisa diubah secara manual hanya "Selesai" atau "Batal".' };
+          }
+          var up = await supa.from('purchase_order').update({ status_po: statusBaru, diubah_oleh: namaUser, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Status PO ' + noPO + ' berhasil diubah ke "' + statusBaru + '".' };
+        }
+      });
+
+      // ── Group #2b: request Pengiriman / Hand Over + linkBeliLangsung ──────
+      window.gsRoute('requestPengiriman', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim(), oleh = (a[1] || '').toString(), reqItems = Array.isArray(a[2]) ? a[2] : null;
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var guard = await _bomEditGuard(noWO); if (!guard.ok) return { success: false, message: guard.message };
+          var bq = await _all('bom_item', 'id,status,qty_reserved,qty_dikirim', function (q) { return q.eq('no_wo', noWO); });
+          var bom = bq.data || []; if (!bom.length) return { success: false, message: 'Gagal membaca BOM.' };
+          var sisaMap = {}, adaApproved = false;
+          bom.forEach(function (b) { if ((b.status || '') !== 'Approved') return; adaApproved = true; var reserved = Number(b.qty_reserved) || 0, dikirim = Number(b.qty_dikirim) || 0, sisa = reserved - dikirim; if (sisa > 0) sisaMap[(b.id || '').toString()] = { sisa: sisa, dikirim: dikirim, reserved: reserved }; });
+          if (!adaApproved) return { success: false, message: 'Belum ada material Approved.' };
+          if (!Object.keys(sisaMap).length) return { success: false, message: 'Belum ada material Reserved dari gudang untuk dikirim.' };
+          var chosen = [];
+          if (reqItems) { reqItems.forEach(function (r) { var m = sisaMap[(r.bomItemId || '').toString()]; if (!m) return; var qty = Number(r.qty) || 0; if (qty <= 0 || qty > m.sisa) qty = m.sisa; chosen.push({ bomItemId: (r.bomItemId || '').toString(), qty: qty, dikirim: m.dikirim, reserved: m.reserved }); }); }
+          else { Object.keys(sisaMap).forEach(function (id) { var m = sisaMap[id]; chosen.push({ bomItemId: id, qty: m.sisa, dikirim: m.dikirim, reserved: m.reserved }); }); }
+          if (!chosen.length) return { success: false, message: 'Pilih minimal 1 material Reserved untuk dikirim.' };
+          var alamat = await _kirimAlamatByWO(noWO);
+          var freshJson = chosen.map(function (c) { return { bomItemId: c.bomItemId, qty: c.qty, target: c.dikirim + c.qty }; });
+          var existing = await supa.from('pengiriman_request').select('*').eq('no_wo', noWO).maybeSingle();
+          if (existing.data && (existing.data.status || '') === 'Diminta') {
+            var arr = _arr(existing.data.items), idx = {}; arr.forEach(function (e) { idx[(e.bomItemId || '').toString()] = e; });
+            var ditambah = 0;
+            chosen.forEach(function (c) { var e = idx[c.bomItemId]; if (e) { e.target = Math.min(c.reserved, (Number(e.target) || 0) + c.qty); e.qty = e.target - c.dikirim; } else { var ne = { bomItemId: c.bomItemId, qty: c.qty, target: c.dikirim + c.qty }; arr.push(ne); idx[c.bomItemId] = ne; ditambah++; } });
+            var up = await supa.from('pengiriman_request').update({ items: arr }).eq('no_wo', noWO);
+            if (up.error) return { success: false, message: up.error.message };
+            return { success: true, message: ditambah ? (ditambah + ' material ditambahkan ke request pengiriman WO ' + noWO + '.') : ('Request pengiriman WO ' + noWO + ' diperbarui.') };
+          }
+          var payload = { no_wo: noWO, status: 'Diminta', diminta_oleh: oleh, diminta_pada: new Date().toISOString(), alamat: alamat, items: freshJson };
+          var res = existing.data ? await supa.from('pengiriman_request').update(payload).eq('no_wo', noWO) : await supa.from('pengiriman_request').insert(payload);
+          if (res.error) return { success: false, message: res.error.message };
+          return { success: true, message: 'Request pengiriman WO ' + noWO + ' (' + chosen.length + ' material) dikirim ke warehouse.' };
+        }
+      });
+      window.gsRoute('requestHandOver', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim(), oleh = (a[1] || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var ho = await supa.from('hand_over').select('status').eq('no_wo', noWO).maybeSingle();
+          var init = { no_wo: noWO, status: 'Diminta', diminta_oleh: oleh, diminta_pada: new Date().toISOString(), tgl_jadwal: null, waktu: null, mode: '', link_meet: '', lokasi: '', peserta: '', catatan_undangan: '', dijadwalkan_oleh: '', dijadwalkan_pada: null, mom: '', selesai_oleh: '', selesai_pada: null, meet_event_id: '' };
+          if (ho.data) {
+            var st = (ho.data.status || '');
+            if (st && st !== 'Batal') return { success: false, message: 'Hand Over WO ini sudah ada (status ' + st + ').' };
+            var up = await supa.from('hand_over').update(init).eq('no_wo', noWO);
+            if (up.error) return { success: false, message: up.error.message };
+          } else {
+            var ins = await supa.from('hand_over').insert(init);
+            if (ins.error) return { success: false, message: ins.error.message };
+          }
+          return { success: true, message: 'Request Hand Over WO ' + noWO + ' dikirim ke Project Coordinator.' };
+        }
+      });
+      window.gsRoute('completeHandOver', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim(), mom = (a[1] || '').toString().trim(), oleh = (a[2] || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          if (!mom) return { success: false, message: 'Catatan hasil meeting (MoM) wajib diisi.' };
+          var ho = await supa.from('hand_over').select('status').eq('no_wo', noWO).maybeSingle();
+          if (!ho.data) return { success: false, message: 'Hand Over belum ada untuk WO ini.' };
+          if ((ho.data.status || '') !== 'Dijadwalkan') return { success: false, message: 'Hand Over harus berstatus Dijadwalkan dulu.' };
+          var up = await supa.from('hand_over').update({ status: 'Selesai', mom: mom, selesai_oleh: oleh, selesai_pada: new Date().toISOString() }).eq('no_wo', noWO);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Hand Over WO ' + noWO + ' selesai. WO siap dieksekusi.' };
+        }
+      });
+      window.gsRoute('linkBeliLangsung', {
+        mode: 'fn',
+        handler: async function (a) {
+          var links = Array.isArray(a[0]) ? a[0] : [], noPO = (a[1] || '').toString(), oleh = (a[2] || '').toString();
+          var ts = Date.now(), hasil = [];
+          for (var k = 0; k < links.length; k++) {
+            var lk = links[k] || {}, bid = (lk.bomItemId || '').toString().trim(), qty = Number(lk.qty) || 0;
+            if (!bid || qty <= 0) continue;
+            var br = await supa.from('bom_item').select('*').eq('id', bid).maybeSingle();
+            if (!br.data) { hasil.push({ bomItemId: bid, success: false, message: 'Material tidak ditemukan.' }); continue; }
+            var it = br.data, qMen = Number(it.qty_menunggu_bl) || 0;
+            if (qMen <= 0) { hasil.push({ bomItemId: bid, success: false, message: 'Material tidak berstatus Tunggu Beli.' }); continue; }
+            if (qty > qMen) qty = qMen;
+            var harga = Number(lk.hargaSatuan) || 0, total = qty * harga, idRef = 'BL-' + bid + '-' + ts + '-' + k;
+            var exp = await _buatPengeluaran({ noWO: (it.no_wo || ''), tanggal: _todayIso(), sumber: 'Pembelian Langsung', noPO: noPO, idReferensi: idRef, idAkun: 'AP001', namaAkun: 'Stok', deskripsi: 'Beli langsung ' + (it.nama_material || '') + (noPO ? ' (PO ' + noPO + ')' : ''), qty: qty, satuan: (it.satuan || ''), hargaSatuan: harga, total: total, dibuatOleh: oleh, kategori: (it.kategori || '') });
+            if (!exp.ok) { hasil.push({ bomItemId: bid, success: false, message: 'Gagal catat pengeluaran: ' + exp.message }); continue; }
+            var qR = Number(it.qty_reserved) || 0, qBLnew = (Number(it.qty_beli_langsung) || 0) + qty, qMenNew = qMen - qty, qtyBeli = Number(it.qty_beli) || 0;
+            var refOld = (it.ref_beli_langsung || '').toString(), refNew = refOld ? (refOld + ';' + idRef) : idRef;
+            var st = _bomDeriveProcStatus(qR, qtyBeli, qMenNew, qBLnew);
+            var up = await supa.from('bom_item').update({ proc_status: st, qty_menunggu_bl: qMenNew, qty_beli_langsung: qBLnew, ref_beli_langsung: refNew, diproses_oleh: oleh, diproses_pada: new Date().toISOString() }).eq('id', bid);
+            if (up.error) { hasil.push({ bomItemId: bid, success: false, message: up.error.message }); continue; }
+            hasil.push({ bomItemId: bid, success: true, qty: qty, idReferensi: idRef, sisaMenunggu: qMenNew });
+          }
+          return { success: true, hasil: hasil };
+        }
+      });
+
       // ── QC master checklist: kelola Section & SubItem (qc_section/qc_checklist)
       window.gsRoute('tambahQCSection', {
         mode: 'fn',
