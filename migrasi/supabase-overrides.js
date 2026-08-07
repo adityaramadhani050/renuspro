@@ -4466,6 +4466,219 @@
         }
       });
 
+      // ── Buat/Edit Penawaran & PO (fungsi inti yang sebelumnya belum ada) ──
+      async function _hoStatus(noWO) {
+        if (!noWO) return '';
+        var q = await supa.from('hand_over').select('status').eq('no_wo', noWO).maybeSingle();
+        return q.data ? (q.data.status || '') : '';
+      }
+      function _isSameJkMonth(v) {
+        if (!v) return false; var s = v.toString(); var m = s.match(/^(\d{4})-(\d{2})/); if (!m) { var d = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (d) { var t2 = _jkMonthYear(); return parseInt(d[3], 10) === t2.yr && parseInt(d[2], 10) === (t2.mo + 1); } return false; }
+        var t = _jkMonthYear(); return parseInt(m[1], 10) === t.yr && parseInt(m[2], 10) === (t.mo + 1);
+      }
+      async function _nextQuotationNumber() {
+        var q = await _all('penawaran', 'no_penawaran'); var maxId = 0;
+        (q.data || []).forEach(function (r) { var m = (r.no_penawaran || '').toString().match(/^(\d+)\/QUOT/); if (m) { var n = parseInt(m[1], 10); if (n > maxId) maxId = n; } });
+        var t = _jkMonthYear();
+        return ('00' + (maxId + 1)).slice(-3) + '/QUOT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
+      }
+      // term_conditions penawaran: buang 7 field angka internal, sisipkan catatan.
+      function _cleanTC(tc, catatan) {
+        var c = {}; tc = tc || {}; for (var k in tc) { if (Object.prototype.hasOwnProperty.call(tc, k)) c[k] = tc[k]; }
+        c.catatan = catatan || '';
+        ['hppTotalGabungan', 'estimasiProfitBersih', 'marginPersenInternal', 'diskonPersen', 'diskonNominal', 'pajakPersen', 'pajakNominal'].forEach(function (kk) { delete c[kk]; });
+        return c;
+      }
+      function _poTC(v) { if (v == null) return null; if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } } return v; }
+      function _hitungPO(items, diskonPersenIn, diskonNominalIn, ppnPersenIn) {
+        var subtotal = 0; items.forEach(function (it) { subtotal += (parseFloat(it.qty) || 0) * (parseFloat(it.hargaBeli) || 0); });
+        var diskonPersen = parseFloat(diskonPersenIn) || 0;
+        var diskonNominal = parseFloat(diskonNominalIn) || Math.round(subtotal * diskonPersen / 100);
+        if (diskonNominal > subtotal) diskonNominal = subtotal;
+        var setelahDiskon = subtotal - diskonNominal;
+        var ppnPersen = parseFloat(ppnPersenIn) || 0;
+        var ppnNominal = Math.round(setelahDiskon * ppnPersen / 100);
+        return { subtotal: subtotal, diskonPersen: diskonPersen, diskonNominal: diskonNominal, ppnPersen: ppnPersen, ppnNominal: ppnNominal, grandTotal: setelahDiskon + ppnNominal };
+      }
+      function _poItemRows(items, noPO) {
+        var ts = Date.now();
+        return items.map(function (it, idx) { var qty = Number(it.qty) || 0, hb = Number(it.hargaBeli) || 0; return { id_item: 'POI-' + ts + '-' + idx, no_po: noPO, nama_item: (it.namaItem || '').toString(), qty: qty, satuan: (it.satuan || '').toString(), harga_beli_satuan: hb, total: qty * hb, catatan: (it.catatan || '').toString(), qty_diterima: 0, id_produk: (it.produkId || '') || null }; });
+      }
+      window.gsRoute('simpanPenawaranKeSheet', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}, tc = p.termConditions || {};
+          var noPen = await _nextQuotationNumber();
+          var ins = await supa.from('penawaran').insert({
+            no_penawaran: noPen, rev: 0, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
+            nama_project: (p.namaProject || '').toString(), klien_id: (p.klienId || '') || null, dibuat_oleh: (p.namaUser || 'Sales Executive').toString(),
+            subtotal: Number(p.subtotal) || 0, diskon: Number(tc.diskonNominal) || 0, pajak: Number(tc.pajakNominal) || 0, grand_total: Number(p.grandTotal) || 0,
+            total_hpp: Number(tc.hppTotalGabungan) || 0, estimasi_keuntungan: Number(tc.estimasiProfitBersih) || 0, margin_persen: parseFloat(tc.marginPersenInternal) || 0,
+            term_conditions: _cleanTC(tc, p.catatan), items: Array.isArray(p.items) ? p.items : [], status: 'On-Progress', no_wo: '', tanggal_deal: null,
+            channel_marketing: (p.channelMarketing || '').toString(), catatan_fail: '', reminder_expired: null, kode_win: '', catatan_win: '', kode_lost: '', tanggal_fail: null, lesson_learned: '', action: ''
+          });
+          if (ins.error) return { success: false, message: 'Gagal menyimpan: ' + ins.error.message };
+          return { success: true, message: 'Penawaran ' + noPen + ' berhasil disimpan!', nextNo: await _nextQuotationNumber() };
+        }
+      });
+      window.gsRoute('editPenawaran', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}, noPen = (p.noPenawaran || '').toString();
+          if (!noPen) return { success: false, message: 'No Penawaran wajib.' };
+          var rows = await _all('penawaran', '*', function (q) { return q.eq('no_penawaran', noPen); });
+          var list = rows.data || []; if (!list.length) return { success: false, message: 'Penawaran tidak ditemukan.' };
+          list.sort(function (x, y) { return (Number(y.rev) || 0) - (Number(x.rev) || 0); });
+          var latest = list[0], maxRev = Number(latest.rev) || 0, currentStatus = (latest.status || '').toString();
+          if (currentStatus === 'Deal') {
+            if (!_isSameJkMonth(latest.tanggal_deal)) return { success: false, message: 'Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah.' };
+            if ((await _hoStatus(latest.no_wo)) === 'Selesai') return { success: false, message: 'Penawaran Deal tidak dapat direvisi karena Hand Over WO ' + (latest.no_wo || '') + ' sudah Selesai (project sudah diserahterimakan ke tim project).' };
+          }
+          var newRev = maxRev + 1, tc = p.termConditions || {}, statusBaru = currentStatus === 'Deal' ? 'Deal' : (p.status || 'On-Progress'), isDeal = statusBaru === 'Deal';
+          var ins = await supa.from('penawaran').insert({
+            no_penawaran: noPen, rev: newRev, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
+            nama_project: (p.namaProject || '').toString(), klien_id: (p.klienId || '') || null, dibuat_oleh: (p.namaUser || 'Sales Executive').toString(),
+            subtotal: Number(p.subtotal) || 0, diskon: Number(tc.diskonNominal) || 0, pajak: Number(tc.pajakNominal) || 0, grand_total: Number(p.grandTotal) || 0,
+            total_hpp: Number(tc.hppTotalGabungan) || 0, estimasi_keuntungan: Number(tc.estimasiProfitBersih) || 0, margin_persen: parseFloat(tc.marginPersenInternal) || 0,
+            term_conditions: _cleanTC(tc, p.catatan), items: Array.isArray(p.items) ? p.items : [], status: statusBaru,
+            no_wo: isDeal ? (latest.no_wo || '') : '', tanggal_deal: isDeal ? (latest.tanggal_deal || null) : null, channel_marketing: (p.channelMarketing || '').toString(),
+            catatan_fail: '', reminder_expired: null, kode_win: isDeal ? (latest.kode_win || '') : '', catatan_win: '', kode_lost: '', tanggal_fail: null,
+            lesson_learned: isDeal ? (latest.lesson_learned || '') : '', action: isDeal ? (latest.action || '') : ''
+          });
+          if (ins.error) return { success: false, message: 'Gagal: ' + ins.error.message };
+          return { success: true, message: noPen + ' berhasil direvisi → Rev' + newRev + '!', nextNo: await _nextQuotationNumber() };
+        }
+      });
+      window.gsRoute('simpanPO', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var idSupplier = (p.idSupplier || '').toString().trim();
+          if (!idSupplier) return { success: false, message: 'ID Supplier tidak boleh kosong.' };
+          var items = Array.isArray(p.items) ? p.items : [];
+          if (!items.length) return { success: false, message: 'PO harus memiliki minimal 1 item.' };
+          var noWO = (p.noWO || '').toString().trim();
+          if (noWO) { var st = await _hoStatus(noWO); if (st !== 'Selesai') { var msg = st === 'Dijadwalkan' ? 'Hand Over WO ini masih Dijadwalkan — selesaikan HO dulu.' : st === 'Diminta' ? 'Hand Over WO ini baru Diminta — jadwalkan & selesaikan HO dulu.' : 'WO ini belum melewati Hand Over. Selesaikan Hand Over dulu sebelum lanjut.'; return { success: false, message: 'PO untuk WO ini belum bisa dibuat. ' + msg }; } }
+          var noPO = await _nextRomanSeq('purchase_order', 'no_po', 'RGI/PO'), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
+          var ins = await supa.from('purchase_order').insert({
+            no_po: noPO, tanggal: _isoDate(p.tanggal) || _todayIso(), id_supplier: idSupplier, nama_supplier: (p.namaSupplier || '').toString(), peruntukan: (p.peruntukan || '').toString(), no_wo: noWO,
+            status_po: 'Aktif', subtotal: calc.subtotal, ppn_persen: calc.ppnPersen, ppn_nominal: calc.ppnNominal, grand_total: calc.grandTotal, catatan: (p.catatan || '').toString(), status_bayar: 'Belum Dibayar', total_dibayar: 0,
+            dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), diubah_oleh: '', diubah_pada: null, diskon_persen: calc.diskonPersen, diskon_nominal: calc.diskonNominal,
+            no_quotation: (p.quotNo || '').toString(), tanggal_quotation: _isoDate(p.quotTanggal), term_conditions: _poTC(p.termConditions), quot_file_id: (p.quotFileId || '').toString(), quot_file_url: (p.quotFileUrl || '').toString(), quot_file_nama: (p.quotFileName || '').toString()
+          });
+          if (ins.error) return { success: false, message: ins.error.message };
+          var insI = await supa.from('po_item').insert(_poItemRows(items, noPO));
+          if (insI.error) return { success: false, message: insI.error.message };
+          return { success: true, message: 'Purchase Order ' + noPO + ' berhasil dibuat.', noPO: noPO };
+        }
+      });
+      window.gsRoute('editPO', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {}, noPO = (p.noPO || '').toString().trim();
+          if (!noPO) return { success: false, message: 'No PO tidak boleh kosong.' };
+          var items = Array.isArray(p.items) ? p.items : [];
+          if (!items.length) return { success: false, message: 'PO harus memiliki minimal 1 item.' };
+          var po = await supa.from('purchase_order').select('*').eq('no_po', noPO).maybeSingle();
+          if (!po.data) return { success: false, message: 'No PO tidak ditemukan.' };
+          if ((po.data.status_po || '') !== 'Aktif') return { success: false, message: 'Hanya PO berstatus Aktif yang dapat diedit.' };
+          var ex = po.data, calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
+          var upd = {
+            tanggal: _isoDate(p.tanggal) || _todayIso(), id_supplier: p.idSupplier ? p.idSupplier.toString() : ex.id_supplier, nama_supplier: p.namaSupplier ? p.namaSupplier.toString() : ex.nama_supplier,
+            peruntukan: p.peruntukan ? p.peruntukan.toString() : ex.peruntukan, no_wo: (p.noWO !== undefined) ? (p.noWO || '').toString() : ex.no_wo,
+            subtotal: calc.subtotal, ppn_persen: calc.ppnPersen, ppn_nominal: calc.ppnNominal, grand_total: calc.grandTotal, catatan: (p.catatan !== undefined) ? (p.catatan || '').toString() : ex.catatan,
+            diubah_oleh: p.diubahOleh ? p.diubahOleh.toString() : '', diubah_pada: new Date().toISOString(), diskon_persen: calc.diskonPersen, diskon_nominal: calc.diskonNominal,
+            no_quotation: (p.quotNo !== undefined) ? (p.quotNo || '').toString() : (ex.no_quotation || ''), tanggal_quotation: (p.quotTanggal !== undefined) ? _isoDate(p.quotTanggal) : ex.tanggal_quotation,
+            term_conditions: (p.termConditions !== undefined) ? _poTC(p.termConditions) : ex.term_conditions,
+            quot_file_id: (p.quotFileId !== undefined) ? (p.quotFileId || '').toString() : (ex.quot_file_id || ''), quot_file_url: (p.quotFileUrl !== undefined) ? (p.quotFileUrl || '').toString() : (ex.quot_file_url || ''), quot_file_nama: (p.quotFileName !== undefined) ? (p.quotFileName || '').toString() : (ex.quot_file_nama || '')
+          };
+          var up = await supa.from('purchase_order').update(upd).eq('no_po', noPO);
+          if (up.error) return { success: false, message: up.error.message };
+          var delI = await supa.from('po_item').delete().eq('no_po', noPO);
+          if (delI.error) return { success: false, message: delI.error.message };
+          var insI = await supa.from('po_item').insert(_poItemRows(items, noPO));
+          if (insI.error) return { success: false, message: insI.error.message };
+          return { success: true, message: 'Purchase Order ' + noPO + ' berhasil diperbarui.' };
+        }
+      });
+
+      // ── QC master checklist: kelola Section & SubItem (qc_section/qc_checklist)
+      window.gsRoute('tambahQCSection', {
+        mode: 'fn',
+        handler: async function (a) {
+          var label = (a[0] || '').toString().trim();
+          if (!label) return { success: false, message: 'Nama item QC wajib diisi.' };
+          var secs = await _all('qc_section', 'kode,urutan');
+          var used = {}, maxU = 0; (secs.data || []).forEach(function (s) { if (s.kode) used[s.kode.toString().trim().toUpperCase()] = true; maxU = Math.max(maxU, Number(s.urutan) || 0); });
+          var kode = 'S' + ((secs.data || []).length + 1); for (var c = 65; c <= 90; c++) { var L = String.fromCharCode(c); if (!used[L]) { kode = L; break; } }
+          var ins = await supa.from('qc_section').insert({ kode: kode, label: label, urutan: maxU + 1 });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Item QC "' + kode + '. ' + label + '" ditambahkan.', kode: kode };
+        }
+      });
+      window.gsRoute('updateQCSection', {
+        mode: 'fn',
+        handler: async function (a) {
+          var kode = (a[0] || '').toString().trim(), label = (a[1] || '').toString().trim();
+          if (!label) return { success: false, message: 'Nama item QC wajib diisi.' };
+          var up = await supa.from('qc_section').update({ label: label }).eq('kode', kode).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Item tidak ditemukan.' };
+          return { success: true, message: 'Item QC diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusQCSection', {
+        mode: 'fn',
+        handler: async function (a) {
+          var kode = (a[0] || '').toString().trim();
+          var delItems = await supa.from('qc_checklist').delete().eq('section_kode', kode);
+          if (delItems.error) return { success: false, message: delItems.error.message };
+          var del = await supa.from('qc_section').delete().eq('kode', kode);
+          if (del.error) return { success: false, message: del.error.message };
+          return { success: true, message: 'Item QC & subitemnya dihapus.' };
+        }
+      });
+      window.gsRoute('tambahQCSubItem', {
+        mode: 'fn',
+        handler: async function (a) {
+          var sectionKode = (a[0] || '').toString().trim(), label = (a[1] || '').toString().trim(), wajib = a[2], instruksi = a[3], tipeUpload = a[4];
+          if (!sectionKode) return { success: false, message: 'Item QC induk wajib.' };
+          if (!label) return { success: false, message: 'Nama subitem wajib diisi.' };
+          var tipe = (tipeUpload === 'file') ? 'file' : 'foto';
+          var items = await _all('qc_checklist', 'kode,section_kode,urutan');
+          var maxNum = 0, maxU = 0;
+          (items.data || []).forEach(function (x) { maxU = Math.max(maxU, Number(x.urutan) || 0); if ((x.section_kode || '').toString().trim() === sectionKode) { var mm = (x.kode || '').toString().match(/(\d+)$/); if (mm) maxNum = Math.max(maxNum, parseInt(mm[1], 10)); } });
+          var kode = sectionKode + (maxNum + 1);
+          var ins = await supa.from('qc_checklist').insert({ kode: kode, section_kode: sectionKode, label: label, wajib: !!wajib, urutan: maxU + 1, instruksi: (instruksi || '').toString(), contoh_foto: '', tipe_upload: tipe });
+          if (ins.error) return { success: false, message: ins.error.message };
+          return { success: true, message: 'Subitem "' + kode + '" ditambahkan.', kode: kode };
+        }
+      });
+      window.gsRoute('updateQCSubItem', {
+        mode: 'fn',
+        handler: async function (a) {
+          var kode = (a[0] || '').toString().trim(), label = (a[1] || '').toString().trim(), wajib = a[2], instruksi = a[3], tipeUpload = a[4];
+          if (!label) return { success: false, message: 'Nama subitem wajib diisi.' };
+          var upd = { label: label, wajib: !!wajib };
+          if (instruksi != null) upd.instruksi = instruksi.toString();
+          if (tipeUpload != null) upd.tipe_upload = (tipeUpload === 'file') ? 'file' : 'foto';
+          var up = await supa.from('qc_checklist').update(upd).eq('kode', kode).select();
+          if (up.error) return { success: false, message: up.error.message };
+          if (!up.data || !up.data.length) return { success: false, message: 'Subitem tidak ditemukan.' };
+          return { success: true, message: 'Subitem diperbarui.' };
+        }
+      });
+      window.gsRoute('hapusQCSubItem', {
+        mode: 'fn',
+        handler: async function (a) {
+          var kode = (a[0] || '').toString().trim();
+          var del = await supa.from('qc_checklist').delete().eq('kode', kode).select();
+          if (del.error) return { success: false, message: del.error.message };
+          if (!del.data || !del.data.length) return { success: false, message: 'Subitem tidak ditemukan.' };
+          return { success: true, message: 'Subitem dihapus.' };
+        }
+      });
+
       // ── CATATAN untuk modul berikutnya (BELUM di-override) ─────────────────
       //  Fungsi berikut punya FIELD HITUNGAN / agregasi / logika multi-tabel,
       //  JANGAN dibuat `supa.from(...)` mentah — pindahkan sebagai EDGE FUNCTION
