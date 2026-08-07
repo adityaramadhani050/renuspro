@@ -4,23 +4,32 @@
  *  agar memakai Supabase, tanpa mengubah tampilan. Fungsi lain yang BELUM
  *  di-override tetap jalan lewat backend Apps Script lama.
  *
- *  CARA PAKAI: isi konfigurasi di file TERPISAH migrasi/config.local.js
- *  (salin dari migrasi/config.local.example.js). File itu TIDAK ikut git → tidak
- *  pernah bentrok saat `git pull`. Bila belum diisi, file ini TIDAK berbuat
- *  apa-apa (login lama tetap dipakai).
+ *  CARA PAKAI: isi 2 nilai di bawah (Project URL & anon key dari Supabase →
+ *  Settings → API). Bila belum diisi, file ini TIDAK berbuat apa-apa (login
+ *  lama tetap dipakai).
  * ========================================================================== */
 (function () {
   'use strict';
 
-  // ── Konfigurasi dari migrasi/config.local.js (window.__SUPA_CFG__) ──────────
-  //  Salin migrasi/config.local.example.js → migrasi/config.local.js lalu isi.
-  //  ENABLE_EDGE_* → true HANYA setelah Edge Function terkait ter-deploy.
-  var _CFG = (typeof window !== 'undefined' && window.__SUPA_CFG__) || {};
-  var SUPABASE_URL  = (_CFG.url  || 'ISI_PROJECT_URL').toString();
-  var SUPABASE_ANON = (_CFG.anon || 'ISI_ANON_KEY').toString();
-  var ENABLE_EDGE_STOK    = _CFG.enableEdgeStok    === true;
-  var ENABLE_EDGE_INVOICE = _CFG.enableEdgeInvoice === true;
-  var ENABLE_EDGE_USER    = _CFG.enableEdgeUser    === true;
+  // ── ISI DUA NILAI INI ──────────────────────────────────────────────────────
+  var SUPABASE_URL  = 'ISI_PROJECT_URL';   // contoh: https://abcd1234.supabase.co
+  var SUPABASE_ANON = 'ISI_ANON_KEY';      // anon public key (aman untuk frontend)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // Nyalakan jadi `true` HANYA SETELAH Edge Function 'get-stok-list' ter-deploy
+  // (lihat migrasi/PANDUAN-EDGE-FUNCTIONS.md). Selama false, getStokList tetap
+  // memakai Apps Script lama supaya Inventory tidak rusak.
+  var ENABLE_EDGE_STOK = false;
+
+  // Nyalakan `true` HANYA SETELAH Edge Function 'invoice-ops' ter-deploy
+  // (lihat PANDUAN-EDGE-FUNCTIONS.md). Selama false, simpan invoice & ubah
+  // status bayar tetap lewat Apps Script (aman).
+  var ENABLE_EDGE_INVOICE = false;
+
+  // Nyalakan `true` HANYA SETELAH Edge Function 'user-ops' ter-deploy. Selama
+  // false, tambah/edit/hapus user tetap lewat Apps Script (aman). Manajemen user
+  // butuh Supabase Auth admin (service_role) → wajib di server.
+  var ENABLE_EDGE_USER = false;
 
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
