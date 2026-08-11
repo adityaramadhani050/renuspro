@@ -11,4 +11,5 @@ File di-assemble build.mjs sesuai urutan nama (lexicographic).
 090-group-c-bom-procurement-hold.js
 100-group-3a-bom-writes-project-.js
 800-site-survey-qc-foto.js
+810-dashboard-laporan.js
 900-tail.js
