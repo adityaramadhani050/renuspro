@@ -18,11 +18,15 @@ sebagai "layanan" yang dipanggil lewat proxy `/api/gs`.
      (halaman T&C statik) dan config tanda tangan (`getDocSignConfig`,
      `saveDocSignConfig`, `saveSignatureImage`, `clearSignatureImage`,
      `getPOTCOptions`) yang **kopel** dengan pencetak PDF.
-  2. **Notifikasi WhatsApp** — pengirim WA (endpoint + pemicu terjadwal /
-     time-trigger) masih di Apps Script (`saveWAConfig`, `*Remind*`,
-     `ajukanReviewBOM`, `kirimHasilReviewBOM`, `kirimReminderExpiredManual`,
-     `testWANotif`, `saveWAReminderScheduleConfig`, dst).
-  3. **Google Calendar** — `hoGenerateMeet` (buat link meeting hand over).
+  2. **Google Calendar** — `hoGenerateMeet` (buat link meeting hand over).
+
+**Notifikasi WhatsApp — SUDAH DIMIGRASI (gated `ENABLE_WA`, default false).**
+Pengirim jadi Edge Function `wa-send` (token di server), config di `app_config`
+`WA_CONFIG`, komposer pesan + reminder harian (`wa-reminder` + pg_cron) di sisi
+Supabase, dan notifikasi tertanam (review/assign/PO/pembayaran) sudah dipasang
+kembali. Aktifkan dengan set `ENABLE_WA = true` di `overrides/830-whatsapp.js`
+setelah deploy Edge Function + isi config — lihat `PANDUAN-WHATSAPP.md`. Selama
+false, WA tetap lewat Apps Script.
 
 > **PENTING (pelajaran):** memindahkan *config* sebuah subsistem TANPA
 > memindahkan *konsumennya* = split-brain (config di Supabase, tapi pembaca lama
