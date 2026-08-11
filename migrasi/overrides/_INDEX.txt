@@ -13,4 +13,5 @@ File di-assemble build.mjs sesuai urutan nama (lexicographic).
 800-site-survey-qc-foto.js
 810-dashboard-laporan.js
 820-report-pdf-data.js
+830-whatsapp.js
 900-tail.js
