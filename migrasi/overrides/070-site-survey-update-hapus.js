@@ -70,13 +70,17 @@
         userIds = userIds || [];
         var uq = await supa.from('app_user').select('id,nama');
         var userMap = {}; (uq.data || []).forEach(function (u) { userMap[u.id] = u.nama; });
+        var prev = await supa.from(table).select('id_user').eq('no_wo', noWO);   // untuk deteksi engineer BARU
+        var prevIds = {}; (prev.data || []).forEach(function (r) { prevIds[(r.id_user || '').toString()] = 1; });
         var d = await supa.from(table).delete().eq('no_wo', noWO); if (d.error) return { success: false, message: d.error.message };
-        var seen = {}, rows = [], when = new Date().toISOString();
+        var seen = {}, rows = [], newIds = [], when = new Date().toISOString();
         for (var j = 0; j < userIds.length; j++) {
           var uid = (userIds[j] || '').toString().trim(); if (!uid || seen[uid]) continue; seen[uid] = true;
           rows.push({ no_wo: noWO, id_user: uid, nama_user: userMap[uid] || uid, assigned_by: (assignedBy || '').toString(), assigned_at: when });
+          if (!prevIds[uid]) newIds.push(uid);
         }
         if (rows.length) { var ins = await supa.from(table).insert(rows); if (ins.error) return { success: false, message: ins.error.message }; }
+        if (newIds.length && typeof _notifAssignEngineer === 'function') { var _md = table === 'bom_assignment' ? 'BOM' : table === 'ded_assignment' ? 'DED' : 'QC'; _notifAssignEngineer(_md, noWO, newIds); }
         return { success: true, message: 'Penugasan diperbarui (' + Object.keys(seen).length + ' engineer).' };
       }
       window.gsRoute('setBOMAssignment', { mode: 'fn', handler: function (a) { return _setAssignment('bom_assignment', a[0], a[1], a[2]); } });
@@ -410,7 +414,7 @@
           var ins = await supa.from(table).insert(row);
           if (ins.error) return { ok: false, message: ins.error.message };
         }
-        return { ok: true, list: all };
+        return { ok: true, list: all, prevStatus: found ? (found.status || '') : '' };
       }
 
       // QC foto: single + batch
@@ -425,6 +429,7 @@
           var foto = { fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) };
           var res = await _engAppendFiles('qc_item', 'foto', 'QCI', noWO, kode, [foto], oleh);
           if (!res.ok) return { success: false, message: res.message };
+          if (typeof _qcNotifLeadReview === 'function') _qcNotifLeadReview(noWO, kode, oleh, 1, res.prevStatus);
           return { success: true, message: 'Foto tersimpan.', foto: foto, status: 'Pending', foto_list: res.list };
         }
       });
@@ -445,6 +450,7 @@
           if (!added.length) return { success: false, message: 'Tidak ada file valid.' };
           var res = await _engAppendFiles('qc_item', 'foto', 'QCI', noWO, kode, added, oleh);
           if (!res.ok) return { success: false, message: res.message };
+          if (typeof _qcNotifLeadReview === 'function') _qcNotifLeadReview(noWO, kode, oleh, added.length, res.prevStatus);
           return { success: true, message: added.length + ' foto tersimpan.', status: 'Pending', foto_list: res.list };
         }
       });
@@ -485,6 +491,7 @@
           if (!added.length) return { success: false, message: 'Tidak ada file valid.' };
           var res = await _engAppendFiles('ded_item', 'files', 'DEDI', noWO, kode, added, oleh);
           if (!res.ok) return { success: false, message: res.message };
+          if (typeof _dedNotifLeadReview === 'function') _dedNotifLeadReview(noWO, kode, oleh, added.length, res.prevStatus);
           return { success: true, message: added.length + ' dokumen tersimpan.', status: 'Pending', file_list: res.list };
         }
       });

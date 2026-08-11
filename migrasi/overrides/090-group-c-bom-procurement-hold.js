@@ -382,6 +382,7 @@
             invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: invUrl, invoice_file_nama: (p.invoiceFileName || '').toString()
           });
           if (ins.error) return { success: false, message: ins.error.message };
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'PO: ' + noPO + (po.data.no_wo ? ' · WO: ' + po.data.no_wo : '') + (po.data.nama_supplier ? ' · ' + po.data.nama_supplier : ''), jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
         }
       });
@@ -401,6 +402,7 @@
             invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: (p.invoiceFileUrl || '').toString(), invoice_file_nama: (p.invoiceFileName || '').toString(), kategori_non_po: kategori
           });
           if (ins.error) return { success: false, message: ins.error.message };
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'Tanpa PO' + (noWO ? ' · WO: ' + noWO : (kategori ? ' · ' + kategori : '')) + ' · ' + keterangan, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
         }
       });
@@ -408,12 +410,13 @@
         mode: 'fn',
         handler: async function (a) {
           var noPO = (a[0] || '').toString().trim(), namaUser = (a[1] || '').toString();
-          var po = await supa.from('purchase_order').select('status_po').eq('no_po', noPO).maybeSingle();
+          var po = await supa.from('purchase_order').select('status_po,no_wo,nama_supplier').eq('no_po', noPO).maybeSingle();
           if (!po.data) return { success: false, message: 'PO tidak ditemukan.' };
           var statusPO = (po.data.status_po || '').toString();
           if (statusPO !== 'Aktif' && statusPO !== 'Diterima Sebagian') return { success: false, message: 'PO berstatus "' + statusPO + '" tidak bisa dikirim ke gudang.' };
           var up = await supa.from('purchase_order').update({ status_po: 'Menunggu Gudang', diubah_oleh: namaUser, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
           if (up.error) return { success: false, message: up.error.message };
+          if (typeof _notifPOKeGudang === 'function') _notifPOKeGudang(noPO, (po.data.no_wo || ''), (po.data.nama_supplier || ''), namaUser);
           return { success: true, message: 'PO ' + noPO + ' berhasil dikirim ke gudang.' };
         }
       });

@@ -192,6 +192,7 @@
           var ev = { type: (keputusan === 'Approved' ? 'approve' : 'reject'), by: reviewer, at: _fmtTs(new Date()), note: catatan };
           var up = await supa.from('ded_item').update({ status: keputusan, catatan_review: catatan, direview_oleh: reviewer, direview_pada: new Date().toISOString(), aktivitas: _arr(f.data.aktivitas).concat([ev]) }).eq('id', f.data.id);
           if (up.error) return { success: false, message: up.error.message };
+          if (typeof _dedNotifSiteReview === 'function') _dedNotifSiteReview(noWO, kode, keputusan, catatan);
           return { success: true, message: 'Dokumen ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
         }
       });
@@ -248,6 +249,7 @@
           var ev = { type: (keputusan === 'Approved' ? 'approve' : 'reject'), by: reviewer, at: _fmtTs(new Date()), note: catatan };
           var up = await supa.from('qc_item').update({ status: keputusan, catatan_spv: catatan, direview_oleh: reviewer, direview_pada: new Date().toISOString(), aktivitas: _arr(f.data.aktivitas).concat([ev]) }).eq('id', f.data.id);
           if (up.error) return { success: false, message: up.error.message };
+          if (typeof _qcNotifSiteReview === 'function') _qcNotifSiteReview(noWO, kode, keputusan, catatan);
           return { success: true, message: 'Item ' + kode + ' ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
         }
       });

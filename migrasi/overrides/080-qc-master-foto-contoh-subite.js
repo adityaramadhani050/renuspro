@@ -464,6 +464,7 @@
           var newStatus = allDiterima ? 'Diterima' : (adaDiterima ? 'Diterima Sebagian' : statusPO);
           await supa.from('purchase_order').update({ status_po: newStatus, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
           if (detailLog.length) { var idLog = 'RCV-' + Date.now() + '-' + Math.floor(Math.random() * 1000); await supa.from('penerimaan_po_log').insert({ id_log: idLog, no_po: noPO, tanggal: _todayIso(), mode: 'Gudang', jumlah_item: detailLog.length, detail_item: detailLog, dibuat_oleh: namaUser, dibuat_pada: new Date().toISOString(), bukti_file_id: (p.buktiFileId || ''), bukti_file_url: (p.buktiFileUrl || ''), bukti_file_nama: (p.buktiFileName || '') }); }
+          if (typeof _notifBarangDiterima === 'function') _notifBarangDiterima(noPO, (po.data.no_wo || ''), newStatus, namaUser, detailLog.filter(function (d) { return d.catatan; }).map(function (d) { return d.namaItem + ': ' + d.catatan; }));
           return { success: true, message: 'Penerimaan berhasil. Status PO: ' + newStatus };
         }
       });
@@ -524,6 +525,7 @@
             res = await _simpanPembayaranPO({ noPO: noPO, tanggalBayar: tglIso, idAkun: idAkun, namaAkun: namaAkun, jumlah: jumlah, catatan: catatanPay, dibuatOleh: approvedBy });
           }
           if (!res.success) { await rollback(); return { success: false, message: 'Gagal mencatat pembayaran: ' + (res.message || '') }; }
+          if (typeof _notifHasilPembayaran === 'function') _notifHasilPembayaran(idReq, (noPO ? ('PO: ' + noPO) : ('Tanpa PO' + (reqKeterangan ? ' · ' + reqKeterangan : ''))), jumlah, true, approvedBy, '');
           return { success: true, message: (noPO ? ('Pembayaran PO ' + noPO) : 'Pembayaran (tanpa PO)') + ' sebesar Rp ' + jumlah.toLocaleString('id-ID') + ' berhasil disetujui dan dicatat.' };
         }
       });
@@ -532,11 +534,12 @@
         handler: async function (a) {
           var idReq = (a[0] || '').toString().trim(), namaUser = (a[1] || '').toString(), catatanTolak = (a[2] || '').toString().trim();
           if (!catatanTolak) return { success: false, message: 'Catatan penolakan wajib diisi.' };
-          var rq = await supa.from('po_payment_request').select('status').eq('id_request', idReq).maybeSingle();
+          var rq = await supa.from('po_payment_request').select('status,no_po,nama_supplier,jumlah').eq('id_request', idReq).maybeSingle();
           if (!rq.data) return { success: false, message: 'Request tidak ditemukan.' };
           if ((rq.data.status || '') !== 'Menunggu') return { success: false, message: 'Request sudah diproses (status: ' + (rq.data.status || '') + ').' };
           var up = await supa.from('po_payment_request').update({ status: 'Ditolak', diapprove_oleh: namaUser, tanggal_approve: _todayIso(), catatan_tolak: catatanTolak }).eq('id_request', idReq);
           if (up.error) return { success: false, message: up.error.message };
+          if (typeof _notifHasilPembayaran === 'function') _notifHasilPembayaran(idReq, (rq.data.no_po ? ('PO: ' + rq.data.no_po) : ('Tanpa PO' + (rq.data.nama_supplier ? ' · ' + rq.data.nama_supplier : ''))), Number(rq.data.jumlah) || 0, false, namaUser, catatanTolak);
           return { success: true, message: 'Request ' + idReq + ' ditolak.' };
         }
       });
