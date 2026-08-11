@@ -14,7 +14,7 @@
  *  Jalankan dari root repo Apps Script:  node migrasi/build.mjs
  *  Output:  dist/index.html  +  dist/gs-run-shim.js
  * ========================================================================== */
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +45,21 @@ function expand(html, depth = 0, seen = new Set()) {
   });
 }
 
-const HAS_OVERRIDES = existsSync(join(ROOT, 'migrasi', 'supabase-overrides.js'));
+// Override dipecah per-modul di migrasi/overrides/*.js (di-assemble sesuai urutan
+// nama). Key Supabase tetap INLINE di 000-head.js (deploy-safe, tak butuh file
+// eksternal). Fallback ke file tunggal migrasi/supabase-overrides.js bila ada.
+const OVR_DIR = join(ROOT, 'migrasi', 'overrides');
+const OVR_SINGLE = join(ROOT, 'migrasi', 'supabase-overrides.js');
+const HAS_OVR_DIR = existsSync(join(OVR_DIR, '000-head.js'));
+const HAS_OVERRIDES = HAS_OVR_DIR || existsSync(OVR_SINGLE);
+
+function assembleOverrides() {
+  if (HAS_OVR_DIR) {
+    const parts = readdirSync(OVR_DIR).filter((f) => f.endsWith('.js')).sort();
+    return parts.map((f) => readFileSync(join(OVR_DIR, f), 'utf8')).join('\n');
+  }
+  return readFileSync(OVR_SINGLE, 'utf8');
+}
 
 function injectShim(html) {
   let tag = '<script src="./gs-run-shim.js"></script>\n';
@@ -73,7 +87,7 @@ if (leftover) {
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'index.html'), html, 'utf8');
 copyFileSync(join(ROOT, 'migrasi', 'gs-run-shim.js'), join(OUT_DIR, 'gs-run-shim.js'));
-if (HAS_OVERRIDES) copyFileSync(join(ROOT, 'migrasi', 'supabase-overrides.js'), join(OUT_DIR, 'supabase-overrides.js'));
+if (HAS_OVERRIDES) writeFileSync(join(OUT_DIR, 'supabase-overrides.js'), assembleOverrides(), 'utf8');
 
 console.log(`[build] ✔ dist/index.html (${(html.length / 1024).toFixed(0)} KB) + dist/gs-run-shim.js`);
 console.log('[build]   Deploy folder dist/ ke Vercel (Output Directory = dist).');

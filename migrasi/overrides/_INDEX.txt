@@ -1,0 +1,13 @@
+File di-assemble build.mjs sesuai urutan nama (lexicographic).
+000-head.js  (pembuka IIFE + config + loader supabase-js)
+010-helpers-awal.js
+020-master-klien-customer-gs.js
+030-penawaran-list-penawaran-gs.js
+040-export-pengeluaran-per-wo-pe.js
+050-data-kontrak-spk-per-wo-work.js
+060-tambah-customer-customer-gs.js
+070-site-survey-update-hapus.js
+080-qc-master-foto-contoh-subite.js
+090-group-c-bom-procurement-hold.js
+100-group-3a-bom-writes-project-.js
+900-tail.js  (penutup IIFE)
