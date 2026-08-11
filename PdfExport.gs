@@ -475,20 +475,18 @@ function _sisipkanFooter(sheet, startRow, item, tc) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+// Peta klien dari SUPABASE (tabel klien), bukan sheet Master_Klien.
 function _getKlienMap(ss) {
   const map = {};
   try {
-    const sheet = ss.getSheetByName('Master_Klien');
-    if (!sheet) return map;
-    // getValues() SEKALI untuk seluruh data (bukan getRange per baris)
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) map[data[i][0].toString()] = {
-        nama: data[i][1], perusahaan: data[i][2],
-        alamat: data[i][3], kontak: data[i][4]
+    const rows = _supaRows_('klien?select=id,nama_klien,perusahaan,alamat,kontak');
+    (rows || []).forEach(function (r) {
+      if (r.id != null) map[r.id.toString()] = {
+        nama: r.nama_klien || '', perusahaan: r.perusahaan || '',
+        alamat: r.alamat || '', kontak: r.kontak || ''
       };
-    }
-  } catch(e) {}
+    });
+  } catch (e) {}
   return map;
 }
 

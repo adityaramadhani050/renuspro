@@ -98,41 +98,27 @@ function _formatTanggalKwitansi(tgl) {
   return 'Surabaya, ' + d + ' ' + bulan[m] + ' ' + y;
 }
 
+// Bank account dari SUPABASE (invoice.bank_account), bukan sheet.
 function _getBankAccountFromInvoice(ss, noInvoice) {
   try {
-    const sheet = ss.getSheetByName('Invoice_Main');
-    if (!sheet) return '';
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] && data[i][0].toString() === noInvoice) {
-        return data[i][19] ? data[i][19].toString() : ''; // kolom 20 = Bank Account
-      }
-    }
-    return '';
+    var r = _supaOne_('invoice?no_invoice=eq.' + _supaEnc_(noInvoice) + '&select=bank_account&limit=1');
+    return r ? (r.bank_account || '').toString() : '';
   } catch (e) { return ''; }
 }
 
+// Data kwitansi dari SUPABASE (tabel kwitansi), bukan sheet Kwitansi_Main.
 function _getKwitansiById(ss, idKwitansi) {
-  const sheet = ss.getSheetByName('Kwitansi_Main');
-  if (!sheet) return null;
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toString() === idKwitansi) {
-      const tglStr = data[i][3] instanceof Date
-        ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][3];
-      return {
-        id:         data[i][0].toString(),
-        noInvoice:  data[i][1] ? data[i][1].toString() : '',
-        noWO:       data[i][2] ? data[i][2].toString() : '',
-        tanggal:    tglStr,
-        terimaDari: data[i][4] ? data[i][4].toString() : '',
-        jumlah:     parseFloat(data[i][5]) || 0,
-        untuk:      data[i][6] ? data[i][6].toString() : '',
-        metode:     data[i][7] ? data[i][7].toString() : '',
-        catatan:    data[i][8] ? data[i][8].toString() : ''
-      };
-    }
-  }
-  return null;
+  var r = _supaOne_('kwitansi?no_kwitansi=eq.' + _supaEnc_(idKwitansi) + '&select=*&limit=1');
+  if (!r) return null;
+  return {
+    id:         (r.no_kwitansi || '').toString(),
+    noInvoice:  (r.no_invoice || '').toString(),
+    noWO:       (r.no_wo || '').toString(),
+    tanggal:    _supaFmtTgl_(r.tanggal),
+    terimaDari: (r.terima_dari || '').toString(),
+    jumlah:     parseFloat(r.jumlah) || 0,
+    untuk:      (r.untuk_pembayaran || '').toString(),
+    metode:     (r.metode || '').toString(),
+    catatan:    (r.catatan || '').toString()
+  };
 }

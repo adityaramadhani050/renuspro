@@ -67,41 +67,30 @@ function _invoiceFileName(inv) {
     '_' + safe(inv.namaProject) + '_' + safe(inv.namaKlien) + '.pdf';
 }
 
+// Data invoice dari SUPABASE (tabel invoice), bukan sheet Invoice_Main.
 function _getInvoiceById(ss, idInvoice) {
-  const sheet = ss.getSheetByName('Invoice_Main');
-  if (!sheet) return null;
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toString() === idInvoice) {
-      const tglStr = data[i][3] instanceof Date
-        ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][3];
-      const tglPoStr = data[i][7] instanceof Date
-        ? Utilities.formatDate(data[i][7], Session.getScriptTimeZone(), "dd/MM/yyyy")
-        : data[i][7];
-      return {
-        id:          data[i][0].toString(),
-        noWO:        data[i][1] ? data[i][1].toString() : '',
-        noPenawaran: data[i][2] ? data[i][2].toString() : '',
-        tanggal:     tglStr,
-        jenis:       data[i][4] ? data[i][4].toString() : 'Penuh',
-        persen:      parseFloat(data[i][5]) || 0,
-        noPO:        data[i][6] ? data[i][6].toString() : '',
-        tglPO:       tglPoStr,
-        klienId:     data[i][8] ? data[i][8].toString() : '',
-        namaKlien:   data[i][9] ? data[i][9].toString() : '',
-        namaProject: data[i][10] ? data[i][10].toString() : '',
-        dpp:         parseFloat(data[i][11]) || 0,
-        ppnPersen:   parseFloat(data[i][12]) || 0,
-        ppnNominal:  parseFloat(data[i][13]) || 0,
-        total:       parseFloat(data[i][14]) || 0,
-        metaJson:    data[i][15] ? data[i][15].toString() : '{}',
-        catatan:     data[i][17] ? data[i][17].toString() : '',
-        bankAccount: data[i][19] ? data[i][19].toString() : ''
-      };
-    }
-  }
-  return null;
+  var r = _supaOne_('invoice?no_invoice=eq.' + _supaEnc_(idInvoice) + '&select=*&limit=1');
+  if (!r) return null;
+  return {
+    id:          (r.no_invoice || '').toString(),
+    noWO:        (r.no_wo || '').toString(),
+    noPenawaran: (r.no_penawaran || '').toString(),
+    tanggal:     _supaFmtTgl_(r.tanggal),
+    jenis:       (r.jenis || 'Penuh').toString(),
+    persen:      parseFloat(r.persen) || 0,
+    noPO:        (r.no_po || '').toString(),
+    tglPO:       _supaFmtTgl_(r.tgl_po),
+    klienId:     (r.klien_id || '').toString(),
+    namaKlien:   (r.nama_klien || '').toString(),
+    namaProject: (r.nama_project || '').toString(),
+    dpp:         parseFloat(r.dpp) || 0,
+    ppnPersen:   parseFloat(r.ppn_persen) || 0,
+    ppnNominal:  parseFloat(r.ppn_nominal) || 0,
+    total:       parseFloat(r.total) || 0,
+    metaJson:    JSON.stringify(r.rincian_item || {}),
+    catatan:     (r.catatan || '').toString(),
+    bankAccount: (r.bank_account || '').toString()
+  };
 }
 
 // Ambil scope (kelompok penawaran) & nilai kontrak dari meta JSON kolom 16.

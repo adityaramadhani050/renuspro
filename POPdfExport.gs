@@ -31,7 +31,7 @@ function exportPODariTemplate(noPO) {
     var sheet = prep.sheet;
     var cache = prep.cache;
 
-    var detail = getPODetail(noPO);
+    var detail = _getPODetailSupabase(noPO);
     if (!detail.success) return { success: false, message: detail.message };
 
     var po       = detail.po;
@@ -303,24 +303,66 @@ function initPOTemplate() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Supplier dari SUPABASE (tabel supplier), bukan sheet Supplier.
 function _getPOSupplierById(ss, idSupplier) {
   try {
-    var sheet = ss.getSheetByName('Supplier');
-    if (!sheet || !idSupplier) return {};
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] && data[i][0].toString() === idSupplier.toString()) {
-        return {
-          nama:    data[i][1] ? data[i][1].toString() : '',
-          pic:     data[i][2] ? data[i][2].toString() : '',
-          telepon: data[i][3] ? data[i][3].toString() : '',
-          email:   data[i][4] ? data[i][4].toString() : '',
-          alamat:  data[i][5] ? data[i][5].toString() : ''
-        };
-      }
-    }
-  } catch(e) { Logger.log('_getPOSupplierById error: ' + e); }
-  return {};
+    if (!idSupplier) return {};
+    var r = _supaOne_('supplier?id_supplier=eq.' + _supaEnc_(idSupplier) + '&select=nama,pic,telepon,email,alamat&limit=1');
+    if (!r) return {};
+    return {
+      nama:    (r.nama || '').toString(),
+      pic:     (r.pic || '').toString(),
+      telepon: (r.telepon || '').toString(),
+      email:   (r.email || '').toString(),
+      alamat:  (r.alamat || '').toString()
+    };
+  } catch (e) { Logger.log('_getPOSupplierById error: ' + e); return {}; }
+}
+
+// Detail PO (header + items) dari SUPABASE — bentuk objek sama seperti getPODetail.
+function _getPODetailSupabase(noPO) {
+  try {
+    var h = _supaOne_('purchase_order?no_po=eq.' + _supaEnc_(noPO) + '&select=*&limit=1');
+    if (!h) return { success: false, message: 'No PO tidak ditemukan.' };
+    var header = {
+      noPO:          (h.no_po || '').toString(),
+      tanggal:       _supaFmtTgl_(h.tanggal),
+      idSupplier:    (h.id_supplier || '').toString(),
+      namaSupplier:  (h.nama_supplier || '').toString(),
+      peruntukan:    (h.peruntukan || '').toString(),
+      noWO:          (h.no_wo || '').toString(),
+      statusPO:      (h.status_po || '').toString(),
+      subtotal:      parseFloat(h.subtotal) || 0,
+      ppnPersen:     parseFloat(h.ppn_persen) || 0,
+      ppnNominal:    parseFloat(h.ppn_nominal) || 0,
+      grandTotal:    parseFloat(h.grand_total) || 0,
+      catatan:       (h.catatan || '').toString(),
+      statusBayar:   (h.status_bayar || '').toString(),
+      totalDibayar:  parseFloat(h.total_dibayar) || 0,
+      dibuatOleh:    (h.dibuat_oleh || '').toString(),
+      diskonPersen:  parseFloat(h.diskon_persen) || 0,
+      diskonNominal: parseFloat(h.diskon_nominal) || 0,
+      quotNo:        (h.no_quotation || '').toString(),
+      quotTanggal:   _supaFmtTgl_(h.tanggal_quotation),
+      termConditions: h.term_conditions ? JSON.stringify(h.term_conditions) : '',
+      quotFileId:    (h.quot_file_id || '').toString(),
+      quotFileUrl:   (h.quot_file_url || '').toString(),
+      quotFileName:  (h.quot_file_nama || '').toString()
+    };
+    var rows = _supaRows_('po_item?no_po=eq.' + _supaEnc_(noPO) + '&select=nama_item,qty,satuan,harga_beli_satuan,total,id_item&order=id_item');
+    var items = (rows || []).map(function (ir) {
+      return {
+        namaItem:  (ir.nama_item || '').toString(),
+        qty:       parseFloat(ir.qty) || 0,
+        satuan:    (ir.satuan || '').toString(),
+        hargaBeli: parseFloat(ir.harga_beli_satuan) || 0,
+        total:     parseFloat(ir.total) || 0
+      };
+    });
+    return { success: true, po: header, items: items };
+  } catch (e) {
+    return { success: false, message: 'Gagal ambil PO dari Supabase: ' + e.toString() };
+  }
 }
 
 function _bersihkanZonaPO(sheet, cache) {
