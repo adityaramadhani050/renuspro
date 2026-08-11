@@ -1,0 +1,75 @@
+      // ── Data untuk PDF: Laporan QC + Laporan Site Survey ──────────────────
+      //  Foto dikonversi ke data URL base64 (unduh dari Storage) agar bisa
+      //  di-embed ke PDF (URL publik lintas-domain tak dapat dipakai jsPDF).
+      async function _photoDataUrl(fileId) {
+        try {
+          var dl = await supa.storage.from('uploads').download((fileId || '').toString());
+          if (dl.error || !dl.data) return '';
+          return await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { res(''); }; fr.readAsDataURL(dl.data); });
+        } catch (e) { return ''; }
+      }
+      function _qcStatusLabelText(st) { var m = { 'Approved': 'APPROVED', 'Pending': 'PENDING', 'Rejected': 'REJECTED', 'NA': 'N/A', 'Belum Upload': 'BELUM UPLOAD' }; return m[st] || (st || 'BELUM UPLOAD'); }
+      async function _ssAttachDataUrls(fotoArr) {
+        var arr = Array.isArray(fotoArr) ? fotoArr : (fotoArr ? [fotoArr] : []), out = [];
+        for (var i = 0; i < arr.length; i++) { var f = arr[i]; if (!f || !f.fileId) continue; var durl = await _photoDataUrl(f.fileId); if (durl) out.push({ fileId: f.fileId, fileUrl: f.fileUrl || '', caption: f.caption || '', dataUrl: durl }); }
+        return out;
+      }
+      window.gsRoute('getQCReportData', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noWO = (a[0] || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+          try {
+            var master = (await _qcMaster()).list;
+            var iq = await supa.from('qc_item').select('*').eq('no_wo', noWO);
+            var rowMap = {}; (iq.data || []).forEach(function (r) { rowMap[(r.kode || '').toString().trim()] = r; });
+            var list = master.map(function (m) {
+              var it = rowMap[m.kode] || null, foto = it ? _arr(it.foto) : [];
+              var status = it && it.status ? it.status.toString() : (foto.length ? 'Pending' : 'Belum Upload');
+              return { kode: m.kode, section: m.section, sectionLabel: m.sectionLabel, label: m.label, wajib: m.wajib, status: status, catatanSPV: it && it.catatan_spv ? it.catatan_spv.toString() : '', foto: foto };
+            });
+            var summary = _engCountSummary(list);
+            var namaProject = '', namaKlien = '';
+            try { var wo = ((await _woListData()) || []).filter(function (w) { return w.noWO === noWO; })[0]; if (wo) { namaProject = wo.namaProject || ''; namaKlien = wo.namaKlien || ''; } } catch (e) {}
+            if (!namaProject) { try { var pr = await supa.from('qc_project').select('nama_project,nama_klien').eq('no_wo', noWO).maybeSingle(); if (pr.data) { namaProject = pr.data.nama_project || ''; namaKlien = pr.data.nama_klien || ''; } } catch (e) {} }
+            var assigned = []; try { var aq = await supa.from('qc_assignment').select('nama_user').eq('no_wo', noWO); assigned = (aq.data || []).map(function (x) { return x.nama_user || ''; }).filter(Boolean); } catch (e) {}
+            var sections = [], idx = {};
+            for (var i = 0; i < list.length; i++) {
+              var it = list[i];
+              if (idx[it.section] == null) { idx[it.section] = sections.length; sections.push({ kode: it.section, label: it.sectionLabel, items: [] }); }
+              var fotoOut = [], fa = it.foto || [];
+              for (var j = 0; j < fa.length; j++) { var durl = await _photoDataUrl(fa[j].fileId); if (durl) fotoOut.push({ dataUrl: durl }); }
+              sections[idx[it.section]].items.push({ kode: it.kode, label: it.label, wajib: it.wajib, status: it.status, statusLabel: _qcStatusLabelText(it.status), catatanSPV: it.catatanSPV || '', foto: fotoOut });
+            }
+            return { success: true, noWO: noWO, namaProject: namaProject, namaKlien: namaKlien, tglExport: _fmtTs(new Date()), assigned: assigned, summary: summary, sections: sections };
+          } catch (e) { return { success: false, message: (e && e.message) || String(e) }; }
+        }
+      });
+      window.gsRoute('getSiteSurveyReportData', {
+        mode: 'fn',
+        handler: async function (a) {
+          var id = (a[0] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          try {
+            var q = await supa.from('site_survey').select('*').eq('id', id).maybeSingle();
+            if (q.error) return { success: false, message: q.error.message };
+            if (!q.data) return { success: false, message: 'Survey tidak ditemukan.' };
+            var r = q.data, dd = _jsonObj(r.data) || {};
+            var kel = dd.kelistrikan || {}, bos = dd.bos || {}, atap = dd.atap || {}, jk = dd.jalurKabel || {};
+            var d = {
+              id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey), dibuatOleh: r.dibuat_oleh || '', dibuatOlehId: dd.dibuatOlehId || '',
+              noWO: r.no_wo || dd.noWO || '', namaSite: r.nama_site || '', namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || '',
+              latitude: (r.latitude !== null && r.latitude !== undefined) ? Number(r.latitude) : null, longitude: (r.longitude !== null && r.longitude !== undefined) ? Number(r.longitude) : null,
+              dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', arahBangunan: dd.arahBangunan || '', tinggiBangunan: dd.tinggiBangunan || 0
+            };
+            d.fotoBangunan = await _ssAttachDataUrls(dd.fotoBangunan);
+            kel.fotoKwh = await _ssAttachDataUrls(kel.fotoKwh); kel.fotoPHB = await _ssAttachDataUrls(kel.fotoPHB);
+            bos.foto = await _ssAttachDataUrls(bos.foto);
+            atap.fotoAtap = await _ssAttachDataUrls(atap.fotoAtap); atap.fotoRangka = await _ssAttachDataUrls(atap.fotoRangka); atap.fotoAkses = await _ssAttachDataUrls(atap.fotoAkses);
+            jk.fotoPV = await _ssAttachDataUrls(jk.fotoPV); jk.fotoAC = await _ssAttachDataUrls(jk.fotoAC);
+            d.kelistrikan = kel; d.bos = bos; d.atap = atap; d.jalurKabel = jk;
+            d.tglExport = _fmtTs(new Date());
+            return { success: true, survey: d };
+          } catch (e) { return { success: false, message: (e && e.message) || String(e) }; }
+        }
+      });
