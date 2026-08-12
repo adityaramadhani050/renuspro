@@ -84,6 +84,24 @@ if (leftover) {
   [...new Set(leftover)].slice(0, 20).forEach((s) => console.warn('   ' + s.slice(0, 80)));
 }
 
+// Sisipkan logo RENUS (assets/renus-logo.png) sebagai data URI ke token di
+// JS_PdfClient. Bila file belum diupload, token dikosongkan → PDF pakai logo
+// vektor fallback. Kirim/commit assets/renus-logo.png untuk logo asli.
+{
+  // Terima logo di assets/renus-logo.png ATAU renus-logo.png di root (lebih
+  // mudah diupload lewat GitHub web).
+  const LOGO_CANDIDATES = [join(ROOT, 'assets', 'renus-logo.png'), join(ROOT, 'renus-logo.png')];
+  const LOGO_PATH = LOGO_CANDIDATES.filter((p) => existsSync(p))[0];
+  let logoURI = '';
+  if (LOGO_PATH) {
+    logoURI = 'data:image/png;base64,' + readFileSync(LOGO_PATH).toString('base64');
+    console.log('[build] ✔ Logo PDF di-embed dari ' + LOGO_PATH.replace(ROOT + '/', ''));
+  } else {
+    console.warn('[build] ⚠ renus-logo.png belum ada (root / assets/) — PDF pakai logo vektor fallback.');
+  }
+  html = html.split('__RENUS_LOGO_DATA_URI__').join(logoURI);
+}
+
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'index.html'), html, 'utf8');
 copyFileSync(join(ROOT, 'migrasi', 'gs-run-shim.js'), join(OUT_DIR, 'gs-run-shim.js'));

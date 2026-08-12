@@ -180,7 +180,7 @@ function buatDokumenPDF(item) {
     const ML   = 14;
     const MR   = 14;
     const CW   = PW - ML - MR;
-    const BLUE = [0, 51, 153];
+    const BLUE = PDF_HDR_BG;   // #0b5394 (bar seksi & header tabel)
 
     const rpNum = v => Math.round(Math.abs(v)).toLocaleString('id-ID');
 
@@ -191,81 +191,22 @@ function buatDokumenPDF(item) {
     let kelompokList = [];
     try { kelompokList = JSON.parse(item.items || '[]'); } catch (e) {}
 
-    // ── LOGO RENUS (kiri atas) ─────────────────────────────────────────────
-    // Kotak biru latar logo
-    doc.setFillColor(...BLUE);
-    doc.rect(ML, 10, 26, 10, 'F');
-
-    // Ikon panah/petir kecil di dalam kotak (dibuat manual dengan polygon)
-    doc.setFillColor(255, 255, 255);
-    // Gambar simbol "F" / panah miring kecil sebagai ikon brand
-    // Menggunakan segitiga + batang horisontal untuk menyerupai logo
-    const ix = ML + 2.5;
-    const iy = 11;
-    // Panah ke kanan atas (chevron)
-    doc.triangle(ix, iy + 7, ix + 3, iy + 3.5, ix + 3, iy + 7, 'F');
-    doc.triangle(ix + 2.5, iy + 7, ix + 5.5, iy + 3.5, ix + 5.5, iy + 7, 'F');
-    // Batang horisontal tengah
-    doc.setFillColor(255, 255, 255);
-    doc.rect(ix, iy + 4.5, 5.5, 1.2, 'F');
-
-    // Teks "RENUS" di dalam kotak biru
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.text('RENUS', ML + 16, 16.2, { align: 'center' });
-
-    // Info perusahaan di bawah logo
-    doc.setTextColor(...BLUE);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 24);
-
-    doc.setTextColor(50, 50, 50);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.text('Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari', ML, 28);
-    doc.text('Kec. Rungkut, Kota Surabaya 60293', ML, 32);
-    doc.setTextColor(...BLUE);
-    doc.text('Email : admin@renergynusantara | renergynusantara@gmail.com', ML, 36);
-    doc.setTextColor(50, 50, 50);
-    doc.text('Telp : 0895-6059-84308 | 0813-5820-8282', ML, 40);
+    // ── HEADER KIRI (logo PNG + perusahaan) — helper bersama ───────────────
+    _pdfHeaderKiri(doc, ML);
 
     // ── HEADER KANAN: "Quotation" + info doc ──────────────────────────────
-    doc.setTextColor(100, 100, 100);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(28);
-    doc.text('Quotation', PW - MR, 20, { align: 'right' });
-
-    const infoLX = PW - MR - 44;
-    const infoRX = PW - MR;
-    [
-      ['Date',        item.tanggal   || ''],
-      ['Quotation #', item.id        || ''],
+    _pdfJudulKanan(doc, 'Quotation', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 20 });
+    _pdfInfoKanan(doc, [
+      ['Date',        item.tanggal || ''],
+      ['Quotation #', item.id || ''],
       ['Rev',         String(item.rev ?? '0')],
-    ].forEach((r, idx) => {
-      const y = 28 + idx * 5;
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(50, 50, 50);
-      doc.text(r[0], infoLX, y);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(20, 20, 20);
-      doc.text(r[1], infoRX, y, { align: 'right' });
-    });
+    ], PW, MR, 30, 5.5);
 
     // ── QUOTATION TO ───────────────────────────────────────────────────────
-    let curY = 45;
+    let curY = 50;
+    curY = _pdfBarSeksi(doc, 'Quotation To :', ML, CW, curY);
 
-    doc.setFillColor(...BLUE);
-    doc.rect(ML, curY, CW, 6, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('Quotation To :', ML + 2, curY + 4.2);
-    curY += 6;
-
-    doc.setFillColor(248, 249, 252);
+    doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]);
     doc.rect(ML, curY, CW, 26, 'F');
     doc.setDrawColor(210, 215, 230);
     doc.setLineWidth(0.2);
@@ -286,20 +227,20 @@ function buatDokumenPDF(item) {
     ];
 
     clientRows.forEach((r, idx) => {
-      const y = curY + 5.5 + idx * 5.5;
-      doc.setFontSize(8);
+      const y = curY + 6 + idx * 5.5;
+      doc.setFontSize(PDF_FS);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(70, 70, 70);
+      doc.setTextColor(0, 0, 0);
       doc.text(r[0], c1L, y);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(20, 20, 20);
+      doc.setTextColor(0, 0, 0);
       doc.text(r[1], c1V, y);
       if (r[2]) {
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(70, 70, 70);
+        doc.setTextColor(0, 0, 0);
         doc.text(r[2], c2L + 5, y);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(20, 20, 20);
+        doc.setTextColor(0, 0, 0);
         doc.text(r[3], c2V - 3, y, { align: 'right' });
       }
     });
@@ -320,7 +261,7 @@ function buatDokumenPDF(item) {
           content: letter,
           styles: {
             fontStyle: 'bold',
-            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG,
             textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
             fontStyle: isDiscount ? 'bolditalic' : 'bold',
           },
@@ -329,13 +270,13 @@ function buatDokumenPDF(item) {
           content: k.namaKelompok,
           styles: {
             fontStyle: isDiscount ? 'bolditalic' : 'bold',
-            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG,
             textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
           },
         },
-        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
-        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
-        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255] } },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG } },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG } },
+        { content: '', styles: { fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG } },
         {
           content: isDiscount
             ? (k.subtotal < 0 ? '-' : '') + rpNum(k.subtotal)
@@ -343,7 +284,7 @@ function buatDokumenPDF(item) {
           styles: {
             halign: 'right',
             fontStyle: isDiscount ? 'bolditalic' : 'bold',
-            fillColor: isDiscount ? [255, 245, 245] : [235, 240, 255],
+            fillColor: isDiscount ? [255, 245, 245] : PDF_GROUP_BG,
             textColor: isDiscount ? [160, 0, 0] : [10, 10, 10],
           },
         },
@@ -394,18 +335,19 @@ function buatDokumenPDF(item) {
         fillColor:  BLUE,
         textColor:  [255, 255, 255],
         fontStyle:  'bold',
-        fontSize:   8,
+        fontSize:   PDF_FS,
         lineColor:  [255, 255, 255],
         lineWidth:  0.3,
       },
       bodyStyles: {
-        fontSize:    7.5,
-        textColor:   [40, 40, 40],
+        fontSize:    PDF_FS,
+        textColor:   [0, 0, 0],
+        fillColor:   PDF_ROW_BG,
         lineColor:   [200, 205, 220],
         lineWidth:   0.2,
         cellPadding: 1.8,
       },
-      alternateRowStyles: { fillColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: PDF_ROW_BG },
       styles: { overflow: 'linebreak' },
     });
 
@@ -451,16 +393,16 @@ function buatDokumenPDF(item) {
         doc.line(colLabelX, ry - 0.5, colLabelX + summaryBoxW, ry - 0.5);
       }
 
-      doc.setFontSize(8);
+      doc.setFontSize(PDF_FS);
       if (row.bold) {
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...BLUE);
+        doc.setTextColor(0, 0, 0);
       } else if (row.red) {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(180, 0, 0);
       } else {
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(50, 50, 50);
+        doc.setTextColor(0, 0, 0);
       }
       doc.text(row.label, colLabelX + 3, ry + 4);
       doc.text(row.value,  colValX - 2,   ry + 4, { align: 'right' });
@@ -479,7 +421,7 @@ function buatDokumenPDF(item) {
           doc.setDrawColor(220, 200, 100);
           doc.setLineWidth(0.2);
           doc.rect(ML, curY, CW, catatanH);
-          doc.setFontSize(7.5);
+          doc.setFontSize(PDF_FS);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(100, 80, 0);
           doc.text('Catatan :', ML + 2, curY + 4.5);
@@ -498,7 +440,7 @@ function buatDokumenPDF(item) {
     doc.rect(ML, curY, CW, 6, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(PDF_FS);
     doc.text('Term & Condition :', ML + 2, curY + 4.2);
     curY += 8;
 
@@ -539,7 +481,7 @@ function buatDokumenPDF(item) {
     const tcRows2    = Math.ceil(tcItems.length / tcColCount);
     const tcTotalH   = tcRows2 * tcRowH + 6;
 
-    doc.setFillColor(248, 249, 252);
+    doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
     doc.rect(ML, curY - 2, CW, tcTotalH, 'F');
     doc.setDrawColor(210, 215, 230);
     doc.setLineWidth(0.2);
@@ -553,8 +495,8 @@ function buatDokumenPDF(item) {
       const x   = ML + 3 + col * tcItemW;
       const y   = curY + 4 + row * tcRowH;
 
-      doc.setFontSize(7.5);
-      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(PDF_FS);
+      doc.setTextColor(0, 0, 0);
 
       // Label bold
       doc.setFont('helvetica', 'bold');
@@ -564,7 +506,7 @@ function buatDokumenPDF(item) {
       // Value normal, menyambung setelah label
       const labelW = doc.getTextWidth(labelText);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(20, 20, 20);
+      doc.setTextColor(0, 0, 0);
 
       // Wrap value jika terlalu panjang
       const maxValW = tcItemW - labelW - 5;
@@ -582,27 +524,27 @@ function buatDokumenPDF(item) {
     doc.line(ML, curY, PW - MR, curY);
     curY += 5;
 
-    doc.setFontSize(7.5);
+    doc.setFontSize(PDF_FS);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.text(
       'If you have any questions concerning this quotation, contact Name, Phone Number, E-mail',
       ML, curY
     );
 
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 30, 30);
+    doc.setTextColor(0, 0, 0);
     doc.text('THANK YOU FOR YOUR BUSINESS!', ML, curY + 5);
 
     // Tanda tangan kanan
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.text('Best Regard,', PW - MR, curY, { align: 'right' });
 
     const namaText = item.dibuatOleh || 'Sales Executive';
     const namaY    = curY + 12;
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(20, 20, 20);
+    doc.setTextColor(0, 0, 0);
     doc.text(namaText, PW - MR, namaY, { align: 'right' });
 
     // Underline nama
