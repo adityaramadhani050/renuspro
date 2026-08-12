@@ -229,17 +229,17 @@ function buatDokumenPDF(item) {
     clientRows.forEach((r, idx) => {
       const y = curY + 6 + idx * 5.5;
       doc.setFontSize(PDF_FS);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(PDF_FONT, 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(r[0], c1L, y);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(PDF_FONT, 'normal');
       doc.setTextColor(0, 0, 0);
       doc.text(r[1], c1V, y);
       if (r[2]) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(PDF_FONT, 'bold');
         doc.setTextColor(0, 0, 0);
         doc.text(r[2], c2L + 5, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(PDF_FONT, 'normal');
         doc.setTextColor(0, 0, 0);
         doc.text(r[3], c2V - 3, y, { align: 'right' });
       }
@@ -395,13 +395,13 @@ function buatDokumenPDF(item) {
 
       doc.setFontSize(PDF_FS);
       if (row.bold) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(PDF_FONT, 'bold');
         doc.setTextColor(0, 0, 0);
       } else if (row.red) {
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(PDF_FONT, 'normal');
         doc.setTextColor(180, 0, 0);
       } else {
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(PDF_FONT, 'normal');
         doc.setTextColor(0, 0, 0);
       }
       doc.text(row.label, colLabelX + 3, ry + 4);
@@ -422,10 +422,10 @@ function buatDokumenPDF(item) {
           doc.setLineWidth(0.2);
           doc.rect(ML, curY, CW, catatanH);
           doc.setFontSize(PDF_FS);
-          doc.setFont('helvetica', 'bold');
+          doc.setFont(PDF_FONT, 'bold');
           doc.setTextColor(100, 80, 0);
           doc.text('Catatan :', ML + 2, curY + 4.5);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont(PDF_FONT, 'normal');
           doc.setTextColor(60, 50, 0);
           doc.text(catatanLines, ML + 2, curY + 9);
           curY += catatanH + 5;
@@ -439,7 +439,7 @@ function buatDokumenPDF(item) {
     doc.setFillColor(...BLUE);
     doc.rect(ML, curY, CW, 6, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(PDF_FS);
     doc.text('Term & Condition :', ML + 2, curY + 4.2);
     curY += 8;
@@ -499,13 +499,13 @@ function buatDokumenPDF(item) {
       doc.setTextColor(0, 0, 0);
 
       // Label bold
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(PDF_FONT, 'bold');
       const labelText = tcItem.label + ': ';
       doc.text(labelText, x, y);
 
       // Value normal, menyambung setelah label
       const labelW = doc.getTextWidth(labelText);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(PDF_FONT, 'normal');
       doc.setTextColor(0, 0, 0);
 
       // Wrap value jika terlalu panjang
@@ -525,25 +525,25 @@ function buatDokumenPDF(item) {
     curY += 5;
 
     doc.setFontSize(PDF_FS);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.setTextColor(0, 0, 0);
     doc.text(
       'If you have any questions concerning this quotation, contact Name, Phone Number, E-mail',
       ML, curY
     );
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text('THANK YOU FOR YOUR BUSINESS!', ML, curY + 5);
 
     // Tanda tangan kanan
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.setTextColor(0, 0, 0);
     doc.text('Best Regard,', PW - MR, curY, { align: 'right' });
 
     const namaText = item.dibuatOleh || 'Sales Executive';
     const namaY    = curY + 12;
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text(namaText, PW - MR, namaY, { align: 'right' });
 
