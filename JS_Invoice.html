@@ -642,30 +642,13 @@
       }).exportKwitansiDariTemplate(kwitansiId);
     }
 
-    // ── Export PDF Invoice (reuse modal preview PDF) ──
+    // ── Export PDF Invoice — DIBUAT LANGSUNG DI KLIEN (jsPDF), data Supabase ──
+    // Tidak lagi memakai template Google Sheets / Apps Script.
     function exportInvoicePDF(item) {
-      document.getElementById('preview-pdf-title').innerText = 'Invoice — ' + item.id;
-      document.getElementById('preview-pdf-subtitle').innerText = (item.namaProject || '') + ' · ' + (item.namaKlien || '');
-      document.getElementById('preview-pdf-loading').classList.remove('hidden');
-      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
-      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
-      document.getElementById('modal-preview-pdf').classList.remove('hidden');
-
-      google.script.run.withSuccessHandler(function(res) {
-        if (res.success) {
-          _activePdfBase64 = res.pdfBase64;
-          _activePdfName   = res.fileName;
-          renderPDFDariBase64(res.pdfBase64);
-        } else {
-          document.getElementById('preview-pdf-loading').innerHTML = `
-            <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
-            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
-            <button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
-        }
-      }).withFailureHandler(function(err) {
-        document.getElementById('preview-pdf-loading').innerHTML = `
-          <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
-          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
-      }).exportInvoiceDariTemplate(item.id);
+      _pdfBukaPreview('Invoice — ' + item.id, (item.namaProject || '') + ' · ' + (item.namaKlien || ''));
+      setTimeout(function () {
+        var doc = buatInvoicePDF(item);
+        _pdfFinishPreview(doc, _pdfNamaFile(item.id), {});
+      }, 60);
     }
 </script>

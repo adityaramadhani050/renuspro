@@ -1,0 +1,298 @@
+<script>
+// ============================================================================
+//  GENERATOR PDF SISI KLIEN — Quotation / Invoice / Kwitansi / PO
+//  Render langsung dari data Supabase memakai jsPDF (+autoTable), TANPA template
+//  Google Sheets / Apps Script. Layout dibuat meniru template lama.
+//  Library dipakai: window.jspdf, autoTable, pdf-lib (untuk merge T&C),
+//  pdf.js (preview via renderPDFDariBase64). Semua sudah dimuat di <head>.
+// ============================================================================
+
+// Identitas perusahaan — sumber: template terbaru (screenshot).
+var PDF_PERUSAHAAN = {
+  nama:    'PT. RENUS GLOBAL INDONESIA',
+  alamat1: 'Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari',
+  alamat2: 'Kec. Rungkut, Kota Surabaya 60293',
+  email:   'Email : admin@renergynusantara | renergynusantara@gmail.com',
+  telp:    'Telp : 0853-8555-8025 | 0814-1225-0644'
+};
+var PDF_BLUE = [23, 74, 145];   // biru header/aksen (mirip template)
+var PDF_NAVY = [32, 45, 92];    // navy ikon panel surya
+
+// Rupiah tanpa simbol, ribuan titik (id-ID). Selalu non-negatif.
+function _pdfRp(v) { return Math.round(Math.abs(Number(v) || 0)).toLocaleString('id-ID'); }
+
+// Bersihkan string jadi nama file aman (slash → strip).
+function _pdfNamaFile(s) { return String(s || 'dokumen').replace(/[\\/:*?"<>|]+/g, '-') + '.pdf'; }
+
+// Ikon panel surya (2×2 sel jajar-genjang navy) + wordmark "RENUS" biru.
+function _pdfDrawLogo(doc, x, y) {
+  var cellW = 4.4, cellH = 4.4, shear = 1.7, gap = 1.1;
+  doc.setFillColor(PDF_NAVY[0], PDF_NAVY[1], PDF_NAVY[2]);
+  for (var r = 0; r < 2; r++) {
+    for (var c = 0; c < 2; c++) {
+      var cx = x + c * (cellW + gap) + (1 - r) * shear; // baris atas condong ke kanan
+      var cy = y + r * (cellH + gap);
+      doc.lines([[cellW, 0], [-shear, cellH], [-cellW, 0]], cx, cy, [1, 1], 'F', true);
+    }
+  }
+  doc.setTextColor(30, 136, 229);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(21);
+  doc.text('RENUS', x + 2 * cellW + shear + gap + 2.5, y + cellH + 1.6);
+}
+
+// Header kiri: logo + blok perusahaan. Balikan: y setelah blok (mm).
+function _pdfHeaderKiri(doc, ML) {
+  _pdfDrawLogo(doc, ML, 9);
+  doc.setTextColor(PDF_BLUE[0], PDF_BLUE[1], PDF_BLUE[2]);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text(PDF_PERUSAHAAN.nama, ML, 24);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.setTextColor(55, 55, 55);
+  doc.text(PDF_PERUSAHAAN.alamat1, ML, 28.5);
+  doc.text(PDF_PERUSAHAAN.alamat2, ML, 32.5);
+  doc.setTextColor(30, 90, 180);
+  doc.text(PDF_PERUSAHAAN.email, ML, 36.5);
+  doc.setTextColor(55, 55, 55);
+  doc.text(PDF_PERUSAHAAN.telp, ML, 40.5);
+  return 46;
+}
+
+// Judul besar kanan-atas (Quotation / INVOICE / KWITANSI / PURCHASE ORDER).
+function _pdfJudulKanan(doc, teks, PW, MR, opt) {
+  opt = opt || {};
+  var col = opt.color || [110, 110, 110];
+  doc.setTextColor(col[0], col[1], col[2]);
+  doc.setFont('helvetica', opt.style || 'bold');
+  doc.setFontSize(opt.size || 28);
+  doc.text(teks, PW - MR, opt.y || 20, { align: 'right' });
+}
+
+// Baris info kanan (label bold + value), rata kanan. rows: [[label,value],...].
+function _pdfInfoKanan(doc, rows, PW, MR, startY, gap) {
+  gap = gap || 5;
+  var valX = PW - MR, labelX = PW - MR - 46;
+  rows.forEach(function (r, i) {
+    var y = startY + i * gap;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+    doc.text(String(r[0]), labelX, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+    doc.text(String(r[1] == null ? '' : r[1]), valX, y, { align: 'right' });
+  });
+}
+
+// Cari klien lengkap dari state (untuk alamat/perusahaan/kontak).
+function _pdfKlien(id) {
+  return (((window.erpState && erpState.klien) || []).filter(function (k) { return k.id === id; })[0]) || {};
+}
+
+// Normalisasi rincian item (grouped ATAU flat) → daftar baris autoTable.
+// Menangani kelompok {namaKelompok, subItems:[...]} maupun baris rata.
+function _pdfBarisItem(rincian) {
+  var body = [], groups = Array.isArray(rincian) ? rincian : [];
+  var terlihatGroup = groups.some(function (g) { return g && (g.subItems || g.items) && (g.namaKelompok || g.nama); });
+  function baris(no, s) {
+    var desk = s.deskripsi || s.nama || s.namaItem || s.description || '';
+    var qty = s.qty != null ? s.qty : (s.jumlah_qty != null ? s.jumlah_qty : '');
+    var unit = s.unit || s.satuan || '';
+    var harga = s.harga != null ? s.harga : (s.hargaSatuan != null ? s.hargaSatuan : (s.price != null ? s.price : 0));
+    var total = s.total != null ? s.total : (s.amount != null ? s.amount : (s.jumlah != null ? s.jumlah : (Number(harga) * Number(qty || 0))));
+    return [
+      { content: no == null ? '' : String(no), styles: { halign: 'center' } },
+      { content: String(desk) },
+      { content: qty === '' ? '' : String(qty), styles: { halign: 'center' } },
+      { content: String(unit), styles: { halign: 'center' } },
+      { content: harga ? _pdfRp(harga) : '', styles: { halign: 'right' } },
+      { content: total ? _pdfRp(total) : '', styles: { halign: 'right' } }
+    ];
+  }
+  if (terlihatGroup) {
+    groups.forEach(function (g, gi) {
+      var sub = g.subItems || g.items || [];
+      var head = [
+        { content: String.fromCharCode(65 + gi), styles: { fontStyle: 'bold', fillColor: [235, 240, 255] } },
+        { content: g.namaKelompok || g.nama || '', styles: { fontStyle: 'bold', fillColor: [235, 240, 255] } },
+        { content: '', styles: { fillColor: [235, 240, 255] } },
+        { content: '', styles: { fillColor: [235, 240, 255] } },
+        { content: '', styles: { fillColor: [235, 240, 255] } },
+        { content: g.subtotal ? _pdfRp(g.subtotal) : '', styles: { halign: 'right', fontStyle: 'bold', fillColor: [235, 240, 255] } }
+      ];
+      body.push(head);
+      sub.forEach(function (s, si) { body.push(baris(si + 1, s)); });
+    });
+  } else {
+    groups.forEach(function (s, i) { body.push(baris(i + 1, s)); });
+  }
+  return body;
+}
+
+// Tabel item standar (No/Description/Qty/Unit/Price/Amount) — dipakai bersama.
+function _pdfTabelItem(doc, startY, rincian, ML, MR) {
+  doc.autoTable({
+    startY: startY,
+    head: [[
+      { content: 'No.', styles: { halign: 'center' } },
+      { content: 'Description', styles: { halign: 'left' } },
+      { content: 'Qty', styles: { halign: 'center' } },
+      { content: 'Unit', styles: { halign: 'center' } },
+      { content: 'Price (IDR)', styles: { halign: 'center' } },
+      { content: 'Amount (IDR)', styles: { halign: 'center' } }
+    ]],
+    body: _pdfBarisItem(rincian),
+    theme: 'grid',
+    margin: { left: ML, right: MR },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' },
+      2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' },
+      4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
+    },
+    headStyles: { fillColor: PDF_BLUE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, lineColor: [255, 255, 255], lineWidth: 0.3 },
+    bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [200, 205, 220], lineWidth: 0.2, cellPadding: 1.8 },
+    styles: { overflow: 'linebreak' }
+  });
+  return doc.lastAutoTable.finalY;
+}
+
+// Blok ringkasan (DPP/PPN/Total) kanan bawah — dipakai invoice & (opsional) lain.
+function _pdfRingkasan(doc, startY, lines, PW, MR) {
+  var colLabelX = PW - MR - 60, colValX = PW - MR, rowH = 6;
+  var boxW = (PW - MR) - colLabelX, totalH = lines.length * rowH + 2, sy = startY;
+  doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2);
+  doc.rect(colLabelX, sy - 1, boxW, totalH + 1);
+  lines.forEach(function (row, idx) {
+    var ry = sy + 1 + idx * rowH;
+    if (row.highlight) {
+      doc.setFillColor(235, 240, 255);
+      doc.rect(colLabelX, ry - 0.5, boxW, rowH + 1, 'F');
+      doc.setDrawColor(180, 190, 220); doc.setLineWidth(0.3);
+      doc.line(colLabelX, ry - 0.5, colLabelX + boxW, ry - 0.5);
+    }
+    doc.setFontSize(8.5);
+    if (row.bold) { doc.setFont('helvetica', 'bold'); doc.setTextColor(PDF_BLUE[0], PDF_BLUE[1], PDF_BLUE[2]); }
+    else { doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); }
+    doc.text(row.label, colLabelX + 3, ry + 4);
+    doc.text(row.value, colValX - 2, ry + 4, { align: 'right' });
+  });
+  return sy + totalH + 4;
+}
+
+// Pipeline akhir: doc → bytes → (opsional merge T&C) → preview + simpan aktif.
+// Dipakai semua generator agar konsisten dengan tombol Download & modal preview.
+async function _pdfFinishPreview(doc, fileName, opts) {
+  opts = opts || {};
+  try {
+    var bytes = new Uint8Array(doc.output('arraybuffer'));
+    if (opts.mergeTC && Array.isArray(opts.kelompokList) && typeof _mergePdfDenganTC === 'function') {
+      try { bytes = await _mergePdfDenganTC(bytes, opts.kelompokList); }
+      catch (e) {
+        console.warn('[pdf] merge T&C gagal:', e);
+        if (typeof showNotification === 'function') showNotification('Lampiran T&C gagal dimuat — PDF tampil tanpa T&C.', 'error');
+      }
+    }
+    var bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    _activePdfBase64 = btoa(bin);
+    _activePdfName = fileName;
+    renderPDFDariBase64(_activePdfBase64);
+  } catch (err) {
+    console.error('[pdf] gagal:', err);
+    var l = document.getElementById('preview-pdf-loading');
+    if (l) l.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+      '<p class="text-sm text-rose-400 text-center px-4">Gagal membuat PDF: ' + ((err && err.message) || err) + '</p>' +
+      '<button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>';
+  }
+}
+
+// Buka modal preview dgn judul/subjudul + state loading (dipakai sebelum build).
+function _pdfBukaPreview(judul, subjudul) {
+  var t = document.getElementById('preview-pdf-title'); if (t) t.innerText = judul || 'Preview';
+  var s = document.getElementById('preview-pdf-subtitle'); if (s) s.innerText = subjudul || '';
+  var l = document.getElementById('preview-pdf-loading');
+  if (l) { l.classList.remove('hidden'); l.innerHTML = '<div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div><p class="text-sm font-medium">Membuat preview...</p>'; }
+  var w = document.getElementById('preview-pdf-canvas-wrap'); if (w) { w.classList.add('hidden'); w.innerHTML = ''; }
+  var m = document.getElementById('modal-preview-pdf'); if (m) m.classList.remove('hidden');
+}
+
+// ── INVOICE ─────────────────────────────────────────────────────────────────
+// Membangun jsPDF invoice mengikuti layout template. `item` = record dari
+// getInvoiceList (punya items JSON, dpp, ppnPersen/Nominal, total, bankAccount).
+function buatInvoicePDF(item) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
+
+  _pdfHeaderKiri(doc, ML);
+  _pdfJudulKanan(doc, 'INVOICE', PW, MR, { size: 26, color: [90, 90, 90], y: 19 });
+  _pdfInfoKanan(doc, [
+    ['No.', item.id || ''],
+    ['Date', item.tanggal || ''],
+    ['No. PO', item.noPO || ''],
+    ['Tgl. PO', item.tglPO || '']
+  ], PW, MR, 27, 5);
+
+  // ── INVOICE TO ──
+  var klien = _pdfKlien(item.klienId);
+  var curY = 47;
+  doc.setFillColor(PDF_BLUE[0], PDF_BLUE[1], PDF_BLUE[2]);
+  doc.rect(ML, curY, CW, 6, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('Invoice to', ML + 2, curY + 4.2);
+  curY += 6;
+  doc.setFillColor(247, 248, 251); doc.rect(ML, curY, CW, 16, 'F');
+  doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, 16);
+  var c1L = ML + 2, c1V = ML + 26, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 28;
+  function _row(lx, vx, y, label, val) {
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(70, 70, 70); doc.setFontSize(8);
+    doc.text(label, lx, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+    doc.text(String(val == null ? '' : val), vx, y);
+  }
+  _row(c1L, c1V, curY + 6, 'Name :', klien.nama || item.namaKlien || '');
+  _row(c1L, c1V, curY + 12, 'Alamat :', klien.alamat || '');
+  _row(c2L, c2V, curY + 6, 'Perusahaan :', klien.perusahaan || '');
+  _row(c2L, c2V, curY + 12, 'No.Telp :', klien.kontak || '');
+  curY += 20;
+
+  // ── TABEL ITEM ──
+  var rincian = [];
+  try { rincian = JSON.parse(item.items || '[]'); } catch (e) { rincian = []; }
+  curY = _pdfTabelItem(doc, curY, rincian, ML, MR) + 4;
+
+  // ── RINGKASAN DPP / PPN / TOTAL ──
+  var lines = [{ label: 'DPP', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
+  if (Number(item.ppnNominal) > 0 || Number(item.ppnPersen) > 0) {
+    lines.push({ label: 'PPN ' + (item.ppnPersen || 11) + '%', value: 'Rp ' + _pdfRp(item.ppnNominal), bold: false });
+  }
+  lines.push({ label: 'TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true });
+  curY = _pdfRingkasan(doc, curY, lines, PW, MR) + 4;
+
+  // ── TERBILANG ──
+  if (typeof _terbilangClient === 'function') {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
+    var terbilang = 'Terbilang : ' + _terbilangClient(item.total) + ' Rupiah';
+    doc.text(doc.splitTextToSize(terbilang, CW), ML, curY + 2);
+    curY += 4 + Math.ceil(doc.getTextWidth(terbilang) / CW) * 4;
+  }
+
+  // ── CATATAN / BANK ──
+  curY += 3;
+  var noteLines = [];
+  if (item.catatan) noteLines.push(item.catatan);
+  if (item.bankAccount) noteLines.push('Pembayaran ke rekening: ' + item.bankAccount);
+  if (noteLines.length) {
+    if (curY > 250) { doc.addPage(); curY = 15; }
+    doc.setFillColor(255, 252, 230);
+    var wrapped = doc.splitTextToSize(noteLines.join('\n'), CW - 4);
+    var h = wrapped.length * 4.2 + 6;
+    doc.rect(ML, curY, CW, h, 'F');
+    doc.setDrawColor(220, 200, 100); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, h);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(100, 80, 0);
+    doc.text('Note :', ML + 2, curY + 4.5);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 50, 0);
+    doc.text(wrapped, ML + 2, curY + 9);
+  }
+
+  return doc;
+}
+</script>
