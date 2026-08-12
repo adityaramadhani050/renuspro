@@ -233,12 +233,13 @@ function buatDokumenPDF(item) {
       doc.setTextColor(0, 0, 0);
       doc.text(r[1], c1V, y);
       if (r[2]) {
+        // Sejajarkan 1 kolom dgn Date/Quotation#/Rev: label rata kanan, value rata kiri.
         doc.setFont(PDF_FONT, 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text(r[2], c2L + 5, y);
+        doc.text(r[2], PW - MR - 38, y, { align: 'right' });
         doc.setFont(PDF_FONT, 'normal');
         doc.setTextColor(0, 0, 0);
-        doc.text(r[3], c2L + 42, y);   // value rata kiri
+        doc.text(r[3], PW - MR - 34, y);
       }
     });
     curY += 22;

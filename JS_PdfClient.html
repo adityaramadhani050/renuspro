@@ -92,7 +92,7 @@ function _pdfJudulKanan(doc, teks, PW, MR, opt) {
 // Baris info kanan (label bold + value), rata kanan.
 function _pdfInfoKanan(doc, rows, PW, MR, startY, gap) {
   gap = gap || 4.0;
-  var sx = PW - MR - 42;   // titik pisah: label rata kanan di sx, value rata kiri dari sx
+  var sx = PW - MR - 36;   // titik pisah: label rata kanan di sx, value rata kiri dari sx (mepet kanan)
   rows.forEach(function (r, i) {
     var y = startY + i * gap;
     doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
