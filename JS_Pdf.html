@@ -238,10 +238,10 @@ function buatDokumenPDF(item) {
         doc.text(r[2], c2L + 5, y);
         doc.setFont(PDF_FONT, 'normal');
         doc.setTextColor(0, 0, 0);
-        doc.text(r[3], c2V - 3, y, { align: 'right' });
+        doc.text(r[3], c2L + 42, y);   // value rata kiri
       }
     });
-    curY += 19;
+    curY += 22;
 
     // ── TABEL ITEM ─────────────────────────────────────────────────────────
     // Kelompok normal + kelompok DISCOUNT (jika ada) masuk ke tabel
@@ -402,6 +402,9 @@ function buatDokumenPDF(item) {
       doc.text(row.label, colLabelX + 3, ry + 3.4);
       doc.text(row.value,  colValX - 2,   ry + 3.4, { align: 'right' });
     });
+    // pemisah kolom label|value (putih tipis)
+    doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.4);
+    doc.line(colValX - 34, sy + 0.5, colValX - 34, sy + 0.5 + summaryLines.length * rowH);
 
     curY = sy + totalSummaryH + 6;
     
@@ -478,7 +481,9 @@ function buatDokumenPDF(item) {
 
     doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
     doc.rect(ML, curY - 2, CW, tcTotalH, 'F');
-    // (border kotak & garis pemisah kolom T&C dihilangkan sesuai desain)
+    // pemisah 2 kolom T&C (putih tipis) — hanya area item
+    doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.4);
+    doc.line(ML + tcItemW, curY - 2, ML + tcItemW, curY - 2 + tcTotalH);
 
     tcItems.forEach((tcItem, idx) => {
       const col = idx % tcColCount;

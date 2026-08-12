@@ -92,24 +92,24 @@ function _pdfJudulKanan(doc, teks, PW, MR, opt) {
 // Baris info kanan (label bold + value), rata kanan.
 function _pdfInfoKanan(doc, rows, PW, MR, startY, gap) {
   gap = gap || 4.0;
-  var valX = PW - MR, labelX = PW - MR - 48;
+  var sx = PW - MR - 42;   // titik pisah: label rata kanan di sx, value rata kiri dari sx
   rows.forEach(function (r, i) {
     var y = startY + i * gap;
-    doc.setFontSize(PDF_FS);
-    doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-    doc.text(String(r[0]), labelX, y);
-    doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-    doc.text(String(r[1] == null ? '' : r[1]), valX, y, { align: 'right' });
+    doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.setFont(PDF_FONT, 'bold');
+    doc.text(String(r[0]), sx - 2, y, { align: 'right' });
+    doc.setFont(PDF_FONT, 'normal');
+    doc.text(String(r[1] == null ? '' : r[1]), sx + 2, y, { align: 'left' });
   });
 }
 
 // Bar judul seksi (mis. "Invoice to") latar #0b5394 teks putih.
 function _pdfBarSeksi(doc, teks, ML, CW, y) {
   doc.setFillColor(PDF_HDR_BG[0], PDF_HDR_BG[1], PDF_HDR_BG[2]);
-  doc.rect(ML, y, CW, 6.5, 'F');
+  doc.rect(ML, y, CW, 5, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
-  doc.text(teks, ML + 2, y + 4.6);
-  return y + 6.5;
+  doc.text(teks, ML + 2, y + 3.4);
+  return y + 5;
 }
 
 function _pdfKlien(id) {
@@ -204,6 +204,10 @@ function _pdfRingkasan(doc, startY, lines, PW, MR) {
     doc.text(row.label, colLabelX + 2.5, ry + 3.4);
     doc.text(row.value, colValX - 2, ry + 3.4, { align: 'right' });
   });
+  // pemisah kolom (putih tipis)
+  var sepX = colValX - 34;
+  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.4);
+  doc.line(sepX, sy, sepX, sy + lines.length * rowH);
   return sy + totalH + 3;
 }
 
@@ -273,7 +277,7 @@ function buatInvoicePDF(item) {
   _row(c1L, c1V, curY + 8.5, 'Alamat :', klien.alamat || '');
   _row(c2L, c2V, curY + 4, 'Perusahaan :', klien.perusahaan || '');
   _row(c2L, c2V, curY + 8.5, 'No.Telp :', klien.kontak || '');
-  curY += 15;
+  curY += 18;
 
   // ── TABEL ITEM ──
   var rincian = [];
