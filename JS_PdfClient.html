@@ -20,7 +20,7 @@ var PDF_PERUSAHAAN = {
 
 // ── Palet & tipografi (spesifikasi user) ──
 var PDF_FONT       = 'Roboto';   // Google Sans → Roboto (subset, di PdfFont_Roboto.html)
-var PDF_FS         = 10;            // seluruh teks
+var PDF_FS         = 8;             // seluruh teks (compact)
 var PDF_FS_TITLE   = 26;            // judul "Quotation"/"INVOICE" dst
 var PDF_FS_COMPANY = 12;            // "PT. RENUS GLOBAL INDONESIA"
 var PDF_TEXT       = [0, 0, 0];     // #000000 teks utama
@@ -65,19 +65,18 @@ function _pdfDrawLogo(doc, x, y) {
 
 // Header kiri: logo + blok perusahaan. Balikan: y setelah blok (mm).
 function _pdfHeaderKiri(doc, ML) {
-  _pdfDrawLogo(doc, ML, 8);
-  doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
+  _pdfDrawLogo(doc, ML, 7);
+  doc.setTextColor(0, 0, 0);
   doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS_COMPANY);
-  doc.text(PDF_PERUSAHAAN.nama, ML, 25);
+  doc.text(PDF_PERUSAHAAN.nama, ML, 21.5);
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS);
-  doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-  doc.text(PDF_PERUSAHAAN.alamat1, ML, 30);
-  doc.text(PDF_PERUSAHAAN.alamat2, ML, 34.5);
+  doc.text(PDF_PERUSAHAAN.alamat1, ML, 25.6);
+  doc.text(PDF_PERUSAHAAN.alamat2, ML, 28.8);
   doc.setTextColor(PDF_LINK[0], PDF_LINK[1], PDF_LINK[2]);
-  doc.text(PDF_PERUSAHAAN.email, ML, 39);
-  doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-  doc.text(PDF_PERUSAHAAN.telp, ML, 43.5);
-  return 49;
+  doc.text(PDF_PERUSAHAAN.email, ML, 32.0);
+  doc.setTextColor(0, 0, 0);
+  doc.text(PDF_PERUSAHAAN.telp, ML, 35.2);
+  return 39;
 }
 
 // Judul besar kanan-atas.
@@ -92,7 +91,7 @@ function _pdfJudulKanan(doc, teks, PW, MR, opt) {
 
 // Baris info kanan (label bold + value), rata kanan.
 function _pdfInfoKanan(doc, rows, PW, MR, startY, gap) {
-  gap = gap || 5.5;
+  gap = gap || 4.0;
   var valX = PW - MR, labelX = PW - MR - 48;
   rows.forEach(function (r, i) {
     var y = startY + i * gap;
@@ -177,31 +176,30 @@ function _pdfTabelItem(doc, startY, rincian, ML, MR) {
       4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
     },
     headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.3 },
-    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineColor: [200, 205, 220], lineWidth: 0.2, cellPadding: 1.8 },
-    styles: { overflow: 'linebreak' }
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineColor: [200, 205, 220], lineWidth: 0.2, cellPadding: 1.1 },
+    styles: { overflow: 'linebreak', cellPadding: 1.1 }
   });
   return doc.lastAutoTable.finalY;
 }
 
 // Blok ringkasan (DPP/PPN/Total) kanan bawah.
 function _pdfRingkasan(doc, startY, lines, PW, MR) {
-  var colLabelX = PW - MR - 62, colValX = PW - MR, rowH = 6.5;
-  var boxW = (PW - MR) - colLabelX, totalH = lines.length * rowH + 2, sy = startY;
-  doc.setDrawColor(200, 205, 220); doc.setLineWidth(0.2);
-  doc.rect(colLabelX, sy - 1, boxW, totalH + 1);
+  var colLabelX = PW - MR - 62, colValX = PW - MR, rowH = 5;
+  var boxW = (PW - MR) - colLabelX, totalH = lines.length * rowH + 1.5, sy = startY;
   lines.forEach(function (row, idx) {
-    var ry = sy + 1 + idx * rowH;
-    if (row.highlight) {
-      doc.setFillColor(PDF_GROUP_BG[0], PDF_GROUP_BG[1], PDF_GROUP_BG[2]);
-      doc.rect(colLabelX, ry - 0.5, boxW, rowH + 1, 'F');
-    }
+    var ry = sy + idx * rowH;
+    var bg = row.highlight ? PDF_GROUP_BG : PDF_ROW_BG;   // grand total #d9d9d9, lain #f3f3f3
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(colLabelX, ry, boxW, rowH, 'F');
+    doc.setDrawColor(200, 205, 220); doc.setLineWidth(0.2);
+    doc.rect(colLabelX, ry, boxW, rowH);
     doc.setFontSize(PDF_FS);
     doc.setFont(PDF_FONT, row.bold ? 'bold' : 'normal');
-    doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-    doc.text(row.label, colLabelX + 3, ry + 4.4);
-    doc.text(row.value, colValX - 2, ry + 4.4, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    doc.text(row.label, colLabelX + 2.5, ry + 3.4);
+    doc.text(row.value, colValX - 2, ry + 3.4, { align: 'right' });
   });
-  return sy + totalH + 4;
+  return sy + totalH + 3;
 }
 
 // Pipeline akhir: doc → bytes → (opsional merge T&C) → preview + simpan aktif.
@@ -243,7 +241,7 @@ function _pdfBukaPreview(judul, subjudul) {
 function buatInvoicePDF(item) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  var PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
+  var PW = 210, ML = 10, MR = 10, CW = PW - ML - MR;
 
   _pdfHeaderKiri(doc, ML);
   _pdfJudulKanan(doc, 'INVOICE', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 20 });
@@ -252,14 +250,14 @@ function buatInvoicePDF(item) {
     ['Date', item.tanggal || ''],
     ['No. PO', item.noPO || ''],
     ['Tgl. PO', item.tglPO || '']
-  ], PW, MR, 30, 5.5);
+  ], PW, MR, 26, 4.0);
 
   // ── INVOICE TO ──
   var klien = _pdfKlien(item.klienId);
-  var curY = 52;
+  var curY = 44;
   curY = _pdfBarSeksi(doc, 'Invoice to', ML, CW, curY);
-  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, 17, 'F');
-  doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, 17);
+  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, 13, 'F');
+  doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, 13);
   var c1L = ML + 2, c1V = ML + 26, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 30;
   function _row(lx, vx, y, label, val) {
     doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]); doc.setFontSize(PDF_FS);
@@ -267,11 +265,11 @@ function buatInvoicePDF(item) {
     doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
     doc.text(String(val == null ? '' : val), vx, y);
   }
-  _row(c1L, c1V, curY + 6.5, 'Name :', klien.nama || item.namaKlien || '');
-  _row(c1L, c1V, curY + 13, 'Alamat :', klien.alamat || '');
-  _row(c2L, c2V, curY + 6.5, 'Perusahaan :', klien.perusahaan || '');
-  _row(c2L, c2V, curY + 13, 'No.Telp :', klien.kontak || '');
-  curY += 21;
+  _row(c1L, c1V, curY + 5, 'Name :', klien.nama || item.namaKlien || '');
+  _row(c1L, c1V, curY + 9.5, 'Alamat :', klien.alamat || '');
+  _row(c2L, c2V, curY + 5, 'Perusahaan :', klien.perusahaan || '');
+  _row(c2L, c2V, curY + 9.5, 'No.Telp :', klien.kontak || '');
+  curY += 16;
 
   // ── TABEL ITEM ──
   var rincian = [];
