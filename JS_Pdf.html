@@ -398,11 +398,11 @@ function buatDokumenPDF(item) {
       const noteW = colLabelX - ML - 3;
       doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
       doc.setFont(PDF_FONT, 'bold');
-      doc.text('Notes :', ML, sy + 3.4);
+      doc.text('Notes :', ML, sy + 6);
       doc.setFont(PDF_FONT, 'normal');
       const catatanLines = doc.splitTextToSize(catatan, noteW);
-      doc.text(catatanLines, ML, sy + 8);
-      leftBottom = sy + 8 + catatanLines.length * 4;
+      doc.text(catatanLines, ML, sy + 10.5);
+      leftBottom = sy + 10.5 + catatanLines.length * 4;
     }
 
     curY = Math.max(summaryBottom, leftBottom) + 6;

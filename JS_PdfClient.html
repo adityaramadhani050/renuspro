@@ -304,13 +304,13 @@ function buatInvoicePDF(item) {
   if (item.bankAccount) noteLines.push('Pembayaran ke rekening: ' + item.bankAccount);
   if (noteLines.length) {
     var wrapped = doc.splitTextToSize(noteLines.join('\n'), CW);
-    var h = wrapped.length * 4 + 8;
+    var h = wrapped.length * 4 + 11;
     if (curY + h > 285) { doc.addPage(); curY = 15; }
     doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
     doc.setFont(PDF_FONT, 'bold');
-    doc.text('Notes :', ML, curY + 4);
+    doc.text('Notes :', ML, curY + 6);
     doc.setFont(PDF_FONT, 'normal');
-    doc.text(wrapped, ML, curY + 8);
+    doc.text(wrapped, ML, curY + 10.5);
     curY += h;
   }
 
