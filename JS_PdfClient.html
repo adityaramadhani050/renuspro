@@ -191,7 +191,7 @@ function _pdfTabelItem(doc, startY, rincian, ML, MR) {
 
 // Blok ringkasan (DPP/PPN/Total) kanan bawah.
 function _pdfRingkasan(doc, startY, lines, PW, MR) {
-  var colLabelX = PW - MR - 62, colValX = PW - MR, rowH = 5;
+  var colLabelX = PW - MR - 60, colValX = PW - MR, rowH = 5;
   var boxW = (PW - MR) - colLabelX, totalH = lines.length * rowH + 1.5, sy = startY;
   lines.forEach(function (row, idx) {
     var ry = sy + idx * rowH;
@@ -204,10 +204,6 @@ function _pdfRingkasan(doc, startY, lines, PW, MR) {
     doc.text(row.label, colLabelX + 2.5, ry + 3.4);
     doc.text(row.value, colValX - 2, ry + 3.4, { align: 'right' });
   });
-  // pemisah kolom (putih tipis)
-  var sepX = colValX - 34;
-  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.2);
-  doc.line(sepX, sy, sepX, sy + lines.length * rowH);
   return sy + totalH + 3;
 }
 

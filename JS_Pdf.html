@@ -357,72 +357,55 @@ function buatDokumenPDF(item) {
 
     curY = doc.lastAutoTable.finalY;
 
-    // ── SUMMARY: SUBTOTAL / DISKON / PPN / GRAND TOTAL (kanan bawah tabel) ─
-    curY += 0;
-    const colLabelX = PW - MR - 62;
+    // ── SUMMARY (kanan, selebar kolom Price+Amount, tanpa border) ─────────
+    const colLabelX = PW - MR - 56;   // = kolom Price (28) + Amount (28)
     const colValX   = PW - MR;
     const rowH      = 5;
-    let   sy        = curY;
+    const sy        = curY;
 
     const netSub = item.subtotal - (item.diskon || 0);
 
     const summaryLines = [];
-    summaryLines.push({ label: 'Subtotal',    value: 'Rp ' + rpNum(item.subtotal), bold: false, highlight: false });
+    summaryLines.push({ label: 'Subtotal', value: 'Rp ' + rpNum(item.subtotal), bold: false });
     if (item.diskon > 0) {
-      summaryLines.push({ label: 'Diskon',    value: '- Rp ' + rpNum(item.diskon), bold: false, highlight: false, red: true });
+      summaryLines.push({ label: 'Diskon', value: '- Rp ' + rpNum(item.diskon), bold: false, red: true });
     }
     if (item.pajak > 0) {
       const pajakPct = netSub > 0 ? Math.round((item.pajak / netSub) * 100) : 11;
-      summaryLines.push({ label: 'PPN ' + pajakPct + '%', value: 'Rp ' + rpNum(item.pajak), bold: false, highlight: false });
+      summaryLines.push({ label: 'PPN ' + pajakPct + '%', value: 'Rp ' + rpNum(item.pajak), bold: false });
     }
     summaryLines.push({ label: 'GRAND TOTAL', value: 'Rp ' + rpNum(item.grandTotal), bold: true, highlight: true });
 
-    const summaryBoxW  = (PW - MR) - colLabelX;
-    const totalSummaryH = summaryLines.length * rowH + 2;
-
+    const summaryBoxW = colValX - colLabelX;
     summaryLines.forEach((row, idx) => {
       const ry = sy + 1 + idx * rowH;
-
-      // Baris normal (subtotal/diskon/ppn) #f3f3f3; GRAND TOTAL #d9d9d9.
       const bg = row.highlight ? PDF_GROUP_BG : PDF_ROW_BG;
       doc.setFillColor(bg[0], bg[1], bg[2]);
       doc.rect(colLabelX, ry - 0.5, summaryBoxW, rowH + 1, 'F');
-
       doc.setFontSize(PDF_FS);
-      if (row.bold) {
-        doc.setFont(PDF_FONT, 'bold');
-        doc.setTextColor(0, 0, 0);
-      } else if (row.red) {
-        doc.setFont(PDF_FONT, 'normal');
-        doc.setTextColor(180, 0, 0);
-      } else {
-        doc.setFont(PDF_FONT, 'normal');
-        doc.setTextColor(0, 0, 0);
-      }
+      doc.setFont(PDF_FONT, row.bold ? 'bold' : 'normal');
+      if (row.red) doc.setTextColor(180, 0, 0); else doc.setTextColor(0, 0, 0);
       doc.text(row.label, colLabelX + 3, ry + 3.4);
-      doc.text(row.value,  colValX - 2,   ry + 3.4, { align: 'right' });
+      doc.text(row.value, colValX - 2, ry + 3.4, { align: 'right' });
     });
-    // pemisah kolom label|value (putih tipis)
-    doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.2);
-    doc.line(colValX - 34, sy + 0.5, colValX - 34, sy + 0.5 + summaryLines.length * rowH);
+    const summaryBottom = sy + summaryLines.length * rowH + 1;
 
-    curY = sy + totalSummaryH + 6;
-    
-        // ── NOTES (header biru + kotak abu, tinggi auto) ──────────────────
-        const catatan = tc.catatan || '';
-        if (catatan) {
-          const catatanLines = doc.splitTextToSize(catatan, CW - 4);
-          const catatanH = catatanLines.length * 4 + 4;
-          if (curY + 5 + catatanH > 285) { doc.addPage(); curY = 15; }
-          curY = _pdfBarSeksi(doc, 'Notes :', ML, CW, curY);
-          doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
-          doc.rect(ML, curY, CW, catatanH, 'F');
-          doc.setFontSize(PDF_FS);
-          doc.setFont(PDF_FONT, 'normal');
-          doc.setTextColor(0, 0, 0);
-          doc.text(catatanLines, ML + 2, curY + 4);
-          curY += catatanH + 4;
-        }
+    // ── NOTES di KIRI, sebaris dgn summary (mengisi ruang kosong) ─────────
+    let leftBottom = sy;
+    const catatan = tc.catatan || '';
+    if (catatan) {
+      const noteW = colLabelX - ML - 3;
+      const ny = _pdfBarSeksi(doc, 'Notes :', ML, noteW, sy);
+      const catatanLines = doc.splitTextToSize(catatan, noteW - 4);
+      const catatanH = catatanLines.length * 4 + 4;
+      doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
+      doc.rect(ML, ny, noteW, catatanH, 'F');
+      doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(0, 0, 0);
+      doc.text(catatanLines, ML + 2, ny + 4);
+      leftBottom = ny + catatanH;
+    }
+
+    curY = Math.max(summaryBottom, leftBottom) + 6;
 
     // ── TERM & CONDITION ───────────────────────────────────────────────────
     // Format: "Label: Value" — 2 kolom, sesuai permintaan
