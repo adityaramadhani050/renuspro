@@ -43,24 +43,24 @@ jobs:
         with:
           node-version: '20'
 
-      # Cegah deploy yang menimpa config Supabase dengan placeholder (bikin app
-      # jatuh ke Apps Script/Sheet). Kalau secret kosong, batalkan lebih awal.
-      - name: Pastikan config Supabase tersedia
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::Secret SUPABASE_URL / SUPABASE_ANON_KEY belum diisi."
-            echo "::error::Deploy dibatalkan agar tak menimpa config dengan placeholder."
-            exit 1
-          fi
-
       - name: Build dist (build.mjs)
         env:
+          # Bila config diisi lewat GitHub Secrets, build.mjs menyuntiknya.
+          # Bila config sudah inline di source (000-head.js), env boleh kosong.
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: node migrasi/build.mjs
+
+      # Cegah deploy yang menimpa config Supabase dengan placeholder (bikin app
+      # jatuh ke Apps Script/Sheet). Berlaku untuk kedua cara isi config.
+      - name: Pastikan config Supabase terisi (bukan placeholder)
+        run: |
+          if grep -q 'ISI_PROJECT_URL\|ISI_ANON_KEY' dist/supabase-overrides.js; then
+            echo "::error::supabase-overrides.js masih placeholder — config Supabase belum ada."
+            echo "::error::Isi via source 000-head.js ATAU secret SUPABASE_URL + SUPABASE_ANON_KEY."
+            echo "::error::Deploy dibatalkan agar tak menimpa config dengan placeholder."
+            exit 1
+          fi
 
       - name: Checkout renuspro-web (target Vercel)
         uses: actions/checkout@v4
