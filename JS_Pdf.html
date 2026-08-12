@@ -69,17 +69,19 @@ function exportPenawaranPDF(item) {
             renderPDFDariBase64(res.pdfBase64);
           }
         } else {
+          console.error('[export PDF] gagal, respons:', res);
           document.getElementById('preview-pdf-loading').innerHTML = `
             <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
-            <p class="text-sm text-rose-400 text-center px-4">${res.message}</p>
+            <p class="text-sm text-rose-400 text-center px-4">${(res && (res.message || res.error)) || ('Export gagal tanpa pesan. Respons: ' + JSON.stringify(res))}</p>
             <button onclick="tutupPreviewPDF()"
               class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>`;
         }
       })
       .withFailureHandler(function(err) {
+        console.error('[export PDF] failure handler:', err);
         document.getElementById('preview-pdf-loading').innerHTML = `
           <i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>
-          <p class="text-sm text-rose-400 text-center px-4">Error: ${err.message || err}</p>`;
+          <p class="text-sm text-rose-400 text-center px-4">Error: ${(err && (err.message || err.error)) || (typeof err === 'string' ? err : JSON.stringify(err))}</p>`;
       })
       .exportQuotationDariTemplate(item);
   } else {
