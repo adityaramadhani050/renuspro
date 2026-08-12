@@ -1,15 +1,16 @@
 /* =============================================================================
- *  RenusPro — Router doPost untuk Apps Script LAMA  (Fase 1 migrasi)
- *  Tempel file ini ke project Apps Script yang SEKARANG. Fungsinya menyediakan
- *  satu pintu HTTP JSON: frontend Vercel (via proxy Vercel) mengirim
- *  { fn: "namaFungsi", args: [ ... ] } → router memanggil fungsi itu dan
- *  mengembalikan hasilnya sbg JSON — bentuk return sama persis seperti
- *  google.script.run (kontrak tak berubah).
+ *  RenusPro — Router doPost untuk proxy Vercel → Apps Script
+ *  Satu pintu HTTP JSON: frontend (via /api/gs Vercel) mengirim
+ *  { fn: "namaFungsi", args: [ ... ] } → router memanggil fungsi itu &
+ *  mengembalikan hasilnya sbg JSON (kontrak sama seperti google.script.run).
  *
- *  Deploy: Deploy > New deployment > Web app > Execute as: Me,
- *  Who has access: Anyone. Salin URL /exec ke env APPS_SCRIPT_EXEC_URL di Vercel.
+ *  PENTING: file ini HARUS ADA di project Apps Script (di ROOT repo, BUKAN di
+ *  migrasi/ — karena .claspignore mengecualikan migrasi/). Kalau ditaruh di
+ *  migrasi/, `clasp push` akan MENGHAPUS doPost dari project → semua proxy mati
+ *  ("Script function not found: doPost"). Jangan pindahkan ke migrasi/.
  *
- *  Catatan: hanya fungsi di _GS_ALLOW yang boleh dipanggil (keamanan).
+ *  Tidak mendefinisikan doGet — doGet ada di Main.gs (menyajikan halaman lama).
+ *  Hanya fungsi di _GS_ALLOW yang boleh dipanggil (keamanan).
  * ========================================================================== */
 
 function doPost(e) {
@@ -36,14 +37,8 @@ function doPost(e) {
   }
 }
 
-// Opsional: healthcheck GET.
-function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'renus-gs-router' }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Allowlist fungsi yang boleh dipanggil frontend (219). Dihasilkan dari
-// pemindaian pemanggilan google.script.run di seluruh JS_*.html.
+// Allowlist fungsi yang boleh dipanggil frontend. Dihasilkan dari pemindaian
+// pemanggilan google.script.run di seluruh JS_*.html.
 var _GS_ALLOW = {
   addBOMProject:1, addDEDProject:1, addQCProject:1, addScheduleProject:1, ajukanReviewBOM:1,
   approvePembayaranPO:1, batalHandOver:1, batalRequestPengiriman:1, batalTandaiBeliLangsung:1,
