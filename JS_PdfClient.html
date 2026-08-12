@@ -256,6 +256,81 @@ function _pdfBukaPreview(judul, subjudul) {
   var m = document.getElementById('modal-preview-pdf'); if (m) m.classList.remove('hidden');
 }
 
+// ── INVOICE: keterangan pembayaran + tabel item (billing + deskripsi scope) ──
+function _pdfKetInvoice(item, nilaiKontrak) {
+  var totalKontrakStr = 'Rp ' + _pdfRp(nilaiKontrak);
+  var jenis = (item.jenis || 'Penuh').toString();
+  var persen = Number(item.persen) || 0;
+  if (jenis === 'Pelunasan') return 'Pelunasan dari total kontrak ' + totalKontrakStr;
+  if (jenis === 'Penuh') return 'Pembayaran penuh dari total kontrak ' + totalKontrakStr;
+  var label = (jenis === 'DP') ? 'DP' : 'Termin';
+  var persenStr = persen > 0 ? (' ' + persen + '%') : '';
+  return label + persenStr + ' dari total kontrak ' + totalKontrakStr;
+}
+
+// Tabel item invoice: baris A (tagihan) + keterangan termin + "Deskripsi:" +
+// scope per-kelompok (nama biru) dgn item (qty/unit, tanpa harga).
+function _pdfTabelInvoice(doc, startY, item, ML, MR) {
+  var meta = {};
+  try { meta = JSON.parse(item.items || '{}'); } catch (e) { meta = {}; }
+  if (Array.isArray(meta)) meta = { scope: meta, nilaiKontrak: 0 };
+  var scope = Array.isArray(meta.scope) ? meta.scope : [];
+  var BLUE_K = [26, 58, 143];
+  var body = [];
+
+  body.push([
+    { content: 'A', styles: { fontStyle: 'bold', halign: 'center' } },
+    { content: item.namaProject || '', styles: { fontStyle: 'bold' } },
+    { content: '1', styles: { halign: 'center' } },
+    { content: 'Ls', styles: { halign: 'center' } },
+    { content: _pdfRp(item.dpp), styles: { halign: 'right' } },
+    { content: _pdfRp(item.dpp), styles: { halign: 'right' } }
+  ]);
+  body.push([{ content: '' }, { content: _pdfKetInvoice(item, Number(meta.nilaiKontrak) || 0), colSpan: 5 }]);
+  body.push([{ content: '', colSpan: 6, styles: { minCellHeight: 2 } }]);
+  body.push([{ content: '' }, { content: 'Deskripsi:', colSpan: 5, styles: { fontStyle: 'bold' } }]);
+  scope.forEach(function (k) {
+    var namaK = (k.namaKelompok || k.nama || '').toString();
+    if (namaK) {
+      body.push([{ content: '' }, { content: namaK.toUpperCase(), colSpan: 5, styles: { fontStyle: 'bold', textColor: BLUE_K } }]);
+    }
+    (k.subItems || k.items || []).forEach(function (s) {
+      body.push([
+        { content: '' },
+        { content: s.deskripsi || s.nama || '' },
+        { content: (s.qty != null && s.qty !== '') ? String(s.qty) : '', styles: { halign: 'center' } },
+        { content: s.unit || s.satuan || '', styles: { halign: 'center' } },
+        { content: '' },
+        { content: '' }
+      ]);
+    });
+  });
+
+  doc.autoTable({
+    startY: startY,
+    head: [[
+      { content: 'No', styles: { halign: 'center' } },
+      { content: 'Description', styles: { halign: 'left' } },
+      { content: 'Qty', styles: { halign: 'center' } },
+      { content: 'Unit', styles: { halign: 'center' } },
+      { content: 'Price (IDR)', styles: { halign: 'center' } },
+      { content: 'Amount (IDR)', styles: { halign: 'center' } }
+    ]],
+    body: body,
+    theme: 'grid',
+    margin: { left: ML, right: MR },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' },
+      2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' },
+      4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
+    },
+    headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.5 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: [255, 255, 255], lineWidth: 0, cellPadding: 1.1 },
+    styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 }
+  });
+  return doc.lastAutoTable.finalY;
+}
+
 // ── INVOICE ─────────────────────────────────────────────────────────────────
 function buatInvoicePDF(item) {
   var jsPDF = window.jspdf.jsPDF;
@@ -273,7 +348,7 @@ function buatInvoicePDF(item) {
 
   // ── INVOICE TO ──
   var klien = _pdfKlien(item.klienId);
-  var curY = 41;
+  var curY = 45;
   curY = _pdfBarSeksi(doc, 'Invoice to', ML, CW, curY);
   doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, 12, 'F');   // tanpa border
   var c1L = ML + 2, c1V = ML + 26, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 30;
@@ -288,12 +363,10 @@ function buatInvoicePDF(item) {
   _row(c1L, c1V, curY + 8.5, 'Alamat :', item.alamatKlien || klien.alamat || '');
   _row(c2L, c2V, curY + 4, 'Perusahaan :', item.perusahaanKlien || klien.perusahaan || '');
   _row(c2L, c2V, curY + 8.5, 'No.Telp :', item.kontakKlien || klien.kontak || '');
-  curY += 18;
+  curY += 13;
 
-  // ── TABEL ITEM ──
-  var rincian = [];
-  try { rincian = JSON.parse(item.items || '[]'); } catch (e) { rincian = []; }
-  curY = _pdfTabelItem(doc, curY, rincian, ML, MR);
+  // ── TABEL ITEM (tagihan + keterangan termin + deskripsi scope) ──
+  curY = _pdfTabelInvoice(doc, curY, item, ML, MR);
 
   // ── RINGKASAN ──
   var lines = [{ label: 'DPP', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
