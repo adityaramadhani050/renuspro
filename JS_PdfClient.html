@@ -36,6 +36,20 @@ var PDF_BLUE       = PDF_HDR_BG;     // alias kompatibilitas
 function _pdfRp(v) { return Math.round(Math.abs(Number(v) || 0)).toLocaleString('id-ID'); }
 function _pdfNamaFile(s) { return String(s || 'dokumen').replace(/[\\/:*?"<>|]+/g, '-') + '.pdf'; }
 
+// Tanggal panjang Indonesia: "01 Januari 2026". Terima dd/MM/yyyy | yyyy-MM-dd.
+function _pdfTglPanjang(v) {
+  if (!v) return '';
+  var s = String(v).trim(), d, m, y;
+  var a = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  var b = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (a) { d = +a[1]; m = +a[2]; y = +a[3]; }
+  else if (b) { d = +b[3]; m = +b[2]; y = +b[1]; }
+  else { return s; }
+  var B = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  if (m < 1 || m > 12) return s;
+  return (d < 10 ? '0' + d : '' + d) + ' ' + B[m - 1] + ' ' + y;
+}
+
 // Logo: pakai PNG bila tersedia (jaga rasio), else fallback vektor panel surya.
 function _pdfDrawLogo(doc, x, y) {
   var b = window.RENUS_LOGO_B64;
@@ -252,9 +266,9 @@ function buatInvoicePDF(item) {
   _pdfJudulKanan(doc, 'INVOICE', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 15 });
   _pdfInfoKanan(doc, [
     ['No.', item.id || ''],
-    ['Date', item.tanggal || ''],
+    ['Date', _pdfTglPanjang(item.tanggal)],
     ['No. PO', item.noPO || ''],
-    ['Tgl. PO', item.tglPO || '']
+    ['Tgl. PO', _pdfTglPanjang(item.tglPO)]
   ], PW, MR, 25, 4.5);
 
   // ── INVOICE TO ──

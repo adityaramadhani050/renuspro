@@ -197,7 +197,7 @@ function buatDokumenPDF(item) {
     // ── HEADER KANAN: "Quotation" + info doc ──────────────────────────────
     _pdfJudulKanan(doc, 'Quotation', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 15 });
     _pdfInfoKanan(doc, [
-      ['Date',        item.tanggal || ''],
+      ['Date',        _pdfTglPanjang(item.tanggal)],
       ['Quotation #', item.id || ''],
       ['Rev',         String(item.rev ?? '0')],
     ], PW, MR, 25, 4.5);
@@ -216,7 +216,7 @@ function buatDokumenPDF(item) {
 
     const clientRows = [
       ['Name',          klien.nama      || item.namaKlien  || '',
-       'Quotation valid until:', item.validUntil || '-'],
+       'Quotation valid until:', _pdfTglPanjang(item.validUntil) || '-'],
       ['Company Name',  klien.perusahaan || '',
        'Prepared by:',          item.dibuatOleh || ''],
       ['Street Address', klien.alamat   || '', '', ''],
@@ -516,7 +516,7 @@ function buatDokumenPDF(item) {
     doc.text('Best Regard,', PW - MR, curY, { align: 'right' });
 
     const namaText = item.dibuatOleh || 'Sales Executive';
-    const namaY    = curY + 12;
+    const namaY    = curY + 4.5;
     doc.setFont(PDF_FONT, 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text(namaText, PW - MR, namaY, { align: 'right' });
@@ -528,7 +528,7 @@ function buatDokumenPDF(item) {
     doc.line(PW - MR - namaW, namaY + 1, PW - MR, namaY + 1);
 
     // ── RENDER PREVIEW (+ merge lampiran T&C via pipeline bersama) ───────────
-    const pdfName  = _pdfNamaFile(`Quotation_${item.id.replace(/\//g, '-')}_Rev${item.rev}`);
+    const pdfName  = _pdfNamaFile(item.id.replace(/\//g, '-') + ' Rev.' + item.rev + ' - ' + (item.namaProject || '') + ' - ' + (item.namaKlien || ''));
     _activePdfDoc  = doc;
     _pdfFinishPreview(doc, pdfName, { mergeTC: true, kelompokList: kelompokList });
 
