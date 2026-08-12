@@ -77,8 +77,11 @@ async function _mergePdfDenganTC(mainPdfBytes, kelompokList) {
   const { PDFDocument } = PDFLib;
   const tipe = _detectPenawaranType(kelompokList);
 
-  // Ambil B64 dari server
-  const tcB64 = await new Promise((resolve, reject) => {
+  // T&C base64 di-inline di frontend (TC_Assets.html) → TIDAK bergantung ke
+  // Apps Script /exec yang bisa gagal transient. Fallback ke google.script.run
+  // hanya bila aset lokal tak tersedia (mis. build lama).
+  const tcLokal = (tipe === 'jasa') ? window.TC_PDF_JASA_B64 : window.TC_PDF_MATERIAL_B64;
+  const tcB64 = tcLokal || await new Promise((resolve, reject) => {
     if (tipe === 'jasa') {
       google.script.run
         .withSuccessHandler(resolve)
