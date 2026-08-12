@@ -18,11 +18,12 @@ on:
       - claude/eloquent-heisenberg-swy9m6
       - main
     # Perubahan yang tak memengaruhi build frontend tak perlu memicu deploy.
+    # (.github TIDAK di-ignore agar update workflow ini bisa memicu deploy
+    # pertama tanpa perlu tombol manual / komputer lokal.)
     paths-ignore:
       - '**.md'
       - '**.sql'
       - '**.gs'
-      - '.github/**'
   workflow_dispatch: {}
 
 # Cegah dua deploy berbarengan saling menimpa push ke renuspro-web.
