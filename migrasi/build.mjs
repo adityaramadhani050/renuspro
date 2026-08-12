@@ -87,7 +87,24 @@ if (leftover) {
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'index.html'), html, 'utf8');
 copyFileSync(join(ROOT, 'migrasi', 'gs-run-shim.js'), join(OUT_DIR, 'gs-run-shim.js'));
-if (HAS_OVERRIDES) writeFileSync(join(OUT_DIR, 'supabase-overrides.js'), assembleOverrides(), 'utf8');
+if (HAS_OVERRIDES) {
+  let ovr = assembleOverrides();
+  // Suntik konfigurasi Supabase dari environment (di CI berasal dari GitHub
+  // Secrets). Sumber (000-head.js) sengaja memakai placeholder ISI_* supaya
+  // kunci tak ikut ter-commit; nilai asli hanya masuk saat build.
+  const supaUrl  = process.env.SUPABASE_URL || '';
+  const supaAnon = process.env.SUPABASE_ANON_KEY || '';
+  if (supaUrl && supaAnon) {
+    ovr = ovr
+      .replace(/'ISI_PROJECT_URL'/g, JSON.stringify(supaUrl))
+      .replace(/'ISI_ANON_KEY'/g, JSON.stringify(supaAnon));
+    console.log('[build] ✔ Konfigurasi Supabase disuntik dari environment.');
+  } else {
+    // Tanpa config, overrides jadi inert → APLIKASI JATUH KE APPS SCRIPT/SHEET.
+    console.warn('[build] ⚠ SUPABASE_URL / SUPABASE_ANON_KEY kosong — supabase-overrides.js memakai placeholder (app TIDAK akan pakai Supabase).');
+  }
+  writeFileSync(join(OUT_DIR, 'supabase-overrides.js'), ovr, 'utf8');
+}
 
 console.log(`[build] ✔ dist/index.html (${(html.length / 1024).toFixed(0)} KB) + dist/gs-run-shim.js`);
 console.log('[build]   Deploy folder dist/ ke Vercel (Output Directory = dist).');
