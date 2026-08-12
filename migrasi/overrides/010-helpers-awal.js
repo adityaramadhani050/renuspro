@@ -14,7 +14,17 @@
           if (email.indexOf('@') === -1) return { success: false, message: 'Masukkan EMAIL (bukan username) untuk login.' };
 
           var r = await supa.auth.signInWithPassword({ email: email, password: password });
-          if (r.error) return { success: false, message: 'Email atau password salah.' };
+          if (r.error) {
+            // Bedakan kunci API salah (config) dari kredensial salah — jangan
+            // menampilkan "password salah" padahal sebenarnya anon key invalid.
+            var _em = (r.error.message || '').toLowerCase();
+            if (r.error.status === 401 || _em.indexOf('api key') !== -1 || _em.indexOf('invalid api') !== -1) {
+              console.error('[login] Supabase menolak API key:', r.error);
+              return { success: false, message: 'Konfigurasi Supabase (anon key) tidak valid. Periksa secret SUPABASE_ANON_KEY (harus key "anon public", bukan service_role, dan tersalin penuh).' };
+            }
+            console.warn('[login] signIn gagal:', r.error.message);
+            return { success: false, message: 'Email atau password salah.' };
+          }
           window.__RENUS_TOKEN__ = (r.data && r.data.session) ? r.data.session.access_token : '';
 
           var uid = r.data.user.id;
