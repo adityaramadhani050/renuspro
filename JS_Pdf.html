@@ -396,14 +396,13 @@ function buatDokumenPDF(item) {
     const catatan = tc.catatan || '';
     if (catatan) {
       const noteW = colLabelX - ML - 3;
-      const ny = _pdfBarSeksi(doc, 'Notes :', ML, noteW, sy);
-      const catatanLines = doc.splitTextToSize(catatan, noteW - 4);
-      const catatanH = catatanLines.length * 4 + 4;
-      doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
-      doc.rect(ML, ny, noteW, catatanH, 'F');
-      doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(0, 0, 0);
-      doc.text(catatanLines, ML + 2, ny + 4);
-      leftBottom = ny + catatanH;
+      doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+      doc.setFont(PDF_FONT, 'bold');
+      doc.text('Notes :', ML, sy + 3.4);
+      doc.setFont(PDF_FONT, 'normal');
+      const catatanLines = doc.splitTextToSize(catatan, noteW);
+      doc.text(catatanLines, ML, sy + 8);
+      leftBottom = sy + 8 + catatanLines.length * 4;
     }
 
     curY = Math.max(summaryBottom, leftBottom) + 6;
