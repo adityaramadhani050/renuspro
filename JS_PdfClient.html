@@ -325,7 +325,7 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
       4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
     },
     headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.5 },
-    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: [255, 255, 255], lineWidth: 0, cellPadding: 1.1 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: 1.1 },
     styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 }
   });
   return doc.lastAutoTable.finalY;
@@ -369,21 +369,12 @@ function buatInvoicePDF(item) {
   curY = _pdfTabelInvoice(doc, curY, item, ML, MR);
 
   // ── RINGKASAN ──
-  var lines = [{ label: 'DPP', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
+  var lines = [{ label: 'Subtotal', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
   if (Number(item.ppnNominal) > 0 || Number(item.ppnPersen) > 0) {
     lines.push({ label: 'PPN ' + (item.ppnPersen || 11) + '%', value: 'Rp ' + _pdfRp(item.ppnNominal), bold: false });
   }
-  lines.push({ label: 'TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true });
+  lines.push({ label: 'GRAND TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true });
   curY = _pdfRingkasan(doc, curY, lines, PW, MR) + 4;
-
-  // ── TERBILANG ──
-  if (typeof _terbilangClient === 'function') {
-    doc.setFont(PDF_FONT, 'italic'); doc.setFontSize(PDF_FS); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-    var terbilang = 'Terbilang : ' + _terbilangClient(item.total) + ' Rupiah';
-    var tl = doc.splitTextToSize(terbilang, CW);
-    doc.text(tl, ML, curY + 2);
-    curY += 2 + tl.length * 5;
-  }
 
   // ── CATATAN / BANK ──
   curY += 3;
