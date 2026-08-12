@@ -195,19 +195,19 @@ function buatDokumenPDF(item) {
     _pdfHeaderKiri(doc, ML);
 
     // ── HEADER KANAN: "Quotation" + info doc ──────────────────────────────
-    _pdfJudulKanan(doc, 'Quotation', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 20 });
+    _pdfJudulKanan(doc, 'Quotation', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 15 });
     _pdfInfoKanan(doc, [
       ['Date',        item.tanggal || ''],
       ['Quotation #', item.id || ''],
       ['Rev',         String(item.rev ?? '0')],
-    ], PW, MR, 21.5, 4.6);
+    ], PW, MR, 25, 4.5);
 
     // ── QUOTATION TO ───────────────────────────────────────────────────────
-    let curY = 40;
+    let curY = 41;
     curY = _pdfBarSeksi(doc, 'Quotation To :', ML, CW, curY);
 
     doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]);
-    doc.rect(ML, curY, CW, 22, 'F');   // tanpa border; +ruang setelah Contact
+    doc.rect(ML, curY, CW, 17, 'F');   // tanpa border
 
     const c1L = ML + 2;
     const c1V = ML + 30;
@@ -224,7 +224,7 @@ function buatDokumenPDF(item) {
     ];
 
     clientRows.forEach((r, idx) => {
-      const y = curY + 5 + idx * 4.2;
+      const y = curY + 3.6 + idx * 4.2;
       doc.setFontSize(PDF_FS);
       doc.setFont(PDF_FONT, 'bold');
       doc.setTextColor(0, 0, 0);
@@ -241,7 +241,7 @@ function buatDokumenPDF(item) {
         doc.text(r[3], c2V - 3, y, { align: 'right' });
       }
     });
-    curY += 25;
+    curY += 19;
 
     // ── TABEL ITEM ─────────────────────────────────────────────────────────
     // Kelompok normal + kelompok DISCOUNT (jika ada) masuk ke tabel
@@ -334,24 +334,24 @@ function buatDokumenPDF(item) {
         fontStyle:  'bold',
         fontSize:   PDF_FS,
         lineColor:  [255, 255, 255],
-        lineWidth:  0.3,
+        lineWidth:  0,
       },
       bodyStyles: {
         fontSize:    PDF_FS,
         textColor:   [0, 0, 0],
         fillColor:   PDF_ROW_BG,
         lineColor:   [255, 255, 255],
-        lineWidth:   0.6,
+        lineWidth:   0,
         cellPadding: 1.1,
       },
       alternateRowStyles: { fillColor: PDF_ROW_BG },
-      styles: { overflow: 'linebreak', cellPadding: 1.1 },
+      styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
     });
 
     curY = doc.lastAutoTable.finalY;
 
     // ── SUMMARY: SUBTOTAL / DISKON / PPN / GRAND TOTAL (kanan bawah tabel) ─
-    curY += 4;
+    curY += 0;
     const colLabelX = PW - MR - 56;
     const colValX   = PW - MR;
     const rowH      = 5;
@@ -373,11 +373,6 @@ function buatDokumenPDF(item) {
     const summaryBoxW  = (PW - MR) - colLabelX;
     const totalSummaryH = summaryLines.length * rowH + 2;
 
-    // Border luar seluruh summary
-    doc.setDrawColor(210, 215, 230);
-    doc.setLineWidth(0.2);
-    doc.rect(colLabelX, sy - 1, summaryBoxW, totalSummaryH + 1);
-
     summaryLines.forEach((row, idx) => {
       const ry = sy + 1 + idx * rowH;
 
@@ -385,9 +380,6 @@ function buatDokumenPDF(item) {
       const bg = row.highlight ? PDF_GROUP_BG : PDF_ROW_BG;
       doc.setFillColor(bg[0], bg[1], bg[2]);
       doc.rect(colLabelX, ry - 0.5, summaryBoxW, rowH + 1, 'F');
-      doc.setDrawColor(200, 205, 220);
-      doc.setLineWidth(0.2);
-      doc.rect(colLabelX, ry - 0.5, summaryBoxW, rowH + 1);
 
       doc.setFontSize(PDF_FS);
       if (row.bold) {
