@@ -67,6 +67,9 @@ function exportPenawaranPDF(item) {
             _activePdfBase64 = res.pdfBase64;
             _activePdfName   = res.fileName;
             renderPDFDariBase64(res.pdfBase64);
+            // Lampiran T&C gagal dimuat (mis. gangguan Google Drive/Apps Script).
+            // Beri tahu user secara eksplisit — jangan diam-diam menampilkan PDF tanpa T&C.
+            showNotification('Lampiran T&C gagal dimuat — PDF tampil tanpa T&C. Coba generate ulang.', 'error');
           }
         } else {
           console.error('[export PDF] gagal, respons:', res);
