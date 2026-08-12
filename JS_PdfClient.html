@@ -283,10 +283,11 @@ function buatInvoicePDF(item) {
     doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
     doc.text(String(val == null ? '' : val), vx, y);
   }
-  _row(c1L, c1V, curY + 4, 'Name :', klien.nama || item.namaKlien || '');
-  _row(c1L, c1V, curY + 8.5, 'Alamat :', klien.alamat || '');
-  _row(c2L, c2V, curY + 4, 'Perusahaan :', klien.perusahaan || '');
-  _row(c2L, c2V, curY + 8.5, 'No.Telp :', klien.kontak || '');
+  // Utamakan detail yg dibawa record invoice (dari getInvoiceList), fallback ke erpState.
+  _row(c1L, c1V, curY + 4, 'Name :', item.namaKlien || klien.nama || '');
+  _row(c1L, c1V, curY + 8.5, 'Alamat :', item.alamatKlien || klien.alamat || '');
+  _row(c2L, c2V, curY + 4, 'Perusahaan :', item.perusahaanKlien || klien.perusahaan || '');
+  _row(c2L, c2V, curY + 8.5, 'No.Telp :', item.kontakKlien || klien.kontak || '');
   curY += 18;
 
   // ── TABEL ITEM ──

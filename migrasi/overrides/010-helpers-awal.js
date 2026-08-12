@@ -471,12 +471,21 @@
         if (!kq.error) (kq.data || []).forEach(function (k) {
           if (k.no_invoice) kwMap[k.no_invoice] = k.no_kwitansi;
         });
+        // Detail klien untuk PDF invoice (perusahaan/alamat/kontak) — peta by id & nama.
+        var klienById = {}, klienByNama = {};
+        var cq = await _all('klien', 'id,nama_klien,perusahaan,alamat,kontak');
+        if (!cq.error) (cq.data || []).forEach(function (k) {
+          klienById[k.id] = k;
+          if (k.nama_klien) klienByNama[k.nama_klien] = k;
+        });
         var list = (q.data || []).map(function (r) {
+          var kd = klienById[r.klien_id] || klienByNama[r.nama_klien] || {};
           return {
             id: r.no_invoice || '', noWO: r.no_wo || '', noPenawaran: r.no_penawaran || '',
             tanggal: _fmtTgl(r.tanggal), jenis: r.jenis || 'Penuh',
             persen: parseFloat(r.persen) || 0, noPO: r.no_po || '', tglPO: _fmtTgl(r.tgl_po),
             klienId: r.klien_id || '', namaKlien: r.nama_klien || '', namaProject: r.nama_project || '',
+            perusahaanKlien: kd.perusahaan || '', alamatKlien: kd.alamat || '', kontakKlien: kd.kontak || '',
             dpp: parseFloat(r.dpp) || 0, ppnPersen: parseFloat(r.ppn_persen) || 0,
             ppnNominal: parseFloat(r.ppn_nominal) || 0, total: parseFloat(r.total) || 0,
             items: _jsonStr(r.rincian_item, '[]'), statusBayar: r.status_bayar || 'Belum Lunas',
