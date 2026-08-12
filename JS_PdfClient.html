@@ -206,7 +206,7 @@ function _pdfRingkasan(doc, startY, lines, PW, MR) {
   });
   // pemisah kolom (putih tipis)
   var sepX = colValX - 34;
-  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.4);
+  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.2);
   doc.line(sepX, sy, sepX, sy + lines.length * rowH);
   return sy + totalH + 3;
 }
@@ -307,16 +307,15 @@ function buatInvoicePDF(item) {
   if (item.catatan) noteLines.push(item.catatan);
   if (item.bankAccount) noteLines.push('Pembayaran ke rekening: ' + item.bankAccount);
   if (noteLines.length) {
-    if (curY > 250) { doc.addPage(); curY = 15; }
-    doc.setFillColor(255, 252, 230);
     var wrapped = doc.splitTextToSize(noteLines.join('\n'), CW - 4);
-    var h = wrapped.length * 5 + 6;
+    var h = wrapped.length * 4 + 4;
+    if (curY + 5 + h > 285) { doc.addPage(); curY = 15; }
+    curY = _pdfBarSeksi(doc, 'Notes :', ML, CW, curY);
+    doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
     doc.rect(ML, curY, CW, h, 'F');
-    doc.setDrawColor(220, 200, 100); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, h);
-    doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
-    doc.text('Note :', ML + 2, curY + 5);
-    doc.setFont(PDF_FONT, 'normal');
-    doc.text(wrapped, ML + 2, curY + 10);
+    doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.text(wrapped, ML + 2, curY + 4);
+    curY += h + 4;
   }
 
   return doc;
