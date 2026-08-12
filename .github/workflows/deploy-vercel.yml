@@ -1,0 +1,73 @@
+name: Auto-deploy ke renuspro-web (Vercel)
+
+# Tiap push ke branch kerja, build frontend (build.mjs) lalu dorong hasilnya
+# ke repo renuspro-web → Vercel auto-deploy. Menghapus langkah manual
+# "node build.mjs + cp dist/* + git push" yang rawan lupa/error.
+#
+# PRASYARAT (sekali saja):
+#   Settings → Secrets and variables → Actions → New repository secret
+#     Name : DEPLOY_TOKEN
+#     Value: Personal Access Token (fine-grained) dgn akses
+#            Contents: Read and write pada repo adityaramadhani050/renuspro-web
+#
+# .gs (Apps Script) TIDAK ikut ke sini — itu dideploy terpisah via clasp.
+
+on:
+  push:
+    branches:
+      - claude/eloquent-heisenberg-swy9m6
+      - main
+    # Perubahan yang tak memengaruhi build frontend tak perlu memicu deploy.
+    paths-ignore:
+      - '**.md'
+      - '**.sql'
+      - '**.gs'
+      - '.github/**'
+  workflow_dispatch: {}
+
+# Cegah dua deploy berbarengan saling menimpa push ke renuspro-web.
+concurrency:
+  group: deploy-vercel
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout renuspro (sumber)
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dist (build.mjs)
+        run: node migrasi/build.mjs
+
+      - name: Checkout renuspro-web (target Vercel)
+        uses: actions/checkout@v4
+        with:
+          repository: adityaramadhani050/renuspro-web
+          token: ${{ secrets.DEPLOY_TOKEN }}
+          path: renuspro-web
+
+      - name: Salin hasil build ke renuspro-web
+        run: |
+          cp dist/index.html            renuspro-web/index.html
+          cp dist/gs-run-shim.js        renuspro-web/gs-run-shim.js
+          cp dist/supabase-overrides.js renuspro-web/supabase-overrides.js
+
+      - name: Commit & push bila ada perubahan
+        run: |
+          cd renuspro-web
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html gs-run-shim.js supabase-overrides.js
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan build — deploy dilewati."
+          else
+            git commit -m "Auto-deploy dari renuspro@${GITHUB_SHA::7}"
+            git push
+            echo "Terkirim ke renuspro-web → Vercel akan auto-deploy."
+          fi
