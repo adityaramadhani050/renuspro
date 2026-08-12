@@ -326,7 +326,14 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
     },
     headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.5 },
     bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: 1.1 },
-    styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 }
+    styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
+    didDrawCell: function (data) {
+      // Hanya border kanan tiap sel (pemisah kolom) — putih tipis, seperti penawaran.
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.4);
+      var rx = data.cell.x + data.cell.width;
+      doc.line(rx, data.cell.y, rx, data.cell.y + data.cell.height);
+    }
   });
   return doc.lastAutoTable.finalY;
 }
