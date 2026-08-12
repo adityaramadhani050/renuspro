@@ -176,7 +176,7 @@ function _pdfTabelItem(doc, startY, rincian, ML, MR) {
       4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
     },
     headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.3 },
-    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineColor: [200, 205, 220], lineWidth: 0.2, cellPadding: 1.1 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineColor: [255, 255, 255], lineWidth: 0.6, cellPadding: 1.1 },
     styles: { overflow: 'linebreak', cellPadding: 1.1 }
   });
   return doc.lastAutoTable.finalY;
@@ -250,14 +250,13 @@ function buatInvoicePDF(item) {
     ['Date', item.tanggal || ''],
     ['No. PO', item.noPO || ''],
     ['Tgl. PO', item.tglPO || '']
-  ], PW, MR, 26, 4.0);
+  ], PW, MR, 21.5, 4.6);
 
   // ── INVOICE TO ──
   var klien = _pdfKlien(item.klienId);
-  var curY = 44;
+  var curY = 40;
   curY = _pdfBarSeksi(doc, 'Invoice to', ML, CW, curY);
-  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, 13, 'F');
-  doc.setDrawColor(210, 215, 230); doc.setLineWidth(0.2); doc.rect(ML, curY, CW, 13);
+  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, 16, 'F');   // tanpa border
   var c1L = ML + 2, c1V = ML + 26, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 30;
   function _row(lx, vx, y, label, val) {
     doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]); doc.setFontSize(PDF_FS);
@@ -269,7 +268,7 @@ function buatInvoicePDF(item) {
   _row(c1L, c1V, curY + 9.5, 'Alamat :', klien.alamat || '');
   _row(c2L, c2V, curY + 5, 'Perusahaan :', klien.perusahaan || '');
   _row(c2L, c2V, curY + 9.5, 'No.Telp :', klien.kontak || '');
-  curY += 16;
+  curY += 19;
 
   // ── TABEL ITEM ──
   var rincian = [];

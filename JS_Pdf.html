@@ -200,17 +200,14 @@ function buatDokumenPDF(item) {
       ['Date',        item.tanggal || ''],
       ['Quotation #', item.id || ''],
       ['Rev',         String(item.rev ?? '0')],
-    ], PW, MR, 30, 5.5);
+    ], PW, MR, 21.5, 4.6);
 
     // ── QUOTATION TO ───────────────────────────────────────────────────────
-    let curY = 50;
+    let curY = 40;
     curY = _pdfBarSeksi(doc, 'Quotation To :', ML, CW, curY);
 
     doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]);
-    doc.rect(ML, curY, CW, 18, 'F');
-    doc.setDrawColor(210, 215, 230);
-    doc.setLineWidth(0.2);
-    doc.rect(ML, curY, CW, 18);
+    doc.rect(ML, curY, CW, 22, 'F');   // tanpa border; +ruang setelah Contact
 
     const c1L = ML + 2;
     const c1V = ML + 30;
@@ -244,7 +241,7 @@ function buatDokumenPDF(item) {
         doc.text(r[3], c2V - 3, y, { align: 'right' });
       }
     });
-    curY += 21;
+    curY += 25;
 
     // ── TABEL ITEM ─────────────────────────────────────────────────────────
     // Kelompok normal + kelompok DISCOUNT (jika ada) masuk ke tabel
@@ -343,8 +340,8 @@ function buatDokumenPDF(item) {
         fontSize:    PDF_FS,
         textColor:   [0, 0, 0],
         fillColor:   PDF_ROW_BG,
-        lineColor:   [200, 205, 220],
-        lineWidth:   0.2,
+        lineColor:   [255, 255, 255],
+        lineWidth:   0.6,
         cellPadding: 1.1,
       },
       alternateRowStyles: { fillColor: PDF_ROW_BG },
@@ -476,17 +473,13 @@ function buatDokumenPDF(item) {
 
     const tcColCount = 2;
     const tcItemW    = CW / tcColCount;
-    const tcRowH     = 6.5;
+    const tcRowH     = 5;
     const tcRows2    = Math.ceil(tcItems.length / tcColCount);
     const tcTotalH   = tcRows2 * tcRowH + 6;
 
     doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
     doc.rect(ML, curY - 2, CW, tcTotalH, 'F');
-    doc.setDrawColor(210, 215, 230);
-    doc.setLineWidth(0.2);
-    doc.rect(ML, curY - 2, CW, tcTotalH);
-    // Garis vertikal pemisah dua kolom
-    doc.line(ML + tcItemW, curY - 2, ML + tcItemW, curY - 2 + tcTotalH);
+    // (border kotak & garis pemisah kolom T&C dihilangkan sesuai desain)
 
     tcItems.forEach((tcItem, idx) => {
       const col = idx % tcColCount;
