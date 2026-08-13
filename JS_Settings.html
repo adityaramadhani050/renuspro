@@ -432,6 +432,155 @@ function simpanPOTCOptions() {
 }
 
 // ═══════════════════════════════════════════════════════
+// MODAL "ATUR S&K" — dipakai dari Form Penawaran & Form PO
+// Modal mandiri (ID sendiri) agar tak bentrok dgn container di halaman
+// Pengaturan. Mode 'penawaran' → getTCOptions/saveTCOptions; mode 'po' →
+// getPOTCOptions/savePOTCOptions. onSaved: callback utk reload dropdown form.
+// ═══════════════════════════════════════════════════════
+var _snkMode = null;       // 'penawaran' | 'po'
+var _snkData = {};
+var _snkOnSaved = null;
+
+function _snkAccent() { return _snkMode === 'po' ? 'amber' : 'blue'; }
+
+function bukaAturSNK(mode, onSaved) {
+  _snkMode = (mode === 'po') ? 'po' : 'penawaran';
+  _snkOnSaved = (typeof onSaved === 'function') ? onSaved : null;
+  var m = document.getElementById('modal-atur-snk'); if (!m) return;
+  var isPO = _snkMode === 'po';
+  var titleEl = document.getElementById('snk-modal-title');
+  var iconEl  = document.getElementById('snk-modal-icon');
+  var saveBtn = document.getElementById('snk-modal-save-btn');
+  if (titleEl) titleEl.textContent = isPO ? 'Atur S&K Purchase Order' : 'Atur S&K Penawaran';
+  if (iconEl)  iconEl.className = 'fa-solid fa-sliders ' + (isPO ? 'text-amber-600' : 'text-blue-600');
+  if (saveBtn) {
+    saveBtn.className = 'px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition flex items-center gap-2 ' +
+      (isPO ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700');
+    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan';
+    saveBtn.disabled = false;
+  }
+  var cont = document.getElementById('snk-modal-container');
+  if (cont) cont.innerHTML = '<div class="text-xs text-slate-400 italic px-1 py-3">Memuat data...</div>';
+  m.classList.remove('hidden');
+  var fn = isPO ? 'getPOTCOptions' : 'getTCOptions';
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) { if (cont) cont.innerHTML = '<div class="text-xs text-rose-500 px-1 py-3">Gagal memuat S&K.</div>'; return; }
+      _snkData = r.options || {};
+      _snkRenderFields(r.fields || [], _snkData);
+    })
+    .withFailureHandler(function(e) { if (cont) cont.innerHTML = '<div class="text-xs text-rose-500 px-1 py-3">Gagal memuat: ' + ((e && e.message) || e) + '</div>'; })
+    [fn]();
+}
+
+function tutupAturSNK() { var m = document.getElementById('modal-atur-snk'); if (m) m.classList.add('hidden'); }
+
+function _snkRenderFields(fields, options) {
+  var cont = document.getElementById('snk-modal-container'); if (!cont) return;
+  var accent = _snkAccent();
+  cont.innerHTML = '';
+  if (!fields.length) { cont.innerHTML = '<div class="text-xs text-slate-400 italic px-1 py-3">Tidak ada field S&K.</div>'; return; }
+  fields.forEach(function(f) {
+    var opts = options[f.key] || [];
+    var html = '<div class="border border-slate-200 rounded-xl overflow-hidden">' +
+      '<div class="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">' +
+        '<span class="text-xs font-bold text-slate-600 uppercase tracking-wide">' + f.label + '</span>' +
+        '<button onclick="_snkAddOption(\'' + f.key + '\')" class="text-' + accent + '-600 hover:text-' + accent + '-800 text-xs font-bold flex items-center gap-1">' +
+          '<i class="fa-solid fa-plus text-[10px]"></i> Tambah</button>' +
+      '</div>' +
+      '<div class="divide-y divide-slate-100" id="snk-list-' + f.key + '">';
+    opts.forEach(function(opt, idx) { html += _snkRow(f.key, idx, opt); });
+    if (opts.length === 0) html += '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+    html += '</div></div>';
+    cont.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function _snkRow(key, idx, val) {
+  var accent = _snkAccent();
+  return '<div class="flex items-center gap-2 px-4 py-2" id="snk-row-' + key + '-' + idx + '">' +
+    '<input type="text" value="' + _escHtml(val) + '" onchange="_snkUpdate(\'' + key + '\',' + idx + ',this.value)" ' +
+      'class="flex-1 px-2 py-1 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-' + accent + '-400 bg-white">' +
+    '<button onclick="_snkDeleteOption(\'' + key + '\',' + idx + ')" class="text-red-400 hover:text-red-600 shrink-0">' +
+      '<i class="fa-solid fa-trash-can text-xs"></i></button>' +
+  '</div>';
+}
+
+function _snkUpdate(key, idx, val) { if (!_snkData[key]) return; _snkData[key][idx] = val; }
+
+function _snkAddOption(key) {
+  if (!_snkData[key]) _snkData[key] = [];
+  var idx = _snkData[key].length;
+  _snkData[key].push('');
+  var list = document.getElementById('snk-list-' + key); if (!list) return;
+  var empty = list.querySelector('.italic'); if (empty) empty.parentNode.removeChild(empty);
+  list.insertAdjacentHTML('beforeend', _snkRow(key, idx, ''));
+  var nr = document.getElementById('snk-row-' + key + '-' + idx); if (nr) nr.querySelector('input').focus();
+}
+
+function _snkDeleteOption(key, idx) {
+  if (!_snkData[key]) return;
+  _snkData[key].splice(idx, 1);
+  var list = document.getElementById('snk-list-' + key); if (!list) return;
+  var opts = _snkData[key];
+  list.innerHTML = '';
+  opts.forEach(function(opt, i) { list.insertAdjacentHTML('beforeend', _snkRow(key, i, opt)); });
+  if (opts.length === 0) list.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+}
+
+function simpanAturSNK() {
+  // Sync nilai input terakhir ke _snkData sebelum simpan.
+  Object.keys(_snkData).forEach(function(key) {
+    (_snkData[key] || []).forEach(function(_, idx) {
+      var row = document.getElementById('snk-row-' + key + '-' + idx);
+      if (row) { var inp = row.querySelector('input'); if (inp) _snkData[key][idx] = inp.value; }
+    });
+  });
+  var isPO = _snkMode === 'po';
+  var btn = document.getElementById('snk-modal-save-btn');
+  var lbl = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...'; }
+  var fn = isPO ? 'savePOTCOptions' : 'saveTCOptions';
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = lbl; }
+      showNotification((r && r.message) || 'Syarat & Ketentuan tersimpan.', (r && r.success) ? 'success' : 'error');
+      if (r && r.success) {
+        if (_snkOnSaved) { try { _snkOnSaved(); } catch (e) {} }
+        tutupAturSNK();
+      }
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = lbl; }
+      showNotification('Gagal menyimpan: ' + ((e && e.message) || e), 'error');
+    })
+    [fn](_snkData);
+}
+
+// Pembuka dari Form Penawaran — reload dropdown S&K (pertahankan pilihan) usai simpan.
+function _aturSNKPenawaran() {
+  bukaAturSNK('penawaran', function() {
+    if (typeof _loadTCDropdowns === 'function') {
+      try { _tcDropdownsLoaded = false; } catch (e) {}
+      _loadTCDropdowns();
+    }
+  });
+}
+
+// Pembuka dari Form Purchase Order — reload dropdown T&C (pertahankan pilihan).
+function _aturSNKPO() {
+  bukaAturSNK('po', function() {
+    var cur = {};
+    var wrap = document.getElementById('po-tc-fields-wrap');
+    if (wrap) {
+      var sels = wrap.querySelectorAll('select[id^="po-tc-"]');
+      Array.prototype.forEach.call(sels, function(sel) { cur[sel.id.replace('po-tc-', '')] = sel.value; });
+    }
+    if (typeof _loadPOTCDropdowns === 'function') _loadPOTCDropdowns(cur);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
 // BANK ACCOUNT
 // ═══════════════════════════════════════════════════════
 

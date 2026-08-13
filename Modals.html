@@ -833,3 +833,26 @@
     </div>
   </div>
 </div>
+
+<!-- ═══ Modal Atur Syarat & Ketentuan (dari Form Penawaran & Form PO) ═══ -->
+<!-- Reuse backend getTCOptions/saveTCOptions (Penawaran) & getPOTCOptions/     -->
+<!-- savePOTCOptions (PO). Mandiri agar ID tak bentrok dgn halaman Pengaturan.  -->
+<div id="modal-atur-snk" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-2 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+      <div class="flex items-center gap-2 min-w-0">
+        <i id="snk-modal-icon" class="fa-solid fa-sliders text-blue-600"></i>
+        <h3 id="snk-modal-title" class="text-base font-extrabold text-slate-800 truncate">Atur Syarat &amp; Ketentuan</h3>
+      </div>
+      <button onclick="tutupAturSNK()" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="px-5 py-2.5 text-[11px] text-slate-500 bg-slate-50/60 border-b border-slate-100">Kelola opsi dropdown Syarat &amp; Ketentuan. Perubahan tersimpan global dan langsung tersedia di form.</div>
+    <div id="snk-modal-container" class="p-5 overflow-y-auto space-y-4">
+      <div class="text-xs text-slate-400 italic">Memuat data...</div>
+    </div>
+    <div class="flex justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
+      <button onclick="tutupAturSNK()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Tutup</button>
+      <button id="snk-modal-save-btn" onclick="simpanAturSNK()" class="px-5 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+    </div>
+  </div>
+</div>
