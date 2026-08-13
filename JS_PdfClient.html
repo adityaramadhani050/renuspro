@@ -818,80 +818,85 @@ function exportPOPDFClient(noPO, subtitle) {
 }
 
 // ── INFO WORK ORDER (untuk tim engineer di BOM/DED/QC) ──────────────────────
-// ── INFO WORK ORDER (untuk tim engineer di BOM/DED/QC) ──────────────────────
-// Desain/layout mengikuti PDF di detail Work Order (kop surat + font Times,
-// judul tengah bergaris bawah, baris data label:value). data: getWOContextByWO.
+// Desain/layout mengikuti PDF WORK ORDER internal di detail Work Order
+// (landscape, header navy, tabel HPP biru dgn kolom HPP merah) — TANPA kolom
+// Harga Jual / Total Jual / Margin, dan Catatan Customer + MoM sebagai 2 kolom.
+// data: getWOContextByWO.
 function buatWOInfoPDF(res) {
-  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  var PW = 210, ML = 18, MR = 18, CW = PW - ML - MR, BOTTOM = 282;
-  var FS = 11, LHF = 1.3, LH = FS / 72 * 25.4 * LHF;
-  var y = 18;
-  doc.setFont('times', 'normal'); doc.setLineHeightFactor(LHF);
+  var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var PW = 297, PH = 210, ML = 12, MR = 12;
+  var DARK = [30, 41, 59], SLATE = [100, 116, 139], GREEN = [5, 150, 105], RED = [190, 30, 30], BLUE = [30, 64, 175];
+  var rp = function (v) { return Math.round(Math.abs(Number(v) || 0)).toLocaleString('id-ID'); };
 
-  function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); y = 18; } }
-  function center(txt, size, bold, underline) {
-    doc.setFont('times', bold ? 'bold' : 'normal'); doc.setFontSize(size || FS);
-    var lines = doc.splitTextToSize(txt, CW), lh = (size ? size * 0.46 : LH);
-    ensure(lines.length * lh);
-    lines.forEach(function (l) {
-      doc.text(l, PW / 2, y, { align: 'center' });
-      if (underline) { var w = doc.getTextWidth(l); doc.setLineWidth(0.4); doc.setDrawColor(30, 30, 30); doc.line(PW / 2 - w / 2, y + 1, PW / 2 + w / 2, y + 1); }
-      y += lh;
-    });
-  }
-  function kv(label, value, bold) {
-    ensure(LH); doc.setFontSize(FS); var colon = ML + 32;
-    doc.setFont('times', 'normal'); doc.setTextColor(0, 0, 0); doc.text(label, ML, y); doc.text(':', colon, y);
-    doc.setFont('times', bold ? 'bold' : 'normal'); var vx = colon + 3, vw = CW - (vx - ML);
-    var lines = doc.splitTextToSize(String(value == null || value === '' ? '-' : value), vw);
-    lines.forEach(function (l, i) { if (i > 0) ensure(LH); doc.text(l, vx, y); y += LH; });
-    doc.setFont('times', 'normal');
-  }
-  function para(txt) {
-    doc.setFont('times', 'normal'); doc.setFontSize(FS); doc.setTextColor(0, 0, 0);
-    var lines = doc.splitTextToSize(String(txt == null || txt === '' ? '-' : txt), CW);
-    ensure(lines.length * LH); doc.text(lines, ML, y); y += lines.length * LH + 2;
-  }
-  function sectionBar(t) {
-    ensure(LH + 3); y += 2; doc.setFont('times', 'bold'); doc.setFontSize(FS + 0.5); doc.setTextColor(0, 0, 0);
-    doc.text(t, ML, y); y += 1.6; doc.setLineWidth(0.3); doc.setDrawColor(120, 120, 120); doc.line(ML, y, PW - MR, y); y += LH * 0.75;
-  }
+  // ── Header navy ──
+  doc.setFillColor(DARK[0], DARK[1], DARK[2]);
+  doc.rect(0, 0, PW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+  doc.text('WORK ORDER', ML, 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setTextColor(190, 200, 220);
+  doc.text('DOKUMEN INTERNAL — INFORMASI WORK ORDER (BOM / DED / QC)', ML, 17);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.setTextColor(170, 195, 255);
+  doc.text('NO. WORK ORDER', PW - MR, 9, { align: 'right' });
+  doc.setFontSize(18); doc.setTextColor(255, 255, 255);
+  doc.text(String(res.noWO || '-'), PW - MR, 17, { align: 'right' });
 
-  var COMP = 'PT. RENUS GLOBAL INDONESIA';
-  var COMP_ADDR = 'Penjaringan Asri X PS1 H/5, Kel. Penjaringan Sari, Kec. Rungkut, Kota Surabaya 60293';
+  // ── Info 2 kolom ──
+  var y = 30;
+  var noPen = (res.id || '-') + ((res.rev !== '' && res.rev != null) ? '  (Rev ' + res.rev + ')' : '');
+  var hoTxt = (res.ho && (res.ho.status || res.ho.tglJadwal))
+    ? ((res.ho.status || '-') + (res.ho.tglJadwal ? ' · ' + res.ho.tglJadwal + (res.ho.waktu ? ' ' + res.ho.waktu : '') : ''))
+    : '-';
+  var infoLeft = [['No Penawaran', noPen], ['Tanggal', res.tanggal || '-'], ['Sales / PIC', res.dibuatOleh || '-'], ['Jenis WO', res.jenisWO || '-']];
+  var infoRight = [['Klien', res.namaKlien || '-'], ['Project', res.namaProject || '-'], ['Status', res.status || '-'], ['Hand Over', hoTxt]];
+  doc.setFontSize(8);
+  infoLeft.forEach(function (r, i) { var yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], ML, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.text(': ' + r[1], ML + 26, yy); });
+  infoRight.forEach(function (r, i) { var yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], PW / 2, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.text(': ' + r[1], PW / 2 + 26, yy); });
+  y += 23;
 
-  // ── Kop surat ──
-  center(COMP, 13.5, true);
-  center(COMP_ADDR, 9);
-  y += 1.5; doc.setLineWidth(0.7); doc.setDrawColor(30, 30, 30); doc.line(ML, y, PW - MR, y); y += 7;
-  center('INFORMASI WORK ORDER', 14, true, true); y += 1.5;
-  center('No. WO ' + (res.noWO || '-') + (res.tanggal ? '     ·     ' + res.tanggal : ''), FS, true); y += 6;
+  // ── Catatan Customer + Catatan Hasil Hand Over (MoM) — 2 kolom sejajar ──
+  var boxFullW = PW - ML - MR, gap = 6, colW = (boxFullW - gap) / 2;
+  var custTxt = (res.catatanCustomer || '').trim() || '-';
+  var momTxt = (res.ho && res.ho.mom ? String(res.ho.mom).trim() : '') || '-';
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  var custLines = doc.splitTextToSize(custTxt, colW - 10);
+  var momLines = doc.splitTextToSize(momTxt, colW - 10);
+  var headH = 5.5;
+  var bodyH = Math.max(custLines.length, momLines.length) * 4.2 + 3.5;
+  var boxH = headH + bodyH;
+  if (y + boxH + 5 > PH - 14) { doc.addPage(); y = 20; }
 
-  // ── Data WO ──
-  kv('No. Penawaran', (res.id || '-') + ((res.rev !== '' && res.rev != null) ? ' (Rev ' + res.rev + ')' : ''));
-  kv('Klien', res.namaKlien);
-  kv('Project', res.namaProject, true);
-  kv('Sales / PIC', res.dibuatOleh);
-  kv('Jenis WO', res.jenisWO);
-  if (res.status) kv('Status', res.status);
-  if (res.ho && (res.ho.status || res.ho.tglJadwal)) kv('Hand Over', (res.ho.status || '-') + (res.ho.tglJadwal ? ' · ' + res.ho.tglJadwal + (res.ho.waktu ? ' ' + res.ho.waktu : '') : ''));
-  y += 2;
+  // Kotak kiri (amber) — Catatan Customer
+  var AMBER_BG = [255, 247, 224], AMBER_LINE = [217, 119, 6];
+  doc.setFillColor(AMBER_BG[0], AMBER_BG[1], AMBER_BG[2]); doc.setDrawColor(AMBER_LINE[0], AMBER_LINE[1], AMBER_LINE[2]); doc.setLineWidth(0.3);
+  doc.rect(ML, y, colW, boxH, 'FD');
+  doc.setFillColor(AMBER_LINE[0], AMBER_LINE[1], AMBER_LINE[2]); doc.rect(ML, y, 1.5, boxH, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(146, 64, 14);
+  doc.text('CATATAN DARI CUSTOMER', ML + 5, y + 4.2);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(60, 50, 40);
+  doc.text(custLines, ML + 5, y + headH + 3.2);
 
-  // ── Catatan ──
-  sectionBar('Catatan Customer');
-  para(res.catatanCustomer);
-  sectionBar('Catatan Hasil Hand Over (MoM)');
-  para((res.ho && res.ho.mom) ? res.ho.mom : '-');
+  // Kotak kanan (emerald) — Catatan Hasil Hand Over (MoM)
+  var rx = ML + colW + gap;
+  var MOM_BG = [236, 253, 245], MOM_LINE = [5, 150, 105];
+  doc.setFillColor(MOM_BG[0], MOM_BG[1], MOM_BG[2]); doc.setDrawColor(MOM_LINE[0], MOM_LINE[1], MOM_LINE[2]); doc.setLineWidth(0.3);
+  doc.rect(rx, y, colW, boxH, 'FD');
+  doc.setFillColor(MOM_LINE[0], MOM_LINE[1], MOM_LINE[2]); doc.rect(rx, y, 1.5, boxH, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(6, 78, 59);
+  doc.text('CATATAN HASIL HAND OVER (MoM)', rx + 5, y + 4.2);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(40, 60, 50);
+  doc.text(momLines, rx + 5, y + headH + 3.2);
+  y += boxH + 6;
 
-  // ── Detail item pekerjaan (HPP) ──
-  sectionBar('Detail Item Pekerjaan');
-  var _rp = function (v) { return Math.round(Math.abs(Number(v) || 0)).toLocaleString('id-ID'); };
+  // ── Detail item pekerjaan (HPP) — tanpa Harga Jual / Total Jual / Margin ──
   var body = [];
   (res.kelompok || []).forEach(function (k, ki) {
     var letter = String.fromCharCode(65 + ki);
-    body.push([{ content: letter + '. ' + (k.nama || '').toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: [230, 230, 230], textColor: [30, 30, 30] } }]);
+    body.push([{ content: letter + '. ' + (k.nama || '').toUpperCase(), colSpan: 6, styles: { fillColor: [226, 232, 240], textColor: DARK, fontStyle: 'bold', halign: 'left' } }]);
     (k.items || []).forEach(function (s, si) {
-      body.push([String(si + 1), s.deskripsi || '', (s.qty != null ? String(s.qty) : ''), s.unit || '', _rp(s.hpp), _rp(s.totalHpp)]);
+      body.push([String(si + 1), s.deskripsi || '', (s.qty != null ? String(s.qty) : ''), s.unit || '', rp(s.hpp), rp(s.totalHpp)]);
     });
   });
   if (!body.length) body.push([{ content: 'Tidak ada item.', colSpan: 6, styles: { halign: 'center', textColor: [120, 120, 120] } }]);
@@ -899,37 +904,45 @@ function buatWOInfoPDF(res) {
     startY: y,
     head: [['No', 'Deskripsi Produk / Jasa', 'Qty', 'Unit', 'HPP Satuan', 'Total HPP']],
     body: body, theme: 'grid', margin: { left: ML, right: MR },
-    styles: { font: 'times', fontSize: 9.5, cellPadding: 1.4, overflow: 'linebreak', lineColor: [200, 200, 200], lineWidth: 0.1, textColor: [30, 30, 30] },
-    headStyles: { font: 'times', fontStyle: 'bold', fillColor: [51, 51, 51], textColor: [255, 255, 255], fontSize: 9.5, halign: 'center' },
-    columnStyles: { 0: { cellWidth: 9, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 12, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' }, 4: { cellWidth: 28, halign: 'right' }, 5: { cellWidth: 28, halign: 'right' } }
+    headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+    bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
+    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 16, halign: 'center' }, 3: { cellWidth: 20, halign: 'center' }, 4: { cellWidth: 40, halign: 'right' }, 5: { cellWidth: 40, halign: 'right' } },
+    styles: { overflow: 'linebreak' },
+    didParseCell: function (data) {
+      // Kolom HPP (HPP Satuan=4, Total HPP=5) disorot merah.
+      if (data.column.index === 4 || data.column.index === 5) {
+        if (data.section === 'head') { data.cell.styles.fillColor = [153, 27, 27]; data.cell.styles.textColor = [255, 255, 255]; }
+        else if (data.section === 'body') { data.cell.styles.fillColor = [254, 235, 235]; data.cell.styles.textColor = [190, 30, 30]; data.cell.styles.fontStyle = 'bold'; }
+      }
+    }
   });
-  y = doc.lastAutoTable.finalY + 3;
+  y = doc.lastAutoTable.finalY + 5;
 
   // ── Site survey terkait ──
   var surv = res.surveys || [];
-  sectionBar('Site Survey Terkait (' + surv.length + ')');
-  if (!surv.length) {
-    doc.setFont('times', 'italic'); doc.setFontSize(FS); doc.setTextColor(120, 120, 120);
-    ensure(6); doc.text('Belum ada site survey tertaut.', ML, y + 1); y += 6; doc.setTextColor(0, 0, 0);
-  } else {
+  if (surv.length) {
+    if (y + 20 > PH - 14) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    doc.text('SITE SURVEY TERKAIT (' + surv.length + ')', ML, y);
     doc.autoTable({
-      startY: y,
+      startY: y + 2,
       head: [['Nama Site', 'PIC', 'Telepon', 'Tanggal']],
       body: surv.map(function (s) { return [s.namaSite || s.id || '-', s.namaPIC || '-', s.telepon || '-', s.tanggalSurvey || '-']; }),
       theme: 'grid', margin: { left: ML, right: MR },
-      styles: { font: 'times', fontSize: 9.5, cellPadding: 1.4, overflow: 'linebreak', lineColor: [200, 200, 200], lineWidth: 0.1, textColor: [30, 30, 30] },
-      headStyles: { font: 'times', fontStyle: 'bold', fillColor: [51, 51, 51], textColor: [255, 255, 255], fontSize: 9.5 }
+      headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'left' },
+      bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
+      styles: { overflow: 'linebreak' }
     });
-    y = doc.lastAutoTable.finalY + 3;
+    y = doc.lastAutoTable.finalY + 5;
   }
 
   // ── Footer nomor halaman ──
   var tp = doc.internal.getNumberOfPages();
   for (var p = 1; p <= tp; p++) {
     doc.setPage(p);
-    doc.setFont('times', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-    doc.text('Hal ' + p + ' / ' + tp, PW - MR, 290, { align: 'right' });
-    doc.text('PT. RENUS GLOBAL INDONESIA', ML, 290);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+    doc.text('PT. RENUS GLOBAL INDONESIA — Dokumen Internal', ML, PH - 6);
+    doc.text('Hal ' + p + ' / ' + tp, PW - MR, PH - 6, { align: 'right' });
     doc.setTextColor(0, 0, 0);
   }
   return doc;
