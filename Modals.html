@@ -411,8 +411,8 @@
 </div>
 
 <!-- MODAL PREVIEW PDF -->
-<div id="modal-preview-pdf" class="hidden fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 px-2 py-2">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200" style="max-height:96vh;">
+<div id="modal-preview-pdf" class="hidden fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 px-2 py-2 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200 my-auto" style="max-height:94vh;">
 
     <!-- Header -->
     <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-200 flex-shrink-0">
@@ -430,7 +430,7 @@
     </div>
 
     <!-- Area preview canvas -->
-    <div class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-100" style="min-height:0;">
+    <div class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-100" style="min-height:0; max-height:calc(94vh - 130px);">
 
       <!-- Loading state -->
       <div id="preview-pdf-loading"
