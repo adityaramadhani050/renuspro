@@ -287,6 +287,7 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
     { content: _pdfRp(item.dpp), styles: { halign: 'right' } }
   ]);
   body.push([{ content: '' }, { content: _pdfKetInvoice(item, Number(meta.nilaiKontrak) || 0), colSpan: 5 }]);
+  body.push([{ content: '', colSpan: 6, styles: { minCellHeight: 1.5, fillColor: PDF_ROW_BG } }]);
   body.push([{ content: '' }, { content: 'Deskripsi:', colSpan: 5, styles: { fontStyle: 'bold' } }]);
   var _spacer = function () { return [{ content: '', colSpan: 6, styles: { minCellHeight: 2.6, fillColor: PDF_ROW_BG } }]; };
   scope.forEach(function (k) {
