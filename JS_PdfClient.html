@@ -456,9 +456,9 @@ function buatInvoicePDF(item) {
   curY += 0.5;
   var ppnP = Number(item.ppnPersen) || (Number(item.ppnNominal) > 0 ? 11 : 0);
   var lines = [
-    { label: 'Subtotal', value: 'Rp ' + _pdfRp(item.dpp), bold: false },
-    { label: 'PPN' + (ppnP ? ' ' + ppnP + '%' : ''), value: 'Rp ' + _pdfRp(item.ppnNominal || 0), bold: false },
-    { label: 'GRAND TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true }
+    { label: 'Subtotal', value: _pdfRp(item.dpp), bold: false },
+    { label: 'PPN' + (ppnP ? ' ' + ppnP + '%' : ''), value: _pdfRp(item.ppnNominal || 0), bold: false },
+    { label: 'GRAND TOTAL', value: _pdfRp(item.total), bold: true, highlight: true }
   ];
   curY = _pdfRingkasan(doc, curY, lines, PW, MR) + 4;
 

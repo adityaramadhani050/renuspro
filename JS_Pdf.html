@@ -343,7 +343,7 @@ function buatDokumenPDF(item) {
         fillColor:   PDF_ROW_BG,
         lineColor:   [255, 255, 255],
         lineWidth:   0,
-        cellPadding: 1.1,
+        cellPadding: { top: 0.7, right: 1.1, bottom: 0.7, left: 1.1 },
       },
       alternateRowStyles: { fillColor: PDF_ROW_BG },
       styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
@@ -367,15 +367,15 @@ function buatDokumenPDF(item) {
     const netSub = item.subtotal - (item.diskon || 0);
 
     const summaryLines = [];
-    summaryLines.push({ label: 'Subtotal', value: 'Rp ' + rpNum(item.subtotal), bold: false });
+    summaryLines.push({ label: 'Subtotal', value: rpNum(item.subtotal), bold: false });
     if (item.diskon > 0) {
-      summaryLines.push({ label: 'Diskon', value: '- Rp ' + rpNum(item.diskon), bold: false, red: true });
+      summaryLines.push({ label: 'Diskon', value: '- ' + rpNum(item.diskon), bold: false, red: true });
     }
     if (item.pajak > 0) {
       const pajakPct = netSub > 0 ? Math.round((item.pajak / netSub) * 100) : 11;
-      summaryLines.push({ label: 'PPN ' + pajakPct + '%', value: 'Rp ' + rpNum(item.pajak), bold: false });
+      summaryLines.push({ label: 'PPN ' + pajakPct + '%', value: rpNum(item.pajak), bold: false });
     }
-    summaryLines.push({ label: 'GRAND TOTAL', value: 'Rp ' + rpNum(item.grandTotal), bold: true, highlight: true });
+    summaryLines.push({ label: 'GRAND TOTAL', value: rpNum(item.grandTotal), bold: true, highlight: true });
 
     const summaryBoxW = colValX - colLabelX;
     summaryLines.forEach((row, idx) => {
