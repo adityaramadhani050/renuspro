@@ -544,7 +544,7 @@ function buatKwitansiPDF(d) {
 
   // ── Kotak nominal (garis tebal atas-bawah + isian garis abu putus, nominal center) ──
   curY += 5;
-  var amtW = 85, amtH = 12, amtX = ML;
+  var amtW = 62, amtH = 12, amtX = ML;
   // Isian: garis horizontal abu tipis putus-putus (mirip pola cek).
   doc.setDrawColor(155, 155, 155); doc.setLineWidth(0.15);
   doc.setLineDashPattern([0.5, 0.8], 0);
@@ -560,7 +560,7 @@ function buatKwitansiPDF(d) {
   doc.line(amtX, curY + amtH - 0.8, amtX + amtW, curY + amtH - 0.8);
   // Nominal center (horizontal & vertikal).
   doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
-  doc.text('Rp' + _pdfRp(d.jumlah), amtX + amtW / 2, curY + amtH / 2 + 2.4, { align: 'center' });
+  doc.text('Rp' + _pdfRp(d.jumlah), amtX + amtW / 2, curY + amtH / 2 + 1.5, { align: 'center' });
   curY += amtH;
 
   // ── Note (kiri) + Tanggal (kanan) ──
@@ -578,8 +578,8 @@ function buatKwitansiPDF(d) {
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
   doc.text('Surabaya, ' + _pdfTglPanjang(d.tanggal), PW - MR, noteY, { align: 'right' });
 
-  // ── Tanda tangan (dari setting) — "Hormat kami," di bawah tanggal (tak menumpuk) ──
-  _pdfTtdInvoice(doc, noteY + 1, PW, MR);
+  // ── Tanda tangan (dari setting) — "Hormat kami," dekat di bawah tanggal ──
+  _pdfTtdInvoice(doc, noteY - 2, PW, MR);
 
   return doc;
 }
