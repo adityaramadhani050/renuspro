@@ -82,7 +82,7 @@
           var rows = Object.keys(latest).map(function (k) { return latest[k]; });
 
           var salesMap = {};
-          function ensureSales(nm) { if (!salesMap[nm]) salesMap[nm] = { nama: nm, targetBulanan: (userMap[nm] ? userMap[nm].target : 0), totalPenawaran: 0, totalNilaiPenawaran: 0, dealCount: 0, dealRevenue: 0, dealHpp: 0, pipelineCount: 0, pipelineValue: 0, failCount: 0, dealCohort: 0, _pen: {} }; return salesMap[nm]; }
+          function ensureSales(nm) { if (!salesMap[nm]) salesMap[nm] = { nama: nm, targetBulanan: (userMap[nm] ? userMap[nm].target : 0), totalPenawaran: 0, totalNilaiPenawaran: 0, dealCount: 0, dealRevenue: 0, dealHpp: 0, pipelineCount: 0, pipelineValue: 0, failCount: 0, failClosed: 0, dealCohort: 0, _pen: {} }; return salesMap[nm]; }
 
           rows.forEach(function (r) {
             var pembuat = (r.dibuat_oleh || '').toString().trim();
@@ -97,6 +97,8 @@
             var kid = (r.klien_id || '').toString();
             var creationInRange = _dInRange(tglISO, fromISO, toISO);
             var dealInRange = status === 'Deal' && _dInRange(effDealISO, fromISO, toISO);
+            // Fail yang DITUTUP periode ini (berdasarkan tanggal fail) — utk close rate.
+            var failInRange = status === 'Fail' && _dInRange(failISO || tglISO, fromISO, toISO);
             var endISO = status === 'Deal' ? dealISO : (status === 'Fail' ? failISO : null);
             var cyc = (tglISO && endISO) ? Math.max(0, _dDaysISO(tglISO, endISO)) : null;
             var pObj = {
@@ -112,6 +114,7 @@
             if (masukList && !s._pen[no]) s._pen[no] = pObj;
             if (creationInRange) { s.totalPenawaran++; s.totalNilaiPenawaran += nilaiKontrak; if (status === 'Fail') s.failCount++; if (status === 'Deal') s.dealCohort++; }
             if (dealInRange) { s.dealCount++; s.dealRevenue += nilaiKontrak; s.dealHpp += totalHpp; }
+            if (failInRange) { s.failClosed++; }
             if (status === 'On-Progress') { s.pipelineCount++; s.pipelineValue += nilaiKontrak; }
           });
 
@@ -128,8 +131,9 @@
               nama: s.nama, targetBulanan: s.targetBulanan, totalPenawaran: s.totalPenawaran, totalNilaiPenawaran: s.totalNilaiPenawaran,
               avgNilaiPenawaran: s.totalPenawaran > 0 ? s.totalNilaiPenawaran / s.totalPenawaran : 0,
               dealCount: s.dealCount, dealRevenue: s.dealRevenue, dealHpp: s.dealHpp, pipelineCount: s.pipelineCount, pipelineValue: s.pipelineValue,
-              failCount: s.failCount, dealCohort: s.dealCohort,
-              winRate: s.totalPenawaran > 0 ? (s.dealCohort / s.totalPenawaran) * 100 : 0,
+              failCount: s.failCount, failClosed: s.failClosed, dealCohort: s.dealCohort,
+              // Win rate = CLOSE RATE: deal ditutup ÷ (deal + fail) yang ditutup periode ini.
+              winRate: (s.dealCount + s.failClosed) > 0 ? (s.dealCount / (s.dealCount + s.failClosed)) * 100 : 0,
               avgMarginDeal: s.dealRevenue > 0 ? ((s.dealRevenue - s.dealHpp) / s.dealRevenue) * 100 : null,
               avgSalesCycle: cycleCount > 0 ? cycleSum / cycleCount : null,
               achievement: s.targetBulanan > 0 ? (s.dealRevenue / s.targetBulanan) * 100 : null,
@@ -139,8 +143,8 @@
           salesList.sort(function (a, b) { return b.dealRevenue - a.dealRevenue; });
 
           // team summary
-          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamPipelineValue = 0, teamPipelineCount = 0;
-          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; });
+          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamFailClosed = 0, teamPipelineValue = 0, teamPipelineCount = 0;
+          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamFailClosed += (s.failClosed || 0); teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; });
           var teamTarget = 0;
           if (isAdmin) { Object.keys(userMap).forEach(function (nm) { teamTarget += userMap[nm].target; }); }
           else if (role === 'leadsales' && teamNames && teamNames.length) { teamNames.forEach(function (nm) { teamTarget += (userMap[nm] ? userMap[nm].target : 0); }); }
@@ -198,7 +202,8 @@
             success: true, dateFrom: _fmtTgl(fromISO), dateTo: _fmtTgl(toISO),
             summary: {
               teamRevenue: teamRevenue, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamDealCount: teamDealCount,
-              teamWinRate: teamPenawaran > 0 ? (teamDealCohort / teamPenawaran) * 100 : 0,
+              // Win rate = CLOSE RATE: deal ÷ (deal + fail) yang DITUTUP periode ini (by tgl deal/fail).
+              teamWinRate: (teamDealCount + teamFailClosed) > 0 ? (teamDealCount / (teamDealCount + teamFailClosed)) * 100 : 0,
               teamPipelineValue: teamPipelineValue, teamPipelineCount: teamPipelineCount,
               teamAvgMarginDeal: teamRevenue > 0 ? ((teamRevenue - teamHppDeal) / teamRevenue) * 100 : 0,
               teamAvgSalesCycle: teamCycleCount > 0 ? teamCycleSum / teamCycleCount : null, leadSalesCount: leadSalesCount
