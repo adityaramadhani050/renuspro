@@ -597,7 +597,7 @@ function _ssRenderFotoSlot(fieldKey) {
         + '<span class="absolute bottom-0 inset-x-0 bg-amber-500/90 text-white text-[9px] font-bold text-center py-0.5">Menunggu upload</span>'
         + '</div>'
       : '<button type="button" class="ss-foto-view block h-24 w-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '">'
-        +   '<img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+        +   '<img src="' + _fotoDisplaySrc(f.fileId, f.fileUrl, 'w200') + '" class="h-full w-full object-cover" loading="lazy"></button>';
     return '<div class="inline-block align-top w-32">'
       + '<div class="relative inline-block">'
       +   thumbInner
@@ -975,7 +975,7 @@ function _ssRenderDetail() {
     if (!f || !f.fileId) return '';
     // data-* + event delegation (bukan onclick inline) agar tak rawan bug
     // escaping kutip pada URL Drive yang panjang/kompleks.
-    var img = '<button type="button" class="ss-foto-view block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '"><img src="https://drive.google.com/thumbnail?id=' + f.fileId + '&sz=w200" class="h-full w-full object-cover" loading="lazy"></button>';
+    var img = '<button type="button" class="ss-foto-view block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in" data-fileid="' + _ssEsc(f.fileId) + '" data-fileurl="' + _ssEsc(f.fileUrl || '') + '"><img src="' + _fotoDisplaySrc(f.fileId, f.fileUrl, 'w200') + '" class="h-full w-full object-cover" loading="lazy"></button>';
     return '<div class="w-20">' + img + (f.caption ? '<p class="text-[10px] text-slate-500 mt-1 break-words">' + _ssEsc(f.caption) + '</p>' : '') + '</div>';
   }
   // Label per field ditampilkan di atas kelompok foto-nya agar jelas foto

@@ -48,7 +48,7 @@ function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r ==
 function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
-function _qcThumb(fileId, sz) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=' + (sz || 'w200'); }  // default kecil sesuai ukuran tampil
+function _qcThumb(fileId, fileUrl, sz) { return _fotoDisplaySrc(fileId, fileUrl, sz || 'w200'); }  // Supabase pakai fileUrl, Drive lama pakai thumbnail fileId
 function _qcJs(s) { return _qcEsc(JSON.stringify(s == null ? '' : s)); }  // aman utk arg string di dalam onclick="..."
 
 var _QC_STATUS = {
@@ -824,7 +824,7 @@ function _qcItemHtml(it) {
     return '<div class="w-20">'
       + '<div class="relative">'
       +   '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ', \'' + it.kode + '\')" class="block h-20 w-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in">'
-      +     '<img src="' + _qcThumb(f.fileId) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + editedMark + del
+      +     '<img src="' + _qcThumb(f.fileId, f.fileUrl) + '" alt="foto" loading="lazy" class="h-full w-full object-cover" onerror="this.style.display=&#39;none&#39;"></button>' + editedMark + del
       + '</div>' + cap
       + '</div>';
   }).join('');
@@ -901,7 +901,7 @@ function _qcItemHtml(it) {
   // Panduan foto dari Lead Engineer: instruksi + foto contoh (agar site engineer tahu foto yang benar).
   var contoh = it.contohFoto || [];
   var contohThumbs = contoh.map(function(f) {
-    return '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-16 w-16 rounded-lg overflow-hidden border border-sky-200 bg-white cursor-zoom-in"><img src="' + _qcThumb(f.fileId) + '" alt="contoh" loading="lazy" class="h-full w-full object-cover"></button>';
+    return '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-16 w-16 rounded-lg overflow-hidden border border-sky-200 bg-white cursor-zoom-in"><img src="' + _qcThumb(f.fileId, f.fileUrl) + '" alt="contoh" loading="lazy" class="h-full w-full object-cover"></button>';
   }).join('');
   var panduan = (it.instruksi || contoh.length)
     ? '<div class="mt-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2.5">'
@@ -1090,8 +1090,8 @@ function _qcViewFoto(fileId, fileUrl, kode) {
   var sp = document.getElementById('qc-photo-viewer-spinner');
   img.classList.add('opacity-0');            // sembunyikan gambar lama
   if (sp) sp.classList.remove('hidden');     // tampilkan spinner
-  img.src = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1600';
-  document.getElementById('qc-photo-viewer-link').href = fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
+  img.src = _fotoDisplaySrc(fileId, fileUrl, 'w1600');
+  document.getElementById('qc-photo-viewer-link').href = _fotoDisplaySrc(fileId, fileUrl, 'w1600') || fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
   _qcViewerCtx = { fileId: fileId, kode: kode || '' };
   // Foto pada item yang sudah Approved tidak boleh ditandai.
   var it = (_qcItems || []).filter(function(x) { return x.kode === kode; })[0];
@@ -1357,7 +1357,7 @@ function _qcRenderManage() {
         var contoh = it.contohFoto || [];
         var thumbs = contoh.map(function(f) {
           return '<div class="relative">'
-            + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-14 w-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in"><img src="' + _qcThumb(f.fileId) + '" alt="contoh" loading="lazy" class="h-full w-full object-cover"></button>'
+            + '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-14 w-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-zoom-in"><img src="' + _qcThumb(f.fileId, f.fileUrl) + '" alt="contoh" loading="lazy" class="h-full w-full object-cover"></button>'
             + '<button onclick="_qcHapusContoh(\'' + it.kode + '\',\'' + f.fileId + '\')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white h-5 w-5 rounded-full text-[10px] shadow flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>'
             + '</div>';
         }).join('');

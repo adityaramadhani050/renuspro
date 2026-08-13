@@ -1,4 +1,13 @@
 <script>
+    // Resolusi URL tampilan foto: Supabase Storage → pakai URL publik penuh
+    // (fileUrl); data lama Google Drive → bangun thumbnail dari fileId.
+    // Dipakai QC / Site Survey / DED (thumbnail & lightbox).
+    function _fotoDisplaySrc(fileId, fileUrl, sz) {
+      if (fileUrl && /^https?:\/\//i.test(fileUrl) && fileUrl.indexOf('drive.google') === -1) return fileUrl;
+      if (fileId && String(fileId).indexOf('/') !== -1 && fileUrl) return fileUrl; // path Supabase
+      if (fileId) return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=' + (sz || 'w200');
+      return fileUrl || '';
+    }
     // --- STATE MANAGEMENT ---
     let erpState = { klien: [], produk: [], templatePaket: {}, nextNo: "" };
     let kalkulasiGlobalState = { subtotalSemua: 0, diskonNominal: 0, pajakNominal: 0, grandTotal: 0, totalHpp: 0, profitInternal: 0, marginPersen: 0 };
