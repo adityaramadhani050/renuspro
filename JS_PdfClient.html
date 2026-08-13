@@ -287,7 +287,6 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
     { content: _pdfRp(item.dpp), styles: { halign: 'right' } }
   ]);
   body.push([{ content: '' }, { content: _pdfKetInvoice(item, Number(meta.nilaiKontrak) || 0), colSpan: 5 }]);
-  body.push([{ content: '', colSpan: 6, styles: { minCellHeight: 2 } }]);
   body.push([{ content: '' }, { content: 'Deskripsi:', colSpan: 5, styles: { fontStyle: 'bold' } }]);
   var _spacer = function () { return [{ content: '', colSpan: 6, styles: { minCellHeight: 2.6, fillColor: PDF_ROW_BG } }]; };
   scope.forEach(function (k) {
@@ -335,7 +334,7 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
       4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
     },
     headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0 },
-    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: 1.1 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: { top: 0.7, right: 1.1, bottom: 0.7, left: 1.1 } },
     styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
     didDrawCell: function (data) {
       // Garis pemisah kolom putih TIPIS & FULL: tiap sel gambar setiap batas kolom
@@ -452,13 +451,14 @@ function buatInvoicePDF(item) {
   // ── TABEL ITEM (tagihan + keterangan termin + deskripsi scope) ──
   curY = _pdfTabelInvoice(doc, curY, item, ML, MR);
 
-  // ── RINGKASAN ── (garis pemisah putih tipis dari kotak tabel, seperti quotation)
-  curY += 2;
-  var lines = [{ label: 'Subtotal', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
-  if (Number(item.ppnNominal) > 0 || Number(item.ppnPersen) > 0) {
-    lines.push({ label: 'PPN ' + (item.ppnPersen || 11) + '%', value: 'Rp ' + _pdfRp(item.ppnNominal), bold: false });
-  }
-  lines.push({ label: 'GRAND TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true });
+  // ── RINGKASAN ── (pemisah tipis dari kotak tabel: garis putih setipis pemisah kolom)
+  curY += 0.5;
+  var ppnP = Number(item.ppnPersen) || (Number(item.ppnNominal) > 0 ? 11 : 0);
+  var lines = [
+    { label: 'Subtotal', value: 'Rp ' + _pdfRp(item.dpp), bold: false },
+    { label: 'PPN' + (ppnP ? ' ' + ppnP + '%' : ''), value: 'Rp ' + _pdfRp(item.ppnNominal || 0), bold: false },
+    { label: 'GRAND TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true }
+  ];
   curY = _pdfRingkasan(doc, curY, lines, PW, MR) + 4;
 
   // ── NOTES | BANK ACCOUNT (kotak 2 kolom) ──
