@@ -510,19 +510,18 @@ function buatKwitansiPDF(d) {
   var PW = 210, ML = 10, MR = 10, CW = PW - ML - MR;
 
   _pdfHeaderKiri(doc, ML);
-  // Judul kanan 2 baris (KWITANSI / RECEIPT) — posisi & warna sama seperti INVOICE.
-  _pdfJudulKanan(doc, 'KWITANSI', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 14 });
-  _pdfJudulKanan(doc, 'RECEIPT', PW, MR, { size: 18, color: PDF_TITLE_COL, style: 'italic', y: 22 });
+  // Judul kanan — posisi & warna sama seperti INVOICE.
+  _pdfJudulKanan(doc, 'KWITANSI', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 15 });
   _pdfInfoKanan(doc, [
     ['Nomor', d.id || ''],
     ['Pembayaran', d.metode || 'Transfer'],
     ['No. Invoice', d.noInvoice || '']
-  ], PW, MR, 30, 4.5);
+  ], PW, MR, 25, 4.5);
 
-  var curY = 47;
+  var curY = 45;
 
   // ── Kotak detail penerimaan (border tipis) ──
-  var boxH = 44;
+  var boxH = 30;
   doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.3);
   doc.rect(ML, curY, CW, boxH);
   var labelX = ML + 4, colonX = ML + 62, valX = ML + 66;
@@ -538,20 +537,20 @@ function buatKwitansiPDF(d) {
     var vLines = doc.splitTextToSize(String(val || ''), (ML + CW) - valX - 2);
     doc.text(vLines, valX, y);
   }
-  _kwRow(curY + 11, 'Telah Terima Dari', d.terimaDari || '', true, false);
-  _kwRow(curY + 23, 'Terbilang', _pdfTerbilang(d.jumlah) + ' Rupiah', false, true);
-  _kwRow(curY + 35, 'Sebagai Pembayaran', d.untuk || '', true, false);
+  _kwRow(curY + 8, 'Telah Terima Dari', d.terimaDari || '', true, false);
+  _kwRow(curY + 16, 'Terbilang', _pdfTerbilang(d.jumlah) + ' Rupiah', false, true);
+  _kwRow(curY + 24, 'Sebagai Pembayaran', d.untuk || '', true, false);
   curY += boxH;
 
-  // ── Kotak nominal (border putus-putus) ──
-  curY += 6;
-  var amtW = 120, amtH = 14;
+  // ── Kotak nominal (border putus-putus, kompak) ──
+  curY += 5;
+  var amtW = 70, amtH = 9;
   doc.setDrawColor(90, 90, 90); doc.setLineWidth(0.3);
   doc.setLineDashPattern([1, 1], 0);
   doc.rect(ML, curY, amtW, amtH);
   doc.setLineDashPattern([], 0);
-  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(18); doc.setTextColor(0, 0, 0);
-  doc.text('Rp' + _pdfRp(d.jumlah), ML + 10, curY + amtH / 2 + 3);
+  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
+  doc.text('Rp' + _pdfRp(d.jumlah), ML + 5, curY + amtH / 2 + 2.2);
   curY += amtH;
 
   // ── Note (kiri) + Tanggal (kanan) ──
@@ -569,8 +568,8 @@ function buatKwitansiPDF(d) {
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
   doc.text('Surabaya, ' + _pdfTglPanjang(d.tanggal), PW - MR, noteY + 2, { align: 'right' });
 
-  // ── Tanda tangan (dari setting) ──
-  _pdfTtdInvoice(doc, noteY + 4, PW, MR);
+  // ── Tanda tangan (dari setting) — "Hormat kami," rapat di bawah tanggal ──
+  _pdfTtdInvoice(doc, noteY - 2, PW, MR);
 
   return doc;
 }
