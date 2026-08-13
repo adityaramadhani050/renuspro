@@ -289,6 +289,7 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
   body.push([{ content: '' }, { content: _pdfKetInvoice(item, Number(meta.nilaiKontrak) || 0), colSpan: 5 }]);
   body.push([{ content: '', colSpan: 6, styles: { minCellHeight: 2 } }]);
   body.push([{ content: '' }, { content: 'Deskripsi:', colSpan: 5, styles: { fontStyle: 'bold' } }]);
+  var _spacer = function () { return [{ content: '', colSpan: 6, styles: { minCellHeight: 2.6, fillColor: PDF_ROW_BG } }]; };
   scope.forEach(function (k) {
     var namaK = (k.namaKelompok || k.nama || '').toString();
     if (namaK) {
@@ -305,6 +306,15 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
       ]);
     });
   });
+
+  // Jarak 1 baris di atas (setelah header) dan di bawah (sebelum garis tutup kotak).
+  body.unshift(_spacer());
+  body.push(_spacer());
+
+  // Batas kolom internal (absolut) untuk garis pemisah putih full atas-bawah.
+  var tableW = 210 - ML - MR;
+  var autoW  = tableW - (10 + 14 + 14 + 30 + 30);
+  var bx = [ML + 10, ML + 10 + autoW, ML + 10 + autoW + 14, ML + 10 + autoW + 28, ML + 10 + autoW + 58];
 
   doc.autoTable({
     startY: startY,
@@ -324,18 +334,85 @@ function _pdfTabelInvoice(doc, startY, item, ML, MR) {
       2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' },
       4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
     },
-    headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0.5 },
+    headStyles: { fillColor: PDF_HDR_BG, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0 },
     bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: 1.1 },
     styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
     didDrawCell: function (data) {
-      // Hanya border kanan tiap sel (pemisah kolom) — putih tipis, seperti penawaran.
+      // Garis pemisah kolom putih TIPIS & FULL: tiap sel gambar setiap batas kolom
+      // yang jatuh dalam rentang-x sel ini (menutup sel biasa & sel colSpan),
+      // sepanjang tinggi sel → sambung antar-baris, tak putus di baris colSpan.
       doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.4);
-      var rx = data.cell.x + data.cell.width;
-      doc.line(rx, data.cell.y, rx, data.cell.y + data.cell.height);
+      doc.setLineWidth(0.3);
+      var x0 = data.cell.x - 0.4, x1 = data.cell.x + data.cell.width + 0.4;
+      for (var i = 0; i < bx.length; i++) {
+        if (bx[i] >= x0 && bx[i] <= x1) {
+          doc.line(bx[i], data.cell.y, bx[i], data.cell.y + data.cell.height);
+        }
+      }
     }
   });
   return doc.lastAutoTable.finalY;
+}
+
+// Kotak 2 kolom (Notes | Bank Account) khusus invoice: header biru (spt header
+// item) + isi latar abu (spt baris item), dgn pemisah kolom putih tipis.
+function _pdfNoteBankInvoice(doc, y, noteText, bankText, ML, CW) {
+  var BLUE = PDF_HDR_BG, half = CW / 2, pad = 2, headH = 5, lineH = 4;
+  // Header
+  doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]);
+  doc.rect(ML, y, CW, headH, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
+  doc.text('Notes', ML + pad, y + 3.4);
+  doc.text('Bank Account', ML + half + pad, y + 3.4);
+  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.3);
+  doc.line(ML + half, y, ML + half, y + headH);
+  y += headH;
+  // Isi
+  var noteLines = noteText ? doc.splitTextToSize(String(noteText), half - pad * 2) : [];
+  var bankLines = bankText ? doc.splitTextToSize(String(bankText), half - pad * 2) : [];
+  var rows = Math.max(noteLines.length, bankLines.length, 1);
+  var bodyH = rows * lineH + 3;
+  doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]);
+  doc.rect(ML, y, CW, bodyH, 'F');
+  doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.3);
+  doc.line(ML + half, y, ML + half, y + bodyH);
+  doc.setTextColor(0, 0, 0); doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS);
+  if (noteLines.length) doc.text(noteLines, ML + pad, y + 3.4);
+  if (bankLines.length) doc.text(bankLines, ML + half + pad, y + 3.4);
+  return y + bodyH;
+}
+
+// Blok tanda tangan kanan-bawah: "Hormat kami," + gambar ttd (dari setting) +
+// nama (bold, garis bawah) + jabatan. Gambar & flag aktif dari getDocSignConfig.
+function _pdfTtdInvoice(doc, y, PW, MR) {
+  var cfg = window._pdfSignCfg || {};
+  if (cfg.sigEnabled === false) return y;
+  var rightX = PW - MR;
+  y += 6;
+  doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+  doc.text('Hormat kami,', rightX, y, { align: 'right' });
+  var imgH = 0;
+  if (cfg.sigBase64) {
+    try {
+      var dataUri = String(cfg.sigBase64).indexOf('data:') === 0 ? cfg.sigBase64 : ('data:image/png;base64,' + cfg.sigBase64);
+      var p = doc.getImageProperties(dataUri);
+      var h = 20, w = h * (p.width / p.height);
+      if (w > 55) { w = 55; h = w * (p.height / p.width); }
+      doc.addImage(dataUri, 'PNG', rightX - w, y + 2, w, h);
+      imgH = h;
+    } catch (e) { console.warn('[pdf] ttd invoice gagal:', e); }
+  }
+  var nameY = y + 2 + (imgH || 16) + 4;
+  var nama = 'Nur Ashri Kurnia F';
+  doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(0, 0, 0);
+  doc.text(nama, rightX, nameY, { align: 'right' });
+  var nw = doc.getTextWidth(nama);
+  doc.setDrawColor(20, 20, 20); doc.setLineWidth(0.3);
+  doc.line(rightX - nw, nameY + 1, rightX, nameY + 1);
+  doc.setFont(PDF_FONT, 'italic');
+  doc.text('Direktur', rightX, nameY + 4.5, { align: 'right' });
+  doc.setFont(PDF_FONT, 'normal');
+  return nameY + 6;
 }
 
 // ── INVOICE ─────────────────────────────────────────────────────────────────
@@ -375,7 +452,8 @@ function buatInvoicePDF(item) {
   // ── TABEL ITEM (tagihan + keterangan termin + deskripsi scope) ──
   curY = _pdfTabelInvoice(doc, curY, item, ML, MR);
 
-  // ── RINGKASAN ──
+  // ── RINGKASAN ── (garis pemisah putih tipis dari kotak tabel, seperti quotation)
+  curY += 2;
   var lines = [{ label: 'Subtotal', value: 'Rp ' + _pdfRp(item.dpp), bold: false }];
   if (Number(item.ppnNominal) > 0 || Number(item.ppnPersen) > 0) {
     lines.push({ label: 'PPN ' + (item.ppnPersen || 11) + '%', value: 'Rp ' + _pdfRp(item.ppnNominal), bold: false });
@@ -383,22 +461,19 @@ function buatInvoicePDF(item) {
   lines.push({ label: 'GRAND TOTAL', value: 'Rp ' + _pdfRp(item.total), bold: true, highlight: true });
   curY = _pdfRingkasan(doc, curY, lines, PW, MR) + 4;
 
-  // ── CATATAN / BANK ──
-  curY += 3;
-  var noteLines = [];
-  if (item.catatan) noteLines.push(item.catatan);
-  if (item.bankAccount) noteLines.push('Pembayaran ke rekening: ' + item.bankAccount);
-  if (noteLines.length) {
-    var wrapped = doc.splitTextToSize(noteLines.join('\n'), CW);
-    var h = wrapped.length * 4 + 11;
-    if (curY + h > 285) { doc.addPage(); curY = 15; }
-    doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
-    doc.setFont(PDF_FONT, 'bold');
-    doc.text('Notes :', ML, curY + 6);
-    doc.setFont(PDF_FONT, 'normal');
-    doc.text(wrapped, ML, curY + 10.5);
-    curY += h;
+  // ── NOTES | BANK ACCOUNT (kotak 2 kolom) ──
+  var bankText = item.bankAccount || '';
+  var noteText = item.catatan || '';
+  if (bankText || noteText) {
+    var estH = Math.max(1, doc.splitTextToSize(String(noteText || ''), CW / 2 - 4).length,
+                           doc.splitTextToSize(String(bankText || ''), CW / 2 - 4).length) * 4 + 8;
+    if (curY + estH > 285) { doc.addPage(); curY = 15; }
+    curY = _pdfNoteBankInvoice(doc, curY, noteText, bankText, ML, CW);
   }
+
+  // ── TANDA TANGAN (gambar dari setting) ──
+  if (curY + 40 > 292) { doc.addPage(); curY = 15; }
+  curY = _pdfTtdInvoice(doc, curY, PW, MR);
 
   return doc;
 }

@@ -646,9 +646,17 @@
     // Tidak lagi memakai template Google Sheets / Apps Script.
     function exportInvoicePDF(item) {
       _pdfBukaPreview('Invoice — ' + item.id, (item.namaProject || '') + ' · ' + (item.namaKlien || ''));
-      setTimeout(function () {
-        var doc = buatInvoicePDF(item);
-        _pdfFinishPreview(doc, _pdfNamaFile(item.id), {});
-      }, 60);
+      var _render = function () {
+        setTimeout(function () {
+          var doc = buatInvoicePDF(item);
+          _pdfFinishPreview(doc, _pdfNamaFile(item.id), {});
+        }, 60);
+      };
+      // Muat konfigurasi tanda tangan (sekali per sesi) sebelum render PDF.
+      if (window._pdfSignCfg) { _render(); return; }
+      google.script.run
+        .withSuccessHandler(function (cfg) { window._pdfSignCfg = cfg || {}; _render(); })
+        .withFailureHandler(function () { window._pdfSignCfg = {}; _render(); })
+        .getDocSignConfig();
     }
 </script>
