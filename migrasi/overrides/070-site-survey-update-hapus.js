@@ -372,6 +372,8 @@
       window.gsRoute('uploadFilePOQuotationSupplier', { mode: 'fn', handler: function (a) { return _storageUpload('quotation-supplier', a); } });
 
       // Site Survey foto: PURE upload (return {foto:{fileId,fileUrl}}) — disimpan
+      // Lampiran file revisi Lead Engineer saat review DED (PDF drawing beranotasi).
+      window.gsRoute('uploadFileDEDReview', { mode: 'fn', handler: function (a) { return _storageUpload('ded-review', a); } });
       // saat survey di-save (updateSiteSurvey).
       window.gsRoute('uploadSiteSurveyFoto', {
         mode: 'fn',

@@ -40,9 +40,12 @@
             var it = rowMap[m.kode] || null;
             var files = it ? _arr(it.files) : [];
             var status = it && it.status ? it.status.toString() : (files.length ? 'Pending' : 'Belum Upload');
+            // Lampiran file revisi Lead: dari event review terakhir yang punya files.
+            var actArr = it ? _arr(it.aktivitas) : [], reviewFiles = [];
+            for (var ai = actArr.length - 1; ai >= 0; ai--) { var e = actArr[ai]; if ((e.type === 'approve' || e.type === 'reject') && _arr(e.files).length) { reviewFiles = _arr(e.files); break; } }
             return {
               kode: m.kode, label: m.label, wajib: m.wajib, urutan: m.urutan, instruksi: m.instruksi,
-              files: files, status: status,
+              files: files, status: status, reviewFiles: reviewFiles,
               catatanReview: it && it.catatan_review ? it.catatan_review.toString() : '',
               uploadedBy: it && it.diupload_oleh ? it.diupload_oleh.toString() : '',
               uploadedPada: it && it.diupload_pada ? it.diupload_pada.toString() : '',

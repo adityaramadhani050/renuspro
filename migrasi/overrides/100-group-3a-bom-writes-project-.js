@@ -185,11 +185,13 @@
         mode: 'fn',
         handler: async function (a) {
           var noWO = (a[0] || '').toString().trim(), kode = (a[1] || '').toString().trim(), keputusan = (a[2] || '').toString().trim(), catatan = (a[3] || '').toString(), reviewer = (a[4] || '').toString();
+          var reviewFile = a[5] || null;   // {fileId, fileUrl, fileName} — lampiran revisi Lead (opsional)
           if (keputusan !== 'Approved' && keputusan !== 'Rejected') return { success: false, message: 'Keputusan tidak valid.' };
           if (keputusan === 'Rejected' && !catatan.trim()) return { success: false, message: 'Catatan revisi wajib diisi untuk menolak.' };
           var f = await supa.from('ded_item').select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
           if (!f.data) return { success: false, message: 'Belum ada dokumen untuk item ini.' };
-          var ev = { type: (keputusan === 'Approved' ? 'approve' : 'reject'), by: reviewer, at: _fmtTs(new Date()), note: catatan };
+          var revFiles = (reviewFile && reviewFile.fileId) ? [{ fileId: (reviewFile.fileId || '').toString(), fileUrl: (reviewFile.fileUrl || '').toString(), fileName: (reviewFile.fileName || 'Revisi.pdf').toString() }] : [];
+          var ev = { type: (keputusan === 'Approved' ? 'approve' : 'reject'), by: reviewer, at: _fmtTs(new Date()), note: catatan, files: revFiles };
           var up = await supa.from('ded_item').update({ status: keputusan, catatan_review: catatan, direview_oleh: reviewer, direview_pada: new Date().toISOString(), aktivitas: _arr(f.data.aktivitas).concat([ev]) }).eq('id', f.data.id);
           if (up.error) return { success: false, message: up.error.message };
           if (typeof _dedNotifSiteReview === 'function') _dedNotifSiteReview(noWO, kode, keputusan, catatan);

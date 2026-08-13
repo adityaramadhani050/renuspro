@@ -14,6 +14,7 @@ let _dedSiteEngineers = null;
 let _dedPending = {};       // kode → [{localId, base64, fileName}]
 let _dedLocalSeq = 0;
 let _dedBusy = {};          // kode → 'upload' | 'review'
+let _dedReviewStage = {};   // kode → {base64, fileName, mimeType} lampiran revisi Lead
 let _dedMasterList = [];    // cache checklist (Kelola Checklist)
 
 function _dedRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -343,10 +344,15 @@ function _dedItemHtml(it) {
       + '</a>' + del + '</div>';
   }).join('');
 
-  var rejectNote = (it.status === 'Rejected' && it.catatanReview)
-    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi Lead:</b> ' + _dedEsc(it.catatanReview) + '</div>' : '';
-  var approvedNote = (it.status === 'Approved' && it.catatanReview)
-    ? '<div class="mt-2 text-[11px] text-emerald-600"><i class="fa-solid fa-comment mr-1"></i>' + _dedEsc(it.catatanReview) + '</div>' : '';
+  // Lampiran file revisi dari Lead Engineer (drawing beranotasi) — dilihat Site Engineer.
+  var reviewFilesHtml = (it.reviewFiles && it.reviewFiles.length)
+    ? '<div class="mt-1.5 flex flex-wrap gap-1.5">' + it.reviewFiles.map(function(rf) {
+        return '<a href="' + _dedEsc(rf.fileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 px-2.5 py-1 rounded-lg"><i class="fa-solid fa-file-pdf"></i>' + _dedEsc(rf.fileName || 'Revisi.pdf') + '</a>';
+      }).join('') + '</div>' : '';
+  var rejectNote = (it.status === 'Rejected' && (it.catatanReview || reviewFilesHtml))
+    ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2">' + (it.catatanReview ? '<i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi Lead:</b> ' + _dedEsc(it.catatanReview) : '<i class="fa-solid fa-paperclip mr-1"></i><b>File revisi Lead terlampir</b>') + reviewFilesHtml + '</div>' : '';
+  var approvedNote = (it.status === 'Approved' && (it.catatanReview || reviewFilesHtml))
+    ? '<div class="mt-2 text-[11px] text-emerald-600"><i class="fa-solid fa-comment mr-1"></i>' + _dedEsc(it.catatanReview || '(disetujui)') + reviewFilesHtml + '</div>' : '';
 
   var panduan = it.instruksi
     ? '<div class="mt-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2"><div class="text-[11px] font-extrabold text-sky-700 uppercase tracking-wider"><i class="fa-solid fa-circle-info mr-1"></i>Instruksi</div><div class="text-[12px] text-sky-800 mt-1 whitespace-pre-line">' + _dedEsc(it.instruksi) + '</div></div>'
@@ -383,8 +389,14 @@ function _dedItemHtml(it) {
   // Review (Lead) — hanya saat Pending.
   var reviewCtrl = '';
   if (canRev && it.status === 'Pending') {
+    var rf = _dedReviewStage[it.kode];
+    var rfChip = rf
+      ? '<div class="mt-2 flex items-center gap-2 bg-white border border-teal-200 rounded-lg px-2 py-1.5"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="text-[11px] text-slate-600 truncate">' + _dedEsc(rf.fileName) + '</span><button onclick="_dedReviewUnstage(\'' + it.kode + '\')" class="text-slate-300 hover:text-rose-500 ml-auto shrink-0"><i class="fa-solid fa-xmark text-xs"></i></button></div>'
+      : '';
     reviewCtrl = '<div class="mt-3 border-t border-slate-100 pt-3">'
       + '<textarea id="ded-note-' + it.kode + '" rows="2" placeholder="Catatan / instruksi revisi (wajib bila reject)..." class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-teal-400">' + _dedEsc(it.catatanReview || '') + '</textarea>'
+      + '<label class="mt-2 inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg cursor-pointer transition"><i class="fa-solid fa-paperclip"></i> Lampirkan file revisi (PDF)<input type="file" accept="application/pdf,.pdf" class="hidden" onchange="_dedReviewStageFile(\'' + it.kode + '\', this)"></label>'
+      + rfChip
       + '<div class="flex gap-2 mt-2">'
       +   '<button onclick="_dedReview(\'' + it.kode + '\', \'Approved\')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-check mr-1"></i>Approve</button>'
       +   '<button onclick="_dedReview(\'' + it.kode + '\', \'Rejected\')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold py-2 rounded-lg"><i class="fa-solid fa-xmark mr-1"></i>Reject</button>'
@@ -486,6 +498,25 @@ function _dedHapusFile(kode, fileId) {
   } });
 }
 
+// ── Lampiran file revisi Lead saat review ───────────────────────
+function _dedReviewStageFile(kode, input) {
+  var f = (input.files || [])[0]; input.value = '';
+  if (!f) return;
+  if (f.size > 15 * 1024 * 1024) return showNotification('Ukuran file maksimal 15MB.', 'error');
+  if (!(f.type === 'application/pdf' || /\.pdf$/i.test(f.name || ''))) return showNotification('Hanya file PDF yang diperbolehkan.', 'error');
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result || '';
+    var base64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : '';
+    if (!base64) return showNotification('Gagal membaca file.', 'error');
+    _dedReviewStage[kode] = { base64: base64, fileName: (f.name || 'Revisi').replace(/\.[a-zA-Z0-9]+$/, '') + '.pdf', mimeType: 'application/pdf' };
+    _dedRerenderItem(kode);
+  };
+  reader.onerror = function() { showNotification('Gagal membaca file.', 'error'); };
+  reader.readAsDataURL(f);
+}
+function _dedReviewUnstage(kode) { delete _dedReviewStage[kode]; _dedRerenderItem(kode); }
+
 // ── Review (Lead) — loading inline per item ─────────────────────
 function _dedReview(kode, keputusan) {
   if (_dedBusy[kode]) return;
@@ -494,16 +525,30 @@ function _dedReview(kode, keputusan) {
   if (keputusan === 'Rejected' && !catatan) { showNotification('Catatan revisi wajib diisi untuk menolak.', 'error'); if (noteEl) noteEl.focus(); return; }
   _dedBusy[kode] = 'review';
   _dedRerenderItem(kode);
+  var rf = _dedReviewStage[kode];
+  // Bila ada lampiran file revisi: upload dulu ke Storage, lalu kirim keputusan.
+  if (rf) {
+    google.script.run.withSuccessHandler(function(up) {
+      if (!up || up.success === false || !up.fileId) { delete _dedBusy[kode]; showNotification((up && up.message) || 'Gagal upload file revisi.', 'error'); _dedRerenderItem(kode); return; }
+      _dedDoReview(kode, keputusan, catatan, { fileId: up.fileId, fileUrl: up.fileUrl, fileName: up.fileName });
+    }).withFailureHandler(function(err) { delete _dedBusy[kode]; showNotification((err && err.message) || 'Gagal upload file revisi.', 'error'); _dedRerenderItem(kode); })
+      .uploadFileDEDReview({ base64Data: rf.base64, mimeType: rf.mimeType, fileName: rf.fileName });
+    return;
+  }
+  _dedDoReview(kode, keputusan, catatan, null);
+}
+function _dedDoReview(kode, keputusan, catatan, reviewFile) {
   google.script.run.withSuccessHandler(function(res) {
     delete _dedBusy[kode];
     if (res && res.success === false) { showNotification(res.message, 'error'); _dedRerenderItem(kode); return; }
+    delete _dedReviewStage[kode];
     var it = _dedFindItem(kode);
-    if (it) { it.status = keputusan; it.catatanReview = (keputusan === 'Rejected') ? catatan : ''; it.reviewedBy = _dedUserNama(); }
+    if (it) { it.status = keputusan; it.catatanReview = catatan; it.reviewedBy = _dedUserNama(); if (reviewFile && reviewFile.fileId) it.reviewFiles = [reviewFile]; else it.reviewFiles = []; }
     _dedRerenderItem(kode);
     _dedRefreshHead();
     showNotification('Dokumen ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.');
   }).withFailureHandler(function(err) { delete _dedBusy[kode]; _dedRerenderItem(kode); showNotification((err && err.message) || 'Gagal.', 'error'); })
-    .reviewDEDItem(_dedWO.noWO, kode, keputusan, catatan, _dedUserNama());
+    .reviewDEDItem(_dedWO.noWO, kode, keputusan, catatan, _dedUserNama(), reviewFile || null);
 }
 function _dedCancelApprove(kode) {
   if (_dedBusy[kode]) return;
