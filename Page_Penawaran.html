@@ -242,7 +242,7 @@
                   <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-t border-slate-200 pt-3 text-sm">
                     <span class="text-slate-600 font-bold">Diskon:</span>
                     <div class="flex items-center gap-2">
-                      <div class="relative w-24"><input type="number" id="inputDiskonPersen" value="0" step="any" oninput="hitungKalkulasiGabungan(false)" class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span></div>
+                      <div class="relative w-24"><input type="number" id="inputDiskonPersen" value="0" step="any" oninput="_diskMode='persen'; hitungKalkulasiGabungan(false)" class="w-full pl-2 pr-7 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none"><span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span></div>
                       <span class="text-xs text-slate-400 font-bold">/</span>
                       <div class="relative w-32"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span><input type="text" id="inputDiskonNominal" oninput="formatAksiDiskonNominal(this)" class="w-full pl-8 pr-2 py-1.5 text-right border border-slate-300 rounded-md text-sm font-medium focus:outline-none" placeholder="0"></div>
                     </div>

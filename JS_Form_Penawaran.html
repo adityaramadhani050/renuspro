@@ -54,6 +54,7 @@
     document.getElementById('inputDiskonPersen').value  = sub > 0 ? +((savedDiskon / sub) * 100).toFixed(2) : 0;
     const netSub = sub - savedDiskon;
     document.getElementById('inputPajakPersen').value   = netSub > 0 ? +((savedPajak / netSub) * 100).toFixed(0) : 11;
+    _diskMode = 'nominal';   // kunci nominal tersimpan agar tak melayang saat recalc
     hitungKalkulasiGabungan(true);
   }, 150);
 
@@ -324,7 +325,11 @@
     function pN(str){ return parseFloat(str.toString().replace(/[^\d-]/g, ''))||0; }
     function formatAksiHargaSatuan(e){ e.value=formatNominalRupiah(pN(e.value)); hitungSubtotalBaris(e); }
     function formatAksiHppSatuan(e){ e.value=formatNominalRupiah(pN(e.value)); hitungSubtotalBaris(e); }
-    function formatAksiDiskonNominal(e){ e.value=formatNominalRupiah(pN(e.value)); hitungKalkulasiGabungan(true); }
+    // Sumber diskon terakhir yang diedit user: 'nominal' → kunci nominal (persen
+    // ikut), 'persen' → kunci persen (nominal ikut). Mencegah nominal "melayang"
+    // ke hasil pembulatan persen saat kalkulasi ulang (mis. edit harga/hpp).
+    var _diskMode = 'persen';
+    function formatAksiDiskonNominal(e){ _diskMode='nominal'; e.value=formatNominalRupiah(pN(e.value)); hitungKalkulasiGabungan(); }
 
     function hitungSubtotalBaris(e){
       const tr=e.closest('tr'); const q=parseFloat(tr.querySelector('.input-qty').value)||0; const h=pN(tr.querySelector('.input-harga').value); const hpp=pN(tr.querySelector('.input-hpp').value);
@@ -342,7 +347,9 @@
       });
       document.getElementById('txtSubtotalSemua').innerText=subG.toLocaleString('id-ID');
       const inP=document.getElementById('inputDiskonPersen'), inN=document.getElementById('inputDiskonNominal');
-      if(isDiskNom){ inP.value = subG>0?Number(((pN(inN.value)/subG)*100).toFixed(2)):0; } else { inN.value = formatNominalRupiah(subG*((parseFloat(inP.value)||0)/100)); }
+      // Param isDiskNom lama tetap didukung; sumber utama = _diskMode.
+      var _modeNom = isDiskNom || _diskMode === 'nominal';
+      if(_modeNom){ inP.value = subG>0?Number(((pN(inN.value)/subG)*100).toFixed(2)):0; } else { inN.value = formatNominalRupiah(subG*((parseFloat(inP.value)||0)/100)); }
       let netSub=Math.max(0, subG-pN(inN.value)); const pNom = netSub*((parseFloat(document.getElementById('inputPajakPersen').value)||0)/100);
       document.getElementById('txtPajakNominal').innerText=Math.round(pNom).toLocaleString('id-ID'); document.getElementById('txtGrandTotalSemua').innerText=Math.round(netSub+pNom).toLocaleString('id-ID');
 
@@ -380,6 +387,7 @@
       document.getElementById('validUntil').valueAsDate = vd;
 
       // Reset kalkulasi diskon & pajak ke default
+      _diskMode = 'persen';
       document.getElementById('inputDiskonPersen').value  = '0';
       document.getElementById('inputDiskonNominal').value = '0';
       document.getElementById('inputPajakPersen').value   = '11';
@@ -1245,6 +1253,7 @@
         if (tc.catatan) document.getElementById('catatanTambahan').value = tc.catatan;
         _tcDropdownsLoaded = false;
         _loadTCDropdowns(tc);
+        _kIsiDataKontrak(tc.kontrak, tc);   // restore termin + garansi + lead time (sebelumnya terlewat → reset ke default)
       } catch(e) {}
 
       // Bangun ulang kelompok item
@@ -1271,6 +1280,7 @@
         document.getElementById('inputDiskonPersen').value  = sub > 0 ? +((item.diskon / sub) * 100).toFixed(2) : 0;
         const netSub = sub - (item.diskon || 0);
         document.getElementById('inputPajakPersen').value   = netSub > 0 ? +((item.pajak / netSub) * 100).toFixed(0) : 11;
+        _diskMode = 'nominal';   // kunci nominal tersimpan agar tak melayang saat recalc
         hitungKalkulasiGabungan(true);
       }, 150);
 
