@@ -715,7 +715,7 @@ function buatPOPDF(data) {
   var sumX = ML + 12 + autoW + 30;   // batas kanan kolom Qty
   var rowH = 5;
   var lines = [
-    { label: 'Total', value: _pdfRp(po.subtotal), bold: false, highlight: false },
+    { label: 'Subtotal', value: _pdfRp(po.subtotal), bold: false, highlight: false },
     { label: (Number(po.diskonNominal) > 0 && Number(po.diskonPersen) > 0) ? ('Diskon (' + po.diskonPersen + '%)') : 'Diskon',
       value: Number(po.diskonNominal) > 0 ? _pdfRp(po.diskonNominal) : '-', bold: false, highlight: false },
     { label: 'PPN ' + (po.ppnPersen || 11) + '%', value: Number(po.ppnNominal) > 0 ? _pdfRp(po.ppnNominal) : '-', bold: false, highlight: false },
