@@ -10,6 +10,7 @@ function loadSettings() {
   _loadWAConfig();
   _loadWAReminderSchedule();
   _loadTCOptions();
+  _loadPOTCOptions();
   _loadBankAccounts();
   _loadDocSign();
   _loadKategoriPengeluaran();
@@ -335,6 +336,99 @@ function simpanTCOptions() {
       showToast('Error: ' + e.message, 'error');
     })
     .saveTCOptions(_tcData);
+}
+
+// ═══════════════════════════════════════════════════════
+// SYARAT & KETENTUAN — PURCHASE ORDER (app_config TC_PO_OPTIONS)
+// ═══════════════════════════════════════════════════════
+var _poTcData = {};
+
+function _loadPOTCOptions() {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.success) return;
+      _poTcData = r.options;
+      _renderPOTCFields(r.fields, r.options);
+    })
+    .withFailureHandler(function() {})
+    .getPOTCOptions();
+}
+
+function _potcRow(key, idx, val) {
+  return '<div class="flex items-center gap-2 px-4 py-2" id="potc-row-' + key + '-' + idx + '">' +
+    '<input type="text" value="' + _escHtml(val) + '" onchange="_potcUpdate(\'' + key + '\',' + idx + ',this.value)" ' +
+      'class="flex-1 px-2 py-1 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-amber-400 bg-white">' +
+    '<button onclick="deletePOTCOption(\'' + key + '\',' + idx + ')" class="text-red-400 hover:text-red-600 shrink-0">' +
+      '<i class="fa-solid fa-trash-can text-xs"></i></button>' +
+  '</div>';
+}
+
+function _renderPOTCFields(fields, options) {
+  var container = document.getElementById('potc-fields-container');
+  if (!container) return;
+  container.innerHTML = '';
+  fields.forEach(function(f) {
+    var opts = options[f.key] || [];
+    var html = '<div class="border border-slate-200 rounded-xl overflow-hidden">' +
+      '<div class="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">' +
+        '<span class="text-xs font-bold text-slate-600 uppercase tracking-wide">' + f.label + '</span>' +
+        '<button onclick="addPOTCOption(\'' + f.key + '\')" class="text-amber-600 hover:text-amber-800 text-xs font-bold flex items-center gap-1">' +
+          '<i class="fa-solid fa-plus text-[10px]"></i> Tambah</button>' +
+      '</div>' +
+      '<div class="divide-y divide-slate-100" id="potc-list-' + f.key + '">';
+    opts.forEach(function(opt, idx) { html += _potcRow(f.key, idx, opt); });
+    if (opts.length === 0) html += '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+    html += '</div></div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function _potcUpdate(key, idx, val) { if (!_poTcData[key]) return; _poTcData[key][idx] = val; }
+
+function addPOTCOption(key) {
+  if (!_poTcData[key]) _poTcData[key] = [];
+  var idx = _poTcData[key].length;
+  _poTcData[key].push('');
+  var list = document.getElementById('potc-list-' + key);
+  if (!list) return;
+  var empty = list.querySelector('.italic');
+  if (empty) empty.parentNode.removeChild(empty);
+  list.insertAdjacentHTML('beforeend', _potcRow(key, idx, ''));
+  var newInput = document.getElementById('potc-row-' + key + '-' + idx);
+  if (newInput) newInput.querySelector('input').focus();
+}
+
+function deletePOTCOption(key, idx) {
+  if (!_poTcData[key]) return;
+  _poTcData[key].splice(idx, 1);
+  var list = document.getElementById('potc-list-' + key);
+  if (!list) return;
+  var opts = _poTcData[key];
+  list.innerHTML = '';
+  opts.forEach(function(opt, i) { list.insertAdjacentHTML('beforeend', _potcRow(key, i, opt)); });
+  if (opts.length === 0) list.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400 italic">Belum ada opsi.</div>';
+}
+
+function simpanPOTCOptions() {
+  Object.keys(_poTcData).forEach(function(key) {
+    (_poTcData[key] || []).forEach(function(_, idx) {
+      var row = document.getElementById('potc-row-' + key + '-' + idx);
+      if (row) { var inp = row.querySelector('input'); if (inp) _poTcData[key][idx] = inp.value; }
+    });
+  });
+  var btn = document.querySelector('[onclick="simpanPOTCOptions()"]');
+  var _lbl = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan S&K Purchase Order';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = _lbl; }
+      showToast((r && r.message) || 'Tersimpan.', r && r.success ? 'success' : 'error');
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = _lbl; }
+      showToast('Error: ' + e.message, 'error');
+    })
+    .savePOTCOptions(_poTcData);
 }
 
 // ═══════════════════════════════════════════════════════
