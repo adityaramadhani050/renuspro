@@ -203,9 +203,12 @@ function _renderWOContext(res){
     var detailBtn = (typeof bukaDetailSiteSurvey === 'function')
       ? '<button onclick="tutupWOContext();bukaDetailSiteSurvey(\'' + esc(s.id) + '\', {readOnly:true})" class="text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg shrink-0"><i class="fa-solid fa-eye mr-1"></i>Detail</button>'
       : '';
+    var pdfBtn = (typeof _ssExportPDFById === 'function')
+      ? '<button onclick="_ssExportPDFById(\'' + esc(s.id) + '\')" title="Export PDF Laporan Site Survey" class="text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg shrink-0"><i class="fa-solid fa-file-pdf mr-1"></i>PDF</button>'
+      : '';
     return '<div class="flex items-center justify-between gap-2 border border-slate-150 rounded-xl px-3 py-2 mb-1.5">'
       + '<div class="min-w-0"><div class="text-xs font-bold text-slate-700 truncate">' + esc(s.namaSite||s.id) + '</div><div class="text-[10px] text-slate-400 truncate">' + esc(meta) + '</div></div>'
-      + detailBtn + '</div>';
+      + '<div class="flex items-center gap-1.5 shrink-0">' + detailBtn + pdfBtn + '</div></div>';
   }).join('');
   body.innerHTML = html;
 }
