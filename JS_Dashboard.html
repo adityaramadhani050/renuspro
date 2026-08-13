@@ -549,12 +549,19 @@ function _dbRenderTrend(items) {
 // ── Status Penawaran Donut (period-filtered) ───────────────────
 function _dbRenderDonut(items, fromMs, toMs) {
   var counts = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
+  var _inPeriode = function(ts) {
+    if (fromMs && ts && ts < fromMs) return false;
+    if (toMs   && ts && ts > toMs)   return false;
+    return true;
+  };
   items.forEach(function(item) {
-    if (counts[item.status] === undefined) return;
-    var ts = item.tanggal;
-    if (fromMs && ts && ts < fromMs) return;
-    if (toMs   && ts && ts > toMs)   return;
-    counts[item.status]++;
+    var st = item.status;
+    if (counts[st] === undefined) return;
+    // Deal dihitung berdasarkan TANGGAL DEAL agar konsisten dgn KPI "Total Deal"
+    // & Revenue Deal. On-Progress/Fail tetap berdasarkan tanggal penawaran dibuat.
+    var ts = (st === 'Deal') ? (item.tanggalDeal || item.tanggal) : item.tanggal;
+    if (!_inPeriode(ts)) return;
+    counts[st]++;
   });
   var onProg = counts['On-Progress'], won = counts['Deal'], fail = counts['Fail'];
   var total  = onProg + won + fail;
