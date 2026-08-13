@@ -456,9 +456,7 @@ function _dbRenderTargetBar(summary, items, annualTarget) {
 
 // ── Statistik Konversi ─────────────────────────────────────────
 function _dbRenderKonversi(summary) {
-  // Win rate = CLOSE RATE: deal ÷ (deal + fail) yang DITUTUP periode ini
-  // (berdasarkan tanggal deal/fail) — konsisten dgn Total Deal, Revenue, dan
-  // kartu Avg Nilai/Margin/Sales Cycle. Dihitung di agregasi (teamWinRate).
+  // Win rate = total deal ÷ total penawaran (dihitung di agregasi teamWinRate).
   var winRate = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
   var dealCount = summary.teamDealCount || 0;
   var revenue   = summary.teamRevenue || 0;
