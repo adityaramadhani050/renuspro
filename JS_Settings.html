@@ -630,21 +630,33 @@ function hapusAkunPembayaranUI(id) {
 window.simpanDocSign = function() {
   var enabled = document.getElementById('sign-enabled').checked;
   var payload = { sigEnabled: enabled };
+  if (typeof google === 'undefined') { showToast('Backend tidak tersedia.', 'error'); return; }
+  toggleLoader(true, 'Menyimpan tanda tangan...');
+  var _done = function() {
+    toggleLoader(false);
+    showToast('Pengaturan tanda tangan disimpan.', 'success');
+  };
+  var _fail = function(e) {
+    toggleLoader(false);
+    showToast('Gagal simpan: ' + ((e && e.message) || e), 'error');
+  };
   google.script.run
     .withSuccessHandler(function(r) {
+      if (r && r.success === false) { _fail({ message: r.message || 'Gagal menyimpan.' }); return; }
       if (_signBase64Pending) {
         google.script.run
-          .withSuccessHandler(function() {
+          .withSuccessHandler(function(r2) {
+            if (r2 && r2.success === false) { _fail({ message: r2.message || 'Gagal simpan gambar.' }); return; }
             _signBase64Pending = null;
-            showToast('Pengaturan tanda tangan disimpan.', 'success');
+            _done();
           })
-          .withFailureHandler(function(e) { showToast('Gagal simpan gambar: ' + e.message, 'error'); })
+          .withFailureHandler(_fail)
           .saveSignatureImage(_signBase64Pending);
       } else {
-        showToast('Pengaturan tanda tangan disimpan.', 'success');
+        _done();
       }
     })
-    .withFailureHandler(function(e) { showToast('Error: ' + e.message, 'error'); })
+    .withFailureHandler(_fail)
     .saveDocSignConfig(payload);
 };
 </script>
