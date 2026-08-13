@@ -267,32 +267,37 @@
         }
       });
 
+      // Panggil Edge Function, dan bila gagal (non-2xx) SURFACE pesan asli dari
+      // body respons (FunctionsHttpError.context = Response), bukan pesan generik.
+      async function _edgeInvoke(fn, body, fallbackMsg) {
+        var r;
+        try { r = await supa.functions.invoke(fn, { body: body }); }
+        catch (e) { return { success: false, message: (e && e.message) || fallbackMsg }; }
+        if (!r.error) return r.data;
+        var msg = fallbackMsg;
+        try {
+          var ctx = r.error.context;
+          if (ctx && typeof ctx.json === 'function') { var j = await ctx.json(); if (j && j.message) msg = j.message; }
+          else if (ctx && typeof ctx.text === 'function') { var t = await ctx.text(); if (t) { try { var jj = JSON.parse(t); msg = (jj && jj.message) || t; } catch (_) { msg = t; } } }
+        } catch (e2) {}
+        console.error('[' + fn + ']', r.error, msg);
+        return { success: false, message: msg };
+      }
+
       // ── Invoice (finansial/multi-tabel) via EDGE FUNCTION invoice-ops ─────
       //  Aktif hanya bila ENABLE_EDGE_INVOICE = true (setelah deploy).
       if (ENABLE_EDGE_INVOICE) {
         window.gsRoute('simpanInvoice', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'create', payload: a[0] || {} } });
-            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal menyimpan invoice.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('invoice-ops', { action: 'create', payload: a[0] || {} }, 'Gagal menyimpan invoice.'); }
         });
         window.gsRoute('updateStatusBayarInvoice', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'setStatus', idInvoice: a[0], statusBaru: a[1], bukti: a[2] || {} } });
-            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal mengubah status bayar.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('invoice-ops', { action: 'setStatus', idInvoice: a[0], statusBaru: a[1], bukti: a[2] || {} }, 'Gagal mengubah status bayar.'); }
         });
         window.gsRoute('editInvoice', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('invoice-ops', { body: { action: 'edit', payload: a[0] || {} } });
-            if (r.error) { console.error('[invoice-ops]', r.error); return { success: false, message: 'Gagal mengubah invoice.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('invoice-ops', { action: 'edit', payload: a[0] || {} }, 'Gagal mengubah invoice.'); }
         });
       }
 
@@ -301,27 +306,15 @@
       if (ENABLE_EDGE_USER) {
         window.gsRoute('simpanUser', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('user-ops', { body: { action: 'create', payload: { nama: a[0], username: a[1], password: a[2], role: a[3], leadId: a[4], noWa: a[5], email: a[6] } } });
-            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal menyimpan user.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('user-ops', { action: 'create', payload: { nama: a[0], username: a[1], password: a[2], role: a[3], leadId: a[4], noWa: a[5], email: a[6] } }, 'Gagal menyimpan user.'); }
         });
         window.gsRoute('editUser', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('user-ops', { body: { action: 'edit', payload: { id: a[0], nama: a[1], username: a[2], password: a[3], role: a[4], aktif: a[5], targetBulanan: a[6], leadId: a[7], noWa: a[8], email: a[9] } } });
-            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal mengubah user.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('user-ops', { action: 'edit', payload: { id: a[0], nama: a[1], username: a[2], password: a[3], role: a[4], aktif: a[5], targetBulanan: a[6], leadId: a[7], noWa: a[8], email: a[9] } }, 'Gagal mengubah user.'); }
         });
         window.gsRoute('hapusUser', {
           mode: 'fn',
-          handler: async function (a) {
-            var r = await supa.functions.invoke('user-ops', { body: { action: 'delete', payload: { id: a[0] } } });
-            if (r.error) { console.error('[user-ops]', r.error); return { success: false, message: 'Gagal menghapus user.' }; }
-            return r.data;
-          }
+          handler: function (a) { return _edgeInvoke('user-ops', { action: 'delete', payload: { id: a[0] } }, 'Gagal menghapus user.'); }
         });
       }
 
