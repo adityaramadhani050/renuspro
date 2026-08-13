@@ -640,21 +640,29 @@ function buatPOPDF(data) {
 
   // ── SUPPLIER INFORMATION ──
   curY = _pdfBarSeksi(doc, 'SUPPLIER INFORMATION', ML, CW, curY);
-  var supH = 22;
+  var c1 = ML + 2, c2 = ML + (CW / 2) + 2, valW = (CW / 2) - 4, lh = 3.6;
+  // Wrap semua nilai agar teks panjang (mis. alamat) turun ke bawah, tak keluar kotak.
+  var nmL = doc.splitTextToSize(String(sup.nama || po.namaSupplier || ''), valW);
+  var adL = doc.splitTextToSize(String(sup.alamat || ''), valW);
+  var ctL = doc.splitTextToSize(String(sup.telepon || sup.pic || ''), valW);
+  var emL = doc.splitTextToSize(String(sup.email || ''), valW);
+  var rowTopN = Math.max(nmL.length, adL.length, 1), rowBotN = Math.max(ctL.length, emL.length, 1);
+  var yLabelA = curY + 4, yValA = yLabelA + 4;
+  var yLabelC = yValA + (rowTopN - 1) * lh + 5, yValC = yLabelC + 4;
+  var supH = (yValC + (rowBotN - 1) * lh + 3) - curY;
   doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, supH, 'F');
-  var c1 = ML + 2, c2 = ML + (CW / 2) + 2;
   function _supLabel(x, y, t) {
     doc.setFont(PDF_FONT, 'italic'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
     doc.text(t, x, y);
   }
-  function _supVal(x, y, t, bold) {
+  function _supVal(x, y, lines, bold) {
     doc.setFont(PDF_FONT, bold ? 'bold' : 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
-    doc.text(String(t || ''), x, y);
+    doc.text(lines, x, y, { lineHeightFactor: 1.15 });
   }
-  _supLabel(c1, curY + 4, 'SUPPLIER NAME'); _supLabel(c2, curY + 4, 'ADDRESS');
-  _supVal(c1, curY + 8.5, sup.nama || po.namaSupplier || '', true); _supVal(c2, curY + 8.5, sup.alamat || '', false);
-  _supLabel(c1, curY + 14, 'CONTACT'); _supLabel(c2, curY + 14, 'EMAIL');
-  _supVal(c1, curY + 18.5, sup.telepon || sup.pic || '', false); _supVal(c2, curY + 18.5, sup.email || '', false);
+  _supLabel(c1, yLabelA, 'SUPPLIER NAME'); _supLabel(c2, yLabelA, 'ADDRESS');
+  _supVal(c1, yValA, nmL, true); _supVal(c2, yValA, adL, false);
+  _supLabel(c1, yLabelC, 'CONTACT'); _supLabel(c2, yLabelC, 'EMAIL');
+  _supVal(c1, yValC, ctL, false); _supVal(c2, yValC, emL, false);
   curY += supH + 4;
 
   // ── Tabel item (No/Details/Unit/Qty/Unit price/Total) ──
@@ -702,7 +710,8 @@ function buatPOPDF(data) {
   });
   curY = doc.lastAutoTable.finalY;
 
-  // ── Notes (kiri) + Summary (kanan), sejajar seperti Invoice ──
+  // ── Notes (kiri) + Summary (kanan) — gaya konsisten Invoice/Quotation ──
+  curY += 0.6;   // garis pemisah tipis di atas summary (spt Invoice)
   var sumX = ML + 12 + autoW + 30;   // batas kanan kolom Qty
   var rowH = 5;
   var lines = [
@@ -712,23 +721,28 @@ function buatPOPDF(data) {
     { label: 'PPN ' + (po.ppnPersen || 11) + '%', value: Number(po.ppnNominal) > 0 ? _pdfRp(po.ppnNominal) : '-', bold: false, highlight: false },
     { label: 'GRAND TOTAL', value: _pdfRp(po.grandTotal), bold: true, highlight: true }
   ];
-  var NS = lines.length, blockH = NS * rowH;
+  var NS = lines.length, summaryH = NS * rowH;
+  // Notes: tinggi kotak fleksibel mengikuti jumlah baris catatan.
+  var noteLines = po.catatan ? doc.splitTextToSize(String(po.catatan), sumX - ML - 4) : [];
+  var notesTextH = noteLines.length * 3.6 + 2.5;
+  var notesGrayH = Math.max(summaryH - rowH, notesTextH);
+  var blockH = rowH + notesGrayH;
   // Notes: bar biru + isi abu (kiri).
   doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]); doc.rect(ML, curY, sumX - ML, rowH, 'F');
   doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(255, 255, 255);
   doc.text('Notes :', ML + 2, curY + 3.4);
-  doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]); doc.rect(ML, curY + rowH, sumX - ML, blockH - rowH, 'F');
-  if (po.catatan) {
+  doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]); doc.rect(ML, curY + rowH, sumX - ML, notesGrayH, 'F');
+  if (noteLines.length) {
     doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
-    doc.text(doc.splitTextToSize(String(po.catatan), sumX - ML - 4), ML + 2, curY + rowH + 3.4);
+    doc.text(noteLines, ML + 2, curY + rowH + 3.4);
   }
-  // Summary (kanan).
+  // Summary (kanan) — warna & gaya sama Invoice/Quotation (teks hitam, grand total abu).
   lines.forEach(function (row, i) {
     var ry = curY + i * rowH;
     var bg = row.highlight ? PDF_GROUP_BG : PDF_ROW_BG;
     doc.setFillColor(bg[0], bg[1], bg[2]); doc.rect(sumX, ry, (PW - MR) - sumX, rowH, 'F');
     doc.setFont(PDF_FONT, row.bold ? 'bold' : 'normal'); doc.setFontSize(PDF_FS);
-    doc.setTextColor(row.highlight ? BLUE[0] : 0, row.highlight ? BLUE[1] : 0, row.highlight ? BLUE[2] : 0);
+    doc.setTextColor(0, 0, 0);
     doc.text(row.label, sumX + 2.5, ry + 3.4);
     doc.text(row.value, (PW - MR) - 2, ry + 3.4, { align: 'right' });
   });
@@ -774,8 +788,8 @@ function buatPOPDF(data) {
   doc.text('Supplier', ML + halfW + 2, curY + 4.2);
   curY += 6;
   doc.setTextColor(0, 0, 0); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
-  doc.text('PT. RENUS GLOBAL INDONESIA', ML + 2, curY + 5);
-  doc.text(String(sup.nama || po.namaSupplier || ''), ML + halfW + 2, curY + 5);
+  doc.text(doc.splitTextToSize('PT. RENUS GLOBAL INDONESIA', halfW - 4), ML + 2, curY + 5);
+  doc.text(doc.splitTextToSize(String(sup.nama || po.namaSupplier || ''), halfW - 4), ML + halfW + 2, curY + 5);
   curY += 26;
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
   doc.text('(' + (po.dibuatOleh || 'Procurement') + ')', ML + 2, curY);
