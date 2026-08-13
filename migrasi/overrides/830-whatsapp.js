@@ -3,11 +3,10 @@
       //  Function wa-send). Frontend menyusun pesan + nomor, lalu memanggil
       //  wa-send. Notifikasi best-effort — TAK memblok/menggagalkan aksi utama.
       //
-      //  GATE: seluruh WA aktif HANYA bila ENABLE_WA = true (setelah deploy
-      //  wa-send + isi WA_CONFIG di app_config + pg_cron reminder). Selama false:
-      //  config & notifikasi WA tetap lewat Apps Script (aman, tanpa split-brain);
-      //  notifikasi tertanam di aksi tulis no-op (komposer langsung return).
-      var ENABLE_WA = false;
+      //  GATE: Edge Function wa-send & wa-reminder sudah ter-deploy → seluruh
+      //  WA (config, notifikasi, reminder QC/DED, review BOM) via Supabase.
+      //  Pastikan WA_CONFIG di app_config terisi (endpoint/token/target).
+      var ENABLE_WA = true;
 
       function _normalizePhone(v) {
         var s = (v == null ? '' : v).toString().trim().replace(/[^0-9]/g, '');

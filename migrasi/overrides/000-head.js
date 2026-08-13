@@ -16,20 +16,16 @@
   var SUPABASE_ANON = 'ISI_ANON_KEY';      // anon public key (aman untuk frontend)
   // ───────────────────────────────────────────────────────────────────────────
 
-  // Nyalakan jadi `true` HANYA SETELAH Edge Function 'get-stok-list' ter-deploy
-  // (lihat migrasi/PANDUAN-EDGE-FUNCTIONS.md). Selama false, getStokList tetap
-  // memakai Apps Script lama supaya Inventory tidak rusak.
-  var ENABLE_EDGE_STOK = false;
+  // Edge Function 'get-stok-list' sudah ter-deploy → getStokList via Supabase.
+  var ENABLE_EDGE_STOK = true;
 
-  // Nyalakan `true` HANYA SETELAH Edge Function 'invoice-ops' ter-deploy
-  // (lihat PANDUAN-EDGE-FUNCTIONS.md). Selama false, simpan invoice & ubah
-  // status bayar tetap lewat Apps Script (aman).
-  var ENABLE_EDGE_INVOICE = false;
+  // Edge Function 'invoice-ops' sudah ter-deploy → simpan/edit invoice & ubah
+  // status bayar via Supabase.
+  var ENABLE_EDGE_INVOICE = true;
 
-  // Nyalakan `true` HANYA SETELAH Edge Function 'user-ops' ter-deploy. Selama
-  // false, tambah/edit/hapus user tetap lewat Apps Script (aman). Manajemen user
-  // butuh Supabase Auth admin (service_role) → wajib di server.
-  var ENABLE_EDGE_USER = false;
+  // Edge Function 'user-ops' sudah ter-deploy → tambah/edit/hapus user via
+  // Supabase Auth admin (service_role di server).
+  var ENABLE_EDGE_USER = true;
 
   if (!SUPABASE_URL || SUPABASE_URL.indexOf('ISI_') === 0 ||
       !SUPABASE_ANON || SUPABASE_ANON.indexOf('ISI_') === 0) {
