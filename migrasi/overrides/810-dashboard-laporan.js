@@ -82,7 +82,7 @@
           var rows = Object.keys(latest).map(function (k) { return latest[k]; });
 
           var salesMap = {};
-          function ensureSales(nm) { if (!salesMap[nm]) salesMap[nm] = { nama: nm, targetBulanan: (userMap[nm] ? userMap[nm].target : 0), totalPenawaran: 0, totalNilaiPenawaran: 0, dealCount: 0, dealRevenue: 0, dealHpp: 0, pipelineCount: 0, pipelineValue: 0, failCount: 0, dealCohort: 0, marginSum: 0, marginCount: 0, _pen: {} }; return salesMap[nm]; }
+          function ensureSales(nm) { if (!salesMap[nm]) salesMap[nm] = { nama: nm, targetBulanan: (userMap[nm] ? userMap[nm].target : 0), totalPenawaran: 0, totalNilaiPenawaran: 0, dealCount: 0, dealRevenue: 0, dealHpp: 0, pipelineCount: 0, pipelineValue: 0, failCount: 0, dealCohort: 0, _pen: {} }; return salesMap[nm]; }
 
           rows.forEach(function (r) {
             var pembuat = (r.dibuat_oleh || '').toString().trim();
@@ -111,11 +111,7 @@
             var masukList = (status === 'Deal') ? dealInRange : creationInRange;
             if (masukList && !s._pen[no]) s._pen[no] = pObj;
             if (creationInRange) { s.totalPenawaran++; s.totalNilaiPenawaran += nilaiKontrak; if (status === 'Fail') s.failCount++; if (status === 'Deal') s.dealCohort++; }
-            if (dealInRange) {
-              s.dealCount++; s.dealRevenue += nilaiKontrak; s.dealHpp += totalHpp;
-              // Rata-rata data: kumpulkan margin PER-DEAL (bukan margin agregat).
-              if (nilaiKontrak > 0) { s.marginSum += ((nilaiKontrak - totalHpp) / nilaiKontrak) * 100; s.marginCount++; }
-            }
+            if (dealInRange) { s.dealCount++; s.dealRevenue += nilaiKontrak; s.dealHpp += totalHpp; }
             if (status === 'On-Progress') { s.pipelineCount++; s.pipelineValue += nilaiKontrak; }
           });
 
@@ -132,12 +128,9 @@
               nama: s.nama, targetBulanan: s.targetBulanan, totalPenawaran: s.totalPenawaran, totalNilaiPenawaran: s.totalNilaiPenawaran,
               avgNilaiPenawaran: s.totalPenawaran > 0 ? s.totalNilaiPenawaran / s.totalPenawaran : 0,
               dealCount: s.dealCount, dealRevenue: s.dealRevenue, dealHpp: s.dealHpp, pipelineCount: s.pipelineCount, pipelineValue: s.pipelineValue,
-              failCount: s.failCount, dealCohort: s.dealCohort, marginSum: s.marginSum, marginCount: s.marginCount,
-              // Win rate = total deal ÷ total penawaran, dibatasi maks 100%
-              // (deal bisa > penawaran bila deal berasal dari penawaran periode lalu).
-              winRate: s.totalPenawaran > 0 ? Math.min(100, (s.dealCount / s.totalPenawaran) * 100) : 0,
-              // Avg margin deal = RATA-RATA margin per-deal (bukan margin agregat).
-              avgMarginDeal: s.marginCount > 0 ? (s.marginSum / s.marginCount) : null,
+              failCount: s.failCount, dealCohort: s.dealCohort,
+              winRate: s.totalPenawaran > 0 ? (s.dealCohort / s.totalPenawaran) * 100 : 0,
+              avgMarginDeal: s.dealRevenue > 0 ? ((s.dealRevenue - s.dealHpp) / s.dealRevenue) * 100 : null,
               avgSalesCycle: cycleCount > 0 ? cycleSum / cycleCount : null,
               achievement: s.targetBulanan > 0 ? (s.dealRevenue / s.targetBulanan) * 100 : null,
               penawaran: pen
@@ -146,11 +139,8 @@
           salesList.sort(function (a, b) { return b.dealRevenue - a.dealRevenue; });
 
           // team summary
-          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamMarginSum = 0, teamMarginCount = 0, teamPipelineValue = 0, teamPipelineCount = 0;
-          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamMarginSum += (s.marginSum || 0); teamMarginCount += (s.marginCount || 0); teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; });
-          // Avg Win Rate tim = RATA-RATA win rate tiap sales (yang punya penawaran).
-          var _wrSales = salesList.filter(function (s) { return s.totalPenawaran > 0; });
-          var teamAvgWinRate = _wrSales.length ? (_wrSales.reduce(function (a, s) { return a + (s.winRate || 0); }, 0) / _wrSales.length) : 0;
+          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamPipelineValue = 0, teamPipelineCount = 0;
+          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; });
           var teamTarget = 0;
           if (isAdmin) { Object.keys(userMap).forEach(function (nm) { teamTarget += userMap[nm].target; }); }
           else if (role === 'leadsales' && teamNames && teamNames.length) { teamNames.forEach(function (nm) { teamTarget += (userMap[nm] ? userMap[nm].target : 0); }); }
@@ -208,11 +198,9 @@
             success: true, dateFrom: _fmtTgl(fromISO), dateTo: _fmtTgl(toISO),
             summary: {
               teamRevenue: teamRevenue, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamDealCount: teamDealCount,
-              // Avg Win Rate = rata-rata win rate per-sales (tiap sales = deal ÷ penawaran, maks 100%).
-              teamWinRate: teamAvgWinRate,
+              teamWinRate: teamPenawaran > 0 ? (teamDealCohort / teamPenawaran) * 100 : 0,
               teamPipelineValue: teamPipelineValue, teamPipelineCount: teamPipelineCount,
-              // Avg margin deal = RATA-RATA margin per-deal (bukan margin agregat).
-              teamAvgMarginDeal: teamMarginCount > 0 ? (teamMarginSum / teamMarginCount) : 0,
+              teamAvgMarginDeal: teamRevenue > 0 ? ((teamRevenue - teamHppDeal) / teamRevenue) * 100 : 0,
               teamAvgSalesCycle: teamCycleCount > 0 ? teamCycleSum / teamCycleCount : null, leadSalesCount: leadSalesCount
             },
             trend: { labels: months.map(function (m) { return m.label; }), values: months.map(function (m) { return m.val; }) },

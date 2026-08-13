@@ -456,7 +456,9 @@ function _dbRenderTargetBar(summary, items, annualTarget) {
 
 // ── Statistik Konversi ─────────────────────────────────────────
 function _dbRenderKonversi(summary) {
-  // Win rate = total deal ÷ total penawaran (dihitung di agregasi teamWinRate).
+  // Win rate berbasis KOHORT (deal dari penawaran yang dibuat periode ini /
+  // total penawaran dibuat periode ini) — konsisten dgn win rate per-sales &
+  // menghindari inflasi dari deal penawaran bulan lalu. Dihitung di backend.
   var winRate = (summary.teamWinRate != null) ? summary.teamWinRate : 0;
   var dealCount = summary.teamDealCount || 0;
   var revenue   = summary.teamRevenue || 0;
