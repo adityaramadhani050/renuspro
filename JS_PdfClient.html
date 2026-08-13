@@ -542,30 +542,34 @@ function buatKwitansiPDF(d) {
   _kwRow(curY + 24, 'Sebagai Pembayaran', d.untuk || '', true, false);
   curY += boxH;
 
-  // ── Kotak nominal (garis tebal atas-bawah + isian garis abu putus, nominal center) ──
+  // ── Kotak nominal (kiri) — sebaris dgn blok tanda tangan (kanan) ──
   curY += 5;
+  var amtTopY = curY;
   var amtW = 62, amtH = 12, amtX = ML;
   // Isian: garis horizontal abu tipis putus-putus (mirip pola cek).
   doc.setDrawColor(155, 155, 155); doc.setLineWidth(0.15);
   doc.setLineDashPattern([0.5, 0.8], 0);
-  for (var _yy = curY + 2; _yy < curY + amtH - 1; _yy += 1.6) {
+  for (var _yy = amtTopY + 2; _yy < amtTopY + amtH - 1; _yy += 1.6) {
     doc.line(amtX + 1, _yy, amtX + amtW - 1, _yy);
   }
   doc.setLineDashPattern([], 0);
   // Garis tebal (double) di atas & bawah.
   doc.setDrawColor(30, 30, 30); doc.setLineWidth(0.5);
-  doc.line(amtX, curY, amtX + amtW, curY);
-  doc.line(amtX, curY + 0.8, amtX + amtW, curY + 0.8);
-  doc.line(amtX, curY + amtH, amtX + amtW, curY + amtH);
-  doc.line(amtX, curY + amtH - 0.8, amtX + amtW, curY + amtH - 0.8);
+  doc.line(amtX, amtTopY, amtX + amtW, amtTopY);
+  doc.line(amtX, amtTopY + 0.8, amtX + amtW, amtTopY + 0.8);
+  doc.line(amtX, amtTopY + amtH, amtX + amtW, amtTopY + amtH);
+  doc.line(amtX, amtTopY + amtH - 0.8, amtX + amtW, amtTopY + amtH - 0.8);
   // Nominal center (horizontal & vertikal).
   doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(14); doc.setTextColor(0, 0, 0);
-  doc.text('Rp' + _pdfRp(d.jumlah), amtX + amtW / 2, curY + amtH / 2 + 1.5, { align: 'center' });
-  curY += amtH;
+  doc.text('Rp' + _pdfRp(d.jumlah), amtX + amtW / 2, amtTopY + amtH / 2 + 1.5, { align: 'center' });
 
-  // ── Note (kiri) + Tanggal (kanan) ──
-  curY += 8;
-  var noteY = curY;
+  // ── Tanggal + tanda tangan (kanan), sejajar kotak nominal ──
+  doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+  doc.text('Surabaya, ' + _pdfTglPanjang(d.tanggal), PW - MR, amtTopY + 2, { align: 'right' });
+  _pdfTtdInvoice(doc, amtTopY, PW, MR);
+
+  // ── Note (kiri), di bawah kotak nominal ──
+  var noteY = amtTopY + amtH + 8;
   doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
   doc.text('Note:', ML, noteY);
   doc.setFont(PDF_FONT, 'normal');
@@ -573,13 +577,6 @@ function buatKwitansiPDF(d) {
   var bank = (d.bankAccount || '').toString();
   if (bank) noteLines = noteLines.concat(doc.splitTextToSize(bank, 95));
   doc.text(noteLines, ML, noteY + 4.5);
-
-  // Tanggal (kanan)
-  doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
-  doc.text('Surabaya, ' + _pdfTglPanjang(d.tanggal), PW - MR, noteY, { align: 'right' });
-
-  // ── Tanda tangan (dari setting) — "Hormat kami," dekat di bawah tanggal ──
-  _pdfTtdInvoice(doc, noteY - 2, PW, MR);
 
   return doc;
 }
