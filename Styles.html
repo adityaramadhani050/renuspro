@@ -401,4 +401,25 @@
         font-size: 16px; padding-top: 0.5rem; padding-bottom: 0.5rem;
       }
     }
+
+    /* ── Ruang aman untuk SEMUA modal ──────────────────────────────────────
+       Modal memakai kombinasi kelas `fixed inset-0 flex items-center
+       justify-center`. Tanpa padding vertikal + dgn max-height terlalu tinggi
+       (mis. 92vh), kotak modal menempel ke tepi atas/bawah layar. Rule ini
+       menambah padding vertikal, mengizinkan scroll bila konten tinggi, dan
+       membatasi tinggi kotak agar selalu ada margin atas-bawah. `:not(.absolute)`
+       menjaga backdrop full-screen (child absolute) tetap menutupi layar. */
+    .fixed.inset-0.flex.items-center.justify-center {
+      padding-top: 1.25rem;
+      padding-bottom: 1.25rem;
+      overflow-y: auto;
+    }
+    .fixed.inset-0.flex.items-center.justify-center > *:not(.absolute) {
+      max-height: calc(100dvh - 2.5rem);
+    }
+    @supports not (height: 100dvh) {
+      .fixed.inset-0.flex.items-center.justify-center > *:not(.absolute) {
+        max-height: calc(100vh - 2.5rem);
+      }
+    }
   </style>
