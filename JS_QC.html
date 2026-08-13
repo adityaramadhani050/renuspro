@@ -542,19 +542,34 @@ function _qcBuildPDF(d) {
       // Catatan Lead tidak ditampilkan di PDF: laporan dibuat setelah semua
       // item Approved, jadi catatan revisi tak lagi relevan di laporan akhir.
 
-      var foto = it.foto || [];
+      var foto = (it.foto || []).filter(function(f) { return f && f.dataUrl; });
       if (foto.length) {
-        var boxW = 30, gap = 2.5, px = ML, rowMaxH = 0;
-        foto.forEach(function(f) {
-          var iw = 4, ih = 3;
-          try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width; ih = pr.height; } catch (e) {}
-          var w = boxW, h = Math.min(26, w * (ih / iw));
-          if (px + w > ML + CW) { px = ML; y += rowMaxH + gap; rowMaxH = 0; }
-          if (y + h > BOTTOM) { newPage(); px = ML; rowMaxH = 0; }
-          try { doc.addImage(f.dataUrl, px, y, w, h); } catch (e) {}
-          px += w + gap; if (h > rowMaxH) rowMaxH = h;
-        });
-        y += rowMaxH + 4;
+        // Layout foto menjaga rasio asli (tidak dipaksa tinggi), grid rapi:
+        // 1 foto → setengah lebar; 2 → 2 kolom; ≥3 → 3 kolom. Potret ditengahkan.
+        var perRow = foto.length === 1 ? 1 : (foto.length === 2 ? 2 : 3);
+        var gap = 3;
+        var boxW = perRow === 1 ? Math.min(90, CW) : (CW - (perRow - 1) * gap) / perRow;
+        var maxH = perRow === 1 ? 62 : (perRow === 2 ? 56 : 42);
+        for (var fi = 0; fi < foto.length; fi += perRow) {
+          var rowItems = foto.slice(fi, fi + perRow);
+          var cells = rowItems.map(function(f) {
+            var iw = 4, ih = 3;
+            try { var pr = doc.getImageProperties(f.dataUrl); iw = pr.width || 4; ih = pr.height || 3; } catch (e) {}
+            var w = boxW, h = w * (ih / iw);
+            if (h > maxH) { h = maxH; w = h * (iw / ih); }   // jaga rasio: batasi tinggi, lebar menyesuaikan
+            return { f: f, w: w, h: h };
+          });
+          var rowH = cells.reduce(function(mx, c) { return Math.max(mx, c.h); }, 0);
+          if (y + rowH > BOTTOM) { newPage(); }
+          cells.forEach(function(c, ci) {
+            var cellX = ML + ci * (boxW + gap);
+            var drawX = cellX + (boxW - c.w) / 2;   // tengahkan foto potret dalam sel
+            try { doc.addImage(c.f.dataUrl, drawX, y, c.w, c.h); } catch (e) {}
+            doc.setDrawColor(226, 232, 240); doc.rect(drawX, y, c.w, c.h);
+          });
+          y += rowH + gap;
+        }
+        y += 1;
       } else if (it.status !== 'NA') {
         doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(148,163,184);
         doc.text('(Belum ada foto)', ML, y + 2); y += 5;
