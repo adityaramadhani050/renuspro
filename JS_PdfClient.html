@@ -816,4 +816,160 @@ function exportPOPDFClient(noPO, subtitle) {
     .withFailureHandler(function (err) { _pdfPreviewError((err && err.message) || err); })
     .getPOForPdf(noPO);
 }
+
+// ── INFO WORK ORDER (untuk tim engineer di BOM/DED/QC) ──────────────────────
+// data: getWOContextByWO → { noWO, id, rev, tanggal, namaKlien, namaProject,
+//        dibuatOleh, jenisWO, status, catatanCustomer, kelompok, budget, ho, surveys }
+function buatWOInfoPDF(res) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, ML = 10, MR = 10, CW = PW - ML - MR;
+  var BLUE = PDF_HDR_BG;
+
+  _pdfHeaderKiri(doc, ML);
+  _pdfJudulKanan(doc, 'INFO WORK ORDER', PW, MR, { size: 19, color: PDF_TITLE_COL, y: 16 });
+  _pdfInfoKanan(doc, [
+    ['No. WO', res.noWO || ''],
+    ['No. Penawaran', (res.id || '') + ((res.rev !== '' && res.rev != null) ? ' (Rev ' + res.rev + ')' : '')],
+    ['Tanggal', _pdfTglPanjang(res.tanggal)]
+  ], PW, MR, 25, 4.5);
+
+  var curY = 45;
+
+  // ── Informasi Work Order (kotak abu 2 kolom) ──
+  curY = _pdfBarSeksi(doc, 'INFORMASI WORK ORDER', ML, CW, curY);
+  var infoH = 22;
+  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, infoH, 'F');
+  var c1L = ML + 2, c1V = ML + 24, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 24;
+  function _wRow(lx, vx, yy, label, val) {
+    doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(0, 0, 0); doc.setFontSize(PDF_FS); doc.text(label, lx, yy);
+    doc.setFont(PDF_FONT, 'normal'); doc.text(String(val == null ? '' : val), vx, yy);
+  }
+  _wRow(c1L, c1V, curY + 5, 'Klien', res.namaKlien || '-');
+  _wRow(c1L, c1V, curY + 10, 'Project', res.namaProject || '-');
+  _wRow(c1L, c1V, curY + 15, 'Sales / PIC', res.dibuatOleh || '-');
+  _wRow(c2L, c2V, curY + 5, 'Jenis WO', res.jenisWO || '-');
+  _wRow(c2L, c2V, curY + 10, 'Status', res.status || '-');
+  var hoTxt = res.ho ? ((res.ho.status || '-') + (res.ho.tglJadwal ? ' · ' + res.ho.tglJadwal : '')) : '-';
+  _wRow(c2L, c2V, curY + 15, 'Hand Over', hoTxt);
+  curY += infoH + 4;
+
+  // ── Catatan Customer + MoM Hand Over (2 kolom) ──
+  var half = (CW - 4) / 2;
+  var custLines = doc.splitTextToSize(res.catatanCustomer || '-', half - 4);
+  var momLines = doc.splitTextToSize((res.ho && res.ho.mom) ? res.ho.mom : '-', half - 4);
+  var noteH = Math.max(custLines.length, momLines.length) * 4 + 9;
+  if (curY + noteH > 285) { doc.addPage(); curY = 15; }
+  function _noteBox(x, title, lines) {
+    doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]); doc.rect(x, curY, half, noteH, 'F');
+    doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
+    doc.text(title, x + 2, curY + 4.5);
+    doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(0, 0, 0);
+    doc.text(lines, x + 2, curY + 9);
+  }
+  _noteBox(ML, 'Catatan Customer', custLines);
+  _noteBox(ML + half + 4, 'MoM Hand Over', momLines);
+  curY += noteH + 5;
+
+  // ── Tabel item (per kelompok, HPP saja) ──
+  var body = [];
+  (res.kelompok || []).forEach(function (k, ki) {
+    var letter = String.fromCharCode(65 + ki);
+    body.push([{ content: letter + '. ' + (k.nama || '').toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: PDF_GROUP_BG, textColor: PDF_TEXT } }]);
+    (k.items || []).forEach(function (s, si) {
+      body.push([
+        { content: String(si + 1), styles: { halign: 'center' } },
+        { content: s.deskripsi || '' },
+        { content: (s.qty != null ? String(s.qty) : ''), styles: { halign: 'center' } },
+        { content: s.unit || '', styles: { halign: 'center' } },
+        { content: _pdfRp(s.hpp), styles: { halign: 'right' } },
+        { content: _pdfRp(s.totalHpp), styles: { halign: 'right' } }
+      ]);
+    });
+  });
+  if (!body.length) body.push([{ content: 'Tidak ada item.', colSpan: 6, styles: { halign: 'center', textColor: [148, 163, 184] } }]);
+  doc.autoTable({
+    startY: curY,
+    head: [[
+      { content: 'No', styles: { halign: 'center' } },
+      { content: 'Deskripsi Produk / Jasa', styles: { halign: 'left' } },
+      { content: 'Qty', styles: { halign: 'center' } },
+      { content: 'Unit', styles: { halign: 'center' } },
+      { content: 'HPP Satuan', styles: { halign: 'center' } },
+      { content: 'Total HPP', styles: { halign: 'center' } }
+    ]],
+    body: body,
+    theme: 'grid',
+    margin: { left: ML, right: MR },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' },
+      2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' },
+      4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' }
+    },
+    headStyles: { fillColor: BLUE, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: [255, 255, 255], lineWidth: 0.2 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.1 },
+    styles: { overflow: 'linebreak', cellPadding: 1.1 }
+  });
+  curY = doc.lastAutoTable.finalY + 4;
+
+  // ── Ringkasan budget HPP ──
+  var bud = res.budget || {};
+  var sumX = PW - MR - 62;
+  var sumLines = [
+    { label: 'Budget Material', value: _pdfRp(bud.material), bold: false },
+    { label: 'Budget Jasa', value: _pdfRp(bud.jasa), bold: false },
+    { label: 'TOTAL HPP', value: _pdfRp(bud.total), bold: true, hi: true }
+  ];
+  if (curY + sumLines.length * 5 > 288) { doc.addPage(); curY = 15; }
+  sumLines.forEach(function (row, i) {
+    var ry = curY + i * 5;
+    doc.setFillColor.apply(doc, row.hi ? PDF_GROUP_BG : PDF_ROW_BG); doc.rect(sumX, ry, (PW - MR) - sumX, 5, 'F');
+    doc.setFont(PDF_FONT, row.bold ? 'bold' : 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.text(row.label, sumX + 2.5, ry + 3.4);
+    doc.text(row.value, (PW - MR) - 2, ry + 3.4, { align: 'right' });
+  });
+  curY += sumLines.length * 5 + 6;
+
+  // ── Site Survey terkait ──
+  var surv = res.surveys || [];
+  if (curY + 14 > 285) { doc.addPage(); curY = 15; }
+  curY = _pdfBarSeksi(doc, 'SITE SURVEY TERKAIT (' + surv.length + ')', ML, CW, curY) + 1;
+  if (!surv.length) {
+    doc.setFont(PDF_FONT, 'italic'); doc.setFontSize(PDF_FS); doc.setTextColor(148, 163, 184);
+    doc.text('Belum ada site survey tertaut.', ML + 1, curY + 3); curY += 6;
+  } else {
+    doc.autoTable({
+      startY: curY,
+      head: [[{ content: 'Nama Site' }, { content: 'PIC' }, { content: 'Telepon' }, { content: 'Tanggal' }]],
+      body: surv.map(function (s) { return [s.namaSite || s.id || '-', s.namaPIC || '-', s.telepon || '-', s.tanggalSurvey || '-']; }),
+      theme: 'grid', margin: { left: ML, right: MR },
+      headStyles: { fillColor: BLUE, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineWidth: 0.2, lineColor: [255, 255, 255] },
+      bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.1 },
+      styles: { overflow: 'linebreak', cellPadding: 1.1 }
+    });
+  }
+
+  // Footer nomor halaman
+  var tp = doc.internal.getNumberOfPages();
+  for (var p = 1; p <= tp; p++) {
+    doc.setPage(p);
+    doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+    doc.text('Hal ' + p + ' / ' + tp, PW - MR, 292, { align: 'right' });
+    doc.text('PT. RENUS GLOBAL INDONESIA — Info Work Order', ML, 292);
+    doc.setTextColor(0, 0, 0);
+  }
+  return doc;
+}
+
+// Export langsung (download) dari data konteks WO yang sudah dimuat di modal Info WO.
+function exportWOInfoPDF() {
+  var res = window._woCtxData;
+  if (!res || !res.success) { if (typeof showNotification === 'function') showNotification('Data WO belum siap.', 'error'); return; }
+  try {
+    var doc = buatWOInfoPDF(res);
+    doc.save(_pdfNamaFile('Info WO ' + (res.noWO || '') + (res.namaProject ? ' - ' + res.namaProject : '')));
+  } catch (e) {
+    if (typeof showNotification === 'function') showNotification('Gagal membuat PDF: ' + ((e && e.message) || e), 'error');
+  }
+}
 </script>

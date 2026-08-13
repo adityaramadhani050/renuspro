@@ -175,10 +175,15 @@ function _woCtxItemTable(kelompok){
 function _renderWOContext(res){
   var body = document.getElementById('wo-ctx-body'); if (!body) return;
   if (!res || !res.success){ body.innerHTML = '<div class="p-6 text-center text-rose-400 text-sm">' + ((res&&res.message)||'Gagal memuat.') + '</div>'; return; }
+  window._woCtxData = res;   // untuk Export PDF Info WO
   var esc = _woCtxEsc;
   var rp = function(v){ return Math.round(v||0).toLocaleString('id-ID'); };
   var b = res.budget || {};
   var html = '';
+  // Tombol Export PDF Info WO (untuk tim engineer).
+  if (typeof exportWOInfoPDF === 'function') {
+    html += '<div class="flex justify-end mb-3"><button onclick="exportWOInfoPDF()" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition"><i class="fa-solid fa-file-pdf"></i> Export PDF</button></div>';
+  }
   // Header — gaya info-grid Lihat WO.
   html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-4">'
     + _woCtxInfoRow('No Penawaran', esc(res.id||'-') + (res.rev!==''&&res.rev!=null ? ' (Rev ' + esc(String(res.rev)) + ')' : ''))
