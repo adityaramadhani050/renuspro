@@ -284,9 +284,15 @@
         handler: async function (args) {
           var noWO = (args[0] || '').toString().trim();
           if (!noWO) return { success: true, list: [] };
-          var q = await supa.from('site_survey').select('*').eq('no_wo', noWO);
+          // Tautan bisa ada di kolom no_wo ATAU di data.noWO (data lama/migrasi).
+          // Samakan dgn getSiteSurveyList yg toleran (r.no_wo || d.noWO).
+          var q = await supa.from('site_survey').select('*');
           if (q.error) return { success: false, list: [], message: q.error.message };
-          var list = (q.data || []).map(function (r) {
+          var matched = (q.data || []).filter(function (r) {
+            var d = _jsonObj(r.data);
+            return (r.no_wo || '').toString().trim() === noWO || (d.noWO || '').toString().trim() === noWO;
+          });
+          var list = matched.map(function (r) {
             return {
               id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey),
               dibuatOleh: r.dibuat_oleh || '', namaSite: r.nama_site || '',

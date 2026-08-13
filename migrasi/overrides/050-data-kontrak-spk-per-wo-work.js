@@ -332,7 +332,7 @@
           var res = await Promise.all([
             _safe(supa.from('produk').select('id,tipe')),
             _safe(supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle()),
-            _safe(supa.from('site_survey').select('*').eq('no_wo', noWO))
+            _safe(supa.from('site_survey').select('*'))   // filter by kolom no_wo ATAU data.noWO di bawah
           ]);
           var tipeMap = {}; (res[0].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
           var kelompokList = []; try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
@@ -352,7 +352,10 @@
           var ho = null;
           var hr = res[1].data;
           if (hr) ho = { status: hr.status || '', mom: hr.mom || '', tglJadwal: hr.tgl_jadwal ? hr.tgl_jadwal.toString().slice(0, 10) : '', waktu: hr.waktu ? hr.waktu.toString().slice(0, 5) : '', mode: hr.mode || '', selesaiOleh: hr.selesai_oleh || '', selesaiPada: _fmtTs(hr.selesai_pada) };
-          var surveys = (res[2].data || []).map(function (r) {
+          var surveys = (res[2].data || []).filter(function (r) {
+            var sd = _jsonObj(r.data);
+            return (r.no_wo || '').toString().trim() === noWO || (sd.noWO || '').toString().trim() === noWO;
+          }).map(function (r) {
             return { id: r.id || '', tanggalSurvey: _fmtTgl(r.tanggal_survey), dibuatOleh: r.dibuat_oleh || '', namaSite: r.nama_site || '', namaPIC: r.nama_pic || '', telepon: r.no_telepon || '', alamat: r.alamat || '' };
           }).sort(function (a, b) { return b.id.localeCompare(a.id, undefined, { numeric: true }); });
           return {
