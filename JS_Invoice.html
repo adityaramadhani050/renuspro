@@ -649,7 +649,9 @@
       var _render = function () {
         setTimeout(function () {
           var doc = buatInvoicePDF(item);
-          _pdfFinishPreview(doc, _pdfNamaFile(item.id), {});
+          // Format nama file samakan seperti quotation: {id} - {project} - {klien}
+          var _fnInv = String(item.id || '').replace(/\//g, '-') + ' - ' + (item.namaProject || '') + ' - ' + (item.namaKlien || '');
+          _pdfFinishPreview(doc, _pdfNamaFile(_fnInv), {});
         }, 60);
       };
       // Muat konfigurasi tanda tangan (sekali per sesi) sebelum render PDF.
