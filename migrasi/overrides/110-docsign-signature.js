@@ -84,3 +84,52 @@
           };
         }
       });
+
+      // ── Data Purchase Order untuk PDF sisi klien (buatPOPDF) ───────────────
+      //  PO header + item + supplier (nama/alamat/kontak/email) + term conditions.
+      window.gsRoute('getPOForPdf', {
+        mode: 'fn',
+        handler: async function (a) {
+          var noPO = (a[0] || '').toString().trim();
+          if (!noPO) return { success: false, message: 'No PO wajib.' };
+          var hq = await supa.from('purchase_order').select('*').eq('no_po', noPO).maybeSingle();
+          if (hq.error || !hq.data) return { success: false, message: 'PO tidak ditemukan.' };
+          var h = hq.data;
+          var iq = await supa.from('po_item').select('*').eq('no_po', noPO).order('id_item');
+          var items = (iq.data || []).map(function (ir) {
+            return {
+              namaItem: (ir.nama_item || '').toString(), qty: parseFloat(ir.qty) || 0,
+              satuan: (ir.satuan || '').toString(), hargaBeli: parseFloat(ir.harga_beli_satuan) || 0,
+              total: parseFloat(ir.total) || 0
+            };
+          });
+          var sup = {};
+          if (h.id_supplier) {
+            var sq = await supa.from('supplier').select('nama,pic,telepon,email,alamat').eq('id_supplier', h.id_supplier).maybeSingle();
+            if (sq.data) sup = {
+              nama: (sq.data.nama || '').toString(), pic: (sq.data.pic || '').toString(),
+              telepon: (sq.data.telepon || '').toString(), email: (sq.data.email || '').toString(),
+              alamat: (sq.data.alamat || '').toString()
+            };
+          }
+          var tc = h.term_conditions;
+          if (typeof tc === 'string') { try { tc = JSON.parse(tc); } catch (e) { tc = {}; } }
+          if (!tc || typeof tc !== 'object') tc = {};
+          return {
+            success: true,
+            data: {
+              po: {
+                noPO: (h.no_po || '').toString(), tanggal: (h.tanggal || '').toString(),
+                quotNo: (h.no_quotation || '').toString(), quotTanggal: (h.tanggal_quotation || '').toString(),
+                namaSupplier: (h.nama_supplier || '').toString(), peruntukan: (h.peruntukan || '').toString(),
+                noWO: (h.no_wo || '').toString(),
+                subtotal: parseFloat(h.subtotal) || 0, diskonPersen: parseFloat(h.diskon_persen) || 0,
+                diskonNominal: parseFloat(h.diskon_nominal) || 0, ppnPersen: parseFloat(h.ppn_persen) || 0,
+                ppnNominal: parseFloat(h.ppn_nominal) || 0, grandTotal: parseFloat(h.grand_total) || 0,
+                catatan: (h.catatan || '').toString(), dibuatOleh: (h.dibuat_oleh || '').toString()
+              },
+              items: items, supplier: sup, tc: tc
+            }
+          };
+        }
+      });

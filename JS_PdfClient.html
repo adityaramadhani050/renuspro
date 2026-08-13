@@ -615,4 +615,191 @@ function exportKwitansiPDFClient(kwitansiId, subtitle) {
     .withFailureHandler(function () { window._pdfSignCfg = {}; _run(); })
     .getDocSignConfig();
 }
+
+// ── PURCHASE ORDER ──────────────────────────────────────────────────────────
+// Header/no dokumen, tabel item, summary, dan T&C memakai gaya yang sama dgn
+// Invoice/Quotation. Data: getPOForPdf → { po, items, supplier, tc }.
+function buatPOPDF(data) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, ML = 10, MR = 10, CW = PW - ML - MR;
+  var BLUE = PDF_HDR_BG;
+  var po = data.po || {}, items = data.items || [], sup = data.supplier || {}, tc = data.tc || {};
+
+  // ── Header (logo + perusahaan) + judul + blok nomor (konsisten Invoice) ──
+  _pdfHeaderKiri(doc, ML);
+  _pdfJudulKanan(doc, 'PURCHASE ORDER', PW, MR, { size: 21, color: PDF_TITLE_COL, y: 16 });
+  _pdfInfoKanan(doc, [
+    ['No.', po.noPO || ''],
+    ['Date', _pdfTglPanjang(po.tanggal)],
+    ['No. Quot', po.quotNo || ''],
+    ['Tgl. Quot', _pdfTglPanjang(po.quotTanggal)]
+  ], PW, MR, 25, 4.5);
+
+  var curY = 45;
+
+  // ── SUPPLIER INFORMATION ──
+  curY = _pdfBarSeksi(doc, 'SUPPLIER INFORMATION', ML, CW, curY);
+  var supH = 22;
+  doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, supH, 'F');
+  var c1 = ML + 2, c2 = ML + (CW / 2) + 2;
+  function _supLabel(x, y, t) {
+    doc.setFont(PDF_FONT, 'italic'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+    doc.text(t, x, y);
+  }
+  function _supVal(x, y, t, bold) {
+    doc.setFont(PDF_FONT, bold ? 'bold' : 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.text(String(t || ''), x, y);
+  }
+  _supLabel(c1, curY + 4, 'SUPPLIER NAME'); _supLabel(c2, curY + 4, 'ADDRESS');
+  _supVal(c1, curY + 8.5, sup.nama || po.namaSupplier || '', true); _supVal(c2, curY + 8.5, sup.alamat || '', false);
+  _supLabel(c1, curY + 14, 'CONTACT'); _supLabel(c2, curY + 14, 'EMAIL');
+  _supVal(c1, curY + 18.5, sup.telepon || sup.pic || '', false); _supVal(c2, curY + 18.5, sup.email || '', false);
+  curY += supH + 4;
+
+  // ── Tabel item (No/Details/Unit/Qty/Unit price/Total) ──
+  var tableW = PW - ML - MR;
+  var autoW = tableW - (12 + 16 + 14 + 34 + 34);
+  var bx = [ML + 12, ML + 12 + autoW, ML + 12 + autoW + 16, ML + 12 + autoW + 30, ML + 12 + autoW + 64];
+  var body = items.map(function (it, i) {
+    return [
+      { content: String(i + 1), styles: { halign: 'center' } },
+      { content: it.namaItem || '' },
+      { content: it.satuan || '', styles: { halign: 'center' } },
+      { content: (it.qty != null && it.qty !== '') ? String(it.qty) : '', styles: { halign: 'center' } },
+      { content: it.hargaBeli ? _pdfRp(it.hargaBeli) : '', styles: { halign: 'right' } },
+      { content: it.total ? _pdfRp(it.total) : '', styles: { halign: 'right' } }
+    ];
+  });
+  doc.autoTable({
+    startY: curY,
+    head: [[
+      { content: 'No.', styles: { halign: 'center' } },
+      { content: 'Details', styles: { halign: 'left' } },
+      { content: 'Unit', styles: { halign: 'center' } },
+      { content: 'Qty', styles: { halign: 'center' } },
+      { content: 'Unit price (IDR)', styles: { halign: 'center' } },
+      { content: 'Total (IDR)', styles: { halign: 'center' } }
+    ]],
+    body: body.length ? body : [[{ content: '', colSpan: 6, styles: { minCellHeight: 6 } }]],
+    theme: 'grid',
+    margin: { left: ML, right: MR },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' }, 1: { cellWidth: 'auto' },
+      2: { cellWidth: 16, halign: 'center' }, 3: { cellWidth: 14, halign: 'center' },
+      4: { cellWidth: 34, halign: 'right' }, 5: { cellWidth: 34, halign: 'right' }
+    },
+    headStyles: { fillColor: BLUE, textColor: PDF_WHITE, fontStyle: 'bold', fontSize: PDF_FS, lineColor: PDF_WHITE, lineWidth: 0 },
+    bodyStyles: { fontSize: PDF_FS, textColor: PDF_TEXT, fillColor: PDF_ROW_BG, lineWidth: 0, cellPadding: { top: 0.7, right: 1.1, bottom: 0.7, left: 1.1 } },
+    styles: { overflow: 'linebreak', cellPadding: 1.1, lineWidth: 0 },
+    didDrawCell: function (dt) {
+      doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.3);
+      var x0 = dt.cell.x - 0.4, x1 = dt.cell.x + dt.cell.width + 0.4;
+      for (var i = 0; i < bx.length; i++) {
+        if (bx[i] >= x0 && bx[i] <= x1) doc.line(bx[i], dt.cell.y, bx[i], dt.cell.y + dt.cell.height);
+      }
+    }
+  });
+  curY = doc.lastAutoTable.finalY;
+
+  // ── Notes (kiri) + Summary (kanan), sejajar seperti Invoice ──
+  var sumX = ML + 12 + autoW + 30;   // batas kanan kolom Qty
+  var rowH = 5;
+  var lines = [
+    { label: 'Total', value: _pdfRp(po.subtotal), bold: false, highlight: false },
+    { label: (Number(po.diskonNominal) > 0 && Number(po.diskonPersen) > 0) ? ('Diskon (' + po.diskonPersen + '%)') : 'Diskon',
+      value: Number(po.diskonNominal) > 0 ? _pdfRp(po.diskonNominal) : '-', bold: false, highlight: false },
+    { label: 'PPN ' + (po.ppnPersen || 11) + '%', value: Number(po.ppnNominal) > 0 ? _pdfRp(po.ppnNominal) : '-', bold: false, highlight: false },
+    { label: 'GRAND TOTAL', value: _pdfRp(po.grandTotal), bold: true, highlight: true }
+  ];
+  var NS = lines.length, blockH = NS * rowH;
+  // Notes: bar biru + isi abu (kiri).
+  doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]); doc.rect(ML, curY, sumX - ML, rowH, 'F');
+  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(255, 255, 255);
+  doc.text('Notes :', ML + 2, curY + 3.4);
+  doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]); doc.rect(ML, curY + rowH, sumX - ML, blockH - rowH, 'F');
+  if (po.catatan) {
+    doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.text(doc.splitTextToSize(String(po.catatan), sumX - ML - 4), ML + 2, curY + rowH + 3.4);
+  }
+  // Summary (kanan).
+  lines.forEach(function (row, i) {
+    var ry = curY + i * rowH;
+    var bg = row.highlight ? PDF_GROUP_BG : PDF_ROW_BG;
+    doc.setFillColor(bg[0], bg[1], bg[2]); doc.rect(sumX, ry, (PW - MR) - sumX, rowH, 'F');
+    doc.setFont(PDF_FONT, row.bold ? 'bold' : 'normal'); doc.setFontSize(PDF_FS);
+    doc.setTextColor(row.highlight ? BLUE[0] : 0, row.highlight ? BLUE[1] : 0, row.highlight ? BLUE[2] : 0);
+    doc.text(row.label, sumX + 2.5, ry + 3.4);
+    doc.text(row.value, (PW - MR) - 2, ry + 3.4, { align: 'right' });
+  });
+  curY += blockH + 5;
+
+  // ── Term & Condition (gaya Quotation: bar biru + kotak 2 kolom) ──
+  var _tv = function (k) { var x = tc[k]; if (Array.isArray(x)) x = x[0]; return (x == null ? '' : String(x)); };
+  var tcItems = [
+    { label: 'Material Status', value: _tv('po_material_status') },
+    { label: 'Down Payment', value: _tv('po_down_payment') },
+    { label: 'Balance Payment', value: _tv('po_balance_pay') },
+    { label: 'Delivery Condition', value: _tv('po_delivery_cond') },
+    { label: 'Warranty', value: _tv('po_warranty') },
+    { label: 'Documents', value: _tv('po_documents') }
+  ].filter(function (t) { return t.value && t.value !== '-'; });
+
+  if (tcItems.length) {
+    if (curY > 240) { doc.addPage(); curY = 15; }
+    doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]); doc.rect(ML, curY, CW, 6, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
+    doc.text('Term & Condition :', ML + 2, curY + 4.2);
+    curY += 8;
+    var tcItemW = CW / 2, tcRowH = 5, tcRows = Math.ceil(tcItems.length / 2), tcTotalH = tcRows * tcRowH + 2;
+    doc.setFillColor(PDF_ROW_BG[0], PDF_ROW_BG[1], PDF_ROW_BG[2]); doc.rect(ML, curY - 1.5, CW, tcTotalH, 'F');
+    doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.4);
+    doc.line(ML + tcItemW, curY - 1.5, ML + tcItemW, curY - 1.5 + tcTotalH);
+    tcItems.forEach(function (t, idx) {
+      var col = idx % 2, r = Math.floor(idx / 2), x = ML + 3 + col * tcItemW, y = curY + 3 + r * tcRowH;
+      doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+      doc.setFont(PDF_FONT, 'bold'); var lt = t.label + ': '; doc.text(lt, x, y);
+      var lw = doc.getTextWidth(lt); doc.setFont(PDF_FONT, 'normal');
+      doc.text(doc.splitTextToSize(t.value, tcItemW - lw - 5), x + lw, y);
+    });
+    curY += tcTotalH + 5;
+  }
+
+  // ── Tanda tangan (Customer | Supplier) ──
+  if (curY > 250) { doc.addPage(); curY = 15; }
+  var halfW = CW / 2;
+  doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]); doc.rect(ML, curY, CW, 6, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
+  doc.text('Customer', ML + 2, curY + 4.2);
+  doc.text('Supplier', ML + halfW + 2, curY + 4.2);
+  curY += 6;
+  doc.setTextColor(0, 0, 0); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
+  doc.text('PT. RENUS GLOBAL INDONESIA', ML + 2, curY + 5);
+  doc.text(String(sup.nama || po.namaSupplier || ''), ML + halfW + 2, curY + 5);
+  curY += 26;
+  doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+  doc.text('(' + (po.dibuatOleh || 'Procurement') + ')', ML + 2, curY);
+  doc.text('(............................................)', ML + halfW + 2, curY);
+
+  return doc;
+}
+
+// Pipeline export Purchase Order (dipakai halaman Purchase Order).
+function exportPOPDFClient(noPO, subtitle) {
+  _pdfBukaPreview('Purchase Order — ' + noPO, subtitle || '');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success || !res.data) { _pdfPreviewError((res && res.message) || 'PO tidak ditemukan.'); return; }
+      setTimeout(function () {
+        try {
+          var d = res.data, po = d.po || {};
+          var doc = buatPOPDF(d);
+          var fn = String(po.noPO || 'PO').replace(/\//g, '-') + ' - ' + (po.peruntukan || '') + ' - ' + (po.namaSupplier || '');
+          _pdfFinishPreview(doc, _pdfNamaFile(fn), {});
+        } catch (e) { _pdfPreviewError((e && e.message) || e); }
+      }, 30);
+    })
+    .withFailureHandler(function (err) { _pdfPreviewError((err && err.message) || err); })
+    .getPOForPdf(noPO);
+}
 </script>

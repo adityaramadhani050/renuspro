@@ -1373,37 +1373,15 @@ function submitPOKeGudang() {
 // ── Export PDF PO ─────────────────────────────────────────────────────────────
 function exportPOPDF(noPO) {
   if (!noPO) return;
-  document.getElementById('preview-pdf-title').innerText    = 'Purchase Order — ' + noPO;
-  document.getElementById('preview-pdf-subtitle').innerText = 'Memuat PDF...';
-  document.getElementById('preview-pdf-loading').classList.remove('hidden');
-  document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
-  document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
-  document.getElementById('modal-preview-pdf').classList.remove('hidden');
-
   if (typeof google === 'undefined') {
+    document.getElementById('preview-pdf-title').innerText = 'Purchase Order — ' + noPO;
+    document.getElementById('modal-preview-pdf').classList.remove('hidden');
     document.getElementById('preview-pdf-loading').innerHTML =
       '<p class="text-sm text-slate-400">Mode lokal — tidak bisa load PDF.</p>';
     return;
   }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success) {
-        document.getElementById('preview-pdf-loading').innerHTML =
-          '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-          '<p class="text-sm text-rose-400 text-center px-4">' + (res ? (res.message || 'Gagal export PDF') : 'Gagal') + '</p>' +
-          '<button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>';
-        return;
-      }
-      _activePdfBase64 = res.pdfBase64;
-      _activePdfName   = res.fileName;
-      renderPDFDariBase64(res.pdfBase64);
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('preview-pdf-loading').innerHTML =
-        '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
-        '<p class="text-sm text-rose-400 text-center px-4">Error: ' + (err.message || err) + '</p>';
-    })
-    .exportPODariTemplate(noPO);
+  // Dibuat langsung di klien (jsPDF), konsisten dgn Invoice/Quotation.
+  exportPOPDFClient(noPO, '');
 }
 
 function cetakPO(po) {
