@@ -53,3 +53,34 @@
           return { success: true };
         }
       });
+
+      // ── Data Kwitansi untuk PDF sisi klien (buatKwitansiPDF) ───────────────
+      //  Ambil kwitansi + bank account dari invoice terkait (rekening tujuan).
+      window.gsRoute('getKwitansiForPdf', {
+        mode: 'fn',
+        handler: async function (a) {
+          var id = (a[0] || '').toString();
+          if (!id) return { success: false, message: 'ID kwitansi kosong.' };
+          var q = await supa.from('kwitansi').select('*').eq('no_kwitansi', id).maybeSingle();
+          if (q.error || !q.data) return { success: false, message: 'Kwitansi tidak ditemukan.' };
+          var r = q.data, noInv = (r.no_invoice || '').toString(), bank = '';
+          if (noInv) {
+            var iq = await supa.from('invoice').select('bank_account').eq('no_invoice', noInv).maybeSingle();
+            if (iq.data) bank = (iq.data.bank_account || '').toString();
+          }
+          return {
+            success: true,
+            data: {
+              id: (r.no_kwitansi || '').toString(),
+              noInvoice: noInv,
+              tanggal: (r.tanggal || '').toString(),
+              terimaDari: (r.terima_dari || '').toString(),
+              jumlah: parseFloat(r.jumlah) || 0,
+              untuk: (r.untuk_pembayaran || '').toString(),
+              metode: (r.metode || 'Transfer').toString(),
+              catatan: (r.catatan || '').toString(),
+              bankAccount: bank
+            }
+          };
+        }
+      });

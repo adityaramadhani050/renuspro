@@ -478,4 +478,135 @@ function buatInvoicePDF(item) {
 
   return doc;
 }
+
+// ── KWITANSI ────────────────────────────────────────────────────────────────
+// Terbilang Indonesia (Title Case tiap kata), tanpa kata "Rupiah".
+function _pdfTerbilang(n) {
+  n = Math.floor(Math.abs(Number(n) || 0));
+  if (n === 0) return 'Nol';
+  var satuan = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+  function konv(x) {
+    if (x < 12) return satuan[x];
+    if (x < 20) return konv(x - 10) + ' belas';
+    if (x < 100) return satuan[Math.floor(x / 10)] + ' puluh' + (x % 10 ? ' ' + konv(x % 10) : '');
+    if (x < 200) return 'seratus' + (x % 100 ? ' ' + konv(x % 100) : '');
+    if (x < 1000) return satuan[Math.floor(x / 100)] + ' ratus' + (x % 100 ? ' ' + konv(x % 100) : '');
+    if (x < 2000) return 'seribu' + (x % 1000 ? ' ' + konv(x % 1000) : '');
+    if (x < 1000000) return konv(Math.floor(x / 1000)) + ' ribu' + (x % 1000 ? ' ' + konv(x % 1000) : '');
+    if (x < 1000000000) return konv(Math.floor(x / 1000000)) + ' juta' + (x % 1000000 ? ' ' + konv(x % 1000000) : '');
+    if (x < 1000000000000) return konv(Math.floor(x / 1000000000)) + ' miliar' + (x % 1000000000 ? ' ' + konv(x % 1000000000) : '');
+    return konv(Math.floor(x / 1000000000000)) + ' triliun' + (x % 1000000000000 ? ' ' + konv(x % 1000000000000) : '');
+  }
+  var s = konv(n).replace(/\s+/g, ' ').trim();
+  return s.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+}
+
+// Kwitansi/Receipt — header (logo+perusahaan, judul, nomor) konsisten dgn
+// Invoice/Quotation. Data: getKwitansiForPdf → { id, noInvoice, tanggal,
+// terimaDari, jumlah, untuk, metode, bankAccount }.
+function buatKwitansiPDF(d) {
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, ML = 10, MR = 10, CW = PW - ML - MR;
+
+  _pdfHeaderKiri(doc, ML);
+  // Judul kanan 2 baris (KWITANSI / RECEIPT) — posisi & warna sama seperti INVOICE.
+  _pdfJudulKanan(doc, 'KWITANSI', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 14 });
+  _pdfJudulKanan(doc, 'RECEIPT', PW, MR, { size: 18, color: PDF_TITLE_COL, style: 'italic', y: 22 });
+  _pdfInfoKanan(doc, [
+    ['Nomor', d.id || ''],
+    ['Pembayaran', d.metode || 'Transfer'],
+    ['No. Invoice', d.noInvoice || '']
+  ], PW, MR, 30, 4.5);
+
+  var curY = 47;
+
+  // ── Kotak detail penerimaan (border tipis) ──
+  var boxH = 44;
+  doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.3);
+  doc.rect(ML, curY, CW, boxH);
+  var labelX = ML + 4, colonX = ML + 62, valX = ML + 66;
+  function _kwRow(y, label, val, bold, italic) {
+    doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+    doc.setFont(PDF_FONT, 'normal');
+    doc.text(label, labelX, y);
+    var lw = doc.getTextWidth(label);
+    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+    doc.line(labelX, y + 1, labelX + lw, y + 1); // garis bawah label
+    doc.text(':', colonX, y);
+    doc.setFont(PDF_FONT, bold ? 'bold' : (italic ? 'italic' : 'normal'));
+    var vLines = doc.splitTextToSize(String(val || ''), (ML + CW) - valX - 2);
+    doc.text(vLines, valX, y);
+  }
+  _kwRow(curY + 11, 'Telah Terima Dari', d.terimaDari || '', true, false);
+  _kwRow(curY + 23, 'Terbilang', _pdfTerbilang(d.jumlah) + ' Rupiah', false, true);
+  _kwRow(curY + 35, 'Sebagai Pembayaran', d.untuk || '', true, false);
+  curY += boxH;
+
+  // ── Kotak nominal (border putus-putus) ──
+  curY += 6;
+  var amtW = 120, amtH = 14;
+  doc.setDrawColor(90, 90, 90); doc.setLineWidth(0.3);
+  doc.setLineDashPattern([1, 1], 0);
+  doc.rect(ML, curY, amtW, amtH);
+  doc.setLineDashPattern([], 0);
+  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(18); doc.setTextColor(0, 0, 0);
+  doc.text('Rp' + _pdfRp(d.jumlah), ML + 10, curY + amtH / 2 + 3);
+  curY += amtH;
+
+  // ── Note (kiri) + Tanggal (kanan) ──
+  curY += 8;
+  var noteY = curY;
+  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+  doc.text('Note:', ML, noteY);
+  doc.setFont(PDF_FONT, 'normal');
+  var noteLines = ['Kwitansi ini dianggap sah apabila dana telah masuk ke'];
+  var bank = (d.bankAccount || '').toString();
+  if (bank) noteLines = noteLines.concat(doc.splitTextToSize(bank, 95));
+  doc.text(noteLines, ML, noteY + 4.5);
+
+  // Tanggal (kanan)
+  doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+  doc.text('Surabaya, ' + _pdfTglPanjang(d.tanggal), PW - MR, noteY + 2, { align: 'right' });
+
+  // ── Tanda tangan (dari setting) ──
+  _pdfTtdInvoice(doc, noteY + 4, PW, MR);
+
+  return doc;
+}
+
+// Tampilkan error di area loading modal preview.
+function _pdfPreviewError(msg) {
+  var l = document.getElementById('preview-pdf-loading');
+  if (l) l.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl mb-2"></i>' +
+    '<p class="text-sm text-rose-400 text-center px-4">' + (msg || 'Gagal membuat PDF') + '</p>' +
+    '<button onclick="tutupPreviewPDF()" class="mt-4 px-4 py-2 bg-slate-200 rounded-xl text-sm font-bold text-slate-600">Tutup</button>';
+}
+
+// Pipeline export Kwitansi (dipakai halaman Invoice & Kwitansi): muat cfg ttd,
+// ambil data kwitansi (+ bank dari invoice terkait), render PDF sisi klien.
+function exportKwitansiPDFClient(kwitansiId, subtitle) {
+  _pdfBukaPreview('Kwitansi — ' + kwitansiId, subtitle || '');
+  var _run = function () {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success || !res.data) { _pdfPreviewError((res && res.message) || 'Kwitansi tidak ditemukan.'); return; }
+        setTimeout(function () {
+          try {
+            var d = res.data;
+            var doc = buatKwitansiPDF(d);
+            var fn = String(d.id || 'kwitansi').replace(/\//g, '-') + ' - ' + (d.untuk || '') + ' - ' + (d.terimaDari || '');
+            _pdfFinishPreview(doc, _pdfNamaFile(fn), {});
+          } catch (e) { _pdfPreviewError((e && e.message) || e); }
+        }, 30);
+      })
+      .withFailureHandler(function (err) { _pdfPreviewError((err && err.message) || err); })
+      .getKwitansiForPdf(kwitansiId);
+  };
+  if (window._pdfSignCfg) { _run(); return; }
+  google.script.run
+    .withSuccessHandler(function (cfg) { window._pdfSignCfg = cfg || {}; _run(); })
+    .withFailureHandler(function () { window._pdfSignCfg = {}; _run(); })
+    .getDocSignConfig();
+}
 </script>
