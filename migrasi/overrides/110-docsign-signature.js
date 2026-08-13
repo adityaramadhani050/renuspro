@@ -85,6 +85,45 @@
         }
       });
 
+      // ── PO Term & Condition options (app_config 'TC_PO_OPTIONS') ──────────
+      //  Sebelumnya dari Script Properties Apps Script; kini dari Supabase.
+      var _TC_PO_FIELDS = [
+        { key: 'po_material_status', label: 'Material Status' },
+        { key: 'po_down_payment', label: 'Down Payment' },
+        { key: 'po_balance_pay', label: 'Balance Payment' },
+        { key: 'po_delivery_cond', label: 'Delivery Condition' },
+        { key: 'po_warranty', label: 'Warranty' },
+        { key: 'po_documents', label: 'Documents' }
+      ];
+      var _TC_PO_DEFAULTS = {
+        po_material_status: ['Ready Stock', 'Indent 4-6 Weeks After DP', '-'],
+        po_down_payment: ['50% From PO', 'Cover GIRO 30 Days', '-'],
+        po_balance_pay: ['Before Shipping', '70% 60 Days After Receive Invoice & BAST', '-'],
+        po_delivery_cond: ['DDP', 'Franco Jakarta/Surabaya', 'Loco', 'Free On Board'],
+        po_warranty: ['A Year', 'Back to Back from Manufacture', '-'],
+        po_documents: ['Datasheet', 'Warranty', 'Datasheet & Warranty', '-']
+      };
+      window.gsRoute('getPOTCOptions', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('app_config').select('value').eq('key', 'TC_PO_OPTIONS').maybeSingle();
+          var opts = (q.data && q.data.value) ? q.data.value : {};
+          if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch (e) { opts = {}; } }
+          if (!opts || typeof opts !== 'object') opts = {};
+          _TC_PO_FIELDS.forEach(function (f) { if (!opts[f.key]) opts[f.key] = _TC_PO_DEFAULTS[f.key] || ['-']; });
+          return { success: true, fields: _TC_PO_FIELDS, options: opts };
+        }
+      });
+      window.gsRoute('savePOTCOptions', {
+        mode: 'fn',
+        handler: async function (a) {
+          var payload = a[0] || {};
+          var up = await supa.from('app_config').upsert({ key: 'TC_PO_OPTIONS', value: payload, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Syarat & Ketentuan PO berhasil disimpan.' };
+        }
+      });
+
       // ── Data Purchase Order untuk PDF sisi klien (buatPOPDF) ───────────────
       //  PO header + item + supplier (nama/alamat/kontak/email) + term conditions.
       window.gsRoute('getPOForPdf', {

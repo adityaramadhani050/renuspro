@@ -1596,57 +1596,16 @@
       document.getElementById('modal-wo-lihat').classList.remove('hidden');
     }
 
+    // Kwitansi & Invoice dari detail WO — dibuat sisi klien (jsPDF), konsisten
+    // dgn halaman Invoice/Kwitansi. Tidak lagi memakai template Apps Script.
     function _exportKwDariWODetail(kwitansiId) {
-      if (typeof exportKwitansiDariTemplate === 'undefined') {
-        // Panggil via google.script.run langsung
-        document.getElementById('preview-pdf-title').innerText = 'Kwitansi — ' + kwitansiId;
-        document.getElementById('preview-pdf-subtitle').innerText = '';
-        document.getElementById('preview-pdf-loading').classList.remove('hidden');
-        document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
-        document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
-        document.getElementById('modal-preview-pdf').classList.remove('hidden');
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res.success) {
-              _activePdfBase64 = res.pdfBase64;
-              _activePdfName   = res.fileName;
-              renderPDFDariBase64(res.pdfBase64);
-            } else {
-              document.getElementById('preview-pdf-loading').innerHTML =
-                '<p class="text-rose-400 text-sm">' + res.message + '</p>';
-            }
-          })
-          .withFailureHandler(function(err) {
-            document.getElementById('preview-pdf-loading').innerHTML =
-              '<p class="text-rose-400 text-sm">Error: ' + (err.message || err) + '</p>';
-          })
-          .exportKwitansiDariTemplate(kwitansiId);
-      }
+      if (typeof exportKwitansiPDFClient === 'function') { exportKwitansiPDFClient(kwitansiId, ''); return; }
+      showNotification && showNotification('Generator kwitansi belum siap.', 'error');
     }
 
     function _exportInvDariWODetail(inv) {
-      document.getElementById('preview-pdf-title').innerText = 'Invoice — ' + inv.id;
-      document.getElementById('preview-pdf-subtitle').innerText = '';
-      document.getElementById('preview-pdf-loading').classList.remove('hidden');
-      document.getElementById('preview-pdf-canvas-wrap').classList.add('hidden');
-      document.getElementById('preview-pdf-canvas-wrap').innerHTML = '';
-      document.getElementById('modal-preview-pdf').classList.remove('hidden');
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) {
-            _activePdfBase64 = res.pdfBase64;
-            _activePdfName   = res.fileName;
-            renderPDFDariBase64(res.pdfBase64);
-          } else {
-            document.getElementById('preview-pdf-loading').innerHTML =
-              '<p class="text-rose-400 text-sm">' + res.message + '</p>';
-          }
-        })
-        .withFailureHandler(function(err) {
-          document.getElementById('preview-pdf-loading').innerHTML =
-            '<p class="text-rose-400 text-sm">Error: ' + (err.message || err) + '</p>';
-        })
-        .exportInvoiceDariTemplate(inv.id);
+      if (typeof exportInvoicePDF === 'function') { exportInvoicePDF(inv); return; }
+      showNotification && showNotification('Generator invoice belum siap.', 'error');
     }
 
     // ================================================================
