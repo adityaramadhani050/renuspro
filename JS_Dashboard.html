@@ -612,22 +612,31 @@ var _CHANNEL_COLORS = {
 };
 var _CHANNELS_ORDER = ['Website','Instagram','Tokopedia','Relasi','Repeat','Lainnya'];
 
+// Status penawaran dipecah di chart channel: warna sama seperti chart status.
+var _CH_STATUS = [
+  { key: 'On-Progress', color: '#3B82F6' },
+  { key: 'Deal',        color: '#10B981' },
+  { key: 'Fail',        color: '#EF4444' }
+];
+
 function _dbRenderChannel(items, fromMs, toMs) {
-  // Hitung jumlah penawaran per channel pada periode aktif
-  var counts = {};
+  // Hitung jumlah penawaran per channel DIPECAH per status pada periode aktif.
+  var counts = {};   // channel -> { 'On-Progress':n, 'Deal':n, 'Fail':n }
   (items || []).forEach(function(item) {
     var ts = item.tanggal;
     if (fromMs && ts && ts < fromMs) return;
     if (toMs   && ts && ts > toMs)   return;
     var ch = (item.channelMarketing || '').trim() || 'Lainnya';
     if (!_CHANNELS_ORDER.includes(ch)) ch = 'Lainnya';
-    counts[ch] = (counts[ch] || 0) + 1;
+    var st = (item.status || 'On-Progress').toString();
+    if (st !== 'Deal' && st !== 'Fail') st = 'On-Progress';
+    if (!counts[ch]) counts[ch] = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
+    counts[ch][st] += 1;
   });
+  var _chTotal = function(c) { var o = counts[c] || {}; return (o['On-Progress'] || 0) + (o['Deal'] || 0) + (o['Fail'] || 0); };
 
-  var labels = _CHANNELS_ORDER.filter(function(c) { return counts[c] > 0; });
-  var values = labels.map(function(c) { return counts[c]; });
-  var colors = labels.map(function(c) { return _CHANNEL_COLORS[c] || '#94A3B8'; });
-  var total  = values.reduce(function(s, v) { return s + v; }, 0);
+  var labels = _CHANNELS_ORDER.filter(function(c) { return _chTotal(c) > 0; });
+  var total  = labels.reduce(function(s, c) { return s + _chTotal(c); }, 0);
 
   var canvas = document.getElementById('db-channel-chart');
   if (canvas) {
@@ -636,13 +645,17 @@ function _dbRenderChannel(items, fromMs, toMs) {
       type: 'bar',
       data: {
         labels: labels,
-        datasets: [{
-          data: values,
-          backgroundColor: colors,
-          borderRadius: 6,
-          borderSkipped: false,
-          barThickness: 22
-        }]
+        datasets: _CH_STATUS.map(function(s) {
+          return {
+            label: s.key,
+            data: labels.map(function(c) { return (counts[c] || {})[s.key] || 0; }),
+            backgroundColor: s.color,
+            borderRadius: 4,
+            borderSkipped: false,
+            barThickness: 22,
+            stack: 'ch'
+          };
+        })
       },
       options: {
         responsive: true, maintainAspectRatio: false, indexAxis: 'y',
@@ -651,15 +664,20 @@ function _dbRenderChannel(items, fromMs, toMs) {
           tooltip: {
             callbacks: {
               label: function(ctx) {
-                var pct = total > 0 ? Math.round(ctx.raw / total * 100) : 0;
-                return ' ' + ctx.raw + ' penawaran (' + pct + '%)';
+                var chTot = _chTotal(ctx.label);
+                var pct = chTot > 0 ? Math.round(ctx.raw / chTot * 100) : 0;
+                return ' ' + ctx.dataset.label + ': ' + ctx.raw + ' (' + pct + '%)';
+              },
+              footer: function(items) {
+                if (!items || !items.length) return '';
+                return 'Total: ' + _chTotal(items[0].label) + ' penawaran';
               }
             }
           }
         },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10 }, stepSize: 1 }, border: { display: false } },
-          y: { grid: { display: false }, ticks: { font: { size: 10 } }, border: { display: false } }
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, stepSize: 1, precision: 0 }, border: { display: false } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } }, border: { display: false } }
         }
       }
     });
@@ -670,14 +688,27 @@ function _dbRenderChannel(items, fromMs, toMs) {
     if (!labels.length) {
       legendEl.innerHTML = '<p class="text-xs text-slate-400 text-center">Tidak ada data</p>';
     } else {
-      legendEl.innerHTML = labels.map(function(c) {
-        var pct = total > 0 ? Math.round(counts[c] / total * 100) : 0;
+      // Baris kunci warna status.
+      var key = '<div class="flex items-center gap-3 flex-wrap pb-1.5 mb-1 border-b border-slate-100">'
+        + _CH_STATUS.map(function(s) {
+            return '<div class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm" style="background:' + s.color + '"></span>'
+              + '<span class="text-[11px] text-slate-500">' + s.key + '</span></div>';
+          }).join('')
+        + '</div>';
+      // Per channel: total + rincian per status.
+      var rows = labels.map(function(c) {
+        var o = counts[c] || {}, t = _chTotal(c);
+        var pct = total > 0 ? Math.round(t / total * 100) : 0;
+        var det = _CH_STATUS.map(function(s) {
+          return '<span style="color:' + s.color + '">' + (o[s.key] || 0) + '</span>';
+        }).join('<span class="text-slate-300">·</span>');
         return '<div class="flex items-center justify-between text-xs">'
-          + '<div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm flex-shrink-0" style="background:' + (_CHANNEL_COLORS[c]||'#94A3B8') + '"></span>'
-          + '<span class="text-slate-600">' + c + '</span></div>'
-          + '<span class="font-bold text-slate-700">' + counts[c] + ' <span class="text-slate-400 font-normal">(' + pct + '%)</span></span>'
+          + '<span class="text-slate-600">' + c + '</span>'
+          + '<span class="flex items-center gap-2"><span class="font-semibold">' + det + '</span>'
+          + '<span class="font-bold text-slate-700 w-14 text-right">' + t + ' <span class="text-slate-400 font-normal">(' + pct + '%)</span></span></span>'
           + '</div>';
       }).join('');
+      legendEl.innerHTML = key + rows;
     }
   }
 }
