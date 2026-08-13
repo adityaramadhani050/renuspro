@@ -4,14 +4,23 @@
         return;
       }
 
-      // ── LOGIN → Supabase Auth (email + password), profil dari app_user ──
+      // Domain email login. User cukup mengetik USERNAME; domain ditambahkan
+      // otomatis di sini (client-side) agar bisa auth ke Supabase, karena email
+      // login = username + '@' + domain. Bila user mengetik email lengkap
+      // (mengandung '@'), nilainya dipakai apa adanya (mis. akun berdomain lain).
+      var LOGIN_EMAIL_DOMAIN = 'renergynusantara.com';
+
+      // ── LOGIN → Supabase Auth (username→email + password), profil dari app_user ──
       window.gsRoute('loginUser', {
         mode: 'fn',
         handler: async function (args) {
-          var email = (args[0] || '').toString().trim();
+          var ident = (args[0] || '').toString().trim();
           var password = (args[1] || '').toString();
-          if (!email || !password) return { success: false, message: 'Email dan password wajib diisi.' };
-          if (email.indexOf('@') === -1) return { success: false, message: 'Masukkan EMAIL (bukan username) untuk login.' };
+          if (!ident || !password) return { success: false, message: 'Username dan password wajib diisi.' };
+          // Username → email: tambahkan domain bila input belum berupa email.
+          var email = (ident.indexOf('@') === -1)
+            ? (ident.toLowerCase() + '@' + LOGIN_EMAIL_DOMAIN)
+            : ident.toLowerCase();
 
           var r = await supa.auth.signInWithPassword({ email: email, password: password });
           if (r.error) {
@@ -23,7 +32,7 @@
               return { success: false, message: 'Konfigurasi Supabase (anon key) tidak valid. Periksa secret SUPABASE_ANON_KEY (harus key "anon public", bukan service_role, dan tersalin penuh).' };
             }
             console.warn('[login] signIn gagal:', r.error.message);
-            return { success: false, message: 'Email atau password salah.' };
+            return { success: false, message: 'Username atau password salah.' };
           }
           window.__RENUS_TOKEN__ = (r.data && r.data.session) ? r.data.session.access_token : '';
 
