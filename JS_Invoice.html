@@ -649,11 +649,11 @@
       var _render = function () {
         setTimeout(function () {
           var doc = buatInvoicePDF(item);
-          // Nama file: NNN-INV-RGI-[ROMAWI]-[TAHUN] - [KET BAYAR] [PROJECT] - [KLIEN]
-          //  Contoh: 001-INV-RGI-VIII-2026 - DP 50% PAKET PLTS HYBRID DEYE - NAMA KLIEN
+          // Nama file: NNN-RGI-INV-[ROMAWI]-[TAHUN] - [KET BAYAR] [PROJECT] - [KLIEN]
+          //  Contoh: 001-RGI-INV-VIII-2026 - DP 50% PAKET PLTS HYBRID DEYE - NAMA KLIEN
           var _idStr = String(item.id || '');
           var _mNo = _idStr.match(/^(\d+)\/RGI\/INV\/([^\/]+)\/(\d+)/i);
-          var _noPart = _mNo ? (_mNo[1] + '-INV-RGI-' + _mNo[2] + '-' + _mNo[3]) : _idStr.replace(/\//g, '-');
+          var _noPart = _mNo ? (_mNo[1] + '-RGI-INV-' + _mNo[2] + '-' + _mNo[3]) : _idStr.replace(/\//g, '-');
           var _jenis = (item.jenis || 'Penuh').toString();
           var _persen = Number(item.persen) || 0;
           var _ket = (_jenis === 'Pelunasan') ? 'Pelunasan'
