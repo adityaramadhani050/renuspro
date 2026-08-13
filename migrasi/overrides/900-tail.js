@@ -11,7 +11,7 @@
       //   • get*Bundle / get*InitialData → gabungan banyak tabel (bootstrap)
       //   • getKategoriPengeluaran, getBankAccounts, getWAConfig, *PdfB64, dll →
       //     dari ScriptProperties / Drive (bukan tabel) → tetap di Apps Script
-      //  Lihat migrasi/edge-functions/ + PANDUAN-EDGE-FUNCTIONS.md.
+      //  Lihat supabase/functions/ + PANDUAN-EDGE-FUNCTIONS.md.
 
       console.log('[supabase-overrides] aktif — login + master data + baca (M5 b1-b9 + M6 WO+HPP+BOM+QC+DED+dashboards) memakai Supabase.');
     })

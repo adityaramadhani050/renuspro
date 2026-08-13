@@ -1,0 +1,5 @@
+# Konfigurasi Supabase CLI untuk RenusPro.
+# project_id = ref project (dari URL: <ref>.supabase.co).
+# Dengan file ini, `supabase functions deploy <nama>` cukup dijalankan dari
+# root repo (folder fungsi: supabase/functions/<nama>/index.ts).
+project_id = "kekmetvugzwnxcpbqvfv"

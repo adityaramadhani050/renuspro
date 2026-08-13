@@ -10,7 +10,7 @@ Edge Function.
 > atau **menulis ke banyak tabel** sekaligus. Fungsi baca sederhana cukup override
 > `supa.from(...)` di `supabase-overrides.js` (lihat `PANDUAN-MILESTONE-4.md`).
 
-Contoh siap-pakai di repo: `migrasi/edge-functions/get-stok-list/`.
+Contoh siap-pakai di repo: `supabase/functions/get-stok-list/`.
 
 ---
 
@@ -42,8 +42,8 @@ supabase link --project-ref ISI-PROJECT-REF-ANDA
 CLI membaca folder `supabase/functions/`. Kita salin contoh dari repo:
 ```bash
 mkdir -p supabase/functions/_shared
-cp migrasi/edge-functions/_shared/cors.ts        supabase/functions/_shared/cors.ts
-cp -r migrasi/edge-functions/get-stok-list       supabase/functions/get-stok-list
+cp supabase/functions/_shared/cors.ts        supabase/functions/_shared/cors.ts
+cp -r supabase/functions/get-stok-list       supabase/functions/get-stok-list
 ```
 
 ## Langkah 4 — Deploy
@@ -104,8 +104,8 @@ Function (atomik, di server).
    ```bash
    cd ~/renuspro
    mkdir -p supabase/functions/_shared
-   cp migrasi/edge-functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
-   cp -r migrasi/edge-functions/invoice-ops     supabase/functions/invoice-ops
+   cp supabase/functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
+   cp -r supabase/functions/invoice-ops     supabase/functions/invoice-ops
    ```
 2. Deploy:
    ```bash
@@ -131,8 +131,8 @@ admin** (service_role) → wajib di server.
    ```bash
    cd ~/renuspro
    mkdir -p supabase/functions/_shared
-   cp migrasi/edge-functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
-   cp -r migrasi/edge-functions/user-ops        supabase/functions/user-ops
+   cp supabase/functions/_shared/cors.ts   supabase/functions/_shared/cors.ts
+   cp -r supabase/functions/user-ops        supabase/functions/user-ops
    ```
 2. Deploy: `supabase functions deploy user-ops`
 3. Nyalakan di frontend: `cloudshell edit migrasi/supabase-overrides.js` →

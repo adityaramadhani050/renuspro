@@ -19,9 +19,9 @@ bawah selesai — supaya tidak split-brain.
    ```bash
    cd ~/renuspro
    mkdir -p supabase/functions/_shared
-   cp migrasi/edge-functions/_shared/cors.ts supabase/functions/_shared/cors.ts
-   cp -r migrasi/edge-functions/wa-send      supabase/functions/wa-send
-   cp -r migrasi/edge-functions/wa-reminder  supabase/functions/wa-reminder
+   cp supabase/functions/_shared/cors.ts supabase/functions/_shared/cors.ts
+   cp -r supabase/functions/wa-send      supabase/functions/wa-send
+   cp -r supabase/functions/wa-reminder  supabase/functions/wa-reminder
    supabase functions deploy wa-send
    supabase functions deploy wa-reminder
    ```

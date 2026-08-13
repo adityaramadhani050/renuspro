@@ -85,8 +85,8 @@ supabase link --project-ref ISI-PROJECT-REF-ANDA
 
 # Salin & deploy function
 mkdir -p supabase/functions/_shared
-cp migrasi/edge-functions/_shared/cors.ts  supabase/functions/_shared/cors.ts
-cp -r migrasi/edge-functions/user-ops       supabase/functions/user-ops
+cp supabase/functions/_shared/cors.ts  supabase/functions/_shared/cors.ts
+cp -r supabase/functions/user-ops       supabase/functions/user-ops
 supabase functions deploy user-ops
 ```
 
