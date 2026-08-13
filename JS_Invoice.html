@@ -649,8 +649,17 @@
       var _render = function () {
         setTimeout(function () {
           var doc = buatInvoicePDF(item);
-          // Format nama file samakan seperti quotation: {id} - {project} - {klien}
-          var _fnInv = String(item.id || '').replace(/\//g, '-') + ' - ' + (item.namaProject || '') + ' - ' + (item.namaKlien || '');
+          // Nama file: NNN-INV-RGI-[ROMAWI]-[TAHUN] - [KET BAYAR] [PROJECT] - [KLIEN]
+          //  Contoh: 001-INV-RGI-VIII-2026 - DP 50% PAKET PLTS HYBRID DEYE - NAMA KLIEN
+          var _idStr = String(item.id || '');
+          var _mNo = _idStr.match(/^(\d+)\/RGI\/INV\/([^\/]+)\/(\d+)/i);
+          var _noPart = _mNo ? (_mNo[1] + '-INV-RGI-' + _mNo[2] + '-' + _mNo[3]) : _idStr.replace(/\//g, '-');
+          var _jenis = (item.jenis || 'Penuh').toString();
+          var _persen = Number(item.persen) || 0;
+          var _ket = (_jenis === 'Pelunasan') ? 'Pelunasan'
+                   : (_jenis === 'Penuh') ? 'Lunas'
+                   : (_jenis + (_persen > 0 ? ' ' + _persen + '%' : ''));
+          var _fnInv = _noPart + ' - ' + (_ket ? _ket + ' ' : '') + (item.namaProject || '') + ' - ' + (item.namaKlien || '');
           _pdfFinishPreview(doc, _pdfNamaFile(_fnInv), {});
         }, 60);
       };
