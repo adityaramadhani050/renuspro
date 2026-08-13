@@ -630,13 +630,15 @@ function _dbRenderChannel(items, fromMs, toMs) {
   // Hitung jumlah penawaran per channel DIPECAH per status pada periode aktif.
   var counts = {};   // channel -> { 'On-Progress':n, 'Deal':n, 'Fail':n }
   (items || []).forEach(function(item) {
-    var ts = item.tanggal;
+    var st = (item.status || 'On-Progress').toString();
+    if (st !== 'Deal' && st !== 'Fail') st = 'On-Progress';
+    // Deal berdasarkan tanggal deal (konsisten dgn KPI & pie Status Penawaran);
+    // On-Progress/Fail berdasarkan tanggal penawaran dibuat.
+    var ts = (st === 'Deal') ? (item.tanggalDeal || item.tanggal) : item.tanggal;
     if (fromMs && ts && ts < fromMs) return;
     if (toMs   && ts && ts > toMs)   return;
     var ch = (item.channelMarketing || '').trim() || 'Lainnya';
     if (!_CHANNELS_ORDER.includes(ch)) ch = 'Lainnya';
-    var st = (item.status || 'On-Progress').toString();
-    if (st !== 'Deal' && st !== 'Fail') st = 'On-Progress';
     if (!counts[ch]) counts[ch] = { 'On-Progress': 0, 'Deal': 0, 'Fail': 0 };
     counts[ch][st] += 1;
   });
