@@ -444,13 +444,14 @@ function _qcBatalkanSelesai() {
 function _qcExportPDF() {
   if (!_qcWO) return;
   if (!window.jspdf || !window.jspdf.jsPDF) { showNotification('Modul PDF belum siap. Muat ulang halaman.', 'error'); return; }
-  toggleLoader(true, 'Menyiapkan PDF laporan QC (memuat foto)...');
+  toggleLoader(true, 'Menyiapkan PDF laporan QC...');
+  var _stopProg = _pdfPhotoProgressPoll();
   google.script.run.withSuccessHandler(function(res) {
-    toggleLoader(false);
+    _stopProg(); toggleLoader(false);
     if (!res || res.success === false) { showNotification((res && res.message) || 'Gagal membuat PDF.', 'error'); return; }
     try { _qcBuildPDF(res); showNotification('Laporan QC berhasil diunduh.'); }
     catch (e) { showNotification('Gagal membuat PDF: ' + e.message, 'error'); }
-  }).withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal membuat PDF.', 'error'); })
+  }).withFailureHandler(function(err) { _stopProg(); toggleLoader(false); showNotification((err && err.message) || 'Gagal membuat PDF.', 'error'); })
     .getQCReportData(_qcWO.noWO);
 }
 

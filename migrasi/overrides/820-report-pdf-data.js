@@ -22,7 +22,15 @@
           } catch (e) { resolve(''); }
         });
       }
+      // Progress embed foto (shared window) → indikator "Memuat foto X / Y".
+      function _pdfEmbedStart(total) { try { window.__pdfEmbed = { done: 0, total: total || 0, active: true }; } catch (e) {} }
+      function _pdfEmbedEnd() { try { if (window.__pdfEmbed) window.__pdfEmbed.active = false; } catch (e) {} }
       async function _photoDataUrl(fileId) {
+        var _r = await _photoDataUrlRaw(fileId);
+        try { if (window.__pdfEmbed && window.__pdfEmbed.active) window.__pdfEmbed.done++; } catch (e) {}
+        return _r;
+      }
+      async function _photoDataUrlRaw(fileId) {
         fileId = (fileId || '').toString();
         if (!fileId) return '';
         // Supabase Storage bila fileId berupa path (mengandung '/'); selain itu
@@ -63,6 +71,7 @@
             try { var wo = ((await _woListData()) || []).filter(function (w) { return w.noWO === noWO; })[0]; if (wo) { namaProject = wo.namaProject || ''; namaKlien = wo.namaKlien || ''; } } catch (e) {}
             if (!namaProject) { try { var pr = await supa.from('qc_project').select('nama_project,nama_klien').eq('no_wo', noWO).maybeSingle(); if (pr.data) { namaProject = pr.data.nama_project || ''; namaKlien = pr.data.nama_klien || ''; } } catch (e) {} }
             var assigned = []; try { var aq = await supa.from('qc_assignment').select('nama_user').eq('no_wo', noWO); assigned = (aq.data || []).map(function (x) { return x.nama_user || ''; }).filter(Boolean); } catch (e) {}
+            _pdfEmbedStart(list.reduce(function (t, it2) { return t + ((it2.foto || []).length); }, 0));
             var sections = [], idx = {};
             for (var i = 0; i < list.length; i++) {
               var it = list[i];
@@ -71,8 +80,9 @@
               for (var j = 0; j < fa.length; j++) { var durl = await _photoDataUrl(fa[j].fileId); if (durl) fotoOut.push({ dataUrl: durl }); }
               sections[idx[it.section]].items.push({ kode: it.kode, label: it.label, wajib: it.wajib, status: it.status, statusLabel: _qcStatusLabelText(it.status), catatanSPV: it.catatanSPV || '', foto: fotoOut });
             }
+            _pdfEmbedEnd();
             return { success: true, noWO: noWO, namaProject: namaProject, namaKlien: namaKlien, tglExport: _fmtTs(new Date()), assigned: assigned, summary: summary, sections: sections };
-          } catch (e) { return { success: false, message: (e && e.message) || String(e) }; }
+          } catch (e) { _pdfEmbedEnd(); return { success: false, message: (e && e.message) || String(e) }; }
         }
       });
       window.gsRoute('getSiteSurveyReportData', {
@@ -92,14 +102,17 @@
               latitude: (r.latitude !== null && r.latitude !== undefined) ? Number(r.latitude) : null, longitude: (r.longitude !== null && r.longitude !== undefined) ? Number(r.longitude) : null,
               dibuatPada: r.dibuat_pada ? r.dibuat_pada.toString() : '', arahBangunan: dd.arahBangunan || '', tinggiBangunan: dd.tinggiBangunan || 0
             };
+            var _cnt = function (a) { return Array.isArray(a) ? a.filter(function (f) { return f && f.fileId; }).length : ((a && a.fileId) ? 1 : 0); };
+            _pdfEmbedStart(_cnt(dd.fotoBangunan) + _cnt(kel.fotoKwh) + _cnt(kel.fotoPHB) + _cnt(bos.foto) + _cnt(atap.fotoAtap) + _cnt(atap.fotoRangka) + _cnt(atap.fotoAkses) + _cnt(jk.fotoPV) + _cnt(jk.fotoAC));
             d.fotoBangunan = await _ssAttachDataUrls(dd.fotoBangunan);
             kel.fotoKwh = await _ssAttachDataUrls(kel.fotoKwh); kel.fotoPHB = await _ssAttachDataUrls(kel.fotoPHB);
             bos.foto = await _ssAttachDataUrls(bos.foto);
             atap.fotoAtap = await _ssAttachDataUrls(atap.fotoAtap); atap.fotoRangka = await _ssAttachDataUrls(atap.fotoRangka); atap.fotoAkses = await _ssAttachDataUrls(atap.fotoAkses);
             jk.fotoPV = await _ssAttachDataUrls(jk.fotoPV); jk.fotoAC = await _ssAttachDataUrls(jk.fotoAC);
+            _pdfEmbedEnd();
             d.kelistrikan = kel; d.bos = bos; d.atap = atap; d.jalurKabel = jk;
             d.tglExport = _fmtTs(new Date());
             return { success: true, survey: d };
-          } catch (e) { return { success: false, message: (e && e.message) || String(e) }; }
+          } catch (e) { _pdfEmbedEnd(); return { success: false, message: (e && e.message) || String(e) }; }
         }
       });

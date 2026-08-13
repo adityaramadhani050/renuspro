@@ -8,6 +8,19 @@
       if (fileId) return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=' + (sz || 'w200');
       return fileUrl || '';
     }
+    // Indikator progres embed foto saat export PDF (Site Survey / QC). Backend
+    // (override) meng-update window.__pdfEmbed = {done,total,active}; poller ini
+    // menulis "Memuat foto X / Y" ke teks loader. Balikan: fungsi stop.
+    function _pdfPhotoProgressPoll() {
+      window.__pdfEmbed = { done: 0, total: 0, active: false };
+      var iv = setInterval(function () {
+        var p = window.__pdfEmbed;
+        if (!p || !p.active || !(p.total > 0)) return;
+        var el = document.getElementById('loaderText');
+        if (el) el.innerText = 'Memuat foto ' + Math.min(p.done, p.total) + ' / ' + p.total + '...';
+      }, 200);
+      return function () { clearInterval(iv); };
+    }
     // --- STATE MANAGEMENT ---
     let erpState = { klien: [], produk: [], templatePaket: {}, nextNo: "" };
     let kalkulasiGlobalState = { subtotalSemua: 0, diskonNominal: 0, pajakNominal: 0, grandTotal: 0, totalHpp: 0, profitInternal: 0, marginPersen: 0 };
