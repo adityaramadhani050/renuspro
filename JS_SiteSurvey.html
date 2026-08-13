@@ -1171,6 +1171,25 @@ function _ssExportPDFById(id) {
 
 function _ssBuildPDF(d) {
   var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  _ssRenderReport(doc, d, { firstPage: true });
+  // Footer halaman
+  var _PW = 210, _ML = 14, _SLATE = [100,116,139];
+  var totalPages = doc.internal.getNumberOfPages();
+  for (var p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc, _SLATE);
+    doc.text('Halaman ' + p + ' / ' + totalPages, _PW / 2, 292, { align:'center' });
+    doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', _ML, 292);
+  }
+  doc.save('Laporan-SiteSurvey-' + (d.namaSite || d.id || '').toString().replace(/[\\/\s:*?"<>|]/g, '-') + '.pdf');
+}
+
+// Render isi laporan site survey ke `doc` yang diberikan. Footer TIDAK digambar
+// di sini agar fungsi ini bisa dipakai ulang saat laporan dilampirkan ke
+// dokumen lain (mis. PDF Info WO), di mana penomoran halaman gabungan diatur
+// oleh pemanggil. opts.firstPage=false → mulai dengan halaman baru (addPage).
+function _ssRenderReport(doc, d, opts) {
+  opts = opts || {};
   var PW = 210, PH = 297, ML = 14, MR = 14, CW = PW - ML - MR;
   var DARK = [30,41,59], SLATE = [100,116,139], WHITE = [255,255,255];
   var BOTTOM = 284;
@@ -1345,6 +1364,7 @@ function _ssBuildPDF(d) {
     });
   }
 
+  if (opts.firstPage === false) { doc.addPage(); }
   header();
   y = 30;
 
@@ -1431,17 +1451,6 @@ function _ssBuildPDF(d) {
   ]);
   photoGroup('Foto Jalur Kabel PV', jk.fotoPV);
   photoGroup('Foto Jalur Kabel AC', jk.fotoAC);
-
-  // Footer halaman
-  var totalPages = doc.internal.getNumberOfPages();
-  for (var p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc, SLATE);
-    doc.text('Halaman ' + p + ' / ' + totalPages, PW / 2, 292, { align:'center' });
-    doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
-  }
-
-  doc.save('Laporan-SiteSurvey-' + (d.namaSite || d.id || '').toString().replace(/[\\/\s:*?"<>|]/g, '-') + '.pdf');
 }
 
 function _ssHapusSurvey(id) {

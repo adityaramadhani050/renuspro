@@ -819,13 +819,15 @@ function exportPOPDFClient(noPO, subtitle) {
 
 // ── INFO WORK ORDER (untuk tim engineer di BOM/DED/QC) ──────────────────────
 // Desain/layout mengikuti PDF WORK ORDER internal di detail Work Order
-// (landscape, header navy, tabel HPP biru dgn kolom HPP merah) — TANPA kolom
+// (potret, header navy, tabel HPP biru dgn kolom HPP merah) — TANPA kolom
 // Harga Jual / Total Jual / Margin, dan Catatan Customer + MoM sebagai 2 kolom.
+// Footer TIDAK digambar di sini: laporan Site Survey terkait dilampirkan setelah
+// halaman ini (oleh exportWOInfoPDF), lalu footer gabungan digambar sekali.
 // data: getWOContextByWO.
 function buatWOInfoPDF(res) {
-  var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  var PW = 297, PH = 210, ML = 12, MR = 12;
-  var DARK = [30, 41, 59], SLATE = [100, 116, 139], GREEN = [5, 150, 105], RED = [190, 30, 30], BLUE = [30, 64, 175];
+  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var PW = 210, PH = 297, ML = 14, MR = 14;
+  var DARK = [30, 41, 59], SLATE = [100, 116, 139], BLUE = [30, 64, 175];
   var rp = function (v) { return Math.round(Math.abs(Number(v) || 0)).toLocaleString('id-ID'); };
 
   // ── Header navy ──
@@ -834,13 +836,13 @@ function buatWOInfoPDF(res) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
   doc.text('WORK ORDER', ML, 11);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   doc.setTextColor(190, 200, 220);
-  doc.text('DOKUMEN INTERNAL — INFORMASI WORK ORDER (BOM / DED / QC)', ML, 17);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text('DOKUMEN INTERNAL — INFORMASI WORK ORDER', ML, 17);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
   doc.setTextColor(170, 195, 255);
   doc.text('NO. WORK ORDER', PW - MR, 9, { align: 'right' });
-  doc.setFontSize(18); doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15); doc.setTextColor(255, 255, 255);
   doc.text(String(res.noWO || '-'), PW - MR, 17, { align: 'right' });
 
   // ── Info 2 kolom ──
@@ -849,11 +851,21 @@ function buatWOInfoPDF(res) {
   var hoTxt = (res.ho && (res.ho.status || res.ho.tglJadwal))
     ? ((res.ho.status || '-') + (res.ho.tglJadwal ? ' · ' + res.ho.tglJadwal + (res.ho.waktu ? ' ' + res.ho.waktu : '') : ''))
     : '-';
+  var colGap = 4, half = (PW - ML - MR - colGap) / 2, rightX = ML + half + colGap;
   var infoLeft = [['No Penawaran', noPen], ['Tanggal', res.tanggal || '-'], ['Sales / PIC', res.dibuatOleh || '-'], ['Jenis WO', res.jenisWO || '-']];
   var infoRight = [['Klien', res.namaKlien || '-'], ['Project', res.namaProject || '-'], ['Status', res.status || '-'], ['Hand Over', hoTxt]];
   doc.setFontSize(8);
-  infoLeft.forEach(function (r, i) { var yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], ML, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.text(': ' + r[1], ML + 26, yy); });
-  infoRight.forEach(function (r, i) { var yy = y + i * 5; doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], PW / 2, yy); doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.text(': ' + r[1], PW / 2 + 26, yy); });
+  function _infoCol(rows, x, labelW, valW) {
+    rows.forEach(function (r, i) {
+      var yy = y + i * 5;
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(SLATE[0], SLATE[1], SLATE[2]); doc.text(r[0], x, yy);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+      var v = doc.splitTextToSize(': ' + r[1], valW)[0];
+      doc.text(v, x + labelW, yy);
+    });
+  }
+  _infoCol(infoLeft, ML, 24, half - 24);
+  _infoCol(infoRight, rightX, 22, half - 22);
   y += 23;
 
   // ── Catatan Customer + Catatan Hasil Hand Over (MoM) — 2 kolom sejajar ──
@@ -906,7 +918,7 @@ function buatWOInfoPDF(res) {
     body: body, theme: 'grid', margin: { left: ML, right: MR },
     headStyles: { fillColor: BLUE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
     bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
-    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 16, halign: 'center' }, 3: { cellWidth: 20, halign: 'center' }, 4: { cellWidth: 40, halign: 'right' }, 5: { cellWidth: 40, halign: 'right' } },
+    columnStyles: { 0: { cellWidth: 9, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 13, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 30, halign: 'right' }, 5: { cellWidth: 32, halign: 'right' } },
     styles: { overflow: 'linebreak' },
     didParseCell: function (data) {
       // Kolom HPP (HPP Satuan=4, Total HPP=5) disorot merah.
@@ -916,27 +928,13 @@ function buatWOInfoPDF(res) {
       }
     }
   });
-  y = doc.lastAutoTable.finalY + 5;
+  return doc;
+}
 
-  // ── Site survey terkait ──
-  var surv = res.surveys || [];
-  if (surv.length) {
-    if (y + 20 > PH - 14) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(DARK[0], DARK[1], DARK[2]);
-    doc.text('SITE SURVEY TERKAIT (' + surv.length + ')', ML, y);
-    doc.autoTable({
-      startY: y + 2,
-      head: [['Nama Site', 'PIC', 'Telepon', 'Tanggal']],
-      body: surv.map(function (s) { return [s.namaSite || s.id || '-', s.namaPIC || '-', s.telepon || '-', s.tanggalSurvey || '-']; }),
-      theme: 'grid', margin: { left: ML, right: MR },
-      headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'left' },
-      bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], lineColor: [210, 215, 225], lineWidth: 0.15, cellPadding: 1.6 },
-      styles: { overflow: 'linebreak' }
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  }
-
-  // ── Footer nomor halaman ──
+// Gambar footer seragam (nomor halaman) pada SEMUA halaman `doc` — dipanggil
+// setelah info WO + lampiran laporan site survey selesai dirangkai.
+function _woInfoFooter(doc) {
+  var PW = 210, PH = 297, ML = 14, MR = 14;
   var tp = doc.internal.getNumberOfPages();
   for (var p = 1; p <= tp; p++) {
     doc.setPage(p);
@@ -945,18 +943,50 @@ function buatWOInfoPDF(res) {
     doc.text('Hal ' + p + ' / ' + tp, PW - MR, PH - 6, { align: 'right' });
     doc.setTextColor(0, 0, 0);
   }
-  return doc;
 }
 
-// Export langsung (download) dari data konteks WO yang sudah dimuat di modal Info WO.
+// Export langsung (download) dari data konteks WO yang sudah dimuat di modal
+// Info WO. Laporan site survey terkait (lengkap dengan foto) dilampirkan setelah
+// halaman info WO sebagai satu berkas PDF. Embed foto bersifat async → tampilkan
+// loader + indikator jumlah foto (bila tersedia).
 function exportWOInfoPDF() {
   var res = window._woCtxData;
   if (!res || !res.success) { if (typeof showNotification === 'function') showNotification('Data WO belum siap.', 'error'); return; }
-  try {
-    var doc = buatWOInfoPDF(res);
-    doc.save(_pdfNamaFile('Info WO ' + (res.noWO || '') + (res.namaProject ? ' - ' + res.namaProject : '')));
-  } catch (e) {
-    if (typeof showNotification === 'function') showNotification('Gagal membuat PDF: ' + ((e && e.message) || e), 'error');
+  var surv = (res.surveys || []).filter(function (s) { return s && s.id; });
+  var namaFile = _pdfNamaFile('Info WO ' + (res.noWO || '') + (res.namaProject ? ' - ' + res.namaProject : ''));
+
+  var doc;
+  try { doc = buatWOInfoPDF(res); }
+  catch (e) { if (typeof showNotification === 'function') showNotification('Gagal membuat PDF: ' + ((e && e.message) || e), 'error'); return; }
+
+  // Tanpa survey / helper survey tak tersedia → langsung simpan.
+  if (!surv.length || typeof google === 'undefined' || !google.script || !google.script.run || typeof _ssRenderReport !== 'function') {
+    _woInfoFooter(doc);
+    doc.save(namaFile);
+    return;
   }
+
+  if (typeof toggleLoader === 'function') toggleLoader(true, 'Menyiapkan PDF Info WO + laporan site survey...');
+  var _stopProg = (typeof _pdfPhotoProgressPoll === 'function') ? _pdfPhotoProgressPoll() : function () {};
+
+  var i = 0;
+  function finish() {
+    _stopProg();
+    if (typeof toggleLoader === 'function') toggleLoader(false);
+    try { _woInfoFooter(doc); doc.save(namaFile); if (typeof showNotification === 'function') showNotification('PDF Info WO berhasil diunduh.'); }
+    catch (e) { if (typeof showNotification === 'function') showNotification('Gagal menyimpan PDF: ' + ((e && e.message) || e), 'error'); }
+  }
+  function next() {
+    if (i >= surv.length) { finish(); return; }
+    var s = surv[i++];
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (r && r.success !== false && r.survey) { try { _ssRenderReport(doc, r.survey, { firstPage: false }); } catch (e) {} }
+        next();
+      })
+      .withFailureHandler(function () { next(); })
+      .getSiteSurveyReportData(s.id);
+  }
+  next();
 }
 </script>
