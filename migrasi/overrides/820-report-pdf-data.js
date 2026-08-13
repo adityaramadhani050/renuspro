@@ -1,12 +1,42 @@
       // ── Data untuk PDF: Laporan QC + Laporan Site Survey ──────────────────
       //  Foto dikonversi ke data URL base64 (unduh dari Storage) agar bisa
       //  di-embed ke PDF (URL publik lintas-domain tak dapat dipakai jsPDF).
+      // Foto lama Google Drive: fileId = ID Drive (bukan path Storage). Ambil via
+      // lh3.googleusercontent.com/d/<id> yg mengirim header CORS → bisa digambar
+      // ke canvas & di-toDataURL untuk di-embed ke PDF.
+      function _driveImgDataUrl(fileId) {
+        return new Promise(function (resolve) {
+          try {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function () {
+              try {
+                var w = img.naturalWidth || 1000, h = img.naturalHeight || 1000;
+                var c = document.createElement('canvas'); c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0);
+                resolve(c.toDataURL('image/jpeg', 0.85));
+              } catch (e) { resolve(''); }
+            };
+            img.onerror = function () { resolve(''); };
+            img.src = 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(fileId) + '=w1600';
+          } catch (e) { resolve(''); }
+        });
+      }
       async function _photoDataUrl(fileId) {
-        try {
-          var dl = await supa.storage.from('uploads').download((fileId || '').toString());
-          if (dl.error || !dl.data) return '';
-          return await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { res(''); }; fr.readAsDataURL(dl.data); });
-        } catch (e) { return ''; }
+        fileId = (fileId || '').toString();
+        if (!fileId) return '';
+        // Supabase Storage bila fileId berupa path (mengandung '/'); selain itu
+        // dianggap ID Google Drive (foto lama) → ambil via googleusercontent.
+        if (fileId.indexOf('/') !== -1) {
+          try {
+            var dl = await supa.storage.from('uploads').download(fileId);
+            if (!dl.error && dl.data) {
+              return await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { res(''); }; fr.readAsDataURL(dl.data); });
+            }
+          } catch (e) {}
+          return '';
+        }
+        return await _driveImgDataUrl(fileId);
       }
       function _qcStatusLabelText(st) { var m = { 'Approved': 'APPROVED', 'Pending': 'PENDING', 'Rejected': 'REJECTED', 'NA': 'N/A', 'Belum Upload': 'BELUM UPLOAD' }; return m[st] || (st || 'BELUM UPLOAD'); }
       async function _ssAttachDataUrls(fotoArr) {
