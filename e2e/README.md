@@ -15,7 +15,12 @@ diblokir di sandbox agen.
 | `tests/05-inventory-hpp.spec.js` | **Numerik** via backend: (1) penerimaan non-PO → stok bertambah + mutasi; (2) penerimaan PO → stok + harga beli terakhir + **sinkron HPP master**; (3) penggunaan stok → stok berkurang + **realisasi HPP** WO | Ya (gated) |
 | `tests/06-invoice-kwitansi.spec.js` | **Numerik** via backend: invoice DP → invarian `total = dpp + PPN`; setelah **Lunas** → kwitansi otomatis `jumlah = total` | Ya (gated) |
 | `tests/07-po-payment-hpp.spec.js` | **Numerik** via backend: request→approve pembayaran PO ber-WO → **realisasi HPP** WO bertambah tepat porsi **DPP** (PPN tak masuk); pengeluaran mencantumkan No PO | Ya (gated) |
+| `tests/08-engineering-chain.spec.js` | **Rantai stateful E2E**: HandOver→BOM→approve→reserve stok→request pengiriman→kirim→terima; assert transisi status + stok turun saat kirim + realisasi HPP naik | Ya (gated) |
 | `tests/00-diag.spec.js` | Diagnostik **read-only**: cetak kondisi PO/stok/WO (untuk memahami skip) | Tidak |
+
+Test **08** mendorong 1 WO existing (Deal, belum di-handover — set `E2E_CHAIN_WO`
+atau auto-pilih) lewat seluruh rantai eksekusi project. Mengubah data permanen
+(stok keluar, surat jalan terbit) — untuk DB tes yang datanya akan di-import ulang.
 
 Test **05 & 06 memanggil fungsi backend langsung** (via shim `google.script.run`,
 lihat `helpers/gs.js`) dengan input deterministik lalu membaca ulang efeknya untuk
