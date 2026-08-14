@@ -447,7 +447,7 @@ function _loadPricelistOptions(selId) {
     var opts = '<option value="">-- Pilih item dari Pricelist Supplier --</option>';
     list.forEach(function(p) {
       var label = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + (p.namaSupplier || '-') + (p.satuan ? ' (' + p.satuan + ')' : '');
-      opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-satuan="' + _escHtml(p.satuan) + '">' + _escHtml(label) + '</option>';
+      opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-satuan="' + _escHtml(p.satuan) + '" data-harga="' + (Number(p.hargaBeli) || 0) + '">' + _escHtml(label) + '</option>';
     });
     sel.innerHTML = opts;
   }).withFailureHandler(function() {}).getPricelistAll();
@@ -458,6 +458,9 @@ function _ptnpoOnPricelistChange() {
   var sel = document.getElementById('ptnpo-pricelist');
   var opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
   document.getElementById('ptnpo-satuan-baru').value = opt ? (opt.getAttribute('data-satuan') || '') : '';
+  // Auto-isi harga satuan dari harga beli pricelist (tetap bisa diedit).
+  var h = opt ? (parseFloat(opt.getAttribute('data-harga')) || 0) : 0;
+  document.getElementById('ptnpo-harga').value = h ? h.toLocaleString('id-ID') : '';
 }
 
 // ── Form Penerimaan Tanpa PO ───────────────────────────────────
