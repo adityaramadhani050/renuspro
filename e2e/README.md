@@ -14,6 +14,8 @@ diblokir di sandbox agen.
 | `tests/04-penawaran-write.spec.js` | Buka form penawaran, verifikasi **invarian total** (grandTotal = netSub + pajak; profit = netSub − HPP) | Ya (gated) |
 | `tests/05-inventory-hpp.spec.js` | **Numerik** via backend: (1) penerimaan non-PO → stok bertambah + mutasi; (2) penerimaan PO → stok + harga beli terakhir + **sinkron HPP master**; (3) penggunaan stok → stok berkurang + **realisasi HPP** WO | Ya (gated) |
 | `tests/06-invoice-kwitansi.spec.js` | **Numerik** via backend: invoice DP → invarian `total = dpp + PPN`; setelah **Lunas** → kwitansi otomatis `jumlah = total` | Ya (gated) |
+| `tests/07-po-payment-hpp.spec.js` | **Numerik** via backend: request→approve pembayaran PO ber-WO → **realisasi HPP** WO bertambah tepat porsi **DPP** (PPN tak masuk); pengeluaran mencantumkan No PO | Ya (gated) |
+| `tests/00-diag.spec.js` | Diagnostik **read-only**: cetak kondisi PO/stok/WO (untuk memahami skip) | Tidak |
 
 Test **05 & 06 memanggil fungsi backend langsung** (via shim `google.script.run`,
 lihat `helpers/gs.js`) dengan input deterministik lalu membaca ulang efeknya untuk
