@@ -31,7 +31,8 @@ function _bomCanManage(){ var r = _bomRole(); return r === 'leadengineer' || r =
 function _bomCanRequestKirim(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // request pengiriman
 function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // approve/reject material
 function _bomCanReserve(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // reserve/alokasi dari stok (warehouse)
-function _bomCanBelanja(){ var r = _bomRole(); return r === 'warehouse' || r === 'procurement' || r === 'admin'; }  // lihat tab Perlu Dibelanjakan + Direct/Batal (warehouse & procurement)
+function _bomCanBelanja(){ var r = _bomRole(); return r === 'warehouse' || r === 'procurement' || r === 'admin'; }  // lihat tab Perlu Dibelanjakan (warehouse & procurement)
+function _bomCanBuatPO(){ var r = _bomRole(); return r === 'procurement' || r === 'admin'; }  // tombol "Buat PO" pada item Tunggu Beli (procurement)
 function _bomIsAssigned(){ var id = _bomUserId(); return (_bomAssigned || []).some(function(a){ return a.id === id; }); }
 // Hanya Site Engineer yang di-assign (& Admin) yang bisa tambah/edit/hapus material.
 function _bomCanEdit()  {
@@ -277,16 +278,23 @@ function _bomRenderNeedPurchase() {
         ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Tunggu Beli</span>'
         : _bomStokStatusBadge(it);
       var aksi;
-      // Reserve (ambil dari stok) khusus warehouse; Direct/Batal (beli langsung)
-      // untuk warehouse & procurement.
+      // Belum diputuskan: Reserve + Direct KHUSUS warehouse (hindari bentrok dua
+      // peran pada item sama). Sudah "Tunggu Beli": warehouse bisa Batal,
+      // procurement dapat tombol "Buat PO" (buka form PO langsung).
       if (!_bomCanBelanja()) aksi = '<span class="text-slate-300 text-xs">—</span>';
-      else if (isTunggu) aksi = '<button onclick="_bomBatalBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Batalkan tanda beli langsung"><i class="fa-solid fa-rotate-left"></i> Batal</button>';
+      else if (isTunggu) {
+        var partsT = [];
+        if (_bomCanReserve()) partsT.push('<button onclick="_bomBatalBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Batalkan tanda beli langsung"><i class="fa-solid fa-rotate-left"></i> Batal</button>');
+        if (_bomCanBuatPO()) partsT.push('<button onclick="_bomBuatPODariBelanja(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Buat Purchase Order untuk item ini"><i class="fa-solid fa-file-invoice"></i> Buat PO</button>');
+        aksi = partsT.length ? '<div class="flex items-center justify-center gap-1.5">' + partsT.join('') + '</div>' : '<span class="text-slate-300 text-xs">—</span>';
+      }
       else {
-        var btnReserve = _bomCanReserve()
-          ? '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
-          : '';
-        var btnDirect = '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Direct</button>';
-        aksi = '<div class="flex items-center justify-center gap-1.5">' + btnReserve + btnDirect + '</div>';
+        aksi = _bomCanReserve()
+          ? '<div class="flex items-center justify-center gap-1.5">'
+            + '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
+            + '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Direct</button>'
+            + '</div>'
+          : '<span class="text-slate-300 text-xs">—</span>';
       }
       return '<tr class="border-t border-slate-100">'
         + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
@@ -430,6 +438,28 @@ function _bomBatalBeliLangsung(id) {
     _bomLoadNeedPurchase();
   }).withFailureHandler(function(err) { delete _bomBusyIds[id]; showNotification((err && err.message) || 'Gagal.', 'error'); _bomLoadNeedPurchase(); })
     .batalTandaiBeliLangsung(id, _bomUserNama());
+}
+
+// Procurement: buka form PO ter-prefill untuk item "Tunggu Beli" (beli langsung).
+// Navigasi ke menu Purchase Order lalu buka form baru dengan supplier + item + WO.
+function _bomBuatPODariBelanja(id) {
+  var it = (_bomNeedList || []).filter(function(x) { return x.id === id; })[0];
+  if (!it) return;
+  if (typeof navigate !== 'function' || typeof bukaFormPOPrefill !== 'function') {
+    return showNotification('Form Purchase Order tidak tersedia.', 'error');
+  }
+  var prefill = {
+    idSupplier: it.idSupplier || '',
+    peruntukan: it.namaProject ? ('Beli Langsung — ' + it.namaProject) : ('Beli Langsung — WO ' + (it.noWO || '')),
+    noWO: it.noWO || '',
+    items: [{
+      produkId: it.idStok || '', namaItem: it.namaMaterial || '',
+      qty: Number(it.qtyMenunggu) || 0, satuan: it.satuan || '',
+      hargaBeli: Number(it.hargaBeli) || 0, catatan: 'Beli langsung BOM ' + it.id
+    }]
+  };
+  navigate('purchaseorder');
+  bukaFormPOPrefill(prefill);
 }
 
 // ── Request Pengiriman (Project Coordinator) — pilih material (parsial) ────────
