@@ -9,6 +9,7 @@ const ROLE_NAV = {
   warehouse: ['workorder', 'inventory', 'bom'],
   siteengineer: ['qc', 'bom', 'ded', 'schedule'],
   leadengineer: ['workorder', 'qc', 'bom', 'ded', 'schedule'],
+  projectcoordinator: ['workorder', 'qc', 'bom', 'ded', 'schedule'],
 };
 
 // Peran → variabel env kredensial.
@@ -20,6 +21,7 @@ const ROLE_ENV = {
   warehouse: ['E2E_WAREHOUSE_USER', 'E2E_WAREHOUSE_PASS'],
   siteengineer: ['E2E_SITEENGINEER_USER', 'E2E_SITEENGINEER_PASS'],
   leadengineer: ['E2E_LEADENGINEER_USER', 'E2E_LEADENGINEER_PASS'],
+  projectcoordinator: ['E2E_PROJECTCOORDINATOR_USER', 'E2E_PROJECTCOORDINATOR_PASS'],
 };
 
 // Kembalikan {user, pass} untuk peran jika kredensialnya ada di env, else null.
