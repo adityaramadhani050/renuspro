@@ -435,6 +435,31 @@ function _loadStokOptions(selId, selectedId) {
 // Alias untuk backward compat
 function _loadProdukMaterialOptions(selId) { _loadStokOptions(selId, ''); }
 
+// Dropdown item Pricelist Supplier untuk penerimaan "Item Baru" — warehouse
+// wajib memilih material dari pricelist (single source of truth), bukan input
+// nama bebas. Nama & satuan diturunkan dari item pricelist terpilih.
+function _loadPricelistOptions(selId) {
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res) {
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    var list = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
+    var opts = '<option value="">-- Pilih item dari Pricelist Supplier --</option>';
+    list.forEach(function(p) {
+      var label = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + (p.namaSupplier || '-') + (p.satuan ? ' (' + p.satuan + ')' : '');
+      opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-satuan="' + _escHtml(p.satuan) + '">' + _escHtml(label) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }).withFailureHandler(function() {}).getPricelistAll();
+}
+
+// Saat item pricelist dipilih → isi satuan (read-only) dari item tsb.
+function _ptnpoOnPricelistChange() {
+  var sel = document.getElementById('ptnpo-pricelist');
+  var opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+  document.getElementById('ptnpo-satuan-baru').value = opt ? (opt.getAttribute('data-satuan') || '') : '';
+}
+
 // ── Form Penerimaan Tanpa PO ───────────────────────────────────
 
 function _setPtnpoMode(mode) {
@@ -455,10 +480,10 @@ function bukaFormPenerimaanTanpaPO() {
   document.getElementById('ptnpo-qty').value = '';
   document.getElementById('ptnpo-harga').value = '';
   document.getElementById('ptnpo-keterangan').value = '';
-  document.getElementById('ptnpo-nama-baru').value = '';
   document.getElementById('ptnpo-satuan-baru').value = '';
   _setPtnpoMode('existing');
   _loadProdukMaterialOptions('sel-produk-ptnpo');
+  _loadPricelistOptions('ptnpo-pricelist');
   document.getElementById('form-penerimaan-tanpa-po').classList.remove('hidden');
 }
 
@@ -496,10 +521,12 @@ function submitPenerimaanTanpaPO() {
   var idStok = '', namaBaru = '', satuanBaru = '';
 
   if (isNewMode) {
-    namaBaru   = document.getElementById('ptnpo-nama-baru').value.trim();
-    satuanBaru = document.getElementById('ptnpo-satuan-baru').value.trim();
-    if (!namaBaru)   return showNotification('Nama item baru wajib diisi.', 'error');
-    if (!satuanBaru) return showNotification('Satuan item baru wajib diisi.', 'error');
+    var selPl = document.getElementById('ptnpo-pricelist');
+    if (!selPl.value) return showNotification('Pilih item dari Pricelist Supplier.', 'error');
+    var optPl = selPl.options[selPl.selectedIndex];
+    namaBaru   = (optPl.getAttribute('data-nama') || '').trim();
+    satuanBaru = (optPl.getAttribute('data-satuan') || '').trim();
+    if (!namaBaru) return showNotification('Item pricelist tidak valid.', 'error');
   } else {
     idStok = document.getElementById('sel-produk-ptnpo').value;
     if (!idStok) return showNotification('Pilih item stok atau pilih "Item Baru".', 'error');

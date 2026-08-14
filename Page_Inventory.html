@@ -299,10 +299,12 @@
                   </select>
                 </div>
                 <div id="ptnpo-panel-baru" class="hidden space-y-3">
-                  <input type="text" id="ptnpo-nama-baru" placeholder="Nama item stok baru..."
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
-                  <input type="text" id="ptnpo-satuan-baru" placeholder="Satuan (unit, pcs, meter, kg...)"
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white">
+                  <select id="ptnpo-pricelist" onchange="_ptnpoOnPricelistChange()"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="">-- Pilih item dari Pricelist Supplier --</option>
+                  </select>
+                  <input type="text" id="ptnpo-satuan-baru" readonly placeholder="Satuan (otomatis dari pricelist)"
+                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed">
                 </div>
               </div>
 
