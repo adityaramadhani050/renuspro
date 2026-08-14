@@ -30,7 +30,8 @@ function _bomUserId()   { return (typeof _currentUser !== 'undefined' && _curren
 function _bomCanManage(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // assign site engineer
 function _bomCanRequestKirim(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // request pengiriman
 function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // approve/reject material
-function _bomCanProcure(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // tandai reserved / need purchase (dipindah dari procurement ke warehouse)
+function _bomCanReserve(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // reserve/alokasi dari stok (warehouse)
+function _bomCanBelanja(){ var r = _bomRole(); return r === 'warehouse' || r === 'procurement' || r === 'admin'; }  // lihat tab Perlu Dibelanjakan + Direct/Batal (warehouse & procurement)
 function _bomIsAssigned(){ var id = _bomUserId(); return (_bomAssigned || []).some(function(a){ return a.id === id; }); }
 // Hanya Site Engineer yang di-assign (& Admin) yang bisa tambah/edit/hapus material.
 function _bomCanEdit()  {
@@ -53,12 +54,12 @@ window.loadBOM = function(fromNav) {
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
-  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'warehouse' ? 'Warehouse' : 'Lihat'));
+  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'warehouse' ? 'Warehouse' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat')));
   var addBtn = document.getElementById('bom-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_bomCanManage());
   // Tab "Perlu Dibelanjakan" hanya untuk procurement / admin (bukan Lead Engineer).
   var needBtn = document.getElementById('bom-tabbtn-need');
-  if (needBtn) needBtn.classList.toggle('hidden', !_bomCanProcure());
+  if (needBtn) needBtn.classList.toggle('hidden', !_bomCanBelanja());
   _bomShowHomeTab(_bomHomeTab === 'need' ? 'proses' : _bomHomeTab);
 
   var render = function(res) {
@@ -215,7 +216,7 @@ function _bomShowHomeTab(tab) {
   var bn  = document.getElementById('bom-tabbtn-need');
   if (bpr) bpr.className = (tab === 'proses') ? on : off;
   if (bap) bap.className = (tab === 'approved') ? on : off;
-  if (bn) bn.className = (isNeed ? on : off) + (_bomCanProcure() ? '' : ' hidden');
+  if (bn) bn.className = (isNeed ? on : off) + (_bomCanBelanja() ? '' : ' hidden');
   if (isNeed) _bomLoadNeedPurchase();   // selalu muat ulang agar status stok terkini
   else _bomRenderWOList();
 }
@@ -276,12 +277,17 @@ function _bomRenderNeedPurchase() {
         ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 whitespace-nowrap"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>Tunggu Beli</span>'
         : _bomStokStatusBadge(it);
       var aksi;
-      if (!_bomCanProcure()) aksi = '<span class="text-slate-300 text-xs">—</span>';
+      // Reserve (ambil dari stok) khusus warehouse; Direct/Batal (beli langsung)
+      // untuk warehouse & procurement.
+      if (!_bomCanBelanja()) aksi = '<span class="text-slate-300 text-xs">—</span>';
       else if (isTunggu) aksi = '<button onclick="_bomBatalBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Batalkan tanda beli langsung"><i class="fa-solid fa-rotate-left"></i> Batal</button>';
-      else aksi = '<div class="flex items-center justify-center gap-1.5">'
-        + '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
-        + '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Direct</button>'
-        + '</div>';
+      else {
+        var btnReserve = _bomCanReserve()
+          ? '<button onclick="_bomReserveBeli(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Stok diterima — reserve dari stok"><i class="fa-solid fa-warehouse"></i> Reserve</button>'
+          : '';
+        var btnDirect = '<button onclick="_bomBeliLangsung(\'' + _bomEsc(it.id) + '\')" class="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition whitespace-nowrap" title="Beli & kirim langsung ke lokasi (tanpa gudang)"><i class="fa-solid fa-truck-fast"></i> Direct</button>';
+        aksi = '<div class="flex items-center justify-center gap-1.5">' + btnReserve + btnDirect + '</div>';
+      }
       return '<tr class="border-t border-slate-100">'
         + '<td class="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">' + _bomEsc(it.noWO) + '</td>'
         + '<td class="px-3 py-2"><div class="font-bold text-slate-700">' + _bomEsc(it.namaMaterial) + linkedBadge + '</div><div class="text-[11px] text-slate-400">' + _bomEsc(it.kategori) + (it.namaProject ? ' · ' + _bomEsc(it.namaProject) : '') + '</div></td>'
@@ -658,7 +664,7 @@ function _bomProcBadge(it) {
 function _bomRenderReview() {
   var body = document.getElementById('bom-detail-body');
   var canReview = _bomCanReview();
-  var canProcure = _bomCanProcure();
+  var canProcure = _bomCanReserve();  // reserve/alokasi item Approved di detail = warehouse
   // Project Coordinator boleh melihat status procurement (read-only), tanpa aksi.
   var canViewProc = canProcure || _bomRole() === 'projectcoordinator';
   var showAksi = canReview || canProcure;
