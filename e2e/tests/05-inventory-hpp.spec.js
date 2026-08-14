@@ -79,21 +79,27 @@ test.describe('Inventory & Realisasi HPP (numerik)', () => {
 
   // ── 5.2 Penerimaan PO: stok + harga beli terakhir + SINKRON HPP MASTER ─────
   test('penerimaan PO menambah stok, set harga beli terakhir & sinkron HPP master', async ({ page }) => {
-    const pos = await gsCall(page, 'getPOMenungguPenerimaan');
-    const parr = Array.isArray(pos) ? pos : (pos && pos.list) || [];
-    test.skip(parr.length === 0, 'Tidak ada PO menunggu penerimaan gudang di DB tes.');
+    // getPOList (bukan getPOMenungguPenerimaan): terimaPOItems menerima status
+    // 'Aktif'/'Diterima Sebagian'/'Menunggu Gudang'. Queue "Menunggu Gudang"
+    // baru terisi setelah pembayaran PO — jadi ambil dari daftar PO penuh.
+    const pos = await gsCall(page, 'getPOList');
+    const parr = (Array.isArray(pos) ? pos : (pos && (pos.list || pos.woList)) || [])
+      .filter((p) => ['Aktif', 'Diterima Sebagian', 'Menunggu Gudang', 'Menunggu Penerimaan Gudang']
+        .indexOf((p.statusPO || p.status || '')) >= 0);
+    test.skip(parr.length === 0, 'Tidak ada PO berstatus dapat-diterima di DB tes.');
 
     // Cari PO + item yang qtySisa>0 DAN tertaut ke baris stok (getStokList).
     // getStokList di-key oleh idProduk (= stok.id_produk) — sumber kebenaran
     // stok & harga beli terakhir, lebih andal dari mencocokkan getProdukList.
     let chosen = null;
     for (const po of parr) {
-      const det = await gsCall(page, 'getPOItemsUntukPenerimaan', po.noPO);
+      const noPOx = po.noPO || po.id;
+      const det = await gsCall(page, 'getPOItemsUntukPenerimaan', noPOx);
       const items = (det && det.items) || [];
       for (const x of items) {
         if (!x.idProduk || (x.qtySisa || 0) <= 0) continue;
         const s = await stokRowFor(page, x.idProduk);
-        if (s) { chosen = { noPO: po.noPO, it: x, sBefore: s }; break; }
+        if (s) { chosen = { noPO: noPOx, it: x, sBefore: s }; break; }
       }
       if (chosen) break;
     }

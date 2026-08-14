@@ -22,17 +22,21 @@ test.describe('Invoice → Kwitansi (numerik)', () => {
   test('invoice DP: total = dpp + PPN; setelah Lunas kwitansi otomatis = total', async ({ page }) => {
     await login(page, credsFor('finance') ? 'finance' : 'admin');
 
-    // Pilih WO dengan nilai kontrak terbesar (> 0).
-    const wos = await gsCall(page, 'getWorkOrderList');
-    const warr = Array.isArray(wos) ? wos : (wos && wos.list) || [];
+    // getWorkOrderDashboard memuat nilaiKontrak & sisaDpp (getWorkOrderList tidak).
+    // Pilih WO belum-diserahterimakan (hoStatus != 'Selesai', agar tak terkunci),
+    // nilai kontrak > 0, dan masih ada sisa yang bisa ditagih.
+    const dash = await gsCall(page, 'getWorkOrderDashboard');
+    const warr = (dash && dash.woList) || (Array.isArray(dash) ? dash : (dash && dash.list) || []);
     const wo = warr
-      .filter((w) => w.noWO && (Number(w.nilaiKontrak) || 0) > 0)
-      .sort((a, b) => (Number(b.nilaiKontrak) || 0) - (Number(a.nilaiKontrak) || 0))[0];
-    test.skip(!wo, 'Tidak ada Work Order dengan nilai kontrak > 0 di DB tes.');
+      .filter((w) => w.noWO && (Number(w.nilaiKontrak) || 0) > 0 &&
+        (w.hoStatus || '') !== 'Selesai' && (Number(w.sisaDpp) || 0) > 0)
+      .sort((a, b) => (Number(a.sisaDpp) || 0) - (Number(b.sisaDpp) || 0))[0];
+    test.skip(!wo, 'Tidak ada WO (belum serah-terima, kontrak>0, sisa tagih>0) di DB tes.');
 
     const nilaiKontrak = Number(wo.nilaiKontrak) || 0;
-    // DP kecil agar tak melebihi sisa: seperempat kontrak, minimal 1.
-    const dpp = Math.max(1, Math.min(100000, Math.round(nilaiKontrak / 4)));
+    const sisaDpp = Number(wo.sisaDpp) || nilaiKontrak;
+    // DP kecil agar tak melebihi sisa yang bisa ditagih.
+    const dpp = Math.max(1, Math.min(100000, Math.round(nilaiKontrak / 4), sisaDpp));
 
     // Buat invoice DP.
     const created = await gsCall(page, 'simpanInvoice', {
