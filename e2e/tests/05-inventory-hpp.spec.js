@@ -63,16 +63,12 @@ test.describe('Inventory & Realisasi HPP (numerik)', () => {
     expect(Number(m.hargaSatuan)).toBe(newPrice);
     expect(Number(m.saldoSetelah)).toBe(q0 + Q);
 
-    // Observasi (bukan assert keras): apakah HPP master ikut ter-update?
-    // Kode saat ini TIDAK memanggil _syncProdukHPP pada penerimaan non-PO.
+    // BY DESIGN: penerimaan non-PO TIDAK menyinkron produk.hpp — warehouse tidak
+    // berwenang menetapkan harga material. HPP master hanya tersinkron dari
+    // penerimaan PO (harga ditetapkan di PO oleh finance/procurement). Jadi di
+    // sini HPP master HARUS tetap = hpp0 (tidak berubah oleh penerimaan non-PO).
     const hppAfter = Number(after.hpp) || 0;
-    test.info().annotations.push({
-      type: 'observasi-HPP-nonPO',
-      description: `HPP master sebelum=${hpp0}, sesudah=${hppAfter}, hargaTerima=${newPrice}. ` +
-        (hppAfter === newPrice
-          ? 'HPP master IKUT ter-update.'
-          : 'HPP master TIDAK ikut (penerimaan non-PO tidak sinkron produk.hpp) — cek apakah sesuai intent roadmap.'),
-    });
+    expect(hppAfter, 'penerimaan non-PO seharusnya tidak mengubah HPP master').toBe(hpp0);
 
     // Kompensasi: kurangi lagi Q agar stok kembali (best-effort).
     await gsCall(page, 'simpanPenyesuaianStok', {
