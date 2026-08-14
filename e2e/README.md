@@ -12,6 +12,16 @@ diblokir di sandbox agen.
 | `tests/02-nav-smoke.spec.js` | Login tiap peran → telusuri **semua menu** peran itu; gagal bila ada exception JS / query rusak / render error | Tidak |
 | `tests/03-pdf-smoke.spec.js` | Klik export PDF di dashboard & 3 laporan (admin); gagal bila jsPDF/agregasi melempar | Tidak |
 | `tests/04-penawaran-write.spec.js` | Buka form penawaran, verifikasi **invarian total** (grandTotal = netSub + pajak; profit = netSub − HPP) | Ya (gated) |
+| `tests/05-inventory-hpp.spec.js` | **Numerik** via backend: (1) penerimaan non-PO → stok bertambah + mutasi; (2) penerimaan PO → stok + harga beli terakhir + **sinkron HPP master**; (3) penggunaan stok → stok berkurang + **realisasi HPP** WO | Ya (gated) |
+| `tests/06-invoice-kwitansi.spec.js` | **Numerik** via backend: invoice DP → invarian `total = dpp + PPN`; setelah **Lunas** → kwitansi otomatis `jumlah = total` | Ya (gated) |
+
+Test **05 & 06 memanggil fungsi backend langsung** (via shim `google.script.run`,
+lihat `helpers/gs.js`) dengan input deterministik lalu membaca ulang efeknya untuk
+meng-assert angka. Ini menguji logika HPP/stok/pembayaran presisi tanpa selector
+form yang rapuh. Keduanya **membuat/mengubah data** — hanya jalan bila
+`E2E_ALLOW_WRITES=1`, memilih entitas dari data yang sudah ada, dan **skip** rapi
+bila data yang cocok tak tersedia (mis. tak ada PO menunggu penerimaan). Entri
+ditandai `E2E TEST`; test 05.1 mengembalikan stok via penyesuaian.
 
 `02-nav-smoke` adalah inti pemburu bug: tiap navigasi memicu query Supabase nyata,
 jadi masalah RLS/permission/bentuk-data/JS akan tersurface per-menu.
