@@ -22,13 +22,17 @@ test.describe('Invoice → Kwitansi (numerik)', () => {
   test('invoice DP: total = dpp + PPN; setelah Lunas kwitansi otomatis = total', async ({ page }) => {
     await login(page, credsFor('finance') ? 'finance' : 'admin');
 
-    // Pilih WO dengan nilai kontrak memadai.
+    // Pilih WO dengan nilai kontrak terbesar (> 0).
     const wos = await gsCall(page, 'getWorkOrderList');
     const warr = Array.isArray(wos) ? wos : (wos && wos.list) || [];
-    const wo = warr.find((w) => w.noWO && (Number(w.nilaiKontrak) || 0) >= 4000);
-    test.skip(!wo, 'Tidak ada Work Order dengan nilai kontrak >= 4000 di DB tes.');
+    const wo = warr
+      .filter((w) => w.noWO && (Number(w.nilaiKontrak) || 0) > 0)
+      .sort((a, b) => (Number(b.nilaiKontrak) || 0) - (Number(a.nilaiKontrak) || 0))[0];
+    test.skip(!wo, 'Tidak ada Work Order dengan nilai kontrak > 0 di DB tes.');
 
-    const dpp = Math.min(100000, Math.round(Number(wo.nilaiKontrak) / 4));
+    const nilaiKontrak = Number(wo.nilaiKontrak) || 0;
+    // DP kecil agar tak melebihi sisa: seperempat kontrak, minimal 1.
+    const dpp = Math.max(1, Math.min(100000, Math.round(nilaiKontrak / 4)));
 
     // Buat invoice DP.
     const created = await gsCall(page, 'simpanInvoice', {
