@@ -118,7 +118,7 @@ function _bomWOProcProgress(w) {
   if (total <= 0) return '';
   var done = w.procDone || 0;
   var cls = (done >= total) ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500';
-  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap" title="Material Approved yang diproses procurement"><i class="fa-solid fa-clipboard-check text-[9px] mr-0.5"></i>Proc ' + done + '/' + total + '</span>';
+  return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap" title="Material Approved yang diproses warehouse"><i class="fa-solid fa-clipboard-check text-[9px] mr-0.5"></i>WH ' + done + '/' + total + '</span>';
 }
 
 function _bomRenderWOList() {
@@ -708,7 +708,7 @@ function _bomRenderReview() {
     var rows = groups[kat].map(function(it, i) {
       var cat = it.catatan ? '<div class="text-[10px] text-slate-400 italic mt-0.5">' + _bomEsc(it.catatan) + '</div>' : '';
       var rej = (it.status === 'Rejected' && it.catatanReview) ? '<div class="mt-1 text-[10px] bg-rose-50 border border-rose-200 text-rose-700 rounded px-2 py-1"><i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi:</b> ' + _bomEsc(it.catatanReview) + '</div>' : '';
-      var procCell = canViewProc ? ('<td class="p-2 text-center col-status" data-label="Procurement">' + _bomProcBadge(it) + '</td>') : '';
+      var procCell = canViewProc ? ('<td class="p-2 text-center col-status" data-label="Warehouse">' + _bomProcBadge(it) + '</td>') : '';
       var aksi = '';
       if (showAksi) {
         var inner = '';
@@ -721,7 +721,7 @@ function _bomRenderReview() {
               + '<button onclick="_bomOpenReject(\'' + _bomEsc(it.id) + '\')" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md" title="Reject"><i class="fa-solid fa-xmark text-sm"></i></button>';
           }
           if (canProcure && it.status === 'Approved') {
-            if (it.procStatus) inner += '<button onclick="_bomBatalProcure(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan proses procurement"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
+            if (it.procStatus) inner += '<button onclick="_bomBatalProcure(\'' + _bomEsc(it.id) + '\')" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-md" title="Batalkan proses warehouse"><i class="fa-solid fa-rotate-left text-xs"></i></button>';
             else inner += '<button onclick="_bomOpenProcure(\'' + _bomEsc(it.id) + '\')" class="text-teal-600 hover:bg-teal-50 p-1.5 rounded-md" title="Proses (reserve / need purchase)"><i class="fa-solid fa-clipboard-check text-sm"></i></button>';
           }
         }
@@ -740,7 +740,7 @@ function _bomRenderReview() {
         + aksi
         + '</tr>';
     }).join('');
-    var procHead = canViewProc ? '<th class="p-2 w-28 text-center">Procurement</th>' : '';
+    var procHead = canViewProc ? '<th class="p-2 w-28 text-center">Warehouse</th>' : '';
     var aksiHead = showAksi ? '<th class="p-2 w-24 text-center">Aksi</th>' : '';
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
       + '<div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2"><span class="font-extrabold text-sm text-slate-700 truncate"><i class="fa-solid fa-layer-group text-slate-400 mr-1.5"></i>' + _bomEsc(kat) + '</span><span class="text-[10px] font-bold text-slate-400">' + groups[kat].length + ' item</span></div>'
@@ -827,7 +827,7 @@ function _bomSubmitProcure() {
     .prosesBOMProcurement(id, { idStok: idStok, qtyReserved: qty, oleh: _bomUserNama() });
 }
 function _bomBatalProcure(id) {
-  showConfirm({ title: 'Batalkan Proses Procurement', message: 'Batalkan proses material ini? Bila ada reserve, stok akan dikembalikan & pengeluaran otomatis dihapus.', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
+  showConfirm({ title: 'Batalkan Proses Warehouse', message: 'Batalkan proses material ini? Bila ada reserve, stok akan dikembalikan & pengeluaran otomatis dihapus.', confirmText: 'Ya, Batalkan', icon: 'fa-rotate-left', type: 'warning', onConfirm: function() {
     if (_bomBusyIds[id]) return;
     _bomBusyIds[id] = true; _bomSetActBusy(id);
     google.script.run.withSuccessHandler(function(res) {
