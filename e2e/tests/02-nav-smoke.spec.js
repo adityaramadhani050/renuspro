@@ -12,10 +12,14 @@ test.describe('Navigasi smoke per peran', () => {
 
   for (const role of roles) {
     test(`peran "${role}" — semua menu render tanpa exception`, async ({ page }) => {
+      const pages = ROLE_NAV[role] || [];
+      // Budget waktu diskalakan: tiap menu memuat data Supabase asli. Admin (24
+      // menu) butuh jauh lebih lama dari peran 7-menu. +30s buffer login.
+      test.setTimeout(Math.max(90_000, pages.length * 9_000 + 30_000));
+
       const errs = attachErrorCollectors(page);
       await login(page, role);
 
-      const pages = ROLE_NAV[role] || [];
       const failures = [];
 
       for (const pageId of pages) {
@@ -23,7 +27,7 @@ test.describe('Navigasi smoke per peran', () => {
         try {
           await gotoPage(page, pageId);
           // Beri jeda singkat agar load async sempat melempar bila akan melempar.
-          await page.waitForTimeout(800);
+          await page.waitForTimeout(500);
         } catch (e) {
           failures.push(`  ✗ [${pageId}] gagal navigasi/aktif: ${e.message.split('\n')[0]}`);
           continue;

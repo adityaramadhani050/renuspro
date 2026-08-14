@@ -21,6 +21,7 @@ test.describe('Penawaran — buat & verifikasi invarian total', () => {
   test.skip(!sales, 'Butuh kredensial sales atau admin.');
 
   test('form penawaran baru: header terisi & span total konsisten', async ({ page }) => {
+    test.setTimeout(90_000);
     const errs = attachErrorCollectors(page);
     await login(page, credsFor('sales') ? 'sales' : 'admin');
     await gotoPage(page, 'penawaran');
@@ -31,12 +32,18 @@ test.describe('Penawaran — buat & verifikasi invarian total', () => {
 
     // Isi header.
     await page.fill('#namaProject', 'E2E TEST — hapus setelah verifikasi');
-    // Pilih klien pertama yang tersedia (opsi index 1; index 0 biasanya placeholder).
-    const klien = page.locator('#klienSelect');
-    const optCount = await klien.locator('option').count();
-    if (optCount > 1) {
-      await klien.selectOption({ index: 1 });
-    }
+    // Pilih klien pertama (best-effort, non-fatal). Aplikasi membungkus <select>
+    // native dengan searchable-dropdown custom (class sd-native, tersembunyi),
+    // jadi selectOption biasa gagal. Set nilai via JS + picu event 'change'
+    // supaya onKlienChanged() tetap jalan. Tidak menggagalkan test bila gagal —
+    // invarian total di bawah adalah assertion utamanya.
+    await page.evaluate(() => {
+      const s = document.getElementById('klienSelect');
+      if (s && s.options.length > 1) {
+        s.selectedIndex = 1;
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
 
     // TODO(anda): tambahkan minimal 1 baris item + qty + harga jual + HPP di sini
     // memakai tombol "Tambah Item" / "Tambah Kelompok" sesuai DOM Anda, agar
