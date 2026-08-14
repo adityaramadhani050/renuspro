@@ -6,7 +6,7 @@ const ROLE_NAV = {
   finance: ['workorder', 'invoice', 'kwitansi', 'laporanfinance', 'pengeluaran', 'laporanprofitabilitas', 'laporankeuangan'],
   sales: ['dashboard', 'sitesurvey', 'penawaran', 'workorder', 'produk', 'template', 'customer'],
   procurement: ['workorder', 'purchaseorder', 'supplier', 'pricelist', 'bom'],
-  warehouse: ['workorder', 'inventory'],
+  warehouse: ['workorder', 'inventory', 'bom'],
   siteengineer: ['qc', 'bom', 'ded', 'schedule'],
   leadengineer: ['workorder', 'qc', 'bom', 'ded', 'schedule'],
 };

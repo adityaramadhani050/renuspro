@@ -30,7 +30,7 @@ function _bomUserId()   { return (typeof _currentUser !== 'undefined' && _curren
 function _bomCanManage(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // assign site engineer
 function _bomCanRequestKirim(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // request pengiriman
 function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // approve/reject material
-function _bomCanProcure(){ var r = _bomRole(); return r === 'procurement' || r === 'admin'; }  // tandai reserved / need purchase
+function _bomCanProcure(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // tandai reserved / need purchase (dipindah dari procurement ke warehouse)
 function _bomIsAssigned(){ var id = _bomUserId(); return (_bomAssigned || []).some(function(a){ return a.id === id; }); }
 // Hanya Site Engineer yang di-assign (& Admin) yang bisa tambah/edit/hapus material.
 function _bomCanEdit()  {
@@ -53,7 +53,7 @@ window.loadBOM = function(fromNav) {
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
-  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat'));
+  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'warehouse' ? 'Warehouse' : 'Lihat'));
   var addBtn = document.getElementById('bom-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_bomCanManage());
   // Tab "Perlu Dibelanjakan" hanya untuk procurement / admin (bukan Lead Engineer).
@@ -109,9 +109,9 @@ function _bomCountHtml(nMat, nKat) {
 // Progres procurement per WO (untuk procurement/lead/admin): berapa material
 // Approved yang sudah diproses dari total Approved.
 function _bomWOProcProgress(w) {
-  // Hanya untuk Procurement & Project Coordinator (juga admin) — bukan Lead Engineer.
+  // Hanya untuk Warehouse & Project Coordinator (juga admin) — bukan Lead Engineer.
   var r = _bomRole();
-  if (!(r === 'procurement' || r === 'projectcoordinator' || r === 'admin')) return '';
+  if (!(r === 'warehouse' || r === 'projectcoordinator' || r === 'admin')) return '';
   var total = w.approved || 0;
   if (total <= 0) return '';
   var done = w.procDone || 0;
