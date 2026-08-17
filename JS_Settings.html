@@ -185,7 +185,7 @@ function simpanWAConfig() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token, qcNotif: (document.getElementById('wa-qc-notif') || {}).checked, testNumber: (document.getElementById('wa-test-number') || {}).value, testGroup: (document.getElementById('wa-test-group') || {}).value });
+    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token, qcNotif: (document.getElementById('wa-qc-notif') || {}).checked, testNumber: (document.getElementById('wa-test-number') || {}).value, testGroup: (document.getElementById('wa-test-group') || {}).value, reminderHour: parseInt((document.getElementById('wa-reminder-hour') || {}).value, 10), reminderInterval: parseInt((document.getElementById('wa-reminder-interval') || {}).value, 10) });
 }
 
 function testWAConfig() {
