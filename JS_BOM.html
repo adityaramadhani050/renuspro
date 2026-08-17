@@ -476,7 +476,9 @@ function _bomBuatPODariBelanja(id) {
     peruntukan: it.namaProject ? ('Beli Langsung — ' + it.namaProject) : ('Beli Langsung — WO ' + (it.noWO || '')),
     noWO: it.noWO || '',
     items: [{
-      produkId: it.idStok || '', namaItem: it.namaMaterial || '',
+      // produkId = pricelistId agar cocok dgn pemenuhan BOM saat terima langsung
+      // (match: bom_item.pricelist_id === po_item.id_produk).
+      produkId: it.pricelistId || '', namaItem: it.namaMaterial || '',
       qty: Number(it.qtyMenunggu) || 0, satuan: it.satuan || '',
       hargaBeli: Number(it.hargaBeli) || 0, catatan: 'Beli langsung BOM ' + it.id
     }]

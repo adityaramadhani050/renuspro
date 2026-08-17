@@ -421,7 +421,10 @@
           (res[0].data || []).forEach(function (r) {
             var qMen = Number(r.qty_menunggu_bl) || 0; if (qMen <= 0) return;
             var plId = (r.pricelist_id || '').toString(); var pm = priceMap[plId] || {};
-            if (fSup && (pm.idSupplier || '') !== fSup) return;
+            // Exclude hanya bila item punya supplier ter-resolve yg BEDA dari
+            // filter. Item tanpa supplier ter-resolve tetap tampil agar bisa
+            // dilink (jangan sampai "Tunggu Beli" tak pernah selesai).
+            if (fSup && pm.idSupplier && pm.idSupplier !== fSup) return;
             var noWO = (r.no_wo || '').toString().trim();
             list.push({
               id: (r.id || '').toString(), noWO: noWO, namaProject: projMap[noWO] || '', kategori: (r.kategori || 'Lainnya').toString(),
