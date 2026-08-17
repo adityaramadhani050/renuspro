@@ -67,6 +67,7 @@ window.loadBOM = function(fromNav) {
     _bomWOList = (res && res.success) ? (res.perWO || []) : [];
     _bomRenderCards((res && res.global) || {});
     _bomRenderWOList();
+    _bomRefreshNeedBadge();
   };
   // Cache navigasi: pindah masuk menu instan; Muat Ulang / setelah aksi → fresh.
   var c = fromNav ? navCacheGet('bom') : null;
@@ -243,6 +244,19 @@ function _bomLoadNeedPurchase() {
     _bomNeedList = [];
     box.innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat daftar belanja.</div>';
   }).getBOMNeedPurchase();
+}
+
+// Perbarui badge jumlah "Perlu Dibelanjakan" saat home load (tanpa merender
+// daftar), agar angkanya akurat sebelum tab dibuka. Hanya untuk peran yg bisa
+// melihat tab (warehouse/procurement/admin).
+function _bomRefreshNeedBadge() {
+  var cnEl = document.getElementById('bom-tabcount-need');
+  if (!cnEl || !_bomCanBelanja()) return;
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.success) ? (res.list || []) : [];
+    _bomNeedList = list;
+    cnEl.textContent = list.length;
+  }).withFailureHandler(function() {}).getBOMNeedPurchase();
 }
 
 // Stok yang bisa dialokasikan (available = saldo − hold); null bila belum tertaut.
