@@ -366,6 +366,32 @@
           return { success: true, message: 'Riwayat mutasi ' + idMutasi + ' berhasil dihapus & saldo stok disesuaikan.' };
         }
       });
+      window.gsRoute('hapusStok', {
+        mode: 'fn',
+        handler: async function (a) {
+          var idStok = (a[0] || '').toString().trim();
+          if (!idStok) return { success: false, message: 'ID Stok wajib diisi.' };
+          var s = await supa.from('stok').select('id_produk,nama_produk,qty_tersedia').eq('id_produk', idStok).maybeSingle();
+          if (!s.data) return { success: false, message: 'Item stok tidak ditemukan.' };
+          // Guard 1: stok masih ada → tolak (cegah kehilangan nilai stok).
+          var qty = Number(s.data.qty_tersedia) || 0;
+          if (qty > 0) return { success: false, message: 'Tidak bisa menghapus: stok masih ' + qty + '. Kosongkan dulu via penyesuaian/penggunaan.' };
+          // Guard 2: masih direserve BOM aktif → tolak (cegah putus reserve/pengiriman).
+          var bq = await supa.from('bom_item').select('no_wo,qty_reserved,qty_dikirim').eq('stok_id', idStok);
+          if (bq.error) return { success: false, message: bq.error.message };
+          var reservedWO = (bq.data || []).filter(function (b) { return ((Number(b.qty_reserved) || 0) - (Number(b.qty_dikirim) || 0)) > 0; });
+          if (reservedWO.length) {
+            var woList = reservedWO.map(function (b) { return (b.no_wo || '?'); }).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).join(', ');
+            return { success: false, message: 'Tidak bisa menghapus: masih direserve BOM WO ' + woList + '.' };
+          }
+          // Hapus baris stok. Riwayat mutasi (kartu stok) DIPERTAHANKAN sesuai kebijakan.
+          var del = await supa.from('stok').delete().eq('id_produk', idStok);
+          if (del.error) return { success: false, message: del.error.message };
+          // Lepas link produk yang menunjuk stok ini (hindari referensi menggantung).
+          await supa.from('produk').update({ stok_id: null }).eq('stok_id', idStok);
+          return { success: true, message: 'Item stok "' + (s.data.nama_produk || idStok) + '" berhasil dihapus.' };
+        }
+      });
       window.gsRoute('simpanPenerimaanTanpaPO', {
         mode: 'fn',
         handler: async function (a) {

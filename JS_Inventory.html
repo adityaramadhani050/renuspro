@@ -133,11 +133,17 @@ function _pgRenderStok(data) {
       ? '<button onclick=\'bukaReserveDetail(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
         'class="text-indigo-600 hover:text-indigo-800 transition mr-2" title="Detail Reserve per WO/Proyek"><i class="fa-solid fa-list-check"></i></button>'
       : '';
+    var canHapusStok = (typeof _currentUser !== 'undefined' && _currentUser && (_currentUser.role === 'warehouse' || _currentUser.role === 'admin'));
+    var hapusBtn = canHapusStok
+      ? '<button onclick=\'hapusStokItem(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
+        'class="text-red-500 hover:text-red-700 transition ml-2" title="Hapus Item Stok"><i class="fa-solid fa-trash"></i></button>'
+      : '';
     var aksiBtn = reserveBtn +
       '<button onclick=\'bukaFormEditStok(' + JSON.stringify(d).replace(/'/g, "&#39;") + ')\' ' +
       'class="text-teal-600 hover:text-teal-800 transition mr-2" title="Edit Nama & Satuan"><i class="fa-solid fa-pen"></i></button>' +
       '<button onclick=\'bukaRincianLot(' + JSON.stringify(idStok).replace(/'/g, "&#39;") + ', ' + JSON.stringify(d.namaProduk || '').replace(/'/g, "&#39;") + ')\' ' +
-      'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>';
+      'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>' +
+      hapusBtn;
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="p-4 font-mono text-xs font-bold text-slate-500" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
       '<td class="p-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
@@ -357,6 +363,34 @@ function submitEditMutasi() {
       showNotification('Error: ' + err.message, 'error');
     })
     .editMutasiStok({ idMutasi: idMutasi, keterangan: keterangan });
+}
+
+function hapusStokItem(idStok, nama) {
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus Item Stok?',
+    message: 'Hapus item stok "' + (nama || idStok) + '"? Hanya bisa bila stok 0 & tidak sedang direserve BOM. Riwayat mutasi (kartu stok) tetap disimpan.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      toggleLoader(true, 'Menghapus item stok...');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (res && res.success) {
+            showNotification(res.message, 'success');
+            _cachedStokData = [];
+            _loadStok();
+          } else {
+            showNotification((res && res.message) || 'Gagal menghapus item stok.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification('Error: ' + err.message, 'error');
+        })
+        .hapusStok(idStok);
+    }
+  });
 }
 
 function hapusMutasi(idMutasi) {
