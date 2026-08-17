@@ -102,7 +102,7 @@
       }
       async function _notifRequestPembayaran(idReq, ref, jumlah, oleh, catatan) {
         if (!ENABLE_WA) return;
-        var lines = ['💰 *Request Pembayaran Baru*', 'ID: *' + idReq + '*', (ref || ''), 'Nominal: ' + _waFmtRp(jumlah), 'Diminta oleh: ' + (oleh || '-'), (catatan ? '📝 ' + catatan : ''), '', 'Mohon direview di menu Purchase Order → Request Pembayaran.'];
+        var lines = ['💰 *Request Pembayaran Baru*', 'ID: *' + idReq + '*', (ref || ''), 'Nominal: ' + _waFmtRp(jumlah), 'Diminta oleh: ' + (oleh || '-'), (catatan ? '📝 ' + catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.'];
         _waSend(await _waPhonesByRole('finance'), lines.filter(function (s) { return s !== ''; }).join('\n'));
       }
       async function _notifHasilPembayaran(idReq, ref, jumlah, disetujui, oleh, catatanTolak) {
@@ -159,7 +159,7 @@
               assign: '🧑‍🔧 *Penugasan BOM*\nWO: *' + W + '* — ' + P + '\nAnda ditugaskan menangani BOM untuk WO ini.\n\nSilakan buka menu BOM di RenusPro.',
               po_gudang: '📦 *Permintaan Penerimaan Barang*\nPO: *PO-UJI*\nWO: ' + W + ' — ' + P + '\nSupplier: PT Contoh Supplier\nDikirim ke gudang oleh: Procurement\n\nMohon proses di menu Inventory → Penerimaan Barang.',
               barang_diterima: '✅ *Barang Diterima Lengkap*\nPO: *PO-UJI*\nWO: ' + W + ' — ' + P + '\nStatus PO: Diterima\nDiterima oleh: Warehouse',
-              req_bayar: '💰 *Request Pembayaran Baru*\nID: *REQ-UJI*\nPO: PO-UJI · WO: ' + W + '\nNominal: ' + rp(5000000) + '\nDiminta oleh: Procurement\n\nMohon direview di menu Purchase Order → Request Pembayaran.',
+              req_bayar: '💰 *Request Pembayaran Baru*\nID: *REQ-UJI*\nPO: PO-UJI · WO: ' + W + '\nNominal: ' + rp(5000000) + '\nDiminta oleh: Procurement\n\nMohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.',
               hasil_bayar: '✅ *Pembayaran Disetujui*\nID: *REQ-UJI*\nPO: PO-UJI\nNominal: ' + rp(5000000) + '\nDisetujui oleh: Finance',
               reminder_expired: '⏰ *Reminder Penawaran Akan Expired*\n\n• 001/QUOT/UJI — ' + P + ' (Valid s/d besok)\n\nMohon segera follow-up ke klien.',
               remind_engineer: '🔔 *Pengingat Tugas Engineering*\nWO: *' + W + '* — ' + P + '\nMohon segera selesaikan tugas QC/DED/BOM yang masih pending di RenusPro.'
