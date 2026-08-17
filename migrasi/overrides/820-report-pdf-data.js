@@ -77,7 +77,15 @@
               var it = list[i];
               if (idx[it.section] == null) { idx[it.section] = sections.length; sections.push({ kode: it.section, label: it.sectionLabel, items: [] }); }
               var fotoOut = [], fa = it.foto || [];
-              for (var j = 0; j < fa.length; j++) { var durl = await _photoDataUrl(fa[j].fileId); if (durl) fotoOut.push({ dataUrl: durl }); }
+              for (var j = 0; j < fa.length; j++) {
+                var durl = await _photoDataUrl(fa[j].fileId);
+                if (!durl) continue;
+                // PDF → tandai isPdf + fileName agar client meng-merge seluruh
+                // halamannya (bukan thumbnail). Selain itu (gambar) → dataUrl biasa.
+                var _nm = (fa[j].fileName || '').toString();
+                var _isPdf = /\.pdf$/i.test(_nm) || durl.indexOf('data:application/pdf') === 0;
+                fotoOut.push(_isPdf ? { dataUrl: durl, isPdf: true, fileName: _nm || 'Lampiran.pdf' } : { dataUrl: durl });
+              }
               sections[idx[it.section]].items.push({ kode: it.kode, label: it.label, wajib: it.wajib, status: it.status, statusLabel: _qcStatusLabelText(it.status), catatanSPV: it.catatanSPV || '', foto: fotoOut });
             }
             _pdfEmbedEnd();
