@@ -83,6 +83,37 @@
       </div>
     </div>
 
+    <!-- ── Uji Notifikasi WA Card ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
+      <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+        <span class="bg-emerald-50 text-emerald-600 h-9 w-9 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-vial text-lg"></i>
+        </span>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">Uji Notifikasi WA</h3>
+          <p class="text-xs text-slate-400">Kirim contoh tiap notifikasi ke nomor/grup pengujian</p>
+        </div>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nomor WA Pengujian</label>
+            <input type="text" id="wa-test-number" placeholder="08xxxxxxxxxx"
+              class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Grup ID Pengujian</label>
+            <input type="text" id="wa-test-group" placeholder="1234567890-1234567890@g.us"
+              class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-400">Isi salah satu atau keduanya. Nomor & grup tersimpan saat klik <b>Simpan</b> di kartu WA Bot di atas. Tiap tombol mengirim contoh pesan (data dummy + tanda uji coba). Pastikan WA <b>Aktif</b> & endpoint terisi.</p>
+        <div id="wa-test-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div class="text-xs text-slate-400 italic col-span-full">Memuat...</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Syarat & Ketentuan Card ── -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden">
       <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">

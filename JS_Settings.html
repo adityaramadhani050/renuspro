@@ -110,10 +110,43 @@ function _loadWAConfig() {
       document.getElementById('wa-target').value     = r.target   || '';
       document.getElementById('wa-token').value      = r.token    || '';
       var qcEl = document.getElementById('wa-qc-notif'); if (qcEl) qcEl.checked = (r.qcNotif !== false);
+      var tn = document.getElementById('wa-test-number'); if (tn) tn.value = r.testNumber || '';
+      var tg = document.getElementById('wa-test-group'); if (tg) tg.value = r.testGroup || '';
+      _waRenderTestButtons();
       _updateWAEnabledLabel(!!r.enabled);
     })
     .withFailureHandler(function() {})
     .getWAConfig();
+}
+
+// ── Uji Notifikasi WA: tombol per jenis notifikasi ──────────────────────────
+var _WA_TEST_JENIS = [
+  { k: 'qc_lead', l: 'QC: Review Baru' }, { k: 'qc_site', l: 'QC: Hasil Review' },
+  { k: 'ded_lead', l: 'DED: Review Baru' }, { k: 'ded_site', l: 'DED: Hasil Review' },
+  { k: 'bom_ajukan', l: 'BOM: Diajukan' }, { k: 'bom_hasil', l: 'BOM: Hasil Review' },
+  { k: 'assign', l: 'Penugasan Engineer' }, { k: 'po_gudang', l: 'PO: Kirim ke Gudang' },
+  { k: 'barang_diterima', l: 'PO: Barang Diterima' }, { k: 'req_bayar', l: 'Request Pembayaran' },
+  { k: 'hasil_bayar', l: 'Hasil Pembayaran' }, { k: 'reminder_expired', l: 'Reminder Expired' },
+  { k: 'remind_engineer', l: 'Reminder Engineer' }
+];
+function _waRenderTestButtons() {
+  var box = document.getElementById('wa-test-buttons'); if (!box) return;
+  box.innerHTML = _WA_TEST_JENIS.map(function(j) {
+    return '<button onclick="testWANotifSample(\'' + j.k + '\')" class="px-3 py-2 text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg font-bold transition text-left flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-emerald-500"></i> ' + j.l + '</button>';
+  }).join('');
+}
+function testWANotifSample(jenis) {
+  var nomor  = (document.getElementById('wa-test-number').value || '').trim();
+  var grupId = (document.getElementById('wa-test-group').value  || '').trim();
+  if (!nomor && !grupId) return showNotification('Isi Nomor atau Grup ID pengujian dulu.', 'error');
+  toggleLoader(true, 'Mengirim contoh notifikasi...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      toggleLoader(false);
+      showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    })
+    .withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim.', 'error'); })
+    .testWANotifSample({ jenis: jenis, nomor: nomor, grupId: grupId });
 }
 
 function _updateWAEnabledLabel(enabled) {
@@ -152,7 +185,7 @@ function simpanWAConfig() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i> Simpan'; }
       showToast('Error: ' + e.message, 'error');
     })
-    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token, qcNotif: (document.getElementById('wa-qc-notif') || {}).checked });
+    .saveWAConfig({ enabled: enabled, endpoint: endpoint, target: target, token: token, qcNotif: (document.getElementById('wa-qc-notif') || {}).checked, testNumber: (document.getElementById('wa-test-number') || {}).value, testGroup: (document.getElementById('wa-test-group') || {}).value });
 }
 
 function testWAConfig() {
