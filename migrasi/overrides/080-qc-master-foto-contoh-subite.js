@@ -384,7 +384,10 @@
             var woList = reservedWO.map(function (b) { return (b.no_wo || '?'); }).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).join(', ');
             return { success: false, message: 'Tidak bisa menghapus: masih direserve BOM WO ' + woList + '.' };
           }
-          // Hapus baris stok. Riwayat mutasi (kartu stok) DIPERTAHANKAN sesuai kebijakan.
+          // Hapus riwayat mutasi (kartu stok) item ini.
+          var delM = await supa.from('mutasi_stok').delete().eq('id_produk', idStok);
+          if (delM.error) return { success: false, message: delM.error.message };
+          // Hapus baris stok.
           var del = await supa.from('stok').delete().eq('id_produk', idStok);
           if (del.error) return { success: false, message: del.error.message };
           // Lepas link produk yang menunjuk stok ini (hindari referensi menggantung).

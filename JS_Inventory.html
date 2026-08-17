@@ -369,7 +369,7 @@ function hapusStokItem(idStok, nama) {
   showConfirm({
     type: 'danger',
     title: 'Hapus Item Stok?',
-    message: 'Hapus item stok "' + (nama || idStok) + '"? Hanya bisa bila stok 0 & tidak sedang direserve BOM. Riwayat mutasi (kartu stok) tetap disimpan.',
+    message: 'Hapus item stok "' + (nama || idStok) + '"? Hanya bisa bila stok 0 & tidak sedang direserve BOM. Riwayat mutasi (kartu stok) item ini ikut terhapus.',
     confirmText: 'Ya, Hapus',
     onConfirm: function() {
       toggleLoader(true, 'Menghapus item stok...');
