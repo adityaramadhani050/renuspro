@@ -121,21 +121,30 @@ function _bomWOProcProgress(w) {
   return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + cls + ' whitespace-nowrap" title="Material Approved yang diproses warehouse"><i class="fa-solid fa-clipboard-check text-[9px] mr-0.5"></i>WH ' + done + '/' + total + '</span>';
 }
 
+// WO masuk tab "Approved" HANYA bila semua item sudah Approved (status Final)
+// DAN seluruhnya sudah diproses warehouse (procDone >= approved). Jika ada item
+// Approved yang belum diproses warehouse, WO tetap di tab "Proses" agar warehouse
+// tahu WO mana yang belum diproses.
+function _bomWODone(w) {
+  var appr = Number(w.approved) || 0;
+  return w.status === 'Final' && appr > 0 && (Number(w.procDone) || 0) >= appr;
+}
+
 function _bomRenderWOList() {
   var q = (document.getElementById('bom-search').value || '').toLowerCase().trim();
   // Hitung jumlah per tab & set badge.
-  var proses = _bomWOList.filter(function(w) { return w.status !== 'Final'; }).length;
-  var approved = _bomWOList.filter(function(w) { return w.status === 'Final'; }).length;
+  var proses = _bomWOList.filter(function(w) { return !_bomWODone(w); }).length;
+  var approved = _bomWOList.filter(function(w) { return _bomWODone(w); }).length;
   var cpEl = document.getElementById('bom-tabcount-proses'); if (cpEl) cpEl.textContent = proses;
   var caEl = document.getElementById('bom-tabcount-approved'); if (caEl) caEl.textContent = approved;
   var list = _bomWOList.filter(function(w) {
-    var tabOk = (_bomHomeTab === 'approved') ? (w.status === 'Final') : (w.status !== 'Final');
+    var tabOk = (_bomHomeTab === 'approved') ? _bomWODone(w) : !_bomWODone(w);
     return tabOk && (!q || ((w.noWO + ' ' + (w.namaProject||'') + ' ' + (w.namaKlien||'')).toLowerCase().indexOf(q) !== -1));
   });
   var box = document.getElementById('bom-wo-list');
   if (!list.length) {
     var emptyMsg = q ? 'Tidak ada WO cocok.'
-      : (_bomHomeTab === 'approved' ? 'Belum ada BOM yang disetujui (Approved).'
+      : (_bomHomeTab === 'approved' ? 'Belum ada BOM yang selesai (Approved & sudah diproses warehouse).'
       : (_bomRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project BOM sedang proses.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked mr-2"></i>' + emptyMsg + '</div>';
     return;
