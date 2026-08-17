@@ -645,13 +645,17 @@ function _renderPODetail(po, items, paymentRequests, riwayatPenerimaan) {
   var btnRequestBayar= document.getElementById('po-detail-btn-request-bayar');
   var btnSelesai     = document.getElementById('po-detail-btn-selesai');
   var btnBatal       = document.getElementById('po-detail-btn-batal');
+  var btnHapus       = document.getElementById('po-detail-btn-hapus');
 
   if (btnEdit)         btnEdit.classList.toggle('hidden', !isAktif);
   if (btnTerima)       btnTerima.classList.toggle('hidden', !bisaTerima);
   if (badgeGudang)     badgeGudang.classList.add('hidden');
   if (btnRequestBayar) btnRequestBayar.classList.toggle('hidden', isTerminal || isLunas);
   if (btnSelesai)      btnSelesai.classList.toggle('hidden', !(isDiterima && isLunas));
-  if (btnBatal)        btnBatal.classList.toggle('hidden', isTerminal);
+  // PO Aktif → tombol Hapus (belum ada penerimaan/pembayaran); non-Aktif
+  // non-terminal (mis. Diterima Sebagian) → tetap Batalkan.
+  if (btnHapus)        btnHapus.classList.toggle('hidden', !isAktif);
+  if (btnBatal)        btnBatal.classList.toggle('hidden', isTerminal || isAktif);
 
   // Items
   var tbody = document.getElementById('po-detail-items');
@@ -1138,6 +1142,38 @@ window.batalkanPO = function(noPO) {
           showNotification(err.message || 'Gagal membatalkan PO.', 'error');
         })
         .ubahStatusPO(noPO, 'Batal', _currentUser ? _currentUser.nama : '');
+    }
+  });
+};
+
+// Hapus PO — hanya untuk PO Aktif (belum ada penerimaan/pembayaran). Backend
+// menolak bila status bukan Aktif atau sudah ada pembayaran.
+window.hapusPO = function(noPO) {
+  if (!noPO) return;
+  showConfirm({
+    type: 'danger',
+    title: 'Hapus PO?',
+    message: 'Hapus PO ' + noPO + ' secara permanen? Hanya bisa untuk PO Aktif yang belum ada pembayaran. Tindakan ini tidak bisa dibatalkan.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      toggleLoader(true, 'Menghapus PO...');
+      if (typeof google === 'undefined') { toggleLoader(false); return; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          toggleLoader(false);
+          if (res && res.success) {
+            showNotification(res.message);
+            loadPurchaseOrder();
+            tutupPanelPO();
+          } else {
+            showNotification((res && res.message) || 'Gagal menghapus PO.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          toggleLoader(false);
+          showNotification((err && err.message) || 'Gagal menghapus PO.', 'error');
+        })
+        .hapusPO(noPO);
     }
   });
 };
