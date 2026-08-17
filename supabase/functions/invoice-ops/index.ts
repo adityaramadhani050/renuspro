@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
         const r = rows[0];
         const k = await sb.from('klien').select('nama_klien').eq('id', r.klien_id || '').maybeSingle();
         wo = { subtotal: r.subtotal, diskon: r.diskon, pajak: r.pajak, id: r.no_penawaran, klienId: r.klien_id, namaKlien: k.data?.nama_klien || '', namaProject: r.nama_project, items: r.items };
-        if (p.jenis !== 'DP') return json({ success: false, message: 'Invoice pre-deal hanya boleh jenis DP.' });
+        if (p.jenis !== 'DP' && p.jenis !== 'Penuh') return json({ success: false, message: 'Invoice pre-deal hanya boleh jenis DP atau Pembayaran Penuh.' });
       } else {
         const w = await sb.from('work_order').select('subtotal,diskon,pajak,no_penawaran,klien_id,nama_klien,nama_project,items').eq('no_wo', p.noWO).maybeSingle();
         if (w.error || !w.data) return json({ success: false, message: 'Work Order tidak ditemukan.' });
@@ -133,7 +133,7 @@ Deno.serve(async (req: Request) => {
         if (!rows.length) return json({ success: false, message: 'Penawaran tidak ditemukan.' });
         const r = rows[0]; const k = await sb.from('klien').select('nama_klien').eq('id', r.klien_id || '').maybeSingle();
         wo = { subtotal: r.subtotal, diskon: r.diskon, pajak: r.pajak, id: r.no_penawaran, klienId: r.klien_id, namaKlien: k.data?.nama_klien || '', namaProject: r.nama_project, items: r.items };
-        if (p.jenis !== 'DP') return json({ success: false, message: 'Invoice pre-deal hanya boleh jenis DP.' });
+        if (p.jenis !== 'DP' && p.jenis !== 'Penuh') return json({ success: false, message: 'Invoice pre-deal hanya boleh jenis DP atau Pembayaran Penuh.' });
       } else {
         const w = await sb.from('work_order').select('subtotal,diskon,pajak,no_penawaran,klien_id,nama_klien,nama_project,items').eq('no_wo', resolvedNoWO).maybeSingle();
         if (w.error || !w.data) return json({ success: false, message: 'Work Order sumber tidak ditemukan.' });

@@ -385,17 +385,21 @@
       document.getElementById('inv-info-sisa').innerText    = 'Rp ' + Math.round(_invEffSisa(wo)).toLocaleString('id-ID');
       document.getElementById('inv-po-penawaran').innerText = wo.id || '-';
 
-      // Pre-deal: kunci jenis ke DP, tambah label peringatan
+      // Pre-deal: batasi pilihan ke DP & Pembayaran Penuh (sembunyikan Termin/
+      // Pelunasan), tetap bisa dipilih. Deal: semua jenis tersedia.
       const jenisEl = document.getElementById('inv-jenis');
       const predealNote = document.getElementById('inv-predeal-note');
       if (wo.isPredeal) {
-        jenisEl.value = 'DP';
-        jenisEl.disabled = true;
+        _invSetJenisPredeal(true);
+        if (jenisEl.value !== 'DP' && jenisEl.value !== 'Penuh') jenisEl.value = 'DP';
+        jenisEl.disabled = false;
         if (predealNote) predealNote.classList.remove('hidden');
       } else {
+        _invSetJenisPredeal(false);
         jenisEl.disabled = false;
         if (predealNote) predealNote.classList.add('hidden');
       }
+      onInvoiceJenisChange();
 
       _renderScopeInvoice(wo);
       onInvoicePersenInput();
@@ -412,6 +416,18 @@
           onInvoicePOToggle();
         }
       }
+    }
+
+    // Batasi opsi jenis untuk pre-deal: hanya DP & Pembayaran Penuh (Termin &
+    // Pelunasan disembunyikan). isPredeal=false → semua opsi tampil.
+    function _invSetJenisPredeal(isPredeal) {
+      const el = document.getElementById('inv-jenis');
+      if (!el) return;
+      Array.prototype.forEach.call(el.options, function(o) {
+        const restricted = (o.value === 'Termin' || o.value === 'Pelunasan');
+        o.hidden = isPredeal && restricted;
+        o.disabled = isPredeal && restricted;
+      });
     }
 
     function onInvoiceJenisChange() {
