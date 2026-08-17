@@ -627,18 +627,25 @@ async function _qcBuildPDF(d) {
 
   var _fname = 'Laporan-QC-' + (d.noWO || '') + '.pdf';
   // Gabungkan seluruh halaman tiap lampiran PDF ke akhir laporan (pdf-lib).
-  if (_qcPdfAttach.length && window.PDFLib && window.PDFLib.PDFDocument) {
-    var _PDFDocument = window.PDFLib.PDFDocument;
-    var _merged = await _PDFDocument.load(doc.output('arraybuffer'));
+  if (_qcPdfAttach.length) {
+    var _PDFLib = window.PDFLib || (typeof PDFLib !== 'undefined' ? PDFLib : null);
+    if (!_PDFLib || !_PDFLib.PDFDocument) {
+      throw new Error('Modul PDF (pdf-lib) belum termuat. Muat ulang halaman lalu coba lagi.');
+    }
+    var _PDFDocument = _PDFLib.PDFDocument;
+    var _mainBytes = _qcDataUrlToBytes(doc.output('datauristring')) || doc.output('arraybuffer');
+    var _merged = await _PDFDocument.load(_mainBytes);
+    var _added = 0, _lastErr = '';
     for (var _ai = 0; _ai < _qcPdfAttach.length; _ai++) {
       try {
         var _b = _qcDataUrlToBytes(_qcPdfAttach[_ai].dataUrl);
-        if (!_b) continue;
+        if (!_b || !_b.length) { _lastErr = 'data lampiran kosong'; continue; }
         var _src = await _PDFDocument.load(_b, { ignoreEncryption: true });
         var _pgs = await _merged.copyPages(_src, _src.getPageIndices());
-        _pgs.forEach(function(pg) { _merged.addPage(pg); });
-      } catch (e) { /* lewati file rusak/terenkripsi */ }
+        _pgs.forEach(function(pg) { _merged.addPage(pg); _added++; });
+      } catch (e) { _lastErr = (e && e.message) || String(e); }
     }
+    if (_added === 0) throw new Error('Gagal menggabungkan lampiran PDF: ' + (_lastErr || 'tidak diketahui'));
     _qcDownloadBytes(await _merged.save(), _fname);
   } else {
     doc.save(_fname);
