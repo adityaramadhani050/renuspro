@@ -572,10 +572,11 @@ async function _qcBuildPDF(d) {
       // File yang benar2 PDF → di-merge; selain itu diperlakukan sbg gambar
       // (mime dinormalkan bila salah label) agar addImage tak gagal.
       var _files = (it.foto || []).filter(function(f) { return f && f.dataUrl; });
-      var foto = [], _pdfs = [];
+      var foto = [], _pdfs = [], _pdfBad = [];
       _files.forEach(function(f) {
         var _b64 = String(f.dataUrl).split(',')[1] || '';
-        if (_b64.indexOf('JVBER') === 0) { _pdfs.push(f); return; }
+        if (_b64.indexOf('JVBER') === 0) { _pdfs.push(f); return; }   // PDF asli (%PDF)
+        if (f.isPdf) { _pdfBad.push({ f: f, magic: _b64.slice(0, 12) }); return; }  // ditandai PDF tapi isi bukan PDF
         var _im = _b64.indexOf('/9j/') === 0 ? 'image/jpeg' : (_b64.indexOf('iVBOR') === 0 ? 'image/png' : '');
         foto.push((_im && f.dataUrl.indexOf('data:' + _im) !== 0) ? { dataUrl: 'data:' + _im + ';base64,' + _b64 } : f);
       });
@@ -617,7 +618,17 @@ async function _qcBuildPDF(d) {
           _qcPdfAttach.push(pf);
         });
       }
-      if (!foto.length && !_pdfs.length && it.status !== 'NA') {
+      // Diagnostik: file ditandai PDF tapi isinya bukan %PDF (mis. tersimpan
+      // sebagai gambar) → tampilkan kode magic agar akar masalah terlihat.
+      if (_pdfBad.length) {
+        _pdfBad.forEach(function(bad) {
+          ensure(7);
+          doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(225,29,72);
+          var _ln = doc.splitTextToSize('Lampiran "' + ((bad.f && bad.f.fileName) || 'dokumen') + '" tersimpan bukan PDF (kode: ' + bad.magic + ')', CW);
+          doc.text(_ln, ML, y + 3); y += _ln.length * 4 + 1;
+        });
+      }
+      if (!foto.length && !_pdfs.length && !_pdfBad.length && it.status !== 'NA') {
         doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(148,163,184);
         doc.text('(Belum ada foto)', ML, y + 2); y += 5;
       }
