@@ -567,9 +567,18 @@ async function _qcBuildPDF(d) {
       // Catatan Lead tidak ditampilkan di PDF: laporan dibuat setelah semua
       // item Approved, jadi catatan revisi tak lagi relevan di laporan akhir.
 
+      // Klasifikasi berdasarkan ISI (magic bytes di base64), bukan label:
+      //   %PDF → base64 diawali 'JVBER'; JPEG → '/9j/'; PNG → 'iVBOR'.
+      // File yang benar2 PDF → di-merge; selain itu diperlakukan sbg gambar
+      // (mime dinormalkan bila salah label) agar addImage tak gagal.
       var _files = (it.foto || []).filter(function(f) { return f && f.dataUrl; });
-      var foto = _files.filter(function(f) { return !f.isPdf; });   // gambar
-      var _pdfs = _files.filter(function(f) { return f.isPdf; });   // dokumen PDF
+      var foto = [], _pdfs = [];
+      _files.forEach(function(f) {
+        var _b64 = String(f.dataUrl).split(',')[1] || '';
+        if (_b64.indexOf('JVBER') === 0) { _pdfs.push(f); return; }
+        var _im = _b64.indexOf('/9j/') === 0 ? 'image/jpeg' : (_b64.indexOf('iVBOR') === 0 ? 'image/png' : '');
+        foto.push((_im && f.dataUrl.indexOf('data:' + _im) !== 0) ? { dataUrl: 'data:' + _im + ';base64,' + _b64 } : f);
+      });
       if (foto.length) {
         // Layout foto menjaga rasio asli (tidak dipaksa tinggi), grid rapi:
         // 1 foto → setengah lebar; 2 → 2 kolom; ≥3 → 3 kolom. Potret ditengahkan.
@@ -635,17 +644,15 @@ async function _qcBuildPDF(d) {
     var _PDFDocument = _PDFLib.PDFDocument;
     var _mainBytes = _qcDataUrlToBytes(doc.output('datauristring')) || doc.output('arraybuffer');
     var _merged = await _PDFDocument.load(_mainBytes);
-    var _added = 0, _lastErr = '';
     for (var _ai = 0; _ai < _qcPdfAttach.length; _ai++) {
       try {
         var _b = _qcDataUrlToBytes(_qcPdfAttach[_ai].dataUrl);
-        if (!_b || !_b.length) { _lastErr = 'data lampiran kosong'; continue; }
+        if (!_b || !_b.length) continue;
         var _src = await _PDFDocument.load(_b, { ignoreEncryption: true });
         var _pgs = await _merged.copyPages(_src, _src.getPageIndices());
-        _pgs.forEach(function(pg) { _merged.addPage(pg); _added++; });
-      } catch (e) { _lastErr = (e && e.message) || String(e); }
+        _pgs.forEach(function(pg) { _merged.addPage(pg); });
+      } catch (e) { /* file bukan PDF valid → lewati (sudah difilter magic bytes) */ }
     }
-    if (_added === 0) throw new Error('Gagal menggabungkan lampiran PDF: ' + (_lastErr || 'tidak diketahui'));
     _qcDownloadBytes(await _merged.save(), _fname);
   } else {
     doc.save(_fname);
