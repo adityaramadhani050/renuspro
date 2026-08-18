@@ -115,6 +115,7 @@ for (const def of TABLES) {
   for (const r of dataRows) {
     if (!r || r.every(c => s(c) === '')) continue;          // baris kosong (bukan skip)
     const o = transformRow(def.cols, r);
+    if (def.post) def.post(o);                              // penyesuaian per-tabel (mis. bangun PK unik)
     if (pkKeys.some(k => o[k] == null || o[k] === '')) { skippedPk++; continue; } // PK tak lengkap
     rows.push(o);
   }
