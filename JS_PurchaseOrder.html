@@ -957,14 +957,101 @@ function submitReqNonPO() {
 // ── Tab home PO: Daftar PO ↔ Riwayat Request Pembayaran ───────────────────────
 var _poRiwayatData = [];
 function _poSwitchTab(tab) {
-  var isList = tab !== 'riwayat';
-  document.getElementById('po-tab-list').classList.toggle('hidden', !isList);
-  document.getElementById('po-tab-riwayat').classList.toggle('hidden', isList);
-  var lb = document.getElementById('po-tab-list-btn'), rb = document.getElementById('po-tab-riwayat-btn');
+  if (['list','riwayat','reqstok'].indexOf(tab) === -1) tab = 'list';
+  document.getElementById('po-tab-list').classList.toggle('hidden', tab !== 'list');
+  document.getElementById('po-tab-riwayat').classList.toggle('hidden', tab !== 'riwayat');
+  var tr = document.getElementById('po-tab-reqstok'); if (tr) tr.classList.toggle('hidden', tab !== 'reqstok');
   var base = 'px-4 py-2.5 text-sm font-bold border-b-2 whitespace-nowrap transition ';
-  lb.className = base + (isList ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600');
-  rb.className = base + (isList ? 'border-transparent text-slate-400 hover:text-slate-600' : 'border-orange-500 text-orange-600');
-  if (!isList) loadPORiwayat();
+  var on = 'border-orange-500 text-orange-600', off = 'border-transparent text-slate-400 hover:text-slate-600';
+  document.getElementById('po-tab-list-btn').className    = base + (tab === 'list'    ? on : off);
+  document.getElementById('po-tab-riwayat-btn').className  = base + (tab === 'riwayat' ? on : off);
+  var rsb = document.getElementById('po-tab-reqstok-btn'); if (rsb) rsb.className = base + (tab === 'reqstok' ? on : off);
+  if (tab === 'riwayat') loadPORiwayat();
+  if (tab === 'reqstok') loadPOReqStok();
+}
+
+// ── Tab Request Stok (dari Warehouse) ────────────────────────────────────────
+var _poReqStokData = [];
+function loadPOReqStok() {
+  var tb = document.getElementById('po-reqstok-body');
+  if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  google.script.run.withSuccessHandler(function(res){
+    _poReqStokData = Array.isArray(res) ? res : [];
+    _poRenderReqStok();
+    _poRefreshReqStokBadge();
+  }).withFailureHandler(function(){ if (tb) tb.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-rose-400">Gagal memuat.</td></tr>'; }).getStokRequestList('');
+}
+function _poRefreshReqStokBadge() {
+  var b = document.getElementById('po-reqstok-badge');
+  if (!b) return;
+  var n = (_poReqStokData || []).filter(function(r){ return r.status === 'Menunggu'; }).length;
+  if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else { b.classList.add('hidden'); }
+}
+function _poRenderReqStok() {
+  var q = (document.getElementById('po-reqstok-search').value || '').toLowerCase().trim();
+  var st = document.getElementById('po-reqstok-status').value;
+  var list = (_poReqStokData || []).filter(function(r){
+    if (st && r.status !== st) return false;
+    if (!q) return true;
+    return ((r.id||'')+' '+(r.namaItem||'')+' '+(r.dimintaOleh||'')).toLowerCase().indexOf(q) !== -1;
+  });
+  var tb = document.getElementById('po-reqstok-body');
+  if (!tb) return;
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Tidak ada data.</td></tr>'; return; }
+  var sc = { 'Menunggu':'bg-amber-100 text-amber-700','Diproses':'bg-blue-100 text-blue-700','Selesai':'bg-emerald-100 text-emerald-700','Ditolak':'bg-rose-100 text-rose-600' };
+  tb.innerHTML = list.map(function(r){
+    var badge = '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full '+(sc[r.status]||'bg-slate-100 text-slate-600')+'">'+_escHtml(r.status)+'</span>';
+    var proc = r.catatanProc ? '<div class="text-[11px] text-slate-400 mt-0.5">'+_escHtml(r.catatanProc)+'</div>' : '';
+    var poCell = r.noPO ? '<div class="text-[11px] text-slate-500 mt-0.5 font-mono">PO: '+_escHtml(r.noPO)+'</div>' : '';
+    var aksi = '';
+    if (r.status === 'Menunggu' || r.status === 'Diproses') {
+      var dj = JSON.stringify(r).replace(/'/g, "&#39;");
+      aksi =
+        '<button onclick=\'buatPODariReqStok('+dj+')\' class="text-orange-600 hover:text-orange-800 transition mr-2" title="Buat PO dari request ini"><i class="fa-solid fa-file-circle-plus"></i></button>' +
+        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Diproses")\' class="text-blue-600 hover:text-blue-800 transition mr-2" title="Tandai Diproses"><i class="fa-solid fa-spinner"></i></button>' +
+        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Selesai")\' class="text-emerald-600 hover:text-emerald-800 transition mr-2" title="Tandai Selesai"><i class="fa-solid fa-check"></i></button>' +
+        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Ditolak")\' class="text-rose-500 hover:text-rose-700 transition" title="Tolak request"><i class="fa-solid fa-xmark"></i></button>';
+    } else {
+      aksi = '<span class="text-slate-300 text-xs">—</span>';
+    }
+    return '<tr class="hover:bg-slate-50 transition-colors">' +
+      '<td class="p-4 align-top"><span class="font-mono text-xs font-bold text-slate-600">'+_escHtml(r.id)+'</span><div class="text-[10px] text-slate-400">'+_escHtml(r.tanggal||'')+'</div></td>' +
+      '<td class="p-4 align-top font-semibold text-slate-800">'+_escHtml(r.namaItem)+poCell+'</td>' +
+      '<td class="p-4 align-top text-center font-bold text-slate-700 whitespace-nowrap">'+(r.qty||0).toLocaleString('id-ID')+' '+_escHtml(r.satuan)+'</td>' +
+      '<td class="p-4 align-top text-slate-500 text-xs">'+(r.catatan ? _escHtml(r.catatan) : '<span class="text-slate-300">—</span>')+'</td>' +
+      '<td class="p-4 align-top text-slate-600 text-xs">'+_escHtml(r.dimintaOleh || '—')+'</td>' +
+      '<td class="p-4 align-top text-center">'+badge+proc+'</td>' +
+      '<td class="p-4 align-top text-center whitespace-nowrap">'+aksi+'</td>' +
+      '</tr>';
+  }).join('');
+}
+function prosesReqStok(id, status, noPO) {
+  var msg = status === 'Ditolak' ? 'Tolak request ini?' : (status === 'Selesai' ? 'Tandai request ini Selesai?' : null);
+  var catatanProc = '';
+  if (status === 'Ditolak') { catatanProc = prompt('Alasan penolakan (opsional):') || ''; }
+  else if (msg && !confirm(msg)) return;
+  toggleLoader(true, 'Memperbarui request...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false);
+    showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) loadPOReqStok();
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .prosesRequestStok({
+      id: id, status: status, catatanProc: catatanProc, noPO: noPO || '',
+      namaUser: (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''
+    });
+}
+function buatPODariReqStok(r) {
+  r = r || {};
+  // Tandai request "Diproses" (bila masih Menunggu), lalu buka form PO ter-prefill.
+  if (r.status === 'Menunggu') {
+    google.script.run.withSuccessHandler(function(){ if (typeof loadPOReqStok === 'function') loadPOReqStok(); })
+      .prosesRequestStok({ id: r.id, status: 'Diproses', namaUser: (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : '' });
+  }
+  bukaFormPOPrefill({
+    peruntukan: 'Stok',
+    items: [{ namaItem: r.namaItem || '', qty: r.qty || 1, satuan: r.satuan || '', hargaBeli: 0, produkId: r.idProduk || '', catatan: 'Request ' + (r.id || '') }]
+  });
 }
 function loadPORiwayat() {
   var tb = document.getElementById('po-riwayat-body');

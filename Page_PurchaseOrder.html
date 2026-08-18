@@ -40,6 +40,7 @@
           <div class="flex items-center gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
             <button id="po-tab-list-btn" onclick="_poSwitchTab('list')" class="px-4 py-2.5 text-sm font-bold border-b-2 border-orange-500 text-orange-600 whitespace-nowrap transition">Purchase Order</button>
             <button id="po-tab-riwayat-btn" onclick="_poSwitchTab('riwayat')" class="px-4 py-2.5 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 whitespace-nowrap transition">Riwayat Request Pembayaran</button>
+            <button id="po-tab-reqstok-btn" onclick="_poSwitchTab('reqstok')" class="px-4 py-2.5 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 whitespace-nowrap transition">Request Stok <span id="po-reqstok-badge" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold"></span></button>
           </div>
 
           <!-- ── TAB: Daftar PO ── -->
@@ -107,6 +108,43 @@
                   </thead>
                   <tbody id="po-riwayat-body" class="divide-y divide-slate-100">
                     <tr><td colspan="6" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TAB: Request Stok (dari Warehouse) ── -->
+          <div id="po-tab-reqstok" class="hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+              <div class="relative w-full sm:w-72">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="po-reqstok-search" oninput="_poRenderReqStok()" placeholder="Cari ID / item / peminta..." class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
+              </div>
+              <select id="po-reqstok-status" onchange="_poRenderReqStok()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
+                <option value="">Semua Status</option>
+                <option value="Menunggu">Menunggu</option>
+                <option value="Diproses">Diproses</option>
+                <option value="Selesai">Selesai</option>
+                <option value="Ditolak">Ditolak</option>
+              </select>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th class="p-4 text-left">ID / Tanggal</th>
+                      <th class="p-4 text-left">Item</th>
+                      <th class="p-4 text-center">Qty</th>
+                      <th class="p-4 text-left">Catatan</th>
+                      <th class="p-4 text-left">Peminta</th>
+                      <th class="p-4 text-center">Status</th>
+                      <th class="p-4 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="po-reqstok-body" class="divide-y divide-slate-100">
+                    <tr><td colspan="7" class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>
                   </tbody>
                 </table>
               </div>

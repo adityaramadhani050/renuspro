@@ -94,6 +94,11 @@
         var lines = ['📦 *Permintaan Penerimaan Barang*', 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), (supplier ? 'Supplier: ' + supplier : ''), 'Dikirim ke gudang oleh: ' + (oleh || '-'), '', 'Mohon proses di menu Inventory → Penerimaan Barang.'];
         _waSend(await _waPhonesByRole('warehouse'), lines.filter(function (s) { return s !== ''; }).join('\n'));
       }
+      async function _notifRequestStok(id, namaItem, qty, satuan, oleh, catatan) {
+        if (!ENABLE_WA) return;
+        var lines = ['📦 *Permintaan Penambahan Stok*', 'ID: *' + id + '*', 'Item: ' + (namaItem || '-') + ' — ' + (Number(qty) || 0) + ' ' + (satuan || ''), 'Diminta oleh: ' + (oleh || '-') + ' (Warehouse)', (catatan ? '📝 ' + catatan : ''), '', 'Mohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'];
+        _waSend(await _waPhonesByRole('procurement'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+      }
       async function _notifBarangDiterima(noPO, noWO, statusPO, oleh, catatanList) {
         if (!ENABLE_WA) return; var proj = noWO ? await _waProjName(noWO) : '';
         var lines = [(statusPO === 'Diterima' ? '✅ *Barang Diterima Lengkap*' : '📥 *Barang Diterima Sebagian*'), 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), 'Status PO: ' + statusPO, 'Diterima oleh: ' + (oleh || '-')];

@@ -395,6 +395,72 @@
           return { success: true, message: 'Item stok "' + (s.data.nama_produk || idStok) + '" berhasil dihapus.' };
         }
       });
+      // ── Request Penambahan Stok (Warehouse → Procurement) ────────────────
+      window.gsRoute('buatRequestStok', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var nama = (p.namaItem || '').toString().trim();
+          var qty = Number(p.qty) || 0;
+          var idProduk = (p.idProduk || '').toString().trim();
+          var satuan = (p.satuan || '').toString().trim();
+          var catatan = (p.catatan || '').toString().trim();
+          var namaUser = (p.namaUser || '').toString().trim();
+          if (!nama) return { success: false, message: 'Nama item wajib diisi.' };
+          if (qty <= 0) return { success: false, message: 'Qty harus lebih dari 0.' };
+          var id = await _nextSeqId('stok_request', 'id', 'REQ-STK-' + _ym() + '-');
+          var ins = await supa.from('stok_request').insert({
+            id: id, tanggal: _todayIso(), id_produk: idProduk || null, nama_item: nama,
+            satuan: satuan || null, qty: qty, catatan: catatan || null, status: 'Menunggu',
+            diminta_oleh: namaUser || null, dibuat_pada: new Date().toISOString()
+          });
+          if (ins.error) return { success: false, message: ins.error.message };
+          if (typeof _notifRequestStok === 'function') _notifRequestStok(id, nama, qty, satuan, namaUser, catatan);
+          return { success: true, message: 'Request stok "' + nama + '" berhasil dikirim ke Procurement.', id: id };
+        }
+      });
+      window.gsRoute('getStokRequestList', {
+        mode: 'fn',
+        handler: async function (a) {
+          var status = ((a && a[0]) || '').toString().trim();
+          var q = supa.from('stok_request').select('*').order('dibuat_pada', { ascending: false });
+          if (status) q = q.eq('status', status);
+          var r = await q;
+          if (r.error) return [];
+          return (r.data || []).map(function (o) {
+            return {
+              id: o.id, tanggal: o.tanggal, idProduk: o.id_produk || '', namaItem: o.nama_item || '',
+              satuan: o.satuan || '', qty: Number(o.qty) || 0, catatan: o.catatan || '',
+              status: o.status || 'Menunggu', noPO: o.no_po || '', catatanProc: o.catatan_proc || '',
+              dimintaOleh: o.diminta_oleh || '', diprosesOleh: o.diproses_oleh || '',
+              dibuatPada: o.dibuat_pada, diprosesPada: o.diproses_pada
+            };
+          });
+        }
+      });
+      window.gsRoute('prosesRequestStok', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var id = (p.id || '').toString().trim();
+          var statusBaru = (p.status || '').toString().trim();   // Diproses | Selesai | Ditolak
+          var namaUser = (p.namaUser || '').toString().trim();
+          var catatanProc = (p.catatanProc || '').toString().trim();
+          var noPO = (p.noPO || '').toString().trim();
+          if (!id) return { success: false, message: 'ID request wajib.' };
+          if (['Diproses', 'Selesai', 'Ditolak', 'Menunggu'].indexOf(statusBaru) === -1) return { success: false, message: 'Status tidak valid.' };
+          var f = await supa.from('stok_request').select('status').eq('id', id).maybeSingle();
+          if (!f.data) return { success: false, message: 'Request tidak ditemukan.' };
+          var statusLama = (f.data.status || '').toString();
+          if (statusLama === 'Selesai' || statusLama === 'Ditolak') return { success: false, message: 'Request berstatus "' + statusLama + '" sudah final.' };
+          var upd = { status: statusBaru, diproses_oleh: namaUser || null, diproses_pada: new Date().toISOString() };
+          if (catatanProc) upd.catatan_proc = catatanProc;
+          if (noPO) upd.no_po = noPO;
+          var up = await supa.from('stok_request').update(upd).eq('id', id);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Request ' + id + ' diperbarui menjadi "' + statusBaru + '".' };
+        }
+      });
       window.gsRoute('simpanPenerimaanTanpaPO', {
         mode: 'fn',
         handler: async function (a) {
