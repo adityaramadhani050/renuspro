@@ -43,7 +43,15 @@ const s = v => (v == null ? '' : String(v)).trim();
 
 function toDate(v) {                 // → 'YYYY-MM-DD' | null
   const x = s(v); if (!x) return null;
-  let m = x.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // Timestamp ber-waktu (mis. '2026-08-06T17:00:00.000Z' hasil Date.toISOString
+  // dari Apps Script) merepresentasikan tanggal LOKAL WIB. Geser +7 jam dulu
+  // sebelum ambil tanggal, agar tak mundur 1 hari akibat konversi UTC.
+  if (/^\d{4}-\d{2}-\d{2}T/.test(x)) {
+    const d = new Date(x);
+    if (isNaN(d)) return x.slice(0, 10);
+    return new Date(d.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+  let m = x.match(/^(\d{4})-(\d{2})-(\d{2})$/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;  // sudah date-only → apa adanya
   m = x.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
   const d = new Date(x); return isNaN(d) ? null : d.toISOString().slice(0,10);
