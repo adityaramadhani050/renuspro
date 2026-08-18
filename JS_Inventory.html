@@ -145,16 +145,16 @@ function _pgRenderStok(data) {
       'class="text-violet-600 hover:text-violet-800 transition" title="Lihat Rincian Lot (FIFO)"><i class="fa-solid fa-layer-group"></i></button>' +
       hapusBtn;
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
-      '<td class="p-4 font-mono text-xs font-bold text-slate-500" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
-      '<td class="p-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
-      '<td class="p-4 text-right" data-label="Reserved">' + reservedCell + '</td>' +
-      '<td class="p-4 text-right ' + qtyClass + '" data-label="Stok Tersedia">' + d.qtyTersedia.toLocaleString('id-ID') +
+      '<td class="px-4 py-4 font-mono text-xs font-bold text-slate-500 whitespace-nowrap" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
+      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
+      '<td class="px-3 py-4 text-center whitespace-nowrap" data-label="Reserved">' + reservedCell + '</td>' +
+      '<td class="px-3 py-4 text-center whitespace-nowrap ' + qtyClass + '" data-label="Stok">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
-      '<td class="p-4 text-center text-slate-500" data-label="Satuan">' + _escHtml(d.satuan) + '</td>' +
-      '<td class="p-4 text-right text-slate-700" data-label="Harga Beli Terakhir">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-4 text-right font-bold text-teal-700" data-label="Total Nilai Stok">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
-      '<td class="p-4 text-center text-xs text-slate-400" data-label="Terakhir Diubah">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
-      '<td class="p-4 text-center rp-actions">' + aksiBtn + '</td>' +
+      '<td class="px-2 py-4 text-center text-slate-500 whitespace-nowrap" data-label="Satuan">' + _escHtml(d.satuan) + '</td>' +
+      '<td class="px-4 py-4 text-right text-slate-700 whitespace-nowrap" data-label="Harga Beli Terakhir">Rp ' + (d.hargaBeliTerakhir || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="px-4 py-4 text-right font-bold text-teal-700 whitespace-nowrap" data-label="Total Nilai Stok">Rp ' + (d.nilaiStok || 0).toLocaleString('id-ID') + '</td>' +
+      '<td class="px-3 py-4 text-center text-xs text-slate-400 whitespace-nowrap" data-label="Terakhir Diubah">' + _fmtTglInv(d.terakhirDiubah) + '</td>' +
+      '<td class="px-3 py-4 text-center whitespace-nowrap rp-actions">' + aksiBtn + '</td>' +
       '</tr>';
   }).join('');
 }
