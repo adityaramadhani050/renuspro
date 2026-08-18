@@ -321,7 +321,7 @@
       // ── Upload file → Supabase Storage (ganti Google Drive) ───────────────
       //  Perlu bucket PUBLIK 'uploads' (lihat panduan). Kembalikan {fileId,
       //  fileUrl, fileName} sama seperti versi Drive.
-      // Kompres gambar di browser (resize maks 1600px + JPEG 0.82) → hemat
+      // Kompres gambar di browser (resize maks 1280px + JPEG 0.72) → hemat
       // storage 80-90%. Non-gambar dibiarkan. Kembalikan {base64, mime, name}.
       function _compressImage(base64, mime, name) {
         return new Promise(function (resolve) {
@@ -330,11 +330,11 @@
             var img = new Image();
             img.onload = function () {
               try {
-                var maxDim = 1600, w = img.width, h = img.height, scale = Math.min(1, maxDim / Math.max(w, h));
+                var maxDim = 1280, w = img.width, h = img.height, scale = Math.min(1, maxDim / Math.max(w, h));
                 var nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
                 var c = document.createElement('canvas'); c.width = nw; c.height = nh;
                 c.getContext('2d').drawImage(img, 0, 0, nw, nh);
-                var durl = c.toDataURL('image/jpeg', 0.82);
+                var durl = c.toDataURL('image/jpeg', 0.72);
                 var b64 = durl.split(',')[1];
                 if (b64 && b64.length < base64.length) { var nm = name.replace(/\.[^.]+$/, '') + '.jpg'; return resolve({ base64: b64, mime: 'image/jpeg', name: nm }); }
                 resolve({ base64: base64, mime: mime, name: name }); // hasil lebih besar → pakai asli

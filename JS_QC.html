@@ -12,7 +12,7 @@ function _qcResizeImage(file, cb) {
   reader.onload = function(e) {
     var img = new Image();
     img.onload = function() {
-      var maxDim = 1600;
+      var maxDim = 1280;
       var w = img.naturalWidth || 800, h = img.naturalHeight || 600;
       var scale = Math.min(1, maxDim / Math.max(w, h));
       var canvas = document.createElement('canvas');
@@ -21,7 +21,7 @@ function _qcResizeImage(file, cb) {
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       var dataUrl;
-      try { dataUrl = canvas.toDataURL('image/jpeg', 0.8); }
+      try { dataUrl = canvas.toDataURL('image/jpeg', 0.72); }
       catch (err) { cb(null); return; }
       cb(dataUrl);
     };
