@@ -4,9 +4,9 @@
 const ROLE_NAV = {
   admin: ['dashboard', 'sitesurvey', 'penawaran', 'workorder', 'invoice', 'kwitansi', 'produk', 'template', 'customer', 'users', 'laporanfinance', 'settings', 'supplier', 'pricelist', 'purchaseorder', 'inventory', 'pengeluaran', 'laporanprofitabilitas', 'laporankeuangan', 'qc', 'bom', 'ded', 'schedule'],
   finance: ['workorder', 'invoice', 'kwitansi', 'laporanfinance', 'pengeluaran', 'laporanprofitabilitas', 'laporankeuangan'],
-  sales: ['dashboard', 'sitesurvey', 'penawaran', 'workorder', 'produk', 'template', 'customer'],
-  procurement: ['workorder', 'purchaseorder', 'supplier', 'pricelist', 'bom'],
-  warehouse: ['workorder', 'inventory', 'bom'],
+  sales: ['dashboard', 'sitesurvey', 'penawaran', 'workorder', 'produk', 'template', 'customer', 'schedule'],
+  procurement: ['workorder', 'purchaseorder', 'supplier', 'pricelist', 'bom', 'schedule'],
+  warehouse: ['workorder', 'inventory', 'bom', 'schedule'],
   siteengineer: ['qc', 'bom', 'ded', 'schedule'],
   leadengineer: ['workorder', 'qc', 'bom', 'ded', 'schedule'],
   projectcoordinator: ['workorder', 'qc', 'bom', 'ded', 'schedule'],
