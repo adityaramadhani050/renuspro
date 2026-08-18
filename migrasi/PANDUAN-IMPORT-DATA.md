@@ -70,8 +70,56 @@ Buka Supabase → **Table Editor** → cek beberapa tabel (mis. `klien`, `produk
 
 ---
 
+## (Opsional) Mode REPLACE — ganti TOTAL data
+
+Import biasa memakai **upsert**: baris ber-ID sama ditimpa & baris baru ditambah,
+tapi **baris lama yang tak ada di sheet TIDAK dihapus** (jadi gabung, bukan ganti
+bersih). Kalau mau **replace total** (buang semua data lama, isi ulang dari sheet):
+
+**1. Backup dulu** (jaga-jaga):
+```bash
+pg_dump "postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres" \
+  --data-only --schema=public -f backup-sebelum-import.sql
+```
+
+**2. Kosongkan tabel data** — jalankan di **Supabase → SQL Editor**.
+> ⚠️ SENGAJA **tidak** mengosongkan `app_user` (akun login/Auth) & `app_config`
+> (config WA Bot + S&K). Jadi login lama & pengaturan tetap aman.
+```sql
+truncate table
+  klien, produk, supplier, supplier_produk, pricelist_kategori, pricelist,
+  template_paket, akun_pembayaran, penawaran, work_order_catatan,
+  work_order_jenis_override, invoice, kwitansi, bom_project, bom_item,
+  bom_assignment, ded_checklist, ded_project, ded_item, ded_assignment,
+  qc_section, qc_checklist, qc_project, qc_item, qc_assignment,
+  schedule_project, schedule_task, stok, mutasi_stok, purchase_order,
+  po_item, pembayaran_po, po_payment_request, penerimaan_po_log,
+  penerimaan_tanpa_po, pengiriman, pengiriman_request, pengeluaran,
+  pemasukan, ayat_silang, hand_over, site_survey, wo_dokumen
+cascade;
+```
+> Kalau muncul error `foreign key`, jalankan sekali `migrasi/fix-migrasi-import.sql`
+> (melepas semua FK) lalu ulangi truncate.
+
+**3. Import — JANGAN sertakan `app_user`.** Pakai `--skip=app_user` supaya akun
+login & tautan Auth yang sudah ada **tak tersentuh** (data user dari sheet tidak
+diimpor):
+```bash
+node migrasi/import-supabase.mjs ~/export.json --skip=app_user
+```
+
+Hasilnya: semua tabel data terganti bersih dari sheet, sementara **user & login
+tetap seperti semula** (tak perlu provisioning Auth ulang).
+
+> Kalau memang ingin mengganti daftar user juga, hapus `--skip=app_user` dan
+> tambahkan `app_user` ke daftar truncate — TAPI setelahnya wajib **provisioning
+> Auth ulang** untuk semua user (langkah di bawah), karena `auth_uid` ikut hilang.
+
+---
+
 ## Setelah ini
 1. **Provisioning Auth** → ikuti `PANDUAN-CLOUD-SHELL.md` (buat akun login user).
+   *(Lewati jika pakai Mode Replace dengan `--skip=app_user` — user lama tetap ada.)*
 2. **Aktifkan RLS** → jalankan `00-ddl-supabase-2-trigger-rls.sql` di SQL Editor.
 
 ---

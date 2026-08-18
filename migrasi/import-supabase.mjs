@@ -20,8 +20,10 @@ const jsonPath = args.find(a => !a.startsWith('--'));
 const DRY = args.includes('--dry');
 const only = (args.find(a => a.startsWith('--only=')) || '').replace('--only=', '')
   .split(',').map(s => s.trim()).filter(Boolean);
+const skip = (args.find(a => a.startsWith('--skip=')) || '').replace('--skip=', '')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
-if (!jsonPath) { console.error('Usage: node import-supabase.mjs <export.json> [--only=t1,t2] [--dry]'); process.exit(1); }
+if (!jsonPath) { console.error('Usage: node import-supabase.mjs <export.json> [--only=t1,t2] [--skip=t1,t2] [--dry]'); process.exit(1); }
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -95,6 +97,7 @@ let totalOk = 0, totalErr = 0;
 
 for (const def of TABLES) {
   if (only.length && !only.includes(def.table)) continue;
+  if (skip.includes(def.table)) { console.log(`— ${def.table.padEnd(26)} : dilewati (--skip)`); continue; }
   const grid = raw[def.sheet];
   if (!grid) { console.log(`— ${def.table.padEnd(26)} : sheet '${def.sheet}' tidak ada, dilewati`); continue; }
   const dataRows = grid.slice(1);        // buang header
