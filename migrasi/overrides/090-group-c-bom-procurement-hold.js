@@ -380,7 +380,7 @@
           var statusPO = (po.data.status_po || '').toString();
           if (statusPO === 'Selesai' || statusPO === 'Batal') return { success: false, message: 'Request pembayaran tidak bisa dibuat untuk PO berstatus "' + statusPO + '".' };
           var grandTotal = Number(po.data.grand_total) || 0;
-          var idReq = await _nextRomanSeq('po_payment_request', 'id_request', 'RGI/PR');
+          var idReq = await _nextSeqId('po_payment_request', 'id_request', 'PR-' + _ym() + '-');
           var persentase = grandTotal > 0 ? Math.round(jumlah / grandTotal * 10000) / 100 : 0;
           var ins = await supa.from('po_payment_request').insert({
             id_request: idReq, no_po: noPO, no_wo: (po.data.no_wo || '').toString(), nama_supplier: (po.data.nama_supplier || '').toString(), grand_total_po: grandTotal,
@@ -402,7 +402,7 @@
           if (!keterangan) return { success: false, message: 'Keterangan wajib diisi.' };
           if (jumlah <= 0) return { success: false, message: 'Jumlah harus lebih dari 0.' };
           if (!noWO && !kategori) return { success: false, message: 'Pilih kategori untuk pengeluaran non-project.' };
-          var idReq = await _nextRomanSeq('po_payment_request', 'id_request', 'RGI/PR');
+          var idReq = await _nextSeqId('po_payment_request', 'id_request', 'PR-' + _ym() + '-');
           var ins = await supa.from('po_payment_request').insert({
             id_request: idReq, no_po: '', no_wo: noWO, nama_supplier: keterangan, grand_total_po: 0,
             tanggal_request: _isoDate(p.tanggalRequest) || _todayIso(), jumlah: jumlah, persentase: 0, catatan: (p.catatan || '').toString(), status: 'Menunggu',
