@@ -232,7 +232,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
             _safe(supa.from('ded_checklist').select('kode,label,wajib')),
-            _safe(supa.from('ded_item').select('no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas')),
+            _all('ded_item', 'no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas'),  // paginasi: >1000 baris
             _safe(supa.from('ded_project').select('no_wo,nama_project,nama_klien,selesai_manual')),
             _safe(supa.from('ded_assignment').select('no_wo,id_user,nama_user'))
           ]);
@@ -249,7 +249,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var mres = await Promise.all([
             _qcMaster(),
-            _safe(supa.from('qc_item').select('no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas')),
+            _all('qc_item', 'no_wo,kode,status,diupload_oleh,diupload_pada,aktivitas'),  // paginasi: >1000 baris
             _safe(supa.from('qc_project').select('no_wo,nama_project,nama_klien,selesai_manual')),
             _safe(supa.from('qc_assignment').select('no_wo,id_user,nama_user'))
           ]);
@@ -355,7 +355,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
             _safe(supa.from('schedule_project').select('*')),
-            _safe(supa.from('schedule_task').select('*')),
+            _all('schedule_task', '*'),  // paginasi: bisa >1000 task
             _safe(_all('work_order', 'no_wo,items')),
             _safe(supa.from('produk').select('id,tipe')),
             _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))

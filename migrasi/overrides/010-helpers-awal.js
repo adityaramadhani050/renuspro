@@ -523,7 +523,7 @@
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
           _safe(supa.from('purchase_order').select('no_po,tanggal,nama_supplier,peruntukan,no_wo,ppn_persen,status_po')),
-          _safe(supa.from('po_item').select('*')),
+          _all('po_item', '*'),  // paginasi: bisa >1000 baris
           _safe(_all('penawaran', 'no_wo,nama_project'))
         ]);
         var pq = res[0], iq = res[1], nq = res[2];
