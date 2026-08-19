@@ -364,10 +364,20 @@
           var tipeMap = {}; (res[3].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
           var jenisOverride = {}; (res[4].data || []).forEach(function (j) { var w = (j.no_wo || '').toString().trim(); var v = (j.jenis_manual || '').toString().trim(); if (w && (v === 'Jasa' || v === 'Material')) jenisOverride[w] = v; });
           var jenisMap = {}; (res[2].data || []).forEach(function (w) { var no = (w.no_wo || '').toString(); jenisMap[no] = jenisOverride[no] || _woJenisAuto(w.items, tipeMap); });
+          var bobot = await _schFaseBobot();
+          var today = _todayIso();
           var list = (res[0].data || []).map(function (p) {
             var noWO = (p.no_wo || '').toString().trim();
             var tasks = taskMap[noWO] || [];
-            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: _schSummary(tasks) };
+            // Deviasi ringan utk badge home (tanpa kurva). hasBaseline → baru bermakna.
+            var hasBaseline = !!(p.baseline_set_at) || tasks.some(function (t) { return t.baselineMulai; });
+            var dev = null;
+            if (hasBaseline && tasks.length) {
+              var ak = _schWeighted(tasks, bobot, true, function (t) { return _schClampPct(t.progress); });
+              var re = _schWeighted(tasks, bobot, true, function (t) { return _schPlannedProgress(t, today); });
+              dev = Math.round((ak - re) * 10) / 10;
+            }
+            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: _schSummary(tasks), deviasi: { hasBaseline: hasBaseline, dev: dev } };
           }).filter(function (x) { return x.noWO; });
           return { success: true, list: list };
         }
