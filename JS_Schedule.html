@@ -30,7 +30,9 @@ var _SCH_BAR = {
 function _schBar(warna){ return _SCH_BAR[warna] || _SCH_BAR.indigo; }
 
 // ── HOME ──────────────────────────────────────────────────
+var _schScrollHome = false;  // true → gulir timeline home ke bulan sekarang saat render
 window.loadSchedule = function(fromNav) {
+  _schScrollHome = true;   // saat menu dibuka, mulai dari bulan berjalan (bukan schedule terlama)
   document.getElementById('sch-home').classList.remove('hidden');
   document.getElementById('sch-detail').classList.add('hidden');
   var hint = document.getElementById('sch-role-hint');
@@ -56,7 +58,7 @@ window.loadSchedule = function(fromNav) {
   }).getScheduleWOList();
 };
 
-function _schSetHomeZoom(z){ _schHomeZoom = z; _schRenderWOList(); }
+function _schSetHomeZoom(z){ _schHomeZoom = z; _schScrollHome = true; _schRenderWOList(); }
 
 // Tinggi header timeline (2 tingkat: bulan di atas, hari/minggu di bawah).
 var _SCH_HEAD_H = 34;
@@ -186,11 +188,17 @@ function _schRenderHomeGantt(list) {
 
   var zoomBtn = function(z, lbl){ return '<button onclick="_schSetHomeZoom(\'' + z + '\')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition ' + (_schHomeZoom===z ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-500 border border-slate-200 hover:text-slate-700') + '">' + lbl + '</button>'; };
 
+  // Posisi gulir awal = awal bulan sekarang (bukan schedule terlama). Disimpan di
+  // data-scroll, diterapkan oleh _schRenderWOList setelah HTML masuk DOM.
+  var _now = new Date();
+  var curMonIso = _now.getFullYear() + '-' + ('0' + (_now.getMonth() + 1)).slice(-2) + '-01';
+  var scrollX = Math.max(0, _schDays(start, curMonIso) * ppd - 6);
+
   return '<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">'
     +   '<div class="flex items-center gap-1.5">' + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + '</div>'
     + '</div>'
     + '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">'
-    +   '<div class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
+    +   '<div id="sch-home-scroll" data-scroll="' + scrollX + '" class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
     +     '<div class="flex bg-slate-50 border-b border-slate-200">'
     +       '<div class="shrink-0 sticky left-0 z-10 flex bg-slate-50 border-r border-slate-200" style="width:' + leftW + 'px">'
     +         '<div class="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase" style="width:' + infoW + 'px">Work Order</div>'
@@ -218,6 +226,15 @@ function _schRenderWOList() {
     return;
   }
   box.innerHTML = _schRenderHomeGantt(list);
+  // Gulir timeline ke bulan berjalan hanya saat dibuka / ganti zoom (bukan saat cari).
+  if (_schScrollHome) {
+    _schScrollHome = false;
+    var sc = document.getElementById('sch-home-scroll');
+    if (sc) {
+      var sx = parseInt(sc.getAttribute('data-scroll') || '0', 10) || 0;
+      requestAnimationFrame(function(){ sc.scrollLeft = sx; });
+    }
+  }
 }
 
 // ── Tambah / keluarkan project ──
