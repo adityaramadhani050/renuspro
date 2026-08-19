@@ -408,6 +408,8 @@
           map[noWO].push({
             id: (r.id || '').toString(), noWO: noWO, namaTugas: r.nama_tugas || '', fase: r.fase || '',
             mulai: _schIso(r.tanggal_mulai), selesai: _schIso(r.tanggal_selesai),
+            baselineMulai: _schIso(r.baseline_mulai), baselineSelesai: _schIso(r.baseline_selesai),
+            aktualMulai: _schIso(r.aktual_mulai), aktualSelesai: _schIso(r.aktual_selesai),
             progress: Math.max(0, Math.min(100, Number(r.progress) || 0)), warna: r.warna || '',
             urutan: Number(r.urutan) || 0, catatan: r.catatan || ''
           });
