@@ -390,10 +390,7 @@ function _schRenderDetail() {
   var baselineBtn = (_schCanEdit() && _schWOStatus !== 'Closed')
     ? '<button onclick="_schSetBaseline()" title="Bekukan jadwal saat ini sebagai baseline (acuan deviasi)" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> ' + (_schBaseline && _schBaseline.hasBaseline ? 'Set Ulang Baseline' : 'Set Baseline') + '</span></button>'
     : '';
-  var rekamBtn = (_schCanEdit() && _schWOStatus !== 'Closed')
-    ? '<button onclick="_schRekamProgres()" title="Rekam titik progres hari ini ke Kurva S" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-camera"></i><span class="hidden sm:inline"> Rekam Progres</span></button>'
-    : '';
-  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + baselineBtn + rekamBtn + assignBtn + bulkBtn + addBtn + '</div>';
+  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + baselineBtn + assignBtn + bulkBtn + addBtn + '</div>';
 
   var se = _schWO.siteEngineer || '';
   var seBadge = se
@@ -436,13 +433,6 @@ function _schSetBaseline(){
       .withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
       .setScheduleBaseline(_schWO.noWO, _schUserNama());
   }});
-}
-function _schRekamProgres(){
-  if (!_schWO) return;
-  showNotification('Merekam progres...', 'success');
-  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
-    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal merekam.', 'error'); })
-    .snapshotScheduleProgress(_schWO.noWO, _schUserNama());
 }
 function _schRenderDeviasi(){
   var box = document.getElementById('sch-deviasi'); if (!box) return;
