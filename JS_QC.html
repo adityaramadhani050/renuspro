@@ -197,6 +197,7 @@ function _qcOpenAddProject() {
     woSel.innerHTML = '<option value="">-- Pilih Work Order --</option>' + list.map(function(w) {
       return '<option value="' + _qcEsc(w.noWO) + '">' + _qcEsc(w.noWO) + ' — ' + _qcEsc(w.namaProject || '-') + (w.namaKlien ? ' (' + _qcEsc(w.namaKlien) + ')' : '') + '</option>';
     }).join('');
+    if (typeof sdEnsure === 'function') sdEnsure('qc-project-wo', '-- Pilih Work Order --', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function() { woSel.innerHTML = '<option value="">Gagal memuat WO</option>'; }).getAvailableWOForQC();
   // Daftar site engineer (checkbox, opsional)
   var renderSE = function() {

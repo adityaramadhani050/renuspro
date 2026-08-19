@@ -949,6 +949,13 @@ function _bomAppendRowToBlock(block, optsStr, item) {
   } else {
     tr.querySelector('.bom-new-status').innerHTML = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700"><i class="fa-solid fa-plus mr-0.5"></i>Baru</span>';
   }
+  // Material = pilih dari pricelist supplier (data-banyak) → searchable.
+  var plSel = tr.querySelector('.bom-new-pl');
+  if (plSel && typeof initSearchableDropdown === 'function') {
+    if (!plSel.id) plSel.id = 'bom-pl-' + Date.now() + '-' + Math.floor(Math.random() * 1e4);
+    if (plSel.dataset.sdInit === '1') { if (typeof sdRefresh === 'function') sdRefresh(plSel.id); }
+    else initSearchableDropdown(plSel.id, { placeholder: '-- Pilih material --', searchPlaceholder: 'Cari material pricelist...' });
+  }
   _bomRenumberBlock(block);
 }
 // Material Approved: kunci baris (input disabled, tak bisa dihapus).
@@ -1243,6 +1250,7 @@ function _bomOpenAddProject() {
   google.script.run.withSuccessHandler(function(res) {
     var list = (res && res.success) ? (res.list || []) : [];
     woSel.innerHTML = list.length ? (['<option value="">-- Pilih Work Order --</option>'].concat(list.map(function(w){ return '<option value="' + _bomEsc(w.noWO) + '">' + _bomEsc(w.noWO) + ' — ' + _bomEsc(w.namaProject || '-') + (w.namaKlien ? ' (' + _bomEsc(w.namaKlien) + ')' : '') + '</option>'; })).join('')) : '<option value="">Semua WO sudah ada di BOM</option>';
+    if (typeof sdEnsure === 'function') sdEnsure('bom-proj-wo', '-- Pilih Work Order --', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function(){ woSel.innerHTML = '<option value="">Gagal memuat</option>'; }).getAvailableWOForBOM();
 
   var seWrap = document.getElementById('bom-proj-se');

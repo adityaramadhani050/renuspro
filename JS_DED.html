@@ -669,6 +669,7 @@ function _dedOpenAddProject() {
   google.script.run.withSuccessHandler(function(res) {
     var list = (res && res.success) ? (res.list || []) : [];
     woSel.innerHTML = list.length ? (['<option value="">-- Pilih Work Order --</option>'].concat(list.map(function(w) { return '<option value="' + _dedEsc(w.noWO) + '">' + _dedEsc(w.noWO) + ' — ' + _dedEsc(w.namaProject || '-') + (w.namaKlien ? ' (' + _dedEsc(w.namaKlien) + ')' : '') + '</option>'; })).join('')) : '<option value="">Semua WO sudah ada di DED</option>';
+    if (typeof sdEnsure === 'function') sdEnsure('ded-project-wo', '-- Pilih Work Order --', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function() { woSel.innerHTML = '<option value="">Gagal memuat</option>'; }).getAvailableWOForDED();
 
   var seWrap = document.getElementById('ded-project-se');
