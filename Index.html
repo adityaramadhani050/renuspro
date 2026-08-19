@@ -35,6 +35,9 @@
         </button>
         <button onclick="navigate('dashboardproject')" id="nav-dashboardproject" class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-diagram-project w-6"></i> Dashboard Project
+        </button>
+        <button onclick="navigate('dashboardpembelian')" id="nav-dashboardpembelian" class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-warehouse w-6"></i> Dashboard Pembelian
         </button><!-- build: dashboard-project v2 -->
 
         <p id="nav-group-penjualan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penjualan</p>
@@ -196,6 +199,7 @@
 
       <?!= include('Page_Dashboard'); ?>
       <?!= include('Page_DashboardProject'); ?>
+      <?!= include('Page_DashboardPembelian'); ?>
       <?!= include('Page_SiteSurvey'); ?>
       <?!= include('Page_Penawaran'); ?>
       <?!= include('Page_WorkOrder'); ?>
@@ -232,6 +236,7 @@
   <?!= include('JS_Core'); ?>
   <?!= include('JS_Dashboard'); ?>
   <?!= include('JS_DashboardProject'); ?>
+  <?!= include('JS_DashboardPembelian'); ?>
   <?!= include('JS_SiteSurvey'); ?>
   <?!= include('JS_Penawaran_List'); ?>
   <?!= include('JS_WorkOrder'); ?>

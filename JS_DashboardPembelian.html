@@ -1,0 +1,89 @@
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  DASHBOARD PEMBELIAN & GUDANG (admin) — data dari RPC dashboard_procurement()
+//  Chart.js dimuat LAZY (hanya saat halaman ini dibuka) agar ringan.
+// ═══════════════════════════════════════════════════════════════════════════
+var _dpbChartTren = null, _dpbChartStatus = null, _dpbChartLib = null;
+
+function _dpbRp(n) { return 'Rp ' + (Math.round(Number(n) || 0)).toLocaleString('id-ID'); }
+function _dpbEsc(s) { return (typeof _escHtml === 'function') ? _escHtml(s == null ? '' : String(s)) : String(s == null ? '' : s); }
+function _dpbSet(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+function _dpbChartJs() {
+  if (_dpbChartLib) return Promise.resolve(_dpbChartLib);
+  return import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm').then(function(m) { _dpbChartLib = m.default || m.Chart || m; return _dpbChartLib; });
+}
+
+window.loadDashboardPembelian = function() {
+  if (typeof google === 'undefined') return;
+  document.getElementById('dpb-supplier-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  google.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { document.getElementById('dpb-supplier-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-rose-400">' + _dpbEsc((res && res.message) || 'Gagal memuat.') + '</td></tr>'; return; }
+    _dpbRender(res.data || {});
+  }).withFailureHandler(function(err) {
+    document.getElementById('dpb-supplier-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-rose-400">Gagal: ' + _dpbEsc((err && err.message) || err) + '</td></tr>';
+  }).getDashboardProcurement();
+};
+
+function _dpbRender(d) {
+  var po = d.po || {}, stok = d.stok || {}, req = d.stokRequest || {}, pay = d.payReq || {}, mut = d.mutasiBulanIni || {};
+  _dpbSet('dpb-kpi-nilai', _dpbRp(po.totalNilai));
+  _dpbSet('dpb-kpi-outstanding', _dpbRp(po.outstanding));
+  _dpbSet('dpb-kpi-aktif', po.aktif || 0);
+  _dpbSet('dpb-kpi-terima', po.menungguTerima || 0);
+  _dpbSet('dpb-stok-nilai', _dpbRp(stok.totalNilai));
+  _dpbSet('dpb-stok-item', stok.jumlahItem || 0);
+  _dpbSet('dpb-stok-habis', stok.habis || 0);
+  _dpbSet('dpb-stok-menipis', stok.menipis || 0);
+  _dpbSet('dpb-req-stok', req.menunggu || 0);
+  _dpbSet('dpb-req-bayar', pay.menunggu || 0);
+  _dpbSet('dpb-req-bayar-nilai', _dpbRp(pay.nilaiMenunggu));
+  _dpbSet('dpb-mut-masuk', _dpbRp(mut.masuk));
+  _dpbSet('dpb-mut-keluar', _dpbRp(mut.keluar));
+
+  // Top supplier
+  var sup = Array.isArray(d.topSupplier) ? d.topSupplier : [];
+  var sb = document.getElementById('dpb-supplier-body');
+  if (sb) sb.innerHTML = sup.length ? sup.map(function(s) {
+    return '<tr class="hover:bg-slate-50"><td class="p-3 text-xs font-semibold text-slate-700 truncate max-w-[180px]" title="' + _dpbEsc(s.nama) + '">' + _dpbEsc(s.nama) + '</td>'
+      + '<td class="p-3 text-center text-xs font-bold text-slate-500">' + (s.jml || 0) + '</td>'
+      + '<td class="p-3 text-right text-xs font-bold text-slate-700 whitespace-nowrap">' + _dpbRp(s.nilai) + '</td></tr>';
+  }).join('') : '<tr><td colspan="3" class="p-6 text-center text-slate-400">Belum ada PO.</td></tr>';
+
+  // Item menipis
+  var mn = Array.isArray(d.itemMenipis) ? d.itemMenipis : [];
+  var mb = document.getElementById('dpb-menipis-body');
+  if (mb) mb.innerHTML = mn.length ? mn.map(function(x) {
+    var cls = (x.qty || 0) <= 0 ? 'text-rose-600' : 'text-amber-600';
+    return '<tr class="hover:bg-slate-50"><td class="p-3"><div class="text-xs font-semibold text-slate-700 truncate max-w-[220px]" title="' + _dpbEsc(x.nama) + '">' + _dpbEsc(x.nama) + '</div><div class="text-[10px] text-slate-400 font-mono">' + _dpbEsc(x.id) + '</div></td>'
+      + '<td class="p-3 text-center whitespace-nowrap"><span class="text-xs font-bold ' + cls + '">' + (Number(x.qty) || 0).toLocaleString('id-ID') + '</span> <span class="text-[10px] text-slate-400">' + _dpbEsc(x.satuan) + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="2" class="p-6 text-center text-emerald-500"><i class="fa-solid fa-circle-check mr-1"></i>Semua stok aman.</td></tr>';
+
+  // Grafik
+  _dpbChartJs().then(function(Chart) {
+    var tren = Array.isArray(d.trenBeli) ? d.trenBeli : [];
+    var ctxT = document.getElementById('dpb-chart-tren');
+    if (ctxT) {
+      if (_dpbChartTren) _dpbChartTren.destroy();
+      _dpbChartTren = new Chart(ctxT, {
+        type: 'bar',
+        data: { labels: tren.map(function(t){ return t.bln; }), datasets: [{ label: 'Nilai PO', data: tren.map(function(t){ return t.nilai; }), backgroundColor: '#f97316', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return _dpbRp(c.parsed.y); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v){ return 'Rp ' + (v/1e6) + 'jt'; } } } } }
+      });
+    }
+    var st = d.poStatus || {};
+    var order = ['Aktif', 'Menunggu Gudang', 'Diterima Sebagian', 'Diterima', 'Selesai', 'Batal'];
+    var labels = [], data = [];
+    order.forEach(function(k){ if (st[k]) { labels.push(k); data.push(st[k]); } });
+    Object.keys(st).forEach(function(k){ if (order.indexOf(k) === -1) { labels.push(k); data.push(st[k]); } });
+    var ctxS = document.getElementById('dpb-chart-status');
+    if (ctxS) {
+      if (_dpbChartStatus) _dpbChartStatus.destroy();
+      _dpbChartStatus = new Chart(ctxS, {
+        type: 'doughnut',
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#3b82f6', '#f59e0b', '#f97316', '#8b5cf6', '#10b981', '#94a3b8', '#64748b'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
+      });
+    }
+  }).catch(function() {});
+}
+</script>
