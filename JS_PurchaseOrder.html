@@ -420,7 +420,7 @@ function renderItemsPO() {
       if (!matched && item.namaItem) {
         opts += '<option value="__keep__" selected>' + _escHtml(item.namaItem) + ' (item lama)</option>';
       }
-      namaCell = '<td class="px-2 py-1.5"><select onchange="onPOItemSelect(' + idx + ',this)" class="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white">' + opts + '</select></td>';
+      namaCell = '<td class="px-2 py-1.5"><select id="po-item-sd-' + idx + '" onchange="onPOItemSelect(' + idx + ',this)" class="po-item-sd w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 bg-white">' + opts + '</select></td>';
     }
     return '<tr class="border-b border-slate-100">' +
       namaCell +
@@ -431,6 +431,13 @@ function renderItemsPO() {
       '<td class="px-2 py-1.5 text-center"><button onclick="hapusItemPO(' + idx + ')" class="text-rose-400 hover:text-rose-600 p-1 rounded transition"><i class="fa-solid fa-trash-can text-xs"></i></button></td>' +
     '</tr>';
   }).join('');
+  // Item PO = pilih dari katalog pricelist supplier (data-banyak) → searchable.
+  if (typeof initSearchableDropdown === 'function') {
+    tbody.querySelectorAll('select.po-item-sd').forEach(function(s) {
+      if (s.dataset.sdInit === '1') { if (typeof sdRefresh === 'function') sdRefresh(s.id); return; }
+      initSearchableDropdown(s.id, { placeholder: '— Pilih item —', searchPlaceholder: 'Cari item pricelist...' });
+    });
+  }
 }
 
 function _onHargaPoInput(el, idx) {
@@ -922,6 +929,7 @@ function bukaReqNonPO() {
     (data || []).filter(function(w){ return w.status !== 'Closed'; }).forEach(function(w){
       var o = document.createElement('option'); o.value = w.noWO; o.textContent = w.noWO + ' — ' + (w.namaProject || w.namaKlien || ''); woSel.appendChild(o);
     });
+    if (typeof sdEnsure === 'function') sdEnsure('reqnp-wo', '— Non-project —', 'Cari No WO / project...');   // data-banyak → searchable
   }).getWorkOrderList();
   // Kategori dropdown
   var katSel = document.getElementById('reqnp-kategori');

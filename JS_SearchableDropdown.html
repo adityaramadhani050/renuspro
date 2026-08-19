@@ -298,6 +298,16 @@
     if (inst && inst.reset) inst.reset();
   };
 
+  // Helper ringan & terarah: jadikan SATU select (by id) searchable — dipanggil
+  // eksplisit HANYA untuk dropdown data-banyak (WO / item stok / item pricelist).
+  // Kalau sudah di-init → cukup refresh tampilan (mis. setelah opsi diisi ulang).
+  window.sdEnsure = function(id, placeholder, searchPlaceholder) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.dataset.sdInit === '1') { if (typeof sdRefresh === 'function') sdRefresh(id); return; }
+    initSearchableDropdown(id, { placeholder: placeholder || '-- Pilih --', searchPlaceholder: searchPlaceholder || 'Cari...' });
+  };
+
   // Diekspos agar bisa dipanggil langsung oleh muatSeluruhDataAwal()
   // untuk menginisialisasi searchable dropdown setelah data klien termuat.
   window._initAllSD = function() {

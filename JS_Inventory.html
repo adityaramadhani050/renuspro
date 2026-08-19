@@ -116,6 +116,7 @@ function _populateMutasiProdukFilter(data) {
     opts += '<option value="' + _escHtml(id) + '">' + _escHtml(id + ' — ' + produkSet[id]) + '</option>';
   });
   sel.innerHTML = opts;
+  if (typeof sdEnsure === 'function') sdEnsure('filter-mutasi-produk', 'Semua Produk', 'Cari item stok...');   // data-banyak → searchable
 }
 
 // ── Render functions (called by _pgRender) ─────────────────────
@@ -516,6 +517,7 @@ function _loadStokOptions(selId, selectedId) {
         _escHtml(s.idStok + ' — ' + s.namaProduk) + '</option>';
     });
     sel.innerHTML = opts;
+    if (typeof sdEnsure === 'function') sdEnsure(selId, '-- Pilih Item Stok --', 'Cari item stok...');   // dropdown data-banyak → searchable
   }).getStokList();
 }
 
@@ -537,6 +539,7 @@ function _loadPricelistOptions(selId) {
       opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-satuan="' + _escHtml(p.satuan) + '" data-harga="' + (Number(p.hargaBeli) || 0) + '">' + _escHtml(label) + '</option>';
     });
     sel.innerHTML = opts;
+    if (typeof sdEnsure === 'function') sdEnsure(selId, '-- Pilih item Pricelist --', 'Cari item pricelist...');   // data-banyak → searchable
   }).withFailureHandler(function() {}).getPricelistAll();
 }
 
@@ -971,6 +974,7 @@ function _loadWOOptionsForInventory(selId) {
       opt.textContent = w.noWO + ' – ' + (w.namaProject || w.namaKlien || '');
       sel.appendChild(opt);
     });
+    if (typeof sdEnsure === 'function') sdEnsure(selId, '-- Tidak terikat WO --', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function() {}).getWorkOrderList();
 }
 

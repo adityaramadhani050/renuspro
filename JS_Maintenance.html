@@ -138,6 +138,7 @@ function _mtnLoadWOOptions() {
     var opts = '<option value="">— Input manual / tanpa WO —</option>';
     _mtnWOList.forEach(function(w){ opts += '<option value="'+_mtnEsc(w.noWO)+'">'+_mtnEsc(w.noWO)+' — '+_mtnEsc(w.namaProject||'')+'</option>'; });
     sel.innerHTML = opts;
+    if (typeof sdEnsure === 'function') sdEnsure('mtn-wo', '— Input manual / tanpa WO —', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function(){}).getMaintenanceWOList();
 }
 function _mtnOnPilihWO() {
