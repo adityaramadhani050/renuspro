@@ -453,14 +453,19 @@ function _schRenderGantt() {
     var prog = Number(t.progress)||0;
     var clickable = canEd ? ' cursor-pointer' : '';
     var onclk = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
+    var grip = canEd ? '<i class="fa-solid fa-grip-vertical text-slate-300 text-[10px] mr-1 cursor-grab shrink-0" title="Tarik untuk ubah urutan"></i>' : '';
     var nameInner = '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0">' + _schEsc(t.namaTugas) + '</div>';
     var delBtn = canEd ? '<button onclick="event.stopPropagation();_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
-    var nameDiv = '<div class="flex items-center gap-1">' + nameInner + delBtn + '</div>';
+    var nameDiv = '<div class="flex items-center gap-1">' + grip + nameInner + delBtn + '</div>';
     var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
     var dateDiv = '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
-    // Kotak tugas (info kiri) → klik untuk buka modal edit tugas.
+    // Kotak tugas (info kiri) → klik untuk buka modal edit tugas; drag untuk ubah urutan (dalam fase).
     var boxClick = canEd ? ' cursor-pointer hover:bg-indigo-50/50' : '';
-    var boxAttr = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')" title="Klik untuk edit tugas"' : '';
+    var boxAttr = canEd
+      ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')" title="Klik untuk edit · tarik untuk ubah urutan"'
+        + ' draggable="true" data-tid="' + _schEsc(t.id) + '" data-fase="' + _schEsc((t.fase || '').trim()) + '"'
+        + ' ondragstart="_schDragStart(event)" ondragover="_schDragOver(event)" ondragleave="_schDragLeave(event)" ondrop="_schDrop(event)" ondragend="_schDragEnd(event)"'
+      : '';
     return '<div class="flex border-b border-slate-100 items-stretch group">'
       + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100 transition-colors' + boxClick + '" style="width:' + leftW + 'px"' + boxAttr + '>'
       +   nameDiv
@@ -526,6 +531,34 @@ function _schRenderGantt() {
     + '</div></div>';
 }
 function _schMonLbl(d){ var m=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']; return m[d.getMonth()] + ' ' + d.getFullYear(); }
+
+// ── Drag urutan tugas (dalam fase yang sama) ──
+var _schDragTid = null, _schDragFase = null;
+function _schFaseTasksOrdered(fase){
+  var f = (fase || '').trim();
+  return (_schTasks || []).filter(function(t){ return (t.fase || '').trim() === f; })
+    .slice().sort(function(a, b){ return (a.urutan - b.urutan) || (a.mulai < b.mulai ? -1 : a.mulai > b.mulai ? 1 : 0); });
+}
+function _schDragStart(e){ var el = e.currentTarget; _schDragTid = el.dataset.tid; _schDragFase = el.dataset.fase || ''; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', _schDragTid); } catch(_){ } el.classList.add('opacity-40'); }
+function _schDragOver(e){ var el = e.currentTarget; if ((el.dataset.fase || '') !== _schDragFase || el.dataset.tid === _schDragTid) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch(_){ } el.classList.add('bg-indigo-100'); }
+function _schDragLeave(e){ e.currentTarget.classList.remove('bg-indigo-100'); }
+function _schDrop(e){ var el = e.currentTarget; el.classList.remove('bg-indigo-100'); if ((el.dataset.fase || '') !== _schDragFase) return; e.preventDefault(); var targetId = el.dataset.tid; if (!_schDragTid || targetId === _schDragTid) return; _schApplyReorder(_schDragFase, _schDragTid, targetId); }
+function _schDragEnd(e){ try { e.currentTarget.classList.remove('opacity-40'); } catch(_){ } try { document.querySelectorAll('.bg-indigo-100').forEach(function(x){ x.classList.remove('bg-indigo-100'); }); } catch(_){ } _schDragTid = null; _schDragFase = null; }
+function _schApplyReorder(fase, dragId, targetId){
+  var ids = _schFaseTasksOrdered(fase).map(function(t){ return t.id; });
+  var from = ids.indexOf(dragId), to = ids.indexOf(targetId);
+  if (from < 0 || to < 0) return;
+  ids.splice(from, 1);
+  var at = ids.indexOf(targetId); if (from < to) at = at + 1;   // ke bawah → setelah target
+  ids.splice(at, 0, dragId);
+  // Optimistis: perbarui urutan lokal lalu render, simpan di latar.
+  ids.forEach(function(id, i){ var t = (_schTasks || []).filter(function(x){ return x.id === id; })[0]; if (t) t.urutan = i; });
+  _schRenderGantt();
+  showNotification('Menyimpan urutan...', 'success');
+  google.script.run.withSuccessHandler(function(res){ if (!(res && res.success)) { showNotification((res && res.message) || 'Gagal menyimpan urutan.', 'error'); _schReloadDetail(); } })
+    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menyimpan urutan.', 'error'); _schReloadDetail(); })
+    .reorderScheduleTasks({ ids: ids });
+}
 
 // ── Tambah Cepat / Template (bulk) ──
 var _SCH_FASE_WARNA = { 'Hand Over':'indigo', 'Engineering':'emerald', 'Pengadaan':'amber', 'Pengiriman':'sky', 'Kontruksi':'violet', 'Finishing':'rose' };

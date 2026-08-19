@@ -206,6 +206,22 @@
         }
       });
 
+      // Susun ulang urutan tugas (drag di dalam fase). ids = urutan baru → urutan = index.
+      window.gsRoute('reorderScheduleTasks', {
+        mode: 'fn',
+        handler: async function (args) {
+          var p = args[0] || {};
+          var ids = Array.isArray(p.ids) ? p.ids.filter(Boolean) : [];
+          if (!ids.length) return { success: false, message: 'Daftar urutan kosong.' };
+          var results = await Promise.all(ids.map(function (id, i) {
+            return supa.from('schedule_task').update({ urutan: i }).eq('id', (id || '').toString());
+          }));
+          var errs = results.filter(function (r) { return r.error; });
+          if (errs.length) return { success: false, message: errs[0].error.message };
+          return { success: true, message: 'Urutan tugas diperbarui.' };
+        }
+      });
+
       // Rekam progres manual ("Rekam progres" di detail WO) → titik kurva S hari ini.
       window.gsRoute('snapshotScheduleProgress', {
         mode: 'fn',
