@@ -5,8 +5,8 @@ let _schWO = null;
 let _schTasks = [];
 let _schSummary = {};
 let _schWOStatus = '';
-let _schZoom = 'minggu';   // hari | minggu | bulan (detail)
-let _schHomeZoom = 'minggu'; // hari | minggu | bulan (home gabungan)
+let _schZoom = 'hari';   // hari | minggu | bulan (detail)
+let _schHomeZoom = 'hari'; // hari | minggu | bulan (home gabungan)
 let _schSEList = [];         // cache daftar Site Engineer
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -58,28 +58,56 @@ window.loadSchedule = function(fromNav) {
 
 function _schSetHomeZoom(z){ _schHomeZoom = z; _schRenderWOList(); }
 
-// Bangun header ticks + garis vertikal untuk rentang tertentu (dipakai home & bisa detail).
-function _schBuildTicks(start, totalDays, ppd, zoom) {
-  var ticks = '';
-  if (zoom === 'bulan') {
-    for (var d = 0; d <= totalDays; d++) {
-      var di = _schShiftIso(start, d);
-      var dd = _schD(di);
-      if (dd.getDate() === 1 || d === 0) {
-        var lx = d * ppd;
-        ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-500 whitespace-nowrap" style="left:' + (lx+3) + 'px">' + _schMonLbl(dd) + '</div>';
-      }
-    }
-  } else {
-    var step = zoom === 'hari' ? 1 : 7;
-    for (var t = 0; t <= totalDays; t += step) {
-      var ti = _schShiftIso(start, t);
-      var lxx = t * ppd;
-      var lbl = zoom === 'hari' ? (''+_schD(ti).getDate()) : _schFmt(ti).slice(0,5);
-      ticks += '<div class="absolute top-0 bottom-0 border-l border-slate-100" style="left:' + lxx + 'px"></div><div class="absolute top-1 text-[10px] font-bold text-slate-400 whitespace-nowrap" style="left:' + (lxx+2) + 'px">' + lbl + '</div>';
+// Tinggi header timeline (2 tingkat: bulan di atas, hari/minggu di bawah).
+var _SCH_HEAD_H = 34;
+// Segmen bulan dalam rentang → [{off, days, mi, d0}]. off = hari ke-, days = jml hari
+// bulan itu di dalam rentang, mi = indeks bulan absolut (untuk selang-seling warna).
+function _schMonthSegs(start, totalDays) {
+  var segs = [], cur = null, prevKey = '';
+  for (var d = 0; d < totalDays; d++) {
+    var dt = _schD(_schShiftIso(start, d));
+    var key = dt.getFullYear() + '-' + dt.getMonth();
+    if (key !== prevKey) { cur = { off: d, days: 0, mi: dt.getFullYear() * 12 + dt.getMonth(), d0: dt }; segs.push(cur); prevKey = key; }
+    cur.days++;
+  }
+  return segs;
+}
+// Latar timeline (dipakai header & tiap baris) — beda warna antar bulan + arsir akhir
+// pekan (khusus zoom hari) + garis pemisah bulan, agar timeline mudah dibaca.
+function _schBands(start, totalDays, ppd, zoom) {
+  var html = '';
+  var segs = _schMonthSegs(start, totalDays);
+  segs.forEach(function(s, i) {
+    var lx = s.off * ppd, w = s.days * ppd;
+    if (s.mi % 2 === 1) html += '<div class="absolute top-0 bottom-0 bg-slate-500/[0.05]" style="left:' + lx + 'px;width:' + w + 'px"></div>';
+    if (i > 0) html += '<div class="absolute top-0 bottom-0 border-l-2 border-slate-200" style="left:' + lx + 'px"></div>';
+  });
+  if (zoom === 'hari') {
+    for (var d = 0; d < totalDays; d++) {
+      var wd = _schD(_schShiftIso(start, d)).getDay(); // 0=Min, 6=Sab
+      if (wd === 0 || wd === 6) html += '<div class="absolute top-0 bottom-0 bg-slate-400/[0.10]" style="left:' + (d * ppd) + 'px;width:' + ppd + 'px"></div>';
     }
   }
-  return ticks;
+  return html;
+}
+// Isi header timeline: latar (bands) + label bulan (atas) + label hari/minggu (bawah).
+function _schBuildTicks(start, totalDays, ppd, zoom) {
+  var inner = _schBands(start, totalDays, ppd, zoom);
+  var segs = _schMonthSegs(start, totalDays);
+  segs.forEach(function(s) {
+    inner += '<div class="absolute top-0.5 text-[10px] font-extrabold text-slate-500 whitespace-nowrap" style="left:' + (s.off * ppd + 3) + 'px">' + _schMonLbl(s.d0) + '</div>';
+  });
+  inner += '<div class="absolute left-0 right-0 border-t border-slate-200" style="top:16px"></div>';
+  if (zoom !== 'bulan') {
+    var step = zoom === 'hari' ? 1 : 7;
+    for (var t = 0; t <= totalDays; t += step) {
+      var lx = t * ppd, iso = _schShiftIso(start, t);
+      var lbl = zoom === 'hari' ? ('' + _schD(iso).getDate()) : _schFmt(iso).slice(0, 5);
+      inner += '<div class="absolute border-l border-slate-100" style="left:' + lx + 'px;top:16px;bottom:0"></div>'
+             + '<div class="absolute text-[10px] font-bold text-slate-400 whitespace-nowrap" style="left:' + (lx + 2) + 'px;top:17px">' + lbl + '</div>';
+    }
+  }
+  return inner;
 }
 
 // Home = SATU gantt gabungan: tiap baris = 1 WO (rentang ringkasan proyek), timeline
@@ -105,6 +133,7 @@ function _schRenderHomeGantt(list) {
   var todayPx = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) * ppd) : -1;
   var todayLine = todayPx >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-20" style="left:' + todayPx + 'px"></div>' : '';
   var ticks = _schBuildTicks(start, totalDays, ppd, _schHomeZoom);
+  var bands = _schBands(start, totalDays, ppd, _schHomeZoom);
 
   var palette = ['indigo','emerald','amber','sky','rose','violet'];
   var rows = list.map(function(w, idx){
@@ -143,7 +172,7 @@ function _schRenderHomeGantt(list) {
       +     removeBtn
       +   '</div>'
       + '</div>'
-      + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:52px">' + todayLine + bar + '</div>'
+      + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:52px">' + bands + todayLine + bar + '</div>'
       + '</div>';
   }).join('');
 
@@ -159,7 +188,7 @@ function _schRenderHomeGantt(list) {
     +         '<div class="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase" style="width:' + infoW + 'px">Work Order</div>'
     +         '<div class="px-2 py-2 text-[11px] font-bold text-slate-500 uppercase border-l border-slate-200" style="width:' + seW + 'px">Site Eng.</div>'
     +       '</div>'
-    +       '<div class="relative" style="width:' + totalPx + 'px;height:24px">' + ticks + '</div>'
+    +       '<div class="relative" style="width:' + totalPx + 'px;height:' + _SCH_HEAD_H + 'px">' + ticks + '</div>'
     +     '</div>'
     +     rows
     +   '</div></div>'
@@ -357,8 +386,9 @@ function _schRenderGantt() {
   var todayPx = (todayIso >= start && todayIso <= end) ? (_schDays(start, todayIso) * ppd) : -1;
   var todayLine = todayPx >= 0 ? '<div class="absolute top-0 bottom-0 w-px bg-rose-400/70 z-20" style="left:' + todayPx + 'px"></div>' : '';
 
-  // Header ticks (helper bersama dengan home)
+  // Header ticks + latar timeline (helper bersama dengan home)
   var ticks = _schBuildTicks(start, totalDays, ppd, _schZoom);
+  var bands = _schBands(start, totalDays, ppd, _schZoom);
 
   var canEd = _schCanEdit();
   // Satu baris tugas (dipakai di dalam grup fase). Klik kotak tugas → modal edit tugas.
@@ -383,6 +413,7 @@ function _schRenderGantt() {
       +   dateDiv
       + '</div>'
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:42px">'
+      +   bands
       +   todayLine
       +   '<div class="absolute rounded-md ' + b[0] + clickable + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px"' + onclk + ' title="' + _schEsc(t.namaTugas) + '">'
       +     '<div class="h-full ' + b[1] + '" style="width:' + prog + '%"></div>'
@@ -426,7 +457,7 @@ function _schRenderGantt() {
       +   '<span class="text-[10px] font-bold text-slate-400">(' + gtasks.length + ')</span>'
       +   '<span class="ml-auto text-[10px] font-bold text-slate-400">' + (gdays ? gdays + ' hari · ' : '') + gpct + '%</span>'
       + '</div>'
-      + '<div class="relative bg-slate-50" style="width:' + totalPx + 'px;min-height:28px">' + todayLine + spanBar + '</div>'
+      + '<div class="relative bg-slate-50" style="width:' + totalPx + 'px;min-height:28px">' + bands + todayLine + spanBar + '</div>'
       + '</div>';
     // Tambah tugas hanya lewat tombol "Tambah Tugas" (fungsi inline dihapus).
     return header + gtasks.map(_schTaskRow).join('');
@@ -435,7 +466,7 @@ function _schRenderGantt() {
   box.innerHTML = '<div class="overflow-x-auto"><div style="min-width:' + (leftW + totalPx) + 'px">'
     + '<div class="flex bg-slate-50 border-b border-slate-200">'
     +   '<div class="shrink-0 sticky left-0 bg-slate-50 z-10 px-3 py-2 text-[11px] font-bold text-slate-500 uppercase border-r border-slate-200" style="width:' + leftW + 'px">Tugas</div>'
-    +   '<div class="relative" style="width:' + totalPx + 'px;height:24px">' + ticks + '</div>'
+    +   '<div class="relative" style="width:' + totalPx + 'px;height:' + _SCH_HEAD_H + 'px">' + ticks + '</div>'
     + '</div>'
     + rows
     + '</div></div>';
