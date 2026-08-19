@@ -41,9 +41,23 @@ select json_build_object(
     'progressRata', (select coalesce(round(avg(prog)::numeric, 0), 0) from sched),
     'telat',        (select count(*) from sched where telat > 0)
   ),
-  'qc',  (select json_build_object('approved', count(*) filter (where status='Approved'), 'pending', count(*) filter (where status='Pending'), 'rejected', count(*) filter (where status='Rejected'), 'woRejected', count(distinct no_wo) filter (where status='Rejected')) from qc_item),
-  'ded', (select json_build_object('approved', count(*) filter (where status='Approved'), 'pending', count(*) filter (where status='Pending'), 'rejected', count(*) filter (where status='Rejected')) from ded_item),
-  'bom', (select json_build_object('approved', count(*) filter (where status='Approved'), 'pending', count(*) filter (where status='Pending'), 'rejected', count(*) filter (where status='Rejected')) from bom_item),
+  -- QC/DED/BOM dihitung per JUMLAH WO (bukan item). Per WO: ada item Rejected →
+  -- "ada revisi"; semua Approved → "tuntas"; selain itu → "proses". Saling lepas.
+  'qc', (select json_build_object(
+      'approved', count(*) filter (where allappr and not rej),
+      'pending',  count(*) filter (where not rej and not allappr),
+      'rejected', count(*) filter (where rej)
+    ) from (select no_wo, bool_or(status='Rejected') as rej, bool_and(status='Approved') as allappr from qc_item where coalesce(no_wo,'')<>'' group by no_wo) w),
+  'ded', (select json_build_object(
+      'approved', count(*) filter (where allappr and not rej),
+      'pending',  count(*) filter (where not rej and not allappr),
+      'rejected', count(*) filter (where rej)
+    ) from (select no_wo, bool_or(status='Rejected') as rej, bool_and(status='Approved') as allappr from ded_item where coalesce(no_wo,'')<>'' group by no_wo) w),
+  'bom', (select json_build_object(
+      'approved', count(*) filter (where allappr and not rej),
+      'pending',  count(*) filter (where not rej and not allappr),
+      'rejected', count(*) filter (where rej)
+    ) from (select no_wo, bool_or(status='Rejected') as rej, bool_and(status='Approved') as allappr from bom_item where coalesce(no_wo,'')<>'' group by no_wo) w),
   'maintenance', (select json_build_object('diajukan', count(*) filter (where status='Diajukan'), 'dijadwalkan', count(*) filter (where status='Dijadwalkan'), 'dikerjakan', count(*) filter (where status='Dikerjakan'), 'selesai', count(*) filter (where status='Selesai')) from maintenance),
   'trenDeal', (
     select coalesce(json_agg(t order by t.bln), '[]'::json) from (

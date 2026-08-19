@@ -1,9 +1,6 @@
       <section id="page-dashboardproject" class="page-section">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Project</h2>
-            <p class="text-sm text-slate-400 mt-0.5">Pantau jalannya project & kinerja tim</p>
-          </div>
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Project</h2>
           <button onclick="_engMuatUlang && _engMuatUlang('loadDashboardProject', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
 
@@ -48,16 +45,15 @@
             <p class="text-xs text-slate-500">Terjadwal: <b id="dp-sch-total" class="text-slate-700">0</b> · Telat: <b id="dp-sch-telat" class="text-rose-600">0</b></p>
           </div>
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quality Control</p>
-            <p class="text-sm"><span class="text-emerald-600 font-bold" id="dp-qc-appr">0</span> <span class="text-slate-400 text-xs">approved</span></p>
-            <p class="text-sm mt-1"><span class="text-amber-600 font-bold" id="dp-qc-pend">0</span> <span class="text-slate-400 text-xs">pending</span> · <span class="text-rose-600 font-bold" id="dp-qc-rej">0</span> <span class="text-slate-400 text-xs">ditolak</span></p>
-            <p class="text-[11px] text-slate-400 mt-1"><span id="dp-qc-worej" class="font-bold text-rose-500">0</span> WO ada item ditolak</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quality Control <span class="normal-case font-semibold text-slate-300">(jumlah WO)</span></p>
+            <p class="text-sm"><span class="text-emerald-600 font-bold" id="dp-qc-appr">0</span> <span class="text-slate-400 text-xs">tuntas</span></p>
+            <p class="text-sm mt-1"><span class="text-amber-600 font-bold" id="dp-qc-pend">0</span> <span class="text-slate-400 text-xs">proses</span> · <span class="text-rose-600 font-bold" id="dp-qc-rej">0</span> <span class="text-slate-400 text-xs">ada revisi</span></p>
           </div>
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DED / BOM</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DED / BOM <span class="normal-case font-semibold text-slate-300">(jumlah WO)</span></p>
             <p class="text-sm">DED: <span class="text-emerald-600 font-bold" id="dp-ded-appr">0</span>/<span id="dp-ded-pend" class="text-amber-600 font-bold">0</span>/<span id="dp-ded-rej" class="text-rose-600 font-bold">0</span></p>
             <p class="text-sm mt-1">BOM: <span class="text-emerald-600 font-bold" id="dp-bom-appr">0</span>/<span id="dp-bom-pend" class="text-amber-600 font-bold">0</span>/<span id="dp-bom-rej" class="text-rose-600 font-bold">0</span></p>
-            <p class="text-[10px] text-slate-400 mt-1">approved / pending / ditolak</p>
+            <p class="text-[10px] text-slate-400 mt-1">tuntas / proses / ada revisi</p>
           </div>
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Maintenance</p>

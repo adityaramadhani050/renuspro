@@ -42,8 +42,8 @@ function _dpRender(d) {
   var bar = document.getElementById('dp-sch-bar'); if (bar) bar.style.width = prog + '%';
   _dpSet('dp-sch-total', sch.terjadwal || 0);
   _dpSet('dp-sch-telat', sch.telat || 0);
-  // QC
-  _dpSet('dp-qc-appr', qc.approved || 0); _dpSet('dp-qc-pend', qc.pending || 0); _dpSet('dp-qc-rej', qc.rejected || 0); _dpSet('dp-qc-worej', qc.woRejected || 0);
+  // QC (jumlah WO)
+  _dpSet('dp-qc-appr', qc.approved || 0); _dpSet('dp-qc-pend', qc.pending || 0); _dpSet('dp-qc-rej', qc.rejected || 0);
   // DED/BOM
   _dpSet('dp-ded-appr', ded.approved || 0); _dpSet('dp-ded-pend', ded.pending || 0); _dpSet('dp-ded-rej', ded.rejected || 0);
   _dpSet('dp-bom-appr', bom.approved || 0); _dpSet('dp-bom-pend', bom.pending || 0); _dpSet('dp-bom-rej', bom.rejected || 0);
