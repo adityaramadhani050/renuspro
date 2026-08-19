@@ -15,9 +15,19 @@
       function _schTaskId(i) { return 'TSK-' + Date.now() + (i != null ? '-' + i : ''); }
       function _schClampPct(v) { return Math.max(0, Math.min(100, Number(v) || 0)); }
 
-      // % proyek berbobot: bobot per fase (dinormalkan ke fase yang ada), dalam
-      // fase dibagi proporsional durasi. useBaseline → pakai durasi baseline.
-      function _schWeightedProgress(tasks, bobot, useBaseline) {
+      function _schAddDays(iso, n) { try { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); } catch (e) { return iso; } }
+      // Progres RENCANA sebuah tugas pada tanggal `today` (linear dari baseline).
+      function _schPlannedProgress(t, today) {
+        var m = t.baselineMulai || t.mulai, s = t.baselineSelesai || t.selesai;
+        if (!m || !s || !today) return 0;
+        if (today < m) return 0;
+        if (today >= s) return 100;
+        var tot = _schDurasi(m, s), el = _schDurasi(m, today);
+        return Math.max(0, Math.min(100, Math.round((el / tot) * 100)));
+      }
+      // % proyek berbobot umum: bobot per fase (dinormalkan ke fase yang ada), dalam
+      // fase dibagi proporsional durasi. progFn(t) → 0..100. useBaseline → durasi baseline.
+      function _schWeighted(tasks, bobot, useBaseline, progFn) {
         var groups = {}, order = [];
         (tasks || []).forEach(function (t) {
           var f = (t.fase || '').toString().trim() || '(Tanpa Fase)';
@@ -39,9 +49,41 @@
             return _schDurasi(m, s);
           });
           var sumDur = durs.reduce(function (a, b) { return a + b; }, 0) || arr.length || 1;
-          arr.forEach(function (t, i) { total += (w * (durs[i] / sumDur)) * (Number(t.progress) || 0); });
+          arr.forEach(function (t, i) { total += (w * (durs[i] / sumDur)) * (Number(progFn(t)) || 0); });
         });
         return Math.round(total * 10) / 10;
+      }
+      function _schWeightedProgress(tasks, bobot, useBaseline) {
+        return _schWeighted(tasks, bobot, useBaseline, function (t) { return _schClampPct(t.progress); });
+      }
+      // Hitung deviasi + kurva rencana + flag per tugas (dipakai getScheduleByWO).
+      function _schBuildDeviasi(tasks, bobot, today) {
+        tasks = tasks || [];
+        var aktual = _schWeighted(tasks, bobot, true, function (t) { return _schClampPct(t.progress); });
+        var rencana = _schWeighted(tasks, bobot, true, function (t) { return _schPlannedProgress(t, today); });
+        var dev = Math.round((aktual - rencana) * 10) / 10;
+        var spi = rencana > 0 ? Math.round((aktual / rencana) * 100) / 100 : null;
+        var perTask = {};
+        tasks.forEach(function (t) {
+          var m = t.baselineMulai || t.mulai, s = t.baselineSelesai || t.selesai, pr = _schClampPct(t.progress), st;
+          if (pr >= 100) st = 'done';
+          else if (s && today > s) st = 'overdue-finish';
+          else if (m && today > m && pr === 0) st = 'overdue-start';
+          else { var pp = _schPlannedProgress(t, today); st = (pr + 5 < pp) ? 'behind' : 'ontrack'; }
+          perTask[t.id] = st;
+        });
+        var starts = [], ends = [];
+        tasks.forEach(function (t) { var mm = t.baselineMulai || t.mulai, ss = t.baselineSelesai || t.selesai; if (mm) starts.push(mm); if (ss) ends.push(ss); });
+        var kurva = [];
+        if (starts.length) {
+          var gmin = starts.reduce(function (a, b) { return a < b ? a : b; });
+          var gmax = ends.reduce(function (a, b) { return a > b ? a : b; });
+          var pushPt = function (dd) { kurva.push({ tanggal: dd, persen: _schWeighted(tasks, bobot, true, function (t) { return _schPlannedProgress(t, dd); }) }); };
+          var d = gmin, guard = 0;
+          while (d <= gmax && guard < 400) { pushPt(d); d = _schAddDays(d, 7); guard++; }
+          if (!kurva.length || kurva[kurva.length - 1].tanggal !== gmax) pushPt(gmax);
+        }
+        return { rencanaPct: rencana, aktualPct: aktual, deviasi: dev, spi: spi, perTask: perTask, kurvaRencana: kurva };
       }
 
       // Rekam 1 titik progres "hari ini" (upsert per no_wo+tanggal) → kurva S aktual.

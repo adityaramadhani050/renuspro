@@ -382,13 +382,25 @@
           var res = await Promise.all([
             _safe(supa.from('schedule_project').select('*').eq('no_wo', noWO).maybeSingle()),
             _safe(supa.from('schedule_task').select('*').eq('no_wo', noWO)),
-            _safe(supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1))
+            _safe(supa.from('penawaran').select('status').eq('no_wo', noWO).limit(1)),
+            _safe(supa.from('schedule_progress_log').select('tanggal,persen_aktual').eq('no_wo', noWO))
           ]);
           if (!res[0].data) return { success: false, message: 'Proyek belum terdaftar di Schedule.' };
           var p = res[0].data;
           var tasks = (_schTasksMap(res[1].data || [])[noWO]) || [];
           var woStatus = (res[2].data && res[2].data[0]) ? (res[2].data[0].status || '') : '';
-          return { success: true, project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' }, tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus };
+          var bobot = await _schFaseBobot();
+          var deviasi = _schBuildDeviasi(tasks, bobot, _todayIso());
+          var kurvaAktual = (res[3].data || []).map(function (r) { return { tanggal: _schIso(r.tanggal), persen: Number(r.persen_aktual) || 0 }; })
+            .filter(function (r) { return r.tanggal; }).sort(function (a, b) { return a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : 0; });
+          var hasBaseline = !!(p.baseline_set_at) || tasks.some(function (t) { return t.baselineMulai; });
+          return {
+            success: true,
+            project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' },
+            tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus,
+            deviasi: deviasi, kurvaAktual: kurvaAktual,
+            baseline: { hasBaseline: hasBaseline, setAt: p.baseline_set_at || '', oleh: p.baseline_oleh || '' }
+          };
         }
       });
 

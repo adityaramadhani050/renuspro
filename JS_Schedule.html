@@ -8,6 +8,12 @@ let _schWOStatus = '';
 let _schZoom = 'hari';   // hari | minggu | bulan (detail)
 let _schHomeZoom = 'hari'; // hari | minggu | bulan (home gabungan)
 let _schSEList = [];         // cache daftar Site Engineer
+let _schDeviasi = null;      // ringkasan deviasi WO aktif
+let _schPerTask = {};        // status per tugas (id → on track/behind/overdue/done)
+let _schKurvaAktual = [];    // titik kurva S aktual (dari progress log)
+let _schBaseline = {};       // { hasBaseline, setAt, oleh }
+let _schChartS = null;       // instance Chart.js kurva S
+let _schChartLib = null;     // cache modul Chart.js
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _schRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -28,6 +34,15 @@ var _SCH_BAR = {
   rose:['bg-rose-200','bg-rose-500'], violet:['bg-violet-200','bg-violet-600'], slate:['bg-slate-200','bg-slate-500']
 };
 function _schBar(warna){ return _SCH_BAR[warna] || _SCH_BAR.indigo; }
+// Flag status tugas (dari deviasi baseline): titik warna + tooltip.
+var _SCH_STATUS = {
+  'done':           { c: 'bg-emerald-500', t: 'Selesai' },
+  'ontrack':        { c: 'bg-emerald-400', t: 'Sesuai jadwal' },
+  'behind':         { c: 'bg-amber-400',   t: 'Tertinggal dari rencana' },
+  'overdue-start':  { c: 'bg-orange-500',  t: 'Belum mulai — harusnya sudah' },
+  'overdue-finish': { c: 'bg-rose-500',    t: 'Overdue — lewat deadline belum selesai' }
+};
+function _schStatusDot(st){ var m = _SCH_STATUS[st]; if (!m) return ''; return '<span class="inline-block w-2 h-2 rounded-full shrink-0 ' + m.c + '" title="' + m.t + '"></span>'; }
 
 // ── HOME ──────────────────────────────────────────────────
 var _schScrollHome = false;  // true → gulir timeline home ke bulan sekarang saat render
@@ -334,6 +349,10 @@ function _schReloadDetail() {
     _schTasks = res.tasks || [];
     _schSummary = res.summary || {};
     _schWOStatus = res.woStatus || '';
+    _schDeviasi = res.deviasi || null;
+    _schPerTask = (res.deviasi && res.deviasi.perTask) || {};
+    _schKurvaAktual = res.kurvaAktual || [];
+    _schBaseline = res.baseline || {};
     if (res.project) { _schWO.namaProject = res.project.namaProject; _schWO.namaKlien = res.project.namaKlien; _schWO.siteEngineer = res.project.siteEngineer || ''; }
     _schRenderDetail();
   }).withFailureHandler(function(){ document.getElementById('sch-gantt').innerHTML = '<div class="p-6 text-center text-rose-400">Gagal memuat.</div>'; })
@@ -354,7 +373,13 @@ function _schRenderDetail() {
     : '';
   var reloadBtn = '<button onclick="_engMuatUlang(\'_schReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[38px] w-[38px] rounded-lg shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
   var bulkBtn = _schCanEdit() ? '<button onclick="_schOpenBulk()" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bolt"></i><span class="hidden sm:inline"> Tambah Cepat</span></button>' : '';
-  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + assignBtn + bulkBtn + addBtn + '</div>';
+  var baselineBtn = (_schCanEdit() && _schWOStatus !== 'Closed')
+    ? '<button onclick="_schSetBaseline()" title="Bekukan jadwal saat ini sebagai baseline (acuan deviasi)" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> ' + (_schBaseline && _schBaseline.hasBaseline ? 'Set Ulang Baseline' : 'Set Baseline') + '</span></button>'
+    : '';
+  var rekamBtn = (_schCanEdit() && _schWOStatus !== 'Closed')
+    ? '<button onclick="_schRekamProgres()" title="Rekam titik progres hari ini ke Kurva S" class="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-camera"></i><span class="hidden sm:inline"> Rekam Progres</span></button>'
+    : '';
+  actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + baselineBtn + rekamBtn + assignBtn + bulkBtn + addBtn + '</div>';
 
   var se = _schWO.siteEngineer || '';
   var seBadge = se
@@ -376,10 +401,93 @@ function _schRenderDetail() {
     + '</div>'
     + '</div>';
 
+  _schRenderDeviasi();
   _schRenderGantt();
 }
 
 function _schSetZoom(z){ _schZoom = z; _schRenderDetail(); }
+
+// ── Panel Deviasi + Kurva S ──
+function _schChartJs(){
+  if (_schChartLib) return Promise.resolve(_schChartLib);
+  return import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm').then(function(m){ _schChartLib = m.default || m.Chart || m; return _schChartLib; });
+}
+function _schDevWarna(dev){ return dev < -0.05 ? 'rose' : (dev > 0.05 ? 'emerald' : 'slate'); }
+function _schSetBaseline(){
+  if (!_schWO) return;
+  var ada = _schBaseline && _schBaseline.hasBaseline;
+  showConfirm({ title: ada ? 'Set Ulang Baseline' : 'Set Baseline', message: (ada ? 'Timpa baseline lama dengan jadwal saat ini?' : 'Bekukan jadwal rencana saat ini sebagai baseline (acuan deviasi)?') + ' Progres tidak berubah.', confirmText: 'Ya, Set', icon: 'fa-flag-checkered', onConfirm: function(){
+    toggleLoader(true, 'Menyimpan baseline...');
+    google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
+      .withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .setScheduleBaseline(_schWO.noWO, _schUserNama());
+  }});
+}
+function _schRekamProgres(){
+  if (!_schWO) return;
+  showNotification('Merekam progres...', 'success');
+  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
+    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal merekam.', 'error'); })
+    .snapshotScheduleProgress(_schWO.noWO, _schUserNama());
+}
+function _schRenderDeviasi(){
+  var box = document.getElementById('sch-deviasi'); if (!box) return;
+  var d = _schDeviasi;
+  if (!_schBaseline || !_schBaseline.hasBaseline) {
+    box.innerHTML = '<div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3">'
+      + '<i class="fa-solid fa-flag-checkered text-indigo-400 mt-0.5"></i>'
+      + '<div class="text-sm text-slate-600"><b class="text-slate-800">Baseline belum diset.</b> Klik <b>Set Baseline</b> untuk membekukan jadwal rencana saat ini — deviasi & Kurva S dihitung dari baseline.</div></div>';
+    return;
+  }
+  if (!d) { box.innerHTML = ''; return; }
+  var dev = Number(d.deviasi) || 0;
+  var devWarna = _schDevWarna(dev);
+  var devTxt = (dev > 0 ? '+' : '') + dev + '%';
+  var spiTxt = (d.spi == null) ? '—' : d.spi.toFixed(2);
+  var kartu = function(label, val, cls, sub){ return '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
+    + '<p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">' + label + '</p>'
+    + '<p class="text-xl font-extrabold leading-tight ' + (cls || 'text-slate-800') + '">' + val + '</p>'
+    + (sub ? '<p class="text-[10px] text-slate-400 mt-0.5">' + sub + '</p>' : '') + '</div>'; };
+  var devCls = devWarna === 'rose' ? 'text-rose-600' : (devWarna === 'emerald' ? 'text-emerald-600' : 'text-slate-700');
+  var devSub = dev < -0.05 ? 'terlambat dari rencana' : (dev > 0.05 ? 'lebih cepat dari rencana' : 'sesuai rencana');
+  box.innerHTML =
+      '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">'
+    +   kartu('Rencana (hari ini)', (Number(d.rencanaPct)||0) + '%', 'text-slate-700')
+    +   kartu('Aktual (hari ini)', (Number(d.aktualPct)||0) + '%', 'text-indigo-600')
+    +   kartu('Deviasi', devTxt, devCls, devSub)
+    +   kartu('SPI', spiTxt, (d.spi != null && d.spi < 1 ? 'text-rose-600' : 'text-emerald-600'), 'Schedule Performance Index')
+    + '</div>'
+    + '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
+    +   '<div class="flex items-center justify-between mb-2"><p class="text-sm font-bold text-slate-700">Kurva S — Rencana vs Aktual</p>'
+    +   '<span class="text-[10px] text-slate-400">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt(_schIso(_schBaseline.setAt)) : '') + '</span></div>'
+    +   '<div class="relative" style="height:240px"><canvas id="sch-chart-s"></canvas></div>'
+    + '</div>';
+  _schRenderKurvaS(d);
+}
+function _schRenderKurvaS(d){
+  _schChartJs().then(function(Chart){
+    var ctx = document.getElementById('sch-chart-s'); if (!ctx) return;
+    var rencana = Array.isArray(d.kurvaRencana) ? d.kurvaRencana : [];
+    var aktual = Array.isArray(_schKurvaAktual) ? _schKurvaAktual : [];
+    var rMap = {}, aMap = {}, setAll = {};
+    rencana.forEach(function(p){ rMap[p.tanggal] = Number(p.persen)||0; setAll[p.tanggal] = 1; });
+    aktual.forEach(function(p){ aMap[p.tanggal] = Number(p.persen)||0; setAll[p.tanggal] = 1; });
+    var labels = Object.keys(setAll).sort();
+    var dataR = labels.map(function(t){ return (t in rMap) ? rMap[t] : null; });
+    var dataA = labels.map(function(t){ return (t in aMap) ? aMap[t] : null; });
+    if (_schChartS) _schChartS.destroy();
+    _schChartS = new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels.map(function(t){ return _schFmt(t).slice(0,5); }), datasets: [
+        { label: 'Rencana', data: dataR, borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 0, fill: true },
+        { label: 'Aktual', data: dataA, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 2, fill: true }
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: function(c){ return c.dataset.label + ': ' + (c.parsed.y == null ? '-' : c.parsed.y + '%'); } } } },
+        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: function(v){ return v + '%'; } } }, x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 } } } } }
+    });
+  }).catch(function(){});
+}
 
 function _schToggleAssign(e) {
   if (e) e.stopPropagation();
@@ -454,9 +562,10 @@ function _schRenderGantt() {
     var clickable = canEd ? ' cursor-pointer' : '';
     var onclk = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
     var grip = canEd ? '<i class="fa-solid fa-grip-vertical text-slate-300 text-[10px] mr-1 cursor-grab shrink-0" title="Tarik untuk ubah urutan"></i>' : '';
+    var flag = _schStatusDot(_schPerTask[t.id]);
     var nameInner = '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0">' + _schEsc(t.namaTugas) + '</div>';
     var delBtn = canEd ? '<button onclick="event.stopPropagation();_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
-    var nameDiv = '<div class="flex items-center gap-1">' + grip + nameInner + delBtn + '</div>';
+    var nameDiv = '<div class="flex items-center gap-1">' + grip + flag + nameInner + delBtn + '</div>';
     var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
     var dateDiv = '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
     // Kotak tugas (info kiri) → klik untuk buka modal edit tugas; drag untuk ubah urutan (dalam fase).
