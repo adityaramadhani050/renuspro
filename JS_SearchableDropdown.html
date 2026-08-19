@@ -6,6 +6,22 @@
 
   // Registry semua instance SD
   const _sdInstances = {};
+  // Instance yang sedang terbuka (hanya 1). Dipakai oleh listener GLOBAL tunggal
+  // di bawah — menggantikan listener per-instance (scroll/resize/click) yang dulu
+  // menumpuk & membuat berat, terutama utk dropdown per-baris yg dibuat ulang.
+  let _sdOpenInst = null;
+  let _sdGlobalReady = false;
+  function _sdSetupGlobal() {
+    if (_sdGlobalReady) return;
+    _sdGlobalReady = true;
+    // Klik di luar dropdown terbuka → tutup.
+    document.addEventListener('click', function(e) {
+      if (_sdOpenInst && _sdOpenInst.wrap && !_sdOpenInst.wrap.contains(e.target)) _sdOpenInst.close();
+    });
+    // Scroll (capture, agar tertangkap di container mana pun) & resize → reposisi.
+    window.addEventListener('scroll', function() { if (_sdOpenInst) _sdOpenInst.reposition(); }, true);
+    window.addEventListener('resize', function() { if (_sdOpenInst) _sdOpenInst.reposition(); });
+  }
 
   /**
    * Inisialisasi searchable dropdown
@@ -20,6 +36,10 @@
     if (native.dataset.sdInit === '1') return;
     native.dataset.sdInit = '1';
     native.classList.add('sd-native');
+    _sdSetupGlobal();   // pasang listener GLOBAL sekali saja (bukan per-instance)
+    // Reap instance yatim (DOM-nya sudah lepas, mis. baris tabel yg dibuat ulang)
+    // agar registry tak membengkak & node lama bisa di-GC.
+    for (var _k in _sdInstances) { var _ii = _sdInstances[_k]; if (_ii && _ii.native && _ii.native.isConnected === false) delete _sdInstances[_k]; }
 
     const wrap = document.createElement('div');
     wrap.className = 'sd-wrap';
@@ -153,12 +173,9 @@
     }
 
     function openDropdown() {
-      // Tutup semua dropdown lain dulu
-      Object.values(_sdInstances).forEach(function(other) {
-        if (other !== inst) {
-          other.dropdown.classList.remove('open');
-        }
-      });
+      // Tutup dropdown lain yang sedang terbuka (maksimal 1).
+      if (_sdOpenInst && _sdOpenInst !== inst) _sdOpenInst.close();
+      _sdOpenInst = inst;
 
       dropdown.classList.add('open');
       display.classList.add('open');
@@ -197,7 +214,13 @@
     function closeDropdown() {
       dropdown.classList.remove('open');
       display.classList.remove('open');
+      if (_sdOpenInst === inst) _sdOpenInst = null;
     }
+
+    // Referensi utk listener global tunggal.
+    inst.wrap = wrap;
+    inst.reposition = function() { if (dropdown.classList.contains('open')) _repositionDropdown(); };
+    inst.close = closeDropdown;
 
     // ── Event listeners ──
     display.addEventListener('click', function() {
@@ -236,19 +259,8 @@
       }
     });
 
-    // Klik di luar = tutup
-    document.addEventListener('click', function(e) {
-      if (!wrap.contains(e.target)) closeDropdown();
-    });
-
-    // Reposisi saat scroll atau resize
-    window.addEventListener('scroll', function() {
-      if (dropdown.classList.contains('open')) _repositionDropdown();
-    }, true);
-
-    window.addEventListener('resize', function() {
-      if (dropdown.classList.contains('open')) _repositionDropdown();
-    });
+    // (Klik-di-luar / scroll / resize ditangani oleh listener GLOBAL tunggal
+    //  di _sdSetupGlobal — tidak lagi dipasang per-instance agar tetap ringan.)
 
     // ── API publik ──
     inst.refresh = function() {

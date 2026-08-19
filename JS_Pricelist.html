@@ -116,6 +116,7 @@ function _isiPickerSupplierPl() {
     .forEach(function(s) { opts += '<option value="' + s.id + '">' + _plEsc(s.nama) + '</option>'; });
   sel.innerHTML = opts;
   if (cur) sel.value = cur;
+  if (typeof sdEnsure === 'function') sdEnsure('pl-supplier', '— Pilih supplier —', 'Cari supplier...');   // data-banyak → searchable
 }
 
 // ── Tambah / Edit ─────────────────────────────────────────────────
@@ -206,6 +207,7 @@ function _plFillKategori(selected) {
   if (cur && (_pricelistKategori || []).indexOf(cur) === -1) opts += '<option value="' + _plEsc(cur) + '">' + _plEsc(cur) + ' (lama)</option>';
   sel.innerHTML = opts;
   sel.value = cur || '';
+  if (typeof sdEnsure === 'function') sdEnsure('pl-kategori', '— Pilih kategori —', 'Cari kategori...');   // searchable
 }
 function _plOpenKategori() {
   document.getElementById('modal-kategori').classList.remove('hidden');

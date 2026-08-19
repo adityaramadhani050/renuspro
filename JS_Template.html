@@ -24,7 +24,7 @@
         <td class="p-2 text-center text-xs font-bold text-slate-400 idx-baris"></td>
         <td class="p-2">
           <select onchange="onProdukTemplateChanged(this)"
-            class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-teal-400">
+            class="tpl-produk-sd w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-teal-400">
             ${opsiProduk}
           </select>
         </td>
@@ -75,6 +75,13 @@
       const tb = document.getElementById('tbody-template-items');
       const tr = buatBarisTemplate(erpState.produk, item);
       tb.appendChild(tr);
+      // Produk/Jasa = data-banyak → searchable (setelah tr masuk DOM).
+      var s = tr.querySelector('.tpl-produk-sd');
+      if (s && typeof initSearchableDropdown === 'function') {
+        if (!s.id) s.id = 'tpl-produk-sd-' + Date.now() + '-' + Math.floor(Math.random() * 1e4);
+        if (s.dataset.sdInit === '1') { if (typeof sdRefresh === 'function') sdRefresh(s.id); }
+        else initSearchableDropdown(s.id, { placeholder: '-- Pilih Produk/Jasa --', searchPlaceholder: 'Cari produk/jasa...' });
+      }
       updateNomorBarisTemplate();
     }
 
