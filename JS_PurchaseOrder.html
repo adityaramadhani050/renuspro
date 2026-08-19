@@ -102,6 +102,7 @@ function _pgRenderPurchaseOrder(data) {
 // ── Load daftar PO ──────────────────────────────────────────────────────────
 window.loadPurchaseOrder = function(fromNav) {
   if (typeof _poSwitchTab === 'function') _poSwitchTab('list');  // selalu mulai dari tab Daftar PO
+  if (typeof loadPOReqStok === 'function') loadPOReqStok();      // isi badge Request Stok tanpa perlu buka tabnya
   var render = function(data) {
     _cachedPOData = (data || []).slice().reverse();
     filterPO();   // render kartu + KPI sesuai filter/pencarian aktif

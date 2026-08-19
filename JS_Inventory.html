@@ -68,7 +68,8 @@ window.loadInventory = function() {
   _showInvSection('inv-list-section');
   switchInvTab('stok');
   _loadStok();
-  loadPenerimaanBarang();
+  loadPenerimaanBarang();   // isi badge Penerimaan tanpa perlu buka tabnya
+  loadPengirimanBarang();   // isi badge Pengiriman tanpa perlu buka tabnya
 };
 
 function _loadStok() {
