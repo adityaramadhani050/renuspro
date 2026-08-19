@@ -24,7 +24,7 @@
         var ov = await supa.from('work_order_jenis_override').select('jenis_manual').eq('no_wo', noWO).maybeSingle();
         var manual = ov.data ? (ov.data.jenis_manual || '').toString().trim() : '';
         if (manual === 'Jasa' || manual === 'Material') return manual;
-        var pq = await supa.from('produk').select('id,tipe'); var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
+        var pq = await _all('produk', 'id,tipe'); var tipeMap = {}; (pq.data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
         return _woJenisAuto(wo.data.items, tipeMap);
       }
       window.gsRoute('saveBOMItems', {

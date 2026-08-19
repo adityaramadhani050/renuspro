@@ -240,7 +240,7 @@
       async function _waReminderExpiredList(intervalHari, forceAll) {
         var todayISO = _todayIso();
         var pq = await _all('penawaran', 'no_penawaran,rev,valid_hingga,nama_project,klien_id,dibuat_oleh,status,reminder_expired');
-        var kq = await supa.from('klien').select('id,nama_klien'); var km = {}; (kq.data || []).forEach(function (k) { if (k.id != null) km[k.id.toString()] = k.nama_klien || ''; });
+        var kq = await _all('klien', 'id,nama_klien'); var km = {}; (kq.data || []).forEach(function (k) { if (k.id != null) km[k.id.toString()] = k.nama_klien || ''; });
         var latest = {}; (pq.data || []).forEach(function (r) { var no = (r.no_penawaran || '').toString(); if (!no) return; var rev = parseInt(r.rev, 10) || 0; if (!latest[no] || rev > latest[no]._rev) { r._rev = rev; latest[no] = r; } });
         var out = [];
         Object.keys(latest).forEach(function (no) {

@@ -44,7 +44,7 @@
             var res = await Promise.all([
               _safe(_all('invoice', 'no_wo,no_penawaran,dpp')),
               _safe(_all('penawaran', 'no_penawaran,rev,tanggal,nama_project,klien_id,subtotal,diskon,pajak,grand_total,items,status,no_wo')),
-              _safe(supa.from('klien').select('id,nama_klien'))
+              _safe(_all('klien', 'id,nama_klien'))
             ]);
             var tagihMap = {}, tagihByPen = {};
             (res[0].data || []).forEach(function (r) {
@@ -108,7 +108,7 @@
           var res = await Promise.all([
             _safe(_all('pengeluaran', 'no_wo,nama_akun,total')),
             _safe(_all('penawaran', 'no_penawaran,rev,tanggal,nama_project,dibuat_oleh,klien_id,subtotal,diskon,total_hpp,status,no_wo')),
-            _safe(supa.from('klien').select('id,nama_klien'))
+            _safe(_all('klien', 'id,nama_klien'))
           ]);
           var expByWO = {}, expByAkun = {};
           (res[0].data || []).forEach(function (r) {
@@ -311,7 +311,7 @@
       window.gsRoute('getNextSiteSurveyId', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('site_survey').select('id');
+          var q = await _all('site_survey', 'id');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0;
           (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^SVY(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
@@ -330,9 +330,9 @@
           var wo = woList.filter(function (w) { return w.noWO === noWO; })[0];
           if (!wo) return { success: false, message: 'Work Order tidak ditemukan.' };
           var res = await Promise.all([
-            _safe(supa.from('produk').select('id,tipe')),
+            _safe(_all('produk', 'id,tipe')),
             _safe(supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle()),
-            _safe(supa.from('site_survey').select('*'))   // filter by kolom no_wo ATAU data.noWO di bawah
+            _safe(_all('site_survey', '*'))   // filter by kolom no_wo ATAU data.noWO di bawah
           ]);
           var tipeMap = {}; (res[0].data || []).forEach(function (p) { if (p.id) tipeMap[p.id] = (p.tipe || '').toString().trim().toLowerCase(); });
           var kelompokList = []; try { kelompokList = JSON.parse(wo.items || '[]'); } catch (e) {}
@@ -369,7 +369,7 @@
 
       // ── Helper bersama: peta pricelist id → {idSupplier, hargaBeli} ────────
       async function _priceMap() {
-        var q = await supa.from('pricelist').select('id,id_supplier,harga_beli');
+        var q = await _all('pricelist', 'id,id_supplier,harga_beli');
         var m = {}; (q.data || []).forEach(function (p) { m[(p.id || '').toString()] = { idSupplier: (p.id_supplier || '').toString(), hargaBeli: Number(p.harga_beli) || 0 }; });
         return m;
       }
@@ -444,7 +444,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
             _safe(supa.from('penawaran').select('*').eq('no_penawaran', noPen)),
-            _safe(supa.from('klien').select('id,nama_klien'))
+            _safe(_all('klien', 'id,nama_klien'))
           ]);
           var klienMap = {}; (res[1].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
           var list = (res[0].data || []).map(function (r) {

@@ -18,7 +18,7 @@
           namaUser = (namaUser || '').toString();
           var pq = await _all('penawaran', 'no_penawaran,rev,tanggal,tanggal_deal,nama_project,klien_id,dibuat_oleh,subtotal,diskon,grand_total,status,channel_marketing,catatan_fail');
           if (pq.error) throw new Error(pq.error.message);
-          var kq = await supa.from('klien').select('id,nama_klien');
+          var kq = await _all('klien', 'id,nama_klien');
           var klienMap = {}; (kq.data || []).forEach(function (k) { if (k.id != null) klienMap[k.id.toString()] = k.nama_klien || ''; });
           var prodC = await supa.from('produk').select('id', { count: 'exact', head: true });
           var custC = await supa.from('klien').select('id', { count: 'exact', head: true });
@@ -61,7 +61,7 @@
           var todayISO = _todayIso();
 
           var pq = await _all('penawaran', '*'); if (pq.error) return { success: false, error: pq.error.message };
-          var kq = await supa.from('klien').select('id,nama_klien');
+          var kq = await _all('klien', 'id,nama_klien');
           var uq = await supa.from('app_user').select('id,nama,role,aktif,target_bulanan,lead_id');
           var klienMap = {}; (kq.data || []).forEach(function (k) { if (k.id != null) klienMap[k.id.toString()] = k.nama_klien || ''; });
           var userMap = {}, leadSalesCount = 0;

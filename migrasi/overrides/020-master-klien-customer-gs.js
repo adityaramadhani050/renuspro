@@ -142,7 +142,7 @@
       window.gsRoute('getPOList', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('purchase_order').select('*');
+          var q = await _all('purchase_order', '*');
           if (q.error) { console.error('[getPOList]', q.error); return []; }
           // Peta no_wo → nama_project dari penawaran (nama project tidak kritikal).
           var woNama = {};
@@ -203,7 +203,7 @@
       window.gsRoute('getPricelistAll', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('pricelist').select('*');
+          var q = await _all('pricelist', '*');
           if (q.error) return { success: false, list: [], message: q.error.message };
           // Peta supplier → alias/nama.
           var supMap = {};
@@ -259,7 +259,7 @@
       window.gsRoute('getSiteSurveyList', {
         mode: 'fn',
         handler: async function () {
-          var q = await supa.from('site_survey').select('*');
+          var q = await _all('site_survey', '*');
           if (q.error) return { success: false, list: [], message: q.error.message };
           var list = (q.data || []).map(function (r) {
             var d = _jsonObj(r.data);
@@ -286,7 +286,7 @@
           if (!noWO) return { success: true, list: [] };
           // Tautan bisa ada di kolom no_wo ATAU di data.noWO (data lama/migrasi).
           // Samakan dgn getSiteSurveyList yg toleran (r.no_wo || d.noWO).
-          var q = await supa.from('site_survey').select('*');
+          var q = await _all('site_survey', '*');
           if (q.error) return { success: false, list: [], message: q.error.message };
           var matched = (q.data || []).filter(function (r) {
             var d = _jsonObj(r.data);
@@ -453,8 +453,8 @@
             // (mis. penawaran/template) TIDAK boleh mengosongkan daftar klien.
             var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
             var res = await Promise.all([
-              _safe(supa.from('klien').select('id,nama_klien,perusahaan,alamat,kontak').order('id')),
-              _safe(supa.from('produk').select('id,nama,unit,harga_satuan,hpp').order('id')),
+              _all('klien', 'id,nama_klien,perusahaan,alamat,kontak', function (q) { return q.order('id'); }),
+              _all('produk', 'id,nama,unit,harga_satuan,hpp', function (q) { return q.order('id'); }),
               _safe(supa.from('template_paket').select('id,nama_paket,daftar_item')),
               _safe(_all('penawaran', 'no_penawaran'))
             ]);

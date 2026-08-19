@@ -15,7 +15,7 @@
           var res = await Promise.all([
             _safe(_all('work_order', 'no_wo,nama_project,nama_klien,status')),
             _safe(supa.from('hand_over').select('no_wo,status')),
-            _safe(supa.from('klien').select('nama_klien,alamat,kontak'))
+            _safe(_all('klien', 'nama_klien,alamat,kontak'))
           ]);
           var hoMap = {}; (res[1].data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
           var klienMap = {}; (res[2].data || []).forEach(function (k) { if (k.nama_klien) klienMap[k.nama_klien] = k; });

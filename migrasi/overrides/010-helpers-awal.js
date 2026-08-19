@@ -433,7 +433,7 @@
       }
       async function _pengArr() {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
-        var res = await Promise.all([_safe(_all('pengeluaran', '*')), _safe(_all('penawaran', 'no_wo,nama_project,klien_id')), _safe(supa.from('klien').select('id,nama_klien'))]);
+        var res = await Promise.all([_safe(_all('pengeluaran', '*')), _safe(_all('penawaran', 'no_wo,nama_project,klien_id')), _safe(_all('klien', 'id,nama_klien'))]);
         var klienMap = {}; (res[2].data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
         var woMap = {}; (res[1].data || []).forEach(function (p) { var w = (p.no_wo || '').toString().trim(); if (w && !woMap[w]) woMap[w] = { namaProject: p.nama_project || '', namaKlien: klienMap[p.klien_id] || p.klien_id || '' }; });
         var list = (res[0].data || []).map(function (r) {
@@ -522,7 +522,7 @@
       async function _poMenunggu() {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
-          _safe(supa.from('purchase_order').select('no_po,tanggal,nama_supplier,peruntukan,no_wo,ppn_persen,status_po')),
+          _safe(_all('purchase_order', 'no_po,tanggal,nama_supplier,peruntukan,no_wo,ppn_persen,status_po')),
           _all('po_item', '*'),  // paginasi: bisa >1000 baris
           _safe(_all('penawaran', 'no_wo,nama_project'))
         ]);
@@ -563,8 +563,8 @@
       async function _riwayatPenerimaan(noPO) {
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
-          _safe(supa.from('purchase_order').select('no_po,nama_supplier,peruntukan,no_wo')),
-          _safe(supa.from('penerimaan_po_log').select('*'))
+          _safe(_all('purchase_order', 'no_po,nama_supplier,peruntukan,no_wo')),
+          _safe(_all('penerimaan_po_log', '*'))
         ]);
         var pq = res[0], lq = res[1];
         var poInfo = {};

@@ -357,7 +357,7 @@
             _safe(supa.from('schedule_project').select('*')),
             _all('schedule_task', '*'),  // paginasi: bisa >1000 task
             _safe(_all('work_order', 'no_wo,items')),
-            _safe(supa.from('produk').select('id,tipe')),
+            _safe(_all('produk', 'id,tipe')),
             _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
           ]);
           var taskMap = _schTasksMap(res[1].data || []);

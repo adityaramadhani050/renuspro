@@ -8,7 +8,7 @@
           if (q.error) { console.error('[getPenawaranList]', q.error); return []; }
           // Peta klien id→nama & hand_over no_wo→status.
           var klienMap = {};
-          var kq = await supa.from('klien').select('id,nama_klien');
+          var kq = await _all('klien', 'id,nama_klien');
           if (!kq.error) (kq.data || []).forEach(function (k) { klienMap[k.id] = k.nama_klien || ''; });
           var hoMap = {};
           var hq = await supa.from('hand_over').select('no_wo,status');
@@ -177,7 +177,7 @@
           var res = await Promise.all([
             _safe(_all('pengeluaran', '*')),
             _safe(_all('penawaran', 'no_wo,nama_project,klien_id')),
-            _safe(supa.from('klien').select('id,nama_klien'))
+            _safe(_all('klien', 'id,nama_klien'))
           ]);
           var eq = res[0], pq = res[1], kq = res[2];
           if (eq.error) return { success: false, list: [], message: eq.error.message };
@@ -222,7 +222,7 @@
           var fStatus = (params.status || '').toString();
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(supa.from('pengiriman').select('*')),
+            _safe(_all('pengiriman', '*')),
             _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien'))
           ]);
           var gq = res[0], bq = res[1];
@@ -355,7 +355,7 @@
         var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
         var res = await Promise.all([
           _safe(_all('work_order', '*')),
-          _safe(supa.from('produk').select('id,tipe')),
+          _safe(_all('produk', 'id,tipe')),
           _safe(supa.from('hand_over').select('no_wo,status')),
           _safe(supa.from('work_order_catatan').select('no_wo,catatan')),
           _safe(supa.from('work_order_jenis_override').select('no_wo,jenis_manual'))
@@ -455,7 +455,7 @@
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
             _safe(supa.from('penawaran').select('rev,subtotal,diskon,total_hpp,nama_project,klien_id').eq('no_wo', noWO)),
-            _safe(supa.from('klien').select('id,nama_klien')),
+            _safe(_all('klien', 'id,nama_klien')),
             _safe(supa.from('pengeluaran').select('*').eq('no_wo', noWO)),
             _safe(supa.from('purchase_order').select('no_po,nama_supplier,status_po,status_bayar,grand_total,total_dibayar').eq('no_wo', noWO))
           ]);
