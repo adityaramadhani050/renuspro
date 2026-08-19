@@ -233,11 +233,14 @@ function _schRenderHomeGantt(list) {
       +   '<div class="px-3 py-2 min-w-0 flex flex-col justify-center" style="width:' + infoW + 'px">'
       +     '<div class="flex items-center gap-1.5 min-w-0"><span class="font-mono text-xs font-extrabold text-slate-700 shrink-0">' + _schEsc(w.noWO) + '</span>'
       +       '<span class="text-[10px] text-slate-400 truncate">' + pct + '% · ' + (s.jumlahTugas||0) + ' tugas</span></div>'
-      +     '<div class="flex items-center gap-1.5 min-w-0"><span class="text-[11px] text-slate-600 font-semibold truncate flex-1 min-w-0">' + _schEsc(w.namaProject || '-') + '</span>' + _schDevChip(w) + '</div>'
+      +     '<div class="text-[11px] text-slate-600 font-semibold truncate">' + _schEsc(w.namaProject || '-') + '</div>'
       +   '</div>'
-      +   '<div class="px-2 py-2 flex items-center justify-between gap-1 border-l border-slate-100 min-w-0" style="width:' + seW + 'px">'
-      +     '<span class="text-[11px] text-slate-500 truncate" title="' + _schEsc(w.siteEngineer || '') + '"><i class="fa-solid fa-helmet-safety mr-1 text-slate-300"></i>' + (w.siteEngineer ? _schEsc(w.siteEngineer) : '—') + '</span>'
-      +     removeBtn
+      +   '<div class="px-2 py-2 flex flex-col justify-center gap-1 border-l border-slate-100 min-w-0" style="width:' + seW + 'px">'
+      +     '<div class="flex items-center justify-between gap-1 min-w-0">'
+      +       '<span class="text-[11px] text-slate-500 truncate" title="' + _schEsc(w.siteEngineer || '') + '"><i class="fa-solid fa-helmet-safety mr-1 text-slate-300"></i>' + (w.siteEngineer ? _schEsc(w.siteEngineer) : '—') + '</span>'
+      +       removeBtn
+      +     '</div>'
+      +     _schDevChip(w)
       +   '</div>'
       + '</div>'
       + '<div class="relative bg-white" style="width:' + totalPx + 'px;min-height:52px">' + bands + todayLine + bar + '</div>'
