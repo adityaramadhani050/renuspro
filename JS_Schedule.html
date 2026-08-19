@@ -205,6 +205,7 @@ function _schOpenAddProject() {
       opts += '<option value="' + _schEsc(w.noWO) + '">' + _schEsc(w.noWO) + ' — ' + _schEsc(w.namaProject || w.namaKlien || '') + '</option>';
     });
     sel.innerHTML = opts;
+    if (typeof sdEnsure === 'function') sdEnsure('sch-proj-wo', '— Pilih Work Order —', 'Cari No WO / project...');   // data-banyak → searchable
   }).withFailureHandler(function(){ sel.innerHTML = '<option value="">Gagal memuat WO</option>'; }).getWorkOrderList();
   google.script.run.withSuccessHandler(function(res){
     _schSEList = (res && res.success) ? (res.list || []) : [];
