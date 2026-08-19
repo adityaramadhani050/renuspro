@@ -361,7 +361,7 @@ function _schRenderGantt() {
   var ticks = _schBuildTicks(start, totalDays, ppd, _schZoom);
 
   var canEd = _schCanEdit();
-  // Satu baris tugas (dipakai di dalam grup fase). Nama & tanggal = inline edit.
+  // Satu baris tugas (dipakai di dalam grup fase). Klik kotak tugas → modal edit tugas.
   function _schTaskRow(t){
     var b = _schBar(t.warna);
     var leftPx = _schDays(start, t.mulai) * ppd;
@@ -369,17 +369,16 @@ function _schRenderGantt() {
     var prog = Number(t.progress)||0;
     var clickable = canEd ? ' cursor-pointer' : '';
     var onclk = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')"' : '';
-    var nameInner = canEd
-      ? '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0 cursor-text hover:bg-indigo-50 rounded px-0.5 -mx-0.5" title="Klik untuk ubah nama" onclick="_schEditName(this,\'' + _schEsc(t.id) + '\')">' + _schEsc(t.namaTugas) + '</div>'
-      : '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0">' + _schEsc(t.namaTugas) + '</div>';
-    var delBtn = canEd ? '<button onclick="_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
+    var nameInner = '<div class="text-xs font-bold text-slate-700 truncate flex-1 min-w-0">' + _schEsc(t.namaTugas) + '</div>';
+    var delBtn = canEd ? '<button onclick="event.stopPropagation();_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
     var nameDiv = '<div class="flex items-center gap-1">' + nameInner + delBtn + '</div>';
     var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
-    var dateDiv = canEd
-      ? '<div class="text-[10px] text-slate-400 whitespace-nowrap cursor-text hover:text-indigo-600" title="Klik untuk ubah tanggal" onclick="_schEditDates(this,\'' + _schEsc(t.id) + '\')">' + dateTxt + '</div>'
-      : '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
+    var dateDiv = '<div class="text-[10px] text-slate-400 whitespace-nowrap">' + dateTxt + '</div>';
+    // Kotak tugas (info kiri) → klik untuk buka modal edit tugas.
+    var boxClick = canEd ? ' cursor-pointer hover:bg-indigo-50/50' : '';
+    var boxAttr = canEd ? ' onclick="_schOpenTask(\'' + _schEsc(t.id) + '\')" title="Klik untuk edit tugas"' : '';
     return '<div class="flex border-b border-slate-100 items-stretch group">'
-      + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100" style="width:' + leftW + 'px">'
+      + '<div class="shrink-0 sticky left-0 bg-white z-10 pl-5 pr-3 py-2 border-r border-slate-100 transition-colors' + boxClick + '" style="width:' + leftW + 'px"' + boxAttr + '>'
       +   nameDiv
       +   dateDiv
       + '</div>'
@@ -522,45 +521,6 @@ function _schBulkSubmit() {
     .saveScheduleTasksBatch({ noWO: _schWO.noWO, oleh: _schUserNama(), tasks: tasks });
 }
 
-// ── Inline edit (nama & tanggal) di gantt detail ──
-function _schDetailOpen(){ var d = document.getElementById('sch-detail'); return d && !d.classList.contains('hidden'); }
-function _schInlineUpdate(t, changes) {
-  var payload = { id: t.id, noWO: _schWO.noWO, namaTugas: t.namaTugas, fase: t.fase, warna: t.warna, mulai: t.mulai, selesai: t.selesai, progress: t.progress, urutan: t.urutan, catatan: t.catatan, oleh: _schUserNama() };
-  Object.keys(changes).forEach(function(k){ payload[k] = changes[k]; });
-  showNotification('Menyimpan...', 'success');
-  google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (_schDetailOpen()) _schReloadDetail(); })
-    .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal menyimpan.', 'error'); if (_schDetailOpen()) _schReloadDetail(); })
-    .updateScheduleTask(payload);
-}
-function _schEditName(el, id) {
-  if (!_schCanEdit() || el.getAttribute('data-ed')) return;
-  var t = _schTasks.filter(function(x){ return x.id === id; })[0]; if (!t) return;
-  el.setAttribute('data-ed', '1');
-  el.innerHTML = '<input type="text" class="w-full text-xs font-bold text-slate-700 border-b border-indigo-400 bg-white outline-none px-0.5">';
-  var inp = el.querySelector('input'); inp.value = t.namaTugas; inp.focus(); inp.select();
-  var done = false;
-  var finish = function(save){ if (done) return; done = true; var v = inp.value.trim(); if (save && v && v !== t.namaTugas) _schInlineUpdate(t, { namaTugas: v }); else _schRenderGantt(); };
-  inp.addEventListener('blur', function(){ finish(true); });
-  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); finish(true); } else if (e.key === 'Escape'){ e.preventDefault(); finish(false); } });
-}
-function _schEditDates(el, id) {
-  if (!_schCanEdit() || el.getAttribute('data-ed')) return;
-  var t = _schTasks.filter(function(x){ return x.id === id; })[0]; if (!t) return;
-  el.setAttribute('data-ed', '1');
-  el.innerHTML = '<span class="inline-flex items-center gap-1 text-[10px]"><input type="date" class="sch-d0 border border-slate-200 rounded px-1 py-0.5"> → <input type="date" class="sch-d1 border border-slate-200 rounded px-1 py-0.5"></span>';
-  var d0 = el.querySelector('.sch-d0'), d1 = el.querySelector('.sch-d1');
-  d0.value = t.mulai; d1.value = t.selesai;
-  var done = false;
-  var finish = function(){ if (done) return; done = true; var m = d0.value, s = d1.value;
-    if (!m || !s) { _schRenderGantt(); return; }
-    if (s < m) { showNotification('Tanggal selesai tidak boleh sebelum mulai.', 'error'); _schRenderGantt(); return; }
-    if (m === t.mulai && s === t.selesai) { _schRenderGantt(); return; }
-    _schInlineUpdate(t, { mulai: m, selesai: s });
-  };
-  var maybe = function(){ setTimeout(function(){ var a = document.activeElement; if (a !== d0 && a !== d1) finish(); }, 120); };
-  d0.addEventListener('blur', maybe); d1.addEventListener('blur', maybe);
-  d0.focus();
-}
 // ── Tugas CRUD ──
 function _schOpenTask(id) {
   if (!_schCanEdit()) return;
