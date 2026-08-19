@@ -72,7 +72,11 @@ export const TABLES = [
   { table:'ded_project', sheet:'DED_Project', pk:'no_wo', cols:[
     ['no_wo','t'],['nama_project','t'],['nama_klien','t'],['ditambahkan_oleh','t'],['ditambahkan_pada','ts'],
     ['selesai_manual','b'],['ditandai_selesai_oleh','t'],['ditandai_selesai_pada','ts'] ]},
-  { table:'ded_item', sheet:'DED_Item', pk:'id', cols:[
+  { table:'ded_item', sheet:'DED_Item', pk:'id',
+    // Sama seperti qc_item: id sheet lama tidak unik per (no_wo, kode) → bangun
+    // ulang agar unik, cegah baris saling menimpa (kehilangan data) saat import.
+    post:(o)=>{ if(o.no_wo && o.kode) o.id = o.no_wo + '-' + o.kode; },
+    cols:[
     ['id','t'],['no_wo','t'],['kode','t'],['files','j'],['status','t'],['catatan_review','t'],
     ['diupload_oleh','t'],['diupload_pada','ts'],['direview_oleh','t'],['direview_pada','ts'],['aktivitas','j'] ]},
   { table:'ded_assignment', sheet:'DED_Assignment', pk:['no_wo','id_user'], cols:[
