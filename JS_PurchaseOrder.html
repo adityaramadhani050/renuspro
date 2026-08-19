@@ -99,19 +99,9 @@ function _pgRenderPurchaseOrder(data) {
   }).join('');
 }
 
-// ── Urutan No PO: format NNN/RGI/PO/ROMAWI/YYYY (seq reset per bulan) ─────────
-var _PO_ROMAN = { I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8,IX:9,X:10,XI:11,XII:12 };
-function _poSortKey(noPO) {
-  var m = String(noPO || '').match(/^(\d+)\/[^/]+\/[^/]+\/([IVXLCDM]+)\/(\d{4})/);
-  if (!m) return { y: -1, mo: -1, seq: -1 };
-  return { seq: parseInt(m[1], 10) || 0, mo: _PO_ROMAN[m[2]] || 0, y: parseInt(m[3], 10) || 0 };
-}
-function _poCmp(a, b) {           // terbaru di atas: tahun → bulan → nomor urut (desc)
-  var ka = _poSortKey(a.noPO), kb = _poSortKey(b.noPO);
-  if (kb.y !== ka.y) return kb.y - ka.y;
-  if (kb.mo !== ka.mo) return kb.mo - ka.mo;
-  return kb.seq - ka.seq;
-}
+// ── Urutan No PO: berdasarkan nomor depan (NNN), descending ──────────────────
+function _poSeqNo(noPO) { var m = String(noPO || '').match(/^(\d+)/); return m ? (parseInt(m[1], 10) || 0) : -1; }
+function _poCmp(a, b) { return _poSeqNo(b.noPO) - _poSeqNo(a.noPO); }
 
 // ── Load daftar PO ──────────────────────────────────────────────────────────
 window.loadPurchaseOrder = function(fromNav) {
