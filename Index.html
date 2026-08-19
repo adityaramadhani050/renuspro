@@ -33,6 +33,9 @@
         <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-item active flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
           <i class="fas fa-chart-pie w-6"></i> Dashboard Sales
         </button>
+        <button onclick="navigate('dashboardproject')" id="nav-dashboardproject" class="nav-item hidden flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+          <i class="fas fa-diagram-project w-6"></i> Dashboard Project
+        </button>
 
         <p id="nav-group-penjualan" class="px-4 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penjualan</p>
         <button onclick="navigate('sitesurvey')" id="nav-sitesurvey" class="nav-item flex items-center px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
@@ -192,6 +195,7 @@
 
 
       <?!= include('Page_Dashboard'); ?>
+      <?!= include('Page_DashboardProject'); ?>
       <?!= include('Page_SiteSurvey'); ?>
       <?!= include('Page_Penawaran'); ?>
       <?!= include('Page_WorkOrder'); ?>
@@ -227,6 +231,7 @@
   <?!= include('JS_Backdrop'); ?>
   <?!= include('JS_Core'); ?>
   <?!= include('JS_Dashboard'); ?>
+  <?!= include('JS_DashboardProject'); ?>
   <?!= include('JS_SiteSurvey'); ?>
   <?!= include('JS_Penawaran_List'); ?>
   <?!= include('JS_WorkOrder'); ?>

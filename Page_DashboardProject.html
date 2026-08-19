@@ -1,0 +1,96 @@
+      <section id="page-dashboardproject" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Project</h2>
+            <p class="text-sm text-slate-400 mt-0.5">Pantau jalannya project & kinerja tim</p>
+          </div>
+          <button onclick="_engMuatUlang && _engMuatUlang('loadDashboardProject', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+
+        <!-- KPI -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-diagram-project text-blue-400 mr-1"></i>Project Aktif</p>
+            <p id="dp-kpi-aktif" class="text-2xl font-extrabold text-blue-600">0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>Project Selesai</p>
+            <p id="dp-kpi-selesai" class="text-2xl font-extrabold text-emerald-600">0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-file-signature text-slate-400 mr-1"></i>Nilai Kontrak Aktif</p>
+            <p id="dp-kpi-kontrak" class="text-lg font-extrabold text-slate-800 leading-tight">Rp 0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-percent text-amber-400 mr-1"></i>Margin Rata²</p>
+            <p id="dp-kpi-margin" class="text-2xl font-extrabold text-amber-600">0%</p>
+          </div>
+        </div>
+
+        <!-- Grafik -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 lg:col-span-2">
+            <p class="text-sm font-bold text-slate-700 mb-3">Project Baru per Bulan</p>
+            <div class="relative" style="height:240px"><canvas id="dp-chart-tren"></canvas></div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-sm font-bold text-slate-700 mb-3">Tahapan Hand Over (project aktif)</p>
+            <div class="relative" style="height:240px"><canvas id="dp-chart-ho"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Ringkasan tahapan -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Schedule</p>
+            <div class="flex items-end justify-between mb-1"><span class="text-xs text-slate-500">Progress rata²</span><span id="dp-sch-prog" class="text-lg font-extrabold text-indigo-600">0%</span></div>
+            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2"><div id="dp-sch-bar" class="h-2 bg-indigo-500 rounded-full" style="width:0%"></div></div>
+            <p class="text-xs text-slate-500">Terjadwal: <b id="dp-sch-total" class="text-slate-700">0</b> · Telat: <b id="dp-sch-telat" class="text-rose-600">0</b></p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quality Control</p>
+            <p class="text-sm"><span class="text-emerald-600 font-bold" id="dp-qc-appr">0</span> <span class="text-slate-400 text-xs">approved</span></p>
+            <p class="text-sm mt-1"><span class="text-amber-600 font-bold" id="dp-qc-pend">0</span> <span class="text-slate-400 text-xs">pending</span> · <span class="text-rose-600 font-bold" id="dp-qc-rej">0</span> <span class="text-slate-400 text-xs">ditolak</span></p>
+            <p class="text-[11px] text-slate-400 mt-1"><span id="dp-qc-worej" class="font-bold text-rose-500">0</span> WO ada item ditolak</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DED / BOM</p>
+            <p class="text-sm">DED: <span class="text-emerald-600 font-bold" id="dp-ded-appr">0</span>/<span id="dp-ded-pend" class="text-amber-600 font-bold">0</span>/<span id="dp-ded-rej" class="text-rose-600 font-bold">0</span></p>
+            <p class="text-sm mt-1">BOM: <span class="text-emerald-600 font-bold" id="dp-bom-appr">0</span>/<span id="dp-bom-pend" class="text-amber-600 font-bold">0</span>/<span id="dp-bom-rej" class="text-rose-600 font-bold">0</span></p>
+            <p class="text-[10px] text-slate-400 mt-1">approved / pending / ditolak</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Maintenance</p>
+            <p class="text-sm"><span class="text-amber-600 font-bold" id="dp-mtn-diajukan">0</span> <span class="text-slate-400 text-xs">diajukan</span> · <span class="text-blue-600 font-bold" id="dp-mtn-dijadwalkan">0</span> <span class="text-slate-400 text-xs">dijadwalkan</span></p>
+            <p class="text-sm mt-1"><span class="text-indigo-600 font-bold" id="dp-mtn-dikerjakan">0</span> <span class="text-slate-400 text-xs">dikerjakan</span> · <span class="text-emerald-600 font-bold" id="dp-mtn-selesai">0</span> <span class="text-slate-400 text-xs">selesai</span></p>
+          </div>
+        </div>
+
+        <!-- Project berisiko + Kinerja tim -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+              <span class="text-sm font-bold text-slate-700">Project Berisiko</span>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-sm">
+              <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider"><tr>
+                <th class="p-3 text-left">Project</th><th class="p-3 text-center">Progress</th><th class="p-3 text-center">Telat</th><th class="p-3 text-center">QC Ditolak</th>
+              </tr></thead>
+              <tbody id="dp-risiko-body" class="divide-y divide-slate-100"><tr><td colspan="4" class="p-6 text-center text-slate-400">Memuat...</td></tr></tbody>
+            </table></div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-users-gear text-indigo-500"></i>
+              <span class="text-sm font-bold text-slate-700">Kinerja Tim (QC)</span>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-sm">
+              <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider"><tr>
+                <th class="p-3 text-left">Nama</th><th class="p-3 text-center">Item</th><th class="p-3 text-center">Approved</th><th class="p-3 text-center">Pending</th><th class="p-3 text-center">Ditolak</th>
+              </tr></thead>
+              <tbody id="dp-se-body" class="divide-y divide-slate-100"><tr><td colspan="5" class="p-6 text-center text-slate-400">Memuat...</td></tr></tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
