@@ -107,22 +107,22 @@
         },
         // Request penambahan stok (ke Procurement)
         requestStok: function (d) {
-          return ['📦 *Permintaan Penambahan Stok*', 'ID: *' + d.id + '*', 'Item: ' + (d.namaItem || '-') + ' — ' + (Number(d.qty) || 0) + ' ' + (d.satuan || ''), 'Diminta oleh: ' + (d.oleh || '-') + ' (Warehouse)', (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'].filter(_waNonEmpty).join('\n');
+          return ['📦 *Permintaan Penambahan Stok*', 'ID: *' + d.id + '*', 'Item: ' + (d.namaItem || '-') + ' — ' + (Number(d.qty) || 0) + ' ' + (d.satuan || ''), 'Diminta oleh: ' + (d.oleh || '-') + ' (Warehouse)', (d.catatan ? '📝 ' + d.catatan : ''), '', '\nMohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'].filter(_waNonEmpty).join('\n');
         },
         // Maintenance baru diajukan (ke Project Coordinator)
         maintenanceBaru: function (d) {
-          return ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), 'Diajukan oleh: ' + (d.oleh || '-'), '', 'Mohon dijadwalkan di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+          return ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), 'Diajukan oleh: ' + (d.oleh || '-'), '', '\nMohon dijadwalkan di menu Maintenance.'].filter(_waNonEmpty).join('\n');
         },
         // Maintenance ditugaskan ke teknisi
         maintenanceDitugaskan: function (d) {
-          return ['🛠️ *Penugasan Maintenance*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.jadwal ? 'Jadwal: ' + d.jadwal : ''), '', 'Anda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+          return ['🛠️ *Penugasan Maintenance*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.jadwal ? 'Jadwal: ' + d.jadwal : ''), '', '\nAnda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(_waNonEmpty).join('\n');
         },
         // Hand Over dijadwalkan (ke peserta)
         handOverDijadwalkan: function (d) {
           return ['📅 *Hand Over Dijadwalkan*', 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : ''),
             'Jadwal: ' + (d.tanggal || '-') + (d.waktu ? ' · ' + d.waktu : ''), 'Mode: ' + (d.mode || '-'),
             (d.mode !== 'Offline' && d.link ? 'Link: ' + d.link : ''), (d.mode !== 'Online' && d.lokasi ? 'Lokasi: ' + d.lokasi : ''),
-            '💰 Pembayaran: ' + d.bayarStr, 'Dijadwalkan oleh: ' + (d.oleh || '-'), '', 'Anda terdaftar sebagai peserta Hand Over ini.'].filter(_waNonEmpty).join('\n');
+            'Pembayaran: ' + d.bayarStr, 'Dijadwalkan oleh: ' + (d.oleh || '-'), ''].filter(_waNonEmpty).join('\n');
         },
         // BOM diajukan untuk review (ke Lead Engineer)
         bomAjukan: function (d) {
