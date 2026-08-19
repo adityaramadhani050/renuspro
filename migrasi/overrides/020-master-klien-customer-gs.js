@@ -336,6 +336,14 @@
           var bayar = (typeof _woPembayaranLunas === 'function') ? await _woPembayaranLunas(noWO) : { count: 0, total: 0 };
           if (!q.data) return { success: true, record: null, hasPembayaranLunas: bayar.count > 0, bayarCount: bayar.count, bayarTotal: bayar.total };
           var r = q.data;
+          // Peserta disimpan sebagai CSV user id → resolve ke nama untuk tampilan
+          // (token yang bukan id dibiarkan apa adanya, kompat data lama by-nama).
+          var pesertaNama = '';
+          if (r.peserta) {
+            var uq = await supa.from('app_user').select('id,nama');
+            var nmById = {}; (uq.data || []).forEach(function (u) { if (u.id != null) nmById[u.id.toString()] = u.nama || ''; });
+            pesertaNama = (r.peserta || '').split(',').map(function (t) { t = t.trim(); return t ? (nmById[t] || t) : ''; }).filter(Boolean).join(', ');
+          }
           return {
             success: true,
             hasPembayaranLunas: bayar.count > 0, bayarCount: bayar.count, bayarTotal: bayar.total,
@@ -345,7 +353,7 @@
               tglJadwal: r.tgl_jadwal ? r.tgl_jadwal.toString().slice(0, 10) : '',
               waktu: r.waktu ? r.waktu.toString().slice(0, 5) : '',
               mode: r.mode || '', linkMeet: r.link_meet || '', lokasi: r.lokasi || '',
-              peserta: r.peserta || '', catatanUndangan: r.catatan_undangan || '',
+              peserta: r.peserta || '', pesertaNama: pesertaNama, catatanUndangan: r.catatan_undangan || '',
               dijadwalkanOleh: r.dijadwalkan_oleh || '', dijadwalkanPada: _fmtTs(r.dijadwalkan_pada),
               mom: r.mom || '', selesaiOleh: r.selesai_oleh || '', selesaiPada: _fmtTs(r.selesai_pada),
               meetEventId: r.meet_event_id || ''

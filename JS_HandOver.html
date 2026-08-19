@@ -118,7 +118,7 @@ function _hoJadwalInfo(r) {
     + '<div class="bg-slate-50 rounded-xl p-3"><p class="text-slate-400 mb-0.5">Jadwal</p><p class="font-bold text-slate-700">' + _hoFmt(r.tglJadwal) + (r.waktu ? ' · ' + _hoEsc(_hoFmtTime(r.waktu)) : '') + '</p></div>'
     + '<div class="bg-slate-50 rounded-xl p-3"><p class="text-slate-400 mb-0.5">Mode</p><p class="font-bold text-slate-700">' + _hoEsc(r.mode || '-') + '</p></div>'
     + detail
-    + (r.peserta ? '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">Peserta</p><p class="font-semibold text-slate-700">' + _hoEsc(r.peserta) + '</p></div>' : '')
+    + (r.peserta ? '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">Peserta</p><p class="font-semibold text-slate-700">' + _hoEsc(r.pesertaNama || r.peserta) + '</p></div>' : '')
     + (r.catatanUndangan ? '<div class="bg-slate-50 rounded-xl p-3 sm:col-span-2"><p class="text-slate-400 mb-0.5">Catatan Undangan</p><p class="text-slate-600">' + _hoEsc(r.catatanUndangan) + '</p></div>' : '')
     + '</div>';
 }
@@ -164,7 +164,8 @@ function _hoLoadPeserta(selectedCsv) {
     if (!(_hoUsers || []).length) { box.innerHTML = '<div class="text-xs text-slate-400">Belum ada user.</div>'; return; }
     box.innerHTML = _hoUsers.map(function(u){
       var nm = u.nama || '';
-      return '<label class="flex items-center gap-2 py-0.5 cursor-pointer"><input type="checkbox" value="' + _hoEsc(nm) + '"' + (sel[nm] ? ' checked' : '') + ' class="ho-peserta-cb w-4 h-4 accent-indigo-600 shrink-0"><span class="text-sm text-slate-700 truncate">' + _hoEsc(nm) + (u.role ? ' <span class="text-[10px] text-slate-400">(' + _hoEsc(u.role) + ')</span>' : '') + '</span></label>';
+      // value = user id (cocok data by-id); pre-check by id atau nama (kompat lama).
+      return '<label class="flex items-center gap-2 py-0.5 cursor-pointer"><input type="checkbox" value="' + _hoEsc(u.id) + '"' + ((sel[u.id] || sel[nm]) ? ' checked' : '') + ' class="ho-peserta-cb w-4 h-4 accent-indigo-600 shrink-0"><span class="text-sm text-slate-700 truncate">' + _hoEsc(nm) + (u.role ? ' <span class="text-[10px] text-slate-400">(' + _hoEsc(u.role) + ')</span>' : '') + '</span></label>';
     }).join('');
   };
   if (_hoUsers) render();

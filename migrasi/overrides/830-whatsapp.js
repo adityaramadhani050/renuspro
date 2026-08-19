@@ -96,15 +96,18 @@
       }
       async function _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, link, lokasi, oleh, peserta) {
         if (!ENABLE_WA) return;
-        // Kirim ke peserta yang dipilih Project Coordinator (daftar nama user).
-        var names = (peserta || '').split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
-        if (!names.length) return;
-        var nameSet = {}; names.forEach(function (n) { nameSet[n] = 1; });
+        // Kirim ke peserta yang dipilih Project Coordinator (daftar user id;
+        // fallback nama untuk kompat data lama).
+        var toks = (peserta || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        if (!toks.length) return;
+        var idSet = {}, nameSet = {};
+        toks.forEach(function (t) { idSet[t] = 1; nameSet[t.toLowerCase()] = 1; });
         var users = await _waUsers();
         var seen = {}, phones = [];
         users.forEach(function (u) {
           if (u.aktif === false || !u.no_whatsapp) return;
-          if (!nameSet[(u.nama || '').toLowerCase()]) return;
+          var match = idSet[(u.id != null ? u.id.toString() : '')] || nameSet[(u.nama || '').toLowerCase()];
+          if (!match) return;
           var ph = _normalizePhone(u.no_whatsapp);
           if (ph && !seen[ph]) { seen[ph] = 1; phones.push(ph); }
         });
