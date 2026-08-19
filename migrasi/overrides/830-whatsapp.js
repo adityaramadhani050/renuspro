@@ -115,7 +115,7 @@
         },
         // Maintenance ditugaskan ke teknisi
         maintenanceDitugaskan: function (d) {
-          return ['🛠️ *Penugasan Maintenance*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.jadwal ? 'Jadwal: ' + d.jadwal : ''), '', '\nAnda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+          return ['🛠️ *Penugasan Maintenance*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), (d.jadwal ? 'Jadwal: ' + d.jadwal : ''), '', '\nAnda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(_waNonEmpty).join('\n');
         },
         // Hand Over dijadwalkan (ke peserta)
         handOverDijadwalkan: function (d) {
@@ -212,12 +212,12 @@
         if (!ENABLE_WA) return;
         _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.maintenanceBaru({ id: id, project: project, lokasi: lokasi, jenis: jenis, prioritas: prioritas, oleh: oleh }));
       }
-      async function _notifMaintenanceDitugaskan(teknisiId, id, project, tglJadwal) {
+      async function _notifMaintenanceDitugaskan(teknisiId, id, project, tglJadwal, lokasi, jenis, prioritas) {
         if (!ENABLE_WA || !teknisiId) return;
         var uq = await supa.from('app_user').select('id,aktif,no_whatsapp').eq('id', teknisiId).maybeSingle();
         if (!uq.data || uq.data.aktif === false || !uq.data.no_whatsapp) return;
         var phone = _normalizePhone(uq.data.no_whatsapp); if (!phone) return;
-        _waSend([phone], _WA_MSG.maintenanceDitugaskan({ id: id, project: project, jadwal: tglJadwal }));
+        _waSend([phone], _WA_MSG.maintenanceDitugaskan({ id: id, project: project, jadwal: tglJadwal, lokasi: lokasi, jenis: jenis, prioritas: prioritas }));
       }
       async function _notifRequestStok(id, namaItem, qty, satuan, oleh, catatan) {
         if (!ENABLE_WA) return;
@@ -286,7 +286,7 @@
               hasil_bayar: _WA_MSG.hasilPembayaran({ idReq: 'REQ-UJI', ref: 'PO: PO-UJI', jumlah: 5000000, disetujui: true, oleh: 'Finance' }),
               req_stok: _WA_MSG.requestStok({ id: 'REQ-STK-UJI', namaItem: 'Panel Surya 550Wp', qty: 10, satuan: 'pcs', oleh: 'Warehouse', catatan: 'Stok menipis' }),
               maintenance_baru: _WA_MSG.maintenanceBaru({ id: 'MTN-UJI', project: P, lokasi: 'Surabaya', jenis: 'Perbaikan', prioritas: 'Tinggi', oleh: 'Sales' }),
-              maintenance_tugas: _WA_MSG.maintenanceDitugaskan({ id: 'MTN-UJI', project: P, jadwal: 'besok' }),
+              maintenance_tugas: _WA_MSG.maintenanceDitugaskan({ id: 'MTN-UJI', project: P, lokasi: 'Surabaya', jenis: 'Perbaikan', prioritas: 'Tinggi', jadwal: 'besok' }),
               ho_dijadwalkan: _WA_MSG.handOverDijadwalkan({ noWO: W, proj: P, tanggal: '20/08/2026', waktu: '10:00', mode: 'Offline', link: '', lokasi: 'Kantor Klien', bayarStr: 'Lunas 1 invoice · ' + rp(12000000), oleh: 'Project Coordinator' }),
               reminder_expired: _WA_MSG.reminderExpired([{ noPenawaran: '001/QUOT/UJI', namaProject: P, namaKlien: 'Klien Uji', dibuatOleh: 'Sales', validHingga: 'besok' }]),
               remind_engineer: _WA_MSG.reminderReviewLead({ modul: 'QC', noWO: W, proj: P, pending: 3, kata: 'item' })

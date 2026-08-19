@@ -92,8 +92,9 @@
           if (!id) return { success: false, message: 'ID maintenance wajib.' };
           if (!tglJadwal) return { success: false, message: 'Tanggal rencana pengerjaan wajib diisi.' };
           if (!teknisiNama) return { success: false, message: 'Teknisi pelaksana wajib dipilih.' };
-          var st = await _mtnStatus(id);
-          if (st == null) return { success: false, message: 'Maintenance tidak ditemukan.' };
+          var mrow = await supa.from('maintenance').select('status,nama_project,lokasi,jenis,prioritas').eq('id', id).maybeSingle();
+          if (!mrow.data) return { success: false, message: 'Maintenance tidak ditemukan.' };
+          var st = (mrow.data.status || '');
           if (_mtnFinal(st)) return { success: false, message: 'Maintenance berstatus "' + st + '" sudah final.' };
           var up = await supa.from('maintenance').update({
             status: 'Dijadwalkan', tanggal_jadwal: tglJadwal, teknisi_id: teknisiId || null, teknisi_nama: teknisiNama,
@@ -101,7 +102,7 @@
             diubah_pada: new Date().toISOString()
           }).eq('id', id);
           if (up.error) return { success: false, message: up.error.message };
-          if (typeof _notifMaintenanceDitugaskan === 'function') _notifMaintenanceDitugaskan(teknisiId, id, (p.namaProject || ''), tglJadwal);
+          if (typeof _notifMaintenanceDitugaskan === 'function') _notifMaintenanceDitugaskan(teknisiId, id, (mrow.data.nama_project || p.namaProject || ''), tglJadwal, (mrow.data.lokasi || ''), (mrow.data.jenis || ''), (mrow.data.prioritas || ''));
           return { success: true, message: 'Maintenance ' + id + ' dijadwalkan & ditugaskan ke ' + teknisiNama + '.' };
         }
       });
