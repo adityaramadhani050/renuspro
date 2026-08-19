@@ -85,32 +85,28 @@
             <input type="hidden" id="sch-task-id">
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Tugas <span class="text-rose-400">*</span></label>
             <input type="text" id="sch-task-nama" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3" placeholder="cth: Instalasi struktur panel">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fase</label>
+            <select id="sch-task-fase" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-1">
+              <option value="">— Pilih fase —</option>
+              <option value="Hand Over">Hand Over</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Pengadaan">Pengadaan</option>
+              <option value="Pengiriman">Pengiriman</option>
+              <option value="Kontruksi">Kontruksi</option>
+              <option value="Finishing">Finishing</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mb-3"><i class="fa-solid fa-palette mr-1"></i>Warna bar otomatis mengikuti fase.</p>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jadwal Rencana</p>
             <div class="grid grid-cols-2 gap-3 mb-3">
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fase</label>
-                <select id="sch-task-fase" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white">
-                  <option value="">— Pilih fase —</option>
-                  <option value="Hand Over">Hand Over</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Pengadaan">Pengadaan</option>
-                  <option value="Pengiriman">Pengiriman</option>
-                  <option value="Kontruksi">Kontruksi</option>
-                  <option value="Finishing">Finishing</option>
-                </select>
-              </div>
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Warna</label>
-                <select id="sch-task-warna" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white">
-                  <option value="indigo">Indigo</option><option value="emerald">Hijau</option><option value="amber">Kuning</option><option value="sky">Biru</option><option value="rose">Merah</option><option value="violet">Ungu</option><option value="slate">Abu</option>
-                </select>
-              </div>
+              <div><label class="block text-[11px] font-bold text-slate-500 mb-1">Mulai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-mulai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+              <div><label class="block text-[11px] font-bold text-slate-500 mb-1">Selesai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-selesai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
             </div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jadwal Aktual <span class="normal-case font-normal text-slate-300">(otomatis terisi, bisa diubah)</span></p>
             <div class="grid grid-cols-2 gap-3 mb-3">
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Mulai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-mulai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Selesai <span class="text-rose-400">*</span></label><input type="date" id="sch-task-selesai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+              <div><label class="block text-[11px] font-bold text-slate-500 mb-1">Mulai</label><input type="date" id="sch-task-aktual-mulai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
+              <div><label class="block text-[11px] font-bold text-slate-500 mb-1">Selesai</label><input type="date" id="sch-task-aktual-selesai" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
             </div>
-            <div class="grid grid-cols-2 gap-3 mb-3">
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Progress (%)</label><input type="number" id="sch-task-progress" min="0" max="100" value="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
-              <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Urutan</label><input type="number" id="sch-task-urutan" min="0" value="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
-            </div>
+            <div class="mb-3"><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Progress (%)</label><input type="number" id="sch-task-progress" min="0" max="100" value="0" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl"></div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Catatan</label>
             <input type="text" id="sch-task-catatan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4" placeholder="opsional">
             <div class="flex justify-between gap-2">

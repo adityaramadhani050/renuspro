@@ -529,6 +529,8 @@ function _schMonLbl(d){ var m=['Januari','Februari','Maret','April','Mei','Juni'
 
 // ── Tambah Cepat / Template (bulk) ──
 var _SCH_FASE_WARNA = { 'Hand Over':'indigo', 'Engineering':'emerald', 'Pengadaan':'amber', 'Pengiriman':'sky', 'Kontruksi':'violet', 'Finishing':'rose' };
+// Warna bar mengikuti fase (beda fase = beda warna, sama dalam satu fase).
+function _schFaseWarna(fase){ return _SCH_FASE_WARNA[(fase||'').toString().trim()] || 'slate'; }
 // off = hari ke- dari tanggal mulai (0 = tanggal mulai); mendukung tugas paralel.
 var _SCH_TEMPLATE = [
   { nama:'Hand Over', off:0, durasi:1, fase:'Hand Over' },
@@ -595,7 +597,7 @@ function _schBulkSubmit() {
     else if (seq) mulai = cursor;
     else mulai = base;
     var selesai = _schShiftIso(mulai, durasi - 1);
-    tasks.push({ namaTugas: nama, fase: fase, mulai: mulai, selesai: selesai, warna: _SCH_FASE_WARNA[fase] || 'indigo', progress: 0, urutan: urut++ });
+    tasks.push({ namaTugas: nama, fase: fase, mulai: mulai, selesai: selesai, warna: _schFaseWarna(fase), progress: 0, urutan: urut++ });
     if (!hasOff && seq) cursor = _schShiftIso(selesai, 1);
   });
   if (!tasks.length) return showNotification('Isi minimal 1 tugas.', 'error');
@@ -614,11 +616,11 @@ function _schOpenTask(id) {
   document.getElementById('sch-task-id').value = t ? t.id : '';
   document.getElementById('sch-task-nama').value = t ? t.namaTugas : '';
   document.getElementById('sch-task-fase').value = t ? t.fase : '';
-  document.getElementById('sch-task-warna').value = t ? (t.warna || 'indigo') : 'indigo';
   document.getElementById('sch-task-mulai').value = t ? t.mulai : '';
   document.getElementById('sch-task-selesai').value = t ? t.selesai : '';
+  document.getElementById('sch-task-aktual-mulai').value = t ? (t.aktualMulai || '') : '';
+  document.getElementById('sch-task-aktual-selesai').value = t ? (t.aktualSelesai || '') : '';
   document.getElementById('sch-task-progress').value = t ? t.progress : 0;
-  document.getElementById('sch-task-urutan').value = t ? t.urutan : (_schTasks.length);
   document.getElementById('sch-task-catatan').value = t ? t.catatan : '';
   document.getElementById('sch-task-del').classList.toggle('hidden', !t);
   document.getElementById('sch-modal-task').classList.remove('hidden');
@@ -626,18 +628,22 @@ function _schOpenTask(id) {
 function _schCloseTask(){ document.getElementById('sch-modal-task').classList.add('hidden'); }
 function _schSubmitTask() {
   var id = document.getElementById('sch-task-id').value;
+  var fase = document.getElementById('sch-task-fase').value.trim();
   var payload = {
     id: id, noWO: _schWO.noWO,
     namaTugas: document.getElementById('sch-task-nama').value.trim(),
-    fase: document.getElementById('sch-task-fase').value.trim(),
-    warna: document.getElementById('sch-task-warna').value,
+    fase: fase,
+    warna: _schFaseWarna(fase),   // warna otomatis mengikuti fase
     mulai: document.getElementById('sch-task-mulai').value,
     selesai: document.getElementById('sch-task-selesai').value,
+    aktualMulai: document.getElementById('sch-task-aktual-mulai').value,
+    aktualSelesai: document.getElementById('sch-task-aktual-selesai').value,
     progress: Number(document.getElementById('sch-task-progress').value) || 0,
-    urutan: Number(document.getElementById('sch-task-urutan').value) || 0,
     catatan: document.getElementById('sch-task-catatan').value.trim(),
     oleh: _schUserNama()
   };
+  // Tugas baru: taruh di akhir (urutan = jumlah tugas). Edit: urutan dipertahankan server.
+  if (!id) payload.urutan = _schTasks.length;
   if (!payload.namaTugas) return showNotification('Nama tugas wajib.', 'error');
   if (!payload.mulai || !payload.selesai) return showNotification('Tanggal mulai & selesai wajib.', 'error');
   _schCloseTask();

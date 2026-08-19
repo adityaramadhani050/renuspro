@@ -15,6 +15,53 @@
       function _schTaskId(i) { return 'TSK-' + Date.now() + (i != null ? '-' + i : ''); }
       function _schClampPct(v) { return Math.max(0, Math.min(100, Number(v) || 0)); }
 
+      // % proyek berbobot: bobot per fase (dinormalkan ke fase yang ada), dalam
+      // fase dibagi proporsional durasi. useBaseline → pakai durasi baseline.
+      function _schWeightedProgress(tasks, bobot, useBaseline) {
+        var groups = {}, order = [];
+        (tasks || []).forEach(function (t) {
+          var f = (t.fase || '').toString().trim() || '(Tanpa Fase)';
+          if (!groups[f]) { groups[f] = []; order.push(f); }
+          groups[f].push(t);
+        });
+        if (!order.length) return 0;
+        var vals = Object.keys(bobot || {}).map(function (k) { return Number(bobot[k]) || 0; });
+        var avg = vals.length ? (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length) : 1;
+        var raw = {}, sumRaw = 0;
+        order.forEach(function (f) { var r = (bobot && bobot[f] != null) ? (Number(bobot[f]) || 0) : avg; raw[f] = r; sumRaw += r; });
+        if (sumRaw <= 0) sumRaw = 1;
+        var total = 0;
+        order.forEach(function (f) {
+          var w = raw[f] / sumRaw, arr = groups[f];
+          var durs = arr.map(function (t) {
+            var m = (useBaseline && t.baselineMulai) ? t.baselineMulai : t.mulai;
+            var s = (useBaseline && t.baselineSelesai) ? t.baselineSelesai : t.selesai;
+            return _schDurasi(m, s);
+          });
+          var sumDur = durs.reduce(function (a, b) { return a + b; }, 0) || arr.length || 1;
+          arr.forEach(function (t, i) { total += (w * (durs[i] / sumDur)) * (Number(t.progress) || 0); });
+        });
+        return Math.round(total * 10) / 10;
+      }
+
+      // Rekam 1 titik progres "hari ini" (upsert per no_wo+tanggal) → kurva S aktual.
+      async function _schSnapshotProgress(noWO, oleh) {
+        try {
+          noWO = (noWO || '').toString().trim(); if (!noWO) return;
+          var q = await supa.from('schedule_task').select('*').eq('no_wo', noWO);
+          if (q.error) return;
+          var tasks = (_schTasksMap(q.data || [])[noWO]) || [];
+          if (!tasks.length) return;
+          var bobot = await _schFaseBobot();
+          var pct = _schWeightedProgress(tasks, bobot, true);
+          var today = _todayIso();
+          await supa.from('schedule_progress_log').upsert(
+            { id: 'PROG-' + noWO + '-' + today, no_wo: noWO, tanggal: today, persen_aktual: pct, dicatat_oleh: (oleh || '').toString(), dicatat_pada: new Date().toISOString() },
+            { onConflict: 'no_wo,tanggal' }
+          );
+        } catch (e) {}
+      }
+
       window.gsRoute('saveScheduleTask', {
         mode: 'fn',
         handler: async function (args) {
@@ -27,14 +74,20 @@
           if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib.' };
           if (selesai < mulai) return { success: false, message: 'Tanggal selesai tidak boleh sebelum mulai.' };
           var id = _schTaskId();
+          var prog = _schClampPct(p.progress);
+          var am = _schIso(p.aktualMulai), as = _schIso(p.aktualSelesai);
+          if (!am && prog > 0) am = _todayIso();            // auto: mulai saat progres > 0
+          if (!as && prog >= 100) as = _todayIso();         // auto: selesai saat 100%
           var row = {
             id: id, no_wo: noWO, nama_tugas: nama, fase: (p.fase || '').toString(),
-            tanggal_mulai: mulai, tanggal_selesai: selesai, progress: _schClampPct(p.progress),
+            tanggal_mulai: mulai, tanggal_selesai: selesai, progress: prog,
+            aktual_mulai: am || null, aktual_selesai: as || null,
             warna: (p.warna || '').toString(), urutan: Number(p.urutan) || 0,
             catatan: (p.catatan || '').toString(), dibuat_oleh: (p.oleh || '').toString(), dibuat_pada: new Date().toISOString()
           };
           var ins = await supa.from('schedule_task').insert(row);
           if (ins.error) return { success: false, message: ins.error.message };
+          await _schSnapshotProgress(noWO, p.oleh);
           return { success: true, message: 'Tugas ditambahkan.', id: id };
         }
       });
@@ -65,6 +118,7 @@
           if (!rows.length) return { success: false, message: 'Tidak ada tugas valid (nama kosong).' };
           var ins = await supa.from('schedule_task').insert(rows);
           if (ins.error) return { success: false, message: ins.error.message };
+          await _schSnapshotProgress(noWO, p.oleh);
           return { success: true, message: rows.length + ' tugas ditambahkan.', count: rows.length };
         }
       });
@@ -78,14 +132,26 @@
           var mulai = _schIso(p.mulai), selesai = _schIso(p.selesai);
           if (!mulai || !selesai) return { success: false, message: 'Tanggal mulai & selesai wajib.' };
           if (selesai < mulai) return { success: false, message: 'Tanggal selesai tidak boleh sebelum mulai.' };
+          var cur = await supa.from('schedule_task').select('no_wo,urutan,aktual_mulai,aktual_selesai').eq('id', id).maybeSingle();
+          if (cur.error) return { success: false, message: cur.error.message };
+          if (!cur.data) return { success: false, message: 'Tugas tidak ditemukan.' };
+          var prog = _schClampPct(p.progress);
+          // Aktual: nilai dari modal diutamakan; bila kosong pakai yg lama; auto-isi bila progres menuntut.
+          var am = ('aktualMulai' in p) ? _schIso(p.aktualMulai) : _schIso(cur.data.aktual_mulai);
+          var as = ('aktualSelesai' in p) ? _schIso(p.aktualSelesai) : _schIso(cur.data.aktual_selesai);
+          if (!am && prog > 0) am = _todayIso();
+          if (!as && prog >= 100) as = _todayIso();
           var upd = {
             nama_tugas: (p.namaTugas || '').toString(), fase: (p.fase || '').toString(),
-            tanggal_mulai: mulai, tanggal_selesai: selesai, progress: _schClampPct(p.progress),
-            warna: (p.warna || '').toString(), urutan: Number(p.urutan) || 0, catatan: (p.catatan || '').toString()
+            tanggal_mulai: mulai, tanggal_selesai: selesai, progress: prog,
+            aktual_mulai: am || null, aktual_selesai: as || null,
+            warna: (p.warna || '').toString(), urutan: (p.urutan != null && p.urutan !== '') ? (Number(p.urutan) || 0) : (Number(cur.data.urutan) || 0),
+            catatan: (p.catatan || '').toString()
           };
           var r = await supa.from('schedule_task').update(upd).eq('id', id).select('id');
           if (r.error) return { success: false, message: r.error.message };
           if (!r.data || !r.data.length) return { success: false, message: 'Tugas tidak ditemukan.' };
+          await _schSnapshotProgress(cur.data.no_wo, p.oleh);
           return { success: true, message: 'Tugas diperbarui.' };
         }
       });
@@ -95,9 +161,11 @@
         handler: async function (args) {
           var id = (args[0] || '').toString().trim();
           if (!id) return { success: false, message: 'ID tugas wajib.' };
+          var cur = await supa.from('schedule_task').select('no_wo').eq('id', id).maybeSingle();
           var del = await supa.from('schedule_task').delete().eq('id', id).select('id');
           if (del.error) return { success: false, message: del.error.message };
           if (!del.data || !del.data.length) return { success: false, message: 'Tugas tidak ditemukan.' };
+          if (cur.data && cur.data.no_wo) await _schSnapshotProgress(cur.data.no_wo, '');
           return { success: true, message: 'Tugas dihapus.' };
         }
       });
@@ -133,6 +201,19 @@
           if (errs.length) return { success: false, message: errs[0].error.message };
           var stamp = await supa.from('schedule_project').update({ baseline_set_at: new Date().toISOString(), baseline_oleh: oleh }).eq('no_wo', noWO);
           if (stamp.error) return { success: false, message: stamp.error.message };
+          await _schSnapshotProgress(noWO, oleh);
           return { success: true, message: 'Baseline diset untuk ' + tasks.length + ' tugas.', count: tasks.length };
+        }
+      });
+
+      // Rekam progres manual ("Rekam progres" di detail WO) → titik kurva S hari ini.
+      window.gsRoute('snapshotScheduleProgress', {
+        mode: 'fn',
+        handler: async function (args) {
+          var noWO = (args[0] || '').toString().trim();
+          var oleh = (args[1] || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          await _schSnapshotProgress(noWO, oleh);
+          return { success: true, message: 'Progres hari ini terekam.' };
         }
       });
