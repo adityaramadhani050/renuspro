@@ -527,13 +527,16 @@
       // PO: jika ada → pakai input; jika tidak → pakai No. Penawaran sebagai referensi
       const adaPO = document.getElementById('inv-ada-po').checked;
       const noPO  = adaPO ? document.getElementById('inv-nopo').value.trim() : (wo.id || '');
-      const tglPO = adaPO ? _toDDMMYYYY(document.getElementById('inv-tglpo').value) : (wo.tanggal || '');
+      // Edge invoice-ops menerima tanggal format ISO (YYYY-MM-DD). Input <type=date>
+      // sudah ISO — JANGAN diubah ke dd/MM/yyyy (kalau diubah, edge menolak & jatuh
+      // ke tanggal hari ini). Tanpa PO → kosong (tgl_po null).
+      const tglPO = adaPO ? document.getElementById('inv-tglpo').value : '';
       if (adaPO && !noPO) return showNotification('No. PO belum diisi.', 'error');
 
       const payload = {
         noWO:        wo.isPredeal ? '' : wo.noWO,
         noPenawaran: wo.id,
-        tanggal:     _toDDMMYYYY(document.getElementById('inv-tanggal').value),
+        tanggal:     document.getElementById('inv-tanggal').value,  // ISO (YYYY-MM-DD) — edge butuh format ini
         jenis:       jenis,
         inputMode:   'nominal',
         persen:      (jenis === 'DP' || jenis === 'Termin') ? (parseFloat(document.getElementById('inv-persen').value) || 0) : 0,
