@@ -92,13 +92,14 @@
           if (!id) return { success: false, message: 'ID maintenance wajib.' };
           if (!tglJadwal) return { success: false, message: 'Tanggal rencana pengerjaan wajib diisi.' };
           if (!teknisiNama) return { success: false, message: 'Teknisi pelaksana wajib dipilih.' };
-          var mrow = await supa.from('maintenance').select('status,nama_project,lokasi,jenis,prioritas').eq('id', id).maybeSingle();
+          var mrow = await supa.from('maintenance').select('status,nama_project,lokasi,jenis,prioritas,diproses_pada').eq('id', id).maybeSingle();
           if (!mrow.data) return { success: false, message: 'Maintenance tidak ditemukan.' };
           var st = (mrow.data.status || '');
           if (_mtnFinal(st)) return { success: false, message: 'Maintenance berstatus "' + st + '" sudah final.' };
           var up = await supa.from('maintenance').update({
             status: 'Dijadwalkan', tanggal_jadwal: tglJadwal, teknisi_id: teknisiId || null, teknisi_nama: teknisiNama,
             catatan_pc: (p.catatanPC || '').toString().trim() || null, diproses_oleh: (p.namaUser || '').toString().trim() || null,
+            diproses_pada: mrow.data.diproses_pada || new Date().toISOString(),  // waktu respon pertama (untuk hitung response time)
             diubah_pada: new Date().toISOString()
           }).eq('id', id);
           if (up.error) return { success: false, message: up.error.message };
@@ -153,11 +154,13 @@
           var alasan = (p.catatanPC || '').toString().trim();
           if (!id) return { success: false, message: 'ID maintenance wajib.' };
           if (!alasan) return { success: false, message: 'Alasan penolakan wajib diisi.' };
-          var st = await _mtnStatus(id);
-          if (st == null) return { success: false, message: 'Maintenance tidak ditemukan.' };
+          var frow = await supa.from('maintenance').select('status,diproses_pada').eq('id', id).maybeSingle();
+          if (!frow.data) return { success: false, message: 'Maintenance tidak ditemukan.' };
+          var st = (frow.data.status || '');
           if (_mtnFinal(st)) return { success: false, message: 'Maintenance berstatus "' + st + '" sudah final.' };
           var up = await supa.from('maintenance').update({
             status: 'Ditolak', catatan_pc: alasan, diproses_oleh: (p.namaUser || '').toString().trim() || null,
+            diproses_pada: frow.data.diproses_pada || new Date().toISOString(),  // waktu respon pertama
             diubah_pada: new Date().toISOString()
           }).eq('id', id);
           if (up.error) return { success: false, message: up.error.message };
