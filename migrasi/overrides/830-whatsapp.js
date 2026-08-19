@@ -94,6 +94,18 @@
         var lines = ['📦 *Permintaan Penerimaan Barang*', 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), (supplier ? 'Supplier: ' + supplier : ''), 'Dikirim ke gudang oleh: ' + (oleh || '-'), '', 'Mohon proses di menu Inventory → Penerimaan Barang.'];
         _waSend(await _waPhonesByRole('warehouse'), lines.filter(function (s) { return s !== ''; }).join('\n'));
       }
+      async function _notifMaintenanceBaru(id, project, lokasi, oleh, jenis, prioritas) {
+        if (!ENABLE_WA) return;
+        var lines = ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + id + '*', 'Site/Project: ' + (project || '-'), (lokasi ? 'Lokasi: ' + lokasi : ''), (jenis ? 'Jenis: ' + jenis : ''), 'Prioritas: ' + (prioritas || 'Normal'), 'Diajukan oleh: ' + (oleh || '-'), '', 'Mohon dijadwalkan di menu Maintenance.'];
+        _waSend(await _waPhonesByRole('projectcoordinator'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+      }
+      async function _notifMaintenanceDitugaskan(teknisiId, id, project, tglJadwal) {
+        if (!ENABLE_WA || !teknisiId) return;
+        var uq = await supa.from('app_user').select('id,aktif,no_whatsapp').eq('id', teknisiId).maybeSingle();
+        if (!uq.data || uq.data.aktif === false || !uq.data.no_whatsapp) return;
+        var phone = _normalizePhone(uq.data.no_whatsapp); if (!phone) return;
+        _waSend([phone], ['🛠️ *Penugasan Maintenance*', 'ID: *' + id + '*', 'Site/Project: ' + (project || '-'), (tglJadwal ? 'Jadwal: ' + tglJadwal : ''), '', 'Anda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(function (s) { return s !== ''; }).join('\n'));
+      }
       async function _notifRequestStok(id, namaItem, qty, satuan, oleh, catatan) {
         if (!ENABLE_WA) return;
         var lines = ['📦 *Permintaan Penambahan Stok*', 'ID: *' + id + '*', 'Item: ' + (namaItem || '-') + ' — ' + (Number(qty) || 0) + ' ' + (satuan || ''), 'Diminta oleh: ' + (oleh || '-') + ' (Warehouse)', (catatan ? '📝 ' + catatan : ''), '', 'Mohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'];
