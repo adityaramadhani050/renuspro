@@ -161,7 +161,7 @@
           if ((p.meetEventId || '').toString()) upd.meet_event_id = (p.meetEventId || '').toString();
           var up = await supa.from('hand_over').update(upd).eq('no_wo', noWO);
           if (up.error) return { success: false, message: up.error.message };
-          if (typeof _notifHandOverDijadwalkan === 'function') _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, (needLink ? link : ''), (needLokasi ? lokasi : ''), (p.oleh || ''));
+          if (typeof _notifHandOverDijadwalkan === 'function') _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, (needLink ? link : ''), (needLokasi ? lokasi : ''), (p.oleh || ''), (p.peserta || ''));
           return { success: true, message: 'Hand Over WO ' + noWO + ' dijadwalkan.' };
         }
       });

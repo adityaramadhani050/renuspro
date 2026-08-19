@@ -94,17 +94,28 @@
         var lines = ['📦 *Permintaan Penerimaan Barang*', 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), (supplier ? 'Supplier: ' + supplier : ''), 'Dikirim ke gudang oleh: ' + (oleh || '-'), '', 'Mohon proses di menu Inventory → Penerimaan Barang.'];
         _waSend(await _waPhonesByRole('warehouse'), lines.filter(function (s) { return s !== ''; }).join('\n'));
       }
-      async function _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, link, lokasi, oleh) {
+      async function _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, link, lokasi, oleh, peserta) {
         if (!ENABLE_WA) return;
+        // Kirim ke peserta yang dipilih Project Coordinator (daftar nama user).
+        var names = (peserta || '').split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+        if (!names.length) return;
+        var nameSet = {}; names.forEach(function (n) { nameSet[n] = 1; });
+        var users = await _waUsers();
+        var seen = {}, phones = [];
+        users.forEach(function (u) {
+          if (u.aktif === false || !u.no_whatsapp) return;
+          if (!nameSet[(u.nama || '').toLowerCase()]) return;
+          var ph = _normalizePhone(u.no_whatsapp);
+          if (ph && !seen[ph]) { seen[ph] = 1; phones.push(ph); }
+        });
+        if (!phones.length) return;
         var proj = await _waProjName(noWO);
         var bayar = (typeof _woPembayaranLunas === 'function') ? await _woPembayaranLunas(noWO) : { count: 0, total: 0 };
         var bayarStr = bayar.count ? ('Lunas ' + bayar.count + ' invoice · ' + _waFmtRp(bayar.total)) : 'Belum ada pembayaran lunas';
         var lines = ['📅 *Hand Over Dijadwalkan*', 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
           'Jadwal: ' + (tanggal || '-') + (waktu ? ' · ' + waktu : ''), 'Mode: ' + (mode || '-'),
           (mode !== 'Offline' && link ? 'Link: ' + link : ''), (mode !== 'Online' && lokasi ? 'Lokasi: ' + lokasi : ''),
-          '💰 Pembayaran: ' + bayarStr, 'Dijadwalkan oleh: ' + (oleh || '-')];
-        var _dedup = {}; var phones = [];
-        (await _waPhonesByRole('sales')).concat(await _waPhonesByRole('leadsales')).forEach(function (p) { if (p && !_dedup[p]) { _dedup[p] = 1; phones.push(p); } });
+          '💰 Pembayaran: ' + bayarStr, 'Dijadwalkan oleh: ' + (oleh || '-'), '', 'Anda terdaftar sebagai peserta Hand Over ini.'];
         _waSend(phones, lines.filter(function (s) { return s !== ''; }).join('\n'));
       }
       async function _notifMaintenanceBaru(id, project, lokasi, oleh, jenis, prioritas) {
