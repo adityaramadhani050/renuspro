@@ -396,6 +396,18 @@
         }
       });
       // ── Request Penambahan Stok (Warehouse → Procurement) ────────────────
+      // Auto-selesaikan request stok yang tertaut PO ketika PO tsb selesai
+      // diterima gudang (status_po = 'Diterima').
+      async function _autoSelesaiRequestStok(noPO, namaUser) {
+        if (!noPO) return;
+        try {
+          var q = await supa.from('stok_request').select('id,status').eq('no_po', noPO);
+          var list = (q.data || []).filter(function (r) { return r.status !== 'Selesai' && r.status !== 'Ditolak'; });
+          for (var i = 0; i < list.length; i++) {
+            await supa.from('stok_request').update({ status: 'Selesai', diproses_oleh: namaUser || null, diproses_pada: new Date().toISOString(), catatan_proc: 'Otomatis selesai — barang PO ' + noPO + ' diterima lengkap oleh gudang.' }).eq('id', list[i].id);
+          }
+        } catch (e) {}
+      }
       window.gsRoute('buatRequestStok', {
         mode: 'fn',
         handler: async function (a) {
@@ -558,6 +570,7 @@
           var adaDiterima = rows.some(function (r) { return (Number(r.qty_diterima) || 0) > 0; });
           var newStatus = allDiterima ? 'Diterima' : (adaDiterima ? 'Diterima Sebagian' : statusPO);
           await supa.from('purchase_order').update({ status_po: newStatus, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
+          if (newStatus === 'Diterima') await _autoSelesaiRequestStok(noPO, namaUser);
           if (detailLog.length) { var idLog = 'RCV-' + Date.now() + '-' + Math.floor(Math.random() * 1000); await supa.from('penerimaan_po_log').insert({ id_log: idLog, no_po: noPO, tanggal: _todayIso(), mode: 'Gudang', jumlah_item: detailLog.length, detail_item: detailLog, dibuat_oleh: namaUser, dibuat_pada: new Date().toISOString(), bukti_file_id: (p.buktiFileId || ''), bukti_file_url: (p.buktiFileUrl || ''), bukti_file_nama: (p.buktiFileName || '') }); }
           if (typeof _notifBarangDiterima === 'function') _notifBarangDiterima(noPO, (po.data.no_wo || ''), newStatus, namaUser, detailLog.filter(function (d) { return d.catatan; }).map(function (d) { return d.namaItem + ': ' + d.catatan; }));
           return { success: true, message: 'Penerimaan berhasil. Status PO: ' + newStatus };
@@ -588,6 +601,7 @@
           var rows = refreshed.data || [];
           var statusBaru = (rows.length > 0 && rows.every(function (r) { return (Number(r.qty_diterima) || 0) >= (Number(r.qty) || 0); })) ? 'Diterima' : 'Diterima Sebagian';
           await supa.from('purchase_order').update({ status_po: statusBaru, diubah_oleh: namaUser, diubah_pada: new Date().toISOString() }).eq('no_po', noPO);
+          if (statusBaru === 'Diterima') await _autoSelesaiRequestStok(noPO, namaUser);
           if (detailLog.length) { var idLog = 'RCV-' + Date.now() + '-' + Math.floor(Math.random() * 1000); await supa.from('penerimaan_po_log').insert({ id_log: idLog, no_po: noPO, tanggal: _todayIso(), mode: 'Langsung', jumlah_item: detailLog.length, detail_item: detailLog, dibuat_oleh: namaUser, dibuat_pada: new Date().toISOString(), bukti_file_id: (p.buktiFileId || ''), bukti_file_url: (p.buktiFileUrl || ''), bukti_file_nama: (p.buktiFileName || '') }); }
           return { success: true, message: 'Penerimaan langsung berhasil. Status PO: ' + statusBaru + '.' };
         }

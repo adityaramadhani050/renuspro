@@ -170,6 +170,7 @@ function _renderPOKPI(list) {
 // ── Form Buat/Edit PO ────────────────────────────────────────────────────────
 function bukaFormPO() {
   _poFormMode = 'new';
+  window._reqStokPendingId = '';   // PO manual → tidak tertaut request stok
   _poItems    = [];
   _poSupplierProduk = [];
   document.getElementById('form-po-title').innerText = 'Buat Purchase Order Baru';
@@ -207,6 +208,7 @@ function bukaFormPO() {
 function bukaFormPOPrefill(prefill) {
   prefill = prefill || {};
   _poFormMode = 'new';
+  window._reqStokPendingId = '';   // di-set ulang oleh buatPODariReqStok bila dari request stok
   _poItems    = [];
   _poSupplierProduk = [];
   document.getElementById('form-po-title').innerText = 'Buat Purchase Order Baru';
@@ -522,7 +524,8 @@ function submitPO() {
     items:        _poItems.map(function(it) {
       return { namaItem: it.namaItem, qty: it.qty || 0, satuan: it.satuan, hargaBeli: it.hargaBeli || 0, catatan: it.catatan || '', produkId: it.produkId || '' };
     }),
-    dibuatOleh: _currentUser ? _currentUser.nama : ''
+    dibuatOleh: _currentUser ? _currentUser.nama : '',
+    stokRequestId: (typeof window !== 'undefined' && window._reqStokPendingId) ? window._reqStokPendingId : ''
   };
 
   if (_poFormMode === 'edit') {
@@ -539,6 +542,7 @@ function submitPO() {
     .withSuccessHandler(function(res) {
       toggleLoader(false);
       if (res.success) {
+        window._reqStokPendingId = '';   // sudah tertaut ke request stok oleh backend
         showNotification(res.message);
         tutupFormPO();
         loadPurchaseOrder();
@@ -1008,8 +1012,7 @@ function _poRenderReqStok() {
       var dj = JSON.stringify(r).replace(/'/g, "&#39;");
       aksi =
         '<button onclick=\'buatPODariReqStok('+dj+')\' class="text-orange-600 hover:text-orange-800 transition mr-2" title="Buat PO dari request ini"><i class="fa-solid fa-file-circle-plus"></i></button>' +
-        '<button onclick=\'bukaProsesReqStok('+dj+',"Diproses")\' class="text-blue-600 hover:text-blue-800 transition mr-2" title="Tandai Diproses"><i class="fa-solid fa-spinner"></i></button>' +
-        '<button onclick=\'bukaProsesReqStok('+dj+',"Selesai")\' class="text-emerald-600 hover:text-emerald-800 transition mr-2" title="Tandai Selesai"><i class="fa-solid fa-check"></i></button>' +
+        '<button onclick=\'bukaProsesReqStok('+dj+',"Selesai")\' class="text-emerald-600 hover:text-emerald-800 transition mr-2" title="Tandai Selesai (tautkan PO)"><i class="fa-solid fa-check"></i></button>' +
         '<button onclick=\'bukaProsesReqStok('+dj+',"Ditolak")\' class="text-rose-500 hover:text-rose-700 transition" title="Tolak request"><i class="fa-solid fa-xmark"></i></button>';
     } else {
       aksi = '<span class="text-slate-300 text-xs">—</span>';
@@ -1041,6 +1044,14 @@ function bukaProsesReqStok(r, status) {
   document.getElementById('prs-icon').innerHTML  = '<i class="fa-solid ' + t.icon + ' text-sm"></i>';
   document.getElementById('prs-item').innerText  = r.namaItem || '';
   document.getElementById('prs-qty').innerText   = 'Qty diminta: ' + (r.qty || 0).toLocaleString('id-ID') + ' ' + (r.satuan || '') + (r.dimintaOleh ? ' · oleh ' + r.dimintaOleh : '');
+  // Field "Tautkan PO" hanya untuk aksi Selesai (bukti sudah dibelanjakan).
+  var poWrap = document.getElementById('prs-po-wrap');
+  if (status === 'Selesai') {
+    _prsPopulatePOOptions(r.noPO || '');
+    poWrap.classList.remove('hidden');
+  } else {
+    poWrap.classList.add('hidden');
+  }
   document.getElementById('prs-catatan-label').innerText = t.label;
   var ta = document.getElementById('prs-catatan');
   ta.value = '';
@@ -1053,6 +1064,23 @@ function bukaProsesReqStok(r, status) {
   document.getElementById('modal-proses-reqstok').classList.remove('hidden');
   setTimeout(function(){ ta.focus(); }, 50);
 }
+function _prsPopulatePOOptions(selected) {
+  var sel = document.getElementById('prs-po');
+  if (!sel) return;
+  var list = (typeof _cachedPOData !== 'undefined' && _cachedPOData) ? _cachedPOData : [];
+  // Utamakan PO peruntukan Stok yang belum dibatalkan.
+  var stokPO = list.filter(function(po){ return (po.peruntukan === 'Stok') && po.statusPO !== 'Batal'; });
+  var opts = '<option value="">— Pilih PO —</option>';
+  stokPO.forEach(function(po){
+    opts += '<option value="' + _escHtml(po.noPO) + '"' + (po.noPO === selected ? ' selected' : '') + '>' +
+      _escHtml(po.noPO) + ' — ' + _escHtml(po.namaSupplier || '') + ' (' + _escHtml(po.statusPO || '') + ')</option>';
+  });
+  // Bila PO tertaut tidak ada di daftar Stok (mis. peruntukan lain), tetap sertakan.
+  if (selected && stokPO.every(function(po){ return po.noPO !== selected; })) {
+    opts += '<option value="' + _escHtml(selected) + '" selected>' + _escHtml(selected) + '</option>';
+  }
+  sel.innerHTML = opts;
+}
 function _tutupProsesReqStok() {
   document.getElementById('modal-proses-reqstok').classList.add('hidden');
 }
@@ -1060,6 +1088,11 @@ function _submitProsesReqStok() {
   var id = document.getElementById('prs-id').value;
   var status = document.getElementById('prs-status').value;
   var catatanProc = (document.getElementById('prs-catatan').value || '').trim();
+  var noPO = '';
+  if (status === 'Selesai') {
+    noPO = (document.getElementById('prs-po').value || '').trim();
+    if (!noPO) return showNotification('Tautkan PO sebagai bukti sebelum menandai Selesai.', 'error');
+  }
   if (status === 'Ditolak' && !catatanProc) return showNotification('Alasan penolakan wajib diisi.', 'error');
   toggleLoader(true, 'Memperbarui request...');
   google.script.run.withSuccessHandler(function(res){
@@ -1068,21 +1101,19 @@ function _submitProsesReqStok() {
     if (res && res.success) { _tutupProsesReqStok(); loadPOReqStok(); }
   }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
     .prosesRequestStok({
-      id: id, status: status, catatanProc: catatanProc, noPO: '',
+      id: id, status: status, catatanProc: catatanProc, noPO: noPO,
       namaUser: (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''
     });
 }
 function buatPODariReqStok(r) {
   r = r || {};
-  // Tandai request "Diproses" (bila masih Menunggu), lalu buka form PO ter-prefill.
-  if (r.status === 'Menunggu') {
-    google.script.run.withSuccessHandler(function(){ if (typeof loadPOReqStok === 'function') loadPOReqStok(); })
-      .prosesRequestStok({ id: r.id, status: 'Diproses', namaUser: (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : '' });
-  }
+  // Buka form PO ter-prefill. Backend menautkan PO ke request & set status
+  // "Diproses" saat PO disimpan (via stokRequestId di payload).
   bukaFormPOPrefill({
     peruntukan: 'Stok',
     items: [{ namaItem: r.namaItem || '', qty: r.qty || 1, satuan: r.satuan || '', hargaBeli: 0, produkId: r.idProduk || '', catatan: 'Request ' + (r.id || '') }]
   });
+  window._reqStokPendingId = r.id || '';
 }
 function loadPORiwayat() {
   var tb = document.getElementById('po-riwayat-body');

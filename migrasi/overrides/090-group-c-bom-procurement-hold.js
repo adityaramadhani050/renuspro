@@ -327,6 +327,11 @@
           if (ins.error) return { success: false, message: ins.error.message };
           var insI = await supa.from('po_item').insert(_poItemRows(items, noPO));
           if (insI.error) return { success: false, message: insI.error.message };
+          // Tautkan PO ke request stok asal (bila dibuat via "Buat PO" dari request) → status Diproses.
+          var reqId = (p.stokRequestId || '').toString().trim();
+          if (reqId) {
+            try { await supa.from('stok_request').update({ no_po: noPO, status: 'Diproses', diproses_oleh: (p.dibuatOleh || '').toString() || null, diproses_pada: new Date().toISOString() }).eq('id', reqId).in('status', ['Menunggu', 'Diproses']); } catch (e) {}
+          }
           return { success: true, message: 'Purchase Order ' + noPO + ' berhasil dibuat.', noPO: noPO };
         }
       });
