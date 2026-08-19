@@ -1604,8 +1604,17 @@
     }
 
     function _exportInvDariWODetail(inv) {
-      if (typeof exportInvoicePDF === 'function') { exportInvoicePDF(inv); return; }
-      showNotification && showNotification('Generator invoice belum siap.', 'error');
+      if (typeof exportInvoicePDF !== 'function') { showNotification && showNotification('Generator invoice belum siap.', 'error'); return; }
+      // Record invoice di detail WO hanya subset (id/tanggal/total/status). Ambil
+      // data lengkap via getInvoiceList (klien, No PO, DPP/PPN, item, dll.) agar
+      // PDF identik dengan export dari menu Invoice.
+      var _find = function (list) { return (list || []).filter(function (x) { return x.id === inv.id; })[0] || null; };
+      if (typeof google === 'undefined' || !google.script || !google.script.run) { exportInvoicePDF(inv); return; }
+      toggleLoader && toggleLoader(true, 'Menyiapkan invoice...');
+      google.script.run
+        .withSuccessHandler(function (list) { toggleLoader && toggleLoader(false); exportInvoicePDF(_find(list) || inv); })
+        .withFailureHandler(function () { toggleLoader && toggleLoader(false); exportInvoicePDF(inv); })
+        .getInvoiceList();
     }
 
     // ================================================================
