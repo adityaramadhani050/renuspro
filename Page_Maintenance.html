@@ -1,0 +1,203 @@
+      <section id="page-maintenance" class="page-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Maintenance</h2>
+            <p class="text-sm text-slate-400 mt-0.5">Pengajuan & monitoring maintenance site terpasang</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="_engMuatUlang && _engMuatUlang('loadMaintenance', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[42px] w-[42px] rounded-xl shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>
+            <button id="mtn-btn-ajukan" onclick="bukaFormAjukanMaintenance()" class="hidden inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-plus"></i> Ajukan Maintenance</button>
+          </div>
+        </div>
+
+        <!-- KPI ringkas -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Diajukan</p>
+            <p id="mtn-kpi-diajukan" class="text-2xl font-extrabold text-amber-600">0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Dijadwalkan</p>
+            <p id="mtn-kpi-dijadwalkan" class="text-2xl font-extrabold text-blue-600">0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Dikerjakan</p>
+            <p id="mtn-kpi-dikerjakan" class="text-2xl font-extrabold text-indigo-600">0</p>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Selesai</p>
+            <p id="mtn-kpi-selesai" class="text-2xl font-extrabold text-emerald-600">0</p>
+          </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+          <div class="relative w-full sm:w-72">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="mtn-search" oninput="_renderMaintenance()" placeholder="Cari ID / site / customer / WO..." class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white">
+          </div>
+          <select id="mtn-filter-status" onchange="_renderMaintenance()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
+            <option value="">Semua Status</option>
+            <option value="Diajukan">Diajukan</option>
+            <option value="Dijadwalkan">Dijadwalkan</option>
+            <option value="Dikerjakan">Dikerjakan</option>
+            <option value="Selesai">Selesai</option>
+            <option value="Ditolak">Ditolak</option>
+            <option value="Dibatalkan">Dibatalkan</option>
+          </select>
+        </div>
+
+        <div id="mtn-card-list" class="space-y-2">
+          <div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data maintenance...</div>
+        </div>
+
+        <!-- ══ Modal Ajukan Maintenance ══ -->
+        <div id="modal-mtn-ajukan" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-sky-50 text-sky-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+              <div class="flex-1"><h3 class="text-base font-extrabold text-slate-800">Ajukan Maintenance</h3><p class="text-xs text-slate-400 mt-0.5">Site yang instalasinya sudah selesai</p></div>
+              <button onclick="tutupFormAjukanMaintenance()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tautkan Work Order <span class="normal-case font-semibold text-slate-400">(opsional)</span></label>
+                <select id="mtn-wo" onchange="_mtnOnPilihWO()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-sky-400"><option value="">— Input manual / tanpa WO —</option></select>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Project / Site <span class="text-rose-400">*</span></label>
+                  <input type="text" id="mtn-project" placeholder="Nama project / site..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Customer</label>
+                  <input type="text" id="mtn-customer" placeholder="Nama customer..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lokasi / Alamat</label>
+                  <input type="text" id="mtn-lokasi" placeholder="Alamat site..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kontak</label>
+                  <input type="text" id="mtn-kontak" placeholder="No. telp PIC site..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis</label>
+                  <select id="mtn-jenis" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-sky-400">
+                    <option value="Perawatan Rutin">Perawatan Rutin</option>
+                    <option value="Perbaikan">Perbaikan / Troubleshooting</option>
+                    <option value="Keluhan Customer">Keluhan Customer</option>
+                    <option value="Inspeksi">Inspeksi</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Prioritas</label>
+                  <select id="mtn-prioritas" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-sky-400">
+                    <option value="Rendah">Rendah</option>
+                    <option value="Normal" selected>Normal</option>
+                    <option value="Tinggi">Tinggi</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Deskripsi Keluhan / Pekerjaan <span class="text-rose-400">*</span></label>
+                <textarea id="mtn-deskripsi" rows="3" placeholder="Jelaskan keluhan / pekerjaan maintenance yang diminta..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-sky-400 bg-white"></textarea>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 pb-5 pt-3 border-t border-slate-100">
+              <button onclick="tutupFormAjukanMaintenance()" class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">Batal</button>
+              <button onclick="submitAjukanMaintenance()" class="px-6 py-2.5 text-sm bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2"><i class="fa-solid fa-paper-plane"></i> Kirim ke PC</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ Modal Detail & Proses ══ -->
+        <div id="modal-mtn-detail" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-sky-50 text-sky-600 h-9 w-9 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+              <div class="flex-1 min-w-0"><h3 id="mtn-d-title" class="text-base font-extrabold text-slate-800 truncate">Detail Maintenance</h3><p id="mtn-d-sub" class="text-xs text-slate-400 mt-0.5"></p></div>
+              <button onclick="_mtnTutupDetail()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="mtn-d-body" class="overflow-y-auto flex-1 px-6 py-5 space-y-4"></div>
+            <div id="mtn-d-actions" class="flex flex-wrap justify-end gap-2 px-6 pb-5 pt-3 border-t border-slate-100"></div>
+          </div>
+        </div>
+
+        <!-- ══ Modal Jadwalkan & Tugaskan ══ -->
+        <div id="modal-mtn-jadwal" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-blue-100 text-blue-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-calendar-check"></i></span>
+              <div class="flex-1"><h3 class="text-base font-extrabold text-slate-800">Jadwalkan & Tugaskan</h3><p id="mtn-j-sub" class="text-xs text-slate-400 mt-0.5"></p></div>
+              <button onclick="_mtnTutupJadwal()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <input type="hidden" id="mtn-j-id">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Rencana Pengerjaan <span class="text-rose-400">*</span></label>
+            <input type="date" id="mtn-j-tanggal" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-3 focus:outline-none focus:border-blue-400">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Teknisi Pelaksana (Site Engineer) <span class="text-rose-400">*</span></label>
+            <select id="mtn-j-teknisi" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white mb-3 focus:outline-none focus:border-blue-400"><option value="">— Pilih teknisi —</option></select>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan <span class="normal-case font-semibold text-slate-400">(opsional)</span></label>
+            <textarea id="mtn-j-catatan" rows="2" placeholder="Instruksi untuk teknisi..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4 focus:outline-none focus:border-blue-400"></textarea>
+            <div class="flex justify-end gap-2">
+              <button onclick="_mtnTutupJadwal()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_mtnSubmitJadwal()" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-calendar-check"></i> Jadwalkan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ Modal Selesaikan (laporan + foto) ══ -->
+        <div id="modal-mtn-selesai" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col border border-slate-100" style="max-height:92vh">
+            <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+              <span class="bg-emerald-100 text-emerald-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-clipboard-check"></i></span>
+              <div class="flex-1"><h3 class="text-base font-extrabold text-slate-800">Selesaikan Maintenance</h3><p id="mtn-s-sub" class="text-xs text-slate-400 mt-0.5"></p></div>
+              <button onclick="_mtnTutupSelesai()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <input type="hidden" id="mtn-s-id">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Laporan Hasil <span class="text-rose-400">*</span></label>
+                <textarea id="mtn-s-laporan" rows="4" placeholder="Ringkasan pekerjaan yang dilakukan, temuan, & hasil akhir..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-400 bg-white"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Foto Hasil <span class="normal-case font-semibold text-slate-400">(opsional)</span></label>
+                <input type="file" id="mtn-s-file" accept="image/*" multiple onchange="_mtnPilihFoto(this)" class="hidden">
+                <div onclick="document.getElementById('mtn-s-file').click()" class="cursor-pointer flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/40 transition">
+                  <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-camera"></i></div>
+                  <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-600">Klik untuk pilih foto</p><p class="text-xs text-slate-400">Bisa lebih dari satu</p></div>
+                </div>
+                <div id="mtn-s-foto-preview" class="grid grid-cols-3 gap-2 mt-3"></div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 px-6 pb-5 pt-3 border-t border-slate-100">
+              <button onclick="_mtnTutupSelesai()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_mtnSubmitSelesai()" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Tandai Selesai</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ Modal Tolak ══ -->
+        <div id="modal-mtn-tolak" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="bg-rose-100 text-rose-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-xmark"></i></span>
+              <div class="flex-1"><h3 class="text-base font-extrabold text-slate-800">Tolak Maintenance</h3><p id="mtn-t-sub" class="text-xs text-slate-400 mt-0.5"></p></div>
+              <button onclick="_mtnTutupTolak()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <input type="hidden" id="mtn-t-id">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alasan Penolakan <span class="text-rose-400">*</span></label>
+            <textarea id="mtn-t-alasan" rows="3" placeholder="Sebutkan alasan penolakan..." class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl mb-4 focus:outline-none focus:border-rose-400 bg-white"></textarea>
+            <div class="flex justify-end gap-2">
+              <button onclick="_mtnTutupTolak()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_mtnSubmitTolak()" class="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-ban"></i> Tolak</button>
+            </div>
+          </div>
+        </div>
+
+      </section>

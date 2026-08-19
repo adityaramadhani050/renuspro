@@ -1,0 +1,349 @@
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  MAINTENANCE — pengajuan & monitoring maintenance site terpasang
+// ═══════════════════════════════════════════════════════════════════════════
+var _mtnData = [];
+var _mtnWOList = [];
+var _mtnEngineers = [];
+var _mtnDetailCur = null;
+var _mtnFotoQueue = [];
+
+function _mtnRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
+function _mtnUser() { return (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''; }
+function _mtnCanAjukan()  { var r = _mtnRole(); return r === 'sales' || r === 'leadsales' || r === 'admin'; }
+function _mtnCanKelola()  { var r = _mtnRole(); return r === 'projectcoordinator' || r === 'admin'; }
+function _mtnCanKerjakan(m) {
+  var r = _mtnRole();
+  if (r === 'admin' || r === 'projectcoordinator') return true;
+  if ((r === 'siteengineer' || r === 'leadengineer') && m) {
+    return (m.teknisiId && _currentUser && m.teknisiId === _currentUser.id) || (m.teknisiNama && m.teknisiNama === _mtnUser());
+  }
+  return false;
+}
+
+var _MTN_STATUS_CLS = {
+  'Diajukan':'bg-amber-100 text-amber-700', 'Dijadwalkan':'bg-blue-100 text-blue-700',
+  'Dikerjakan':'bg-indigo-100 text-indigo-700', 'Selesai':'bg-emerald-100 text-emerald-700',
+  'Ditolak':'bg-rose-100 text-rose-600', 'Dibatalkan':'bg-slate-200 text-slate-500'
+};
+var _MTN_PRIO_CLS = {
+  'Rendah':'bg-slate-100 text-slate-500', 'Normal':'bg-sky-100 text-sky-700',
+  'Tinggi':'bg-orange-100 text-orange-700', 'Urgent':'bg-rose-100 text-rose-700'
+};
+function _mtnEsc(s) { return (typeof _escHtml === 'function') ? _escHtml(s == null ? '' : String(s)) : String(s == null ? '' : s); }
+function _mtnFmtTgl(s) {
+  if (!s) return '-';
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(s);
+  var bln = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return parseInt(m[3],10) + ' ' + bln[parseInt(m[2],10)-1] + ' ' + m[1];
+}
+
+// ── Load ───────────────────────────────────────────────────────────────────
+window.loadMaintenance = function(fromNav) {
+  var btn = document.getElementById('mtn-btn-ajukan');
+  if (btn) btn.classList.toggle('hidden', !_mtnCanAjukan());
+  if (typeof google === 'undefined') return;
+  var box = document.getElementById('mtn-card-list');
+  if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data maintenance...</div>';
+  google.script.run.withSuccessHandler(function(data) {
+    _mtnData = Array.isArray(data) ? data : [];
+    _renderMaintenance();
+    _mtnRenderKPI();
+    _mtnSetNavBadge(_mtnData.filter(function(m){ return m.status === 'Diajukan'; }).length);
+  }).withFailureHandler(function() {
+    if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-rose-400">Gagal memuat data.</div>';
+  }).getMaintenanceList('');
+};
+
+function _mtnRenderKPI() {
+  var c = { Diajukan:0, Dijadwalkan:0, Dikerjakan:0, Selesai:0 };
+  (_mtnData || []).forEach(function(m){ if (c[m.status] != null) c[m.status]++; });
+  var set = function(id,v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+  set('mtn-kpi-diajukan', c.Diajukan); set('mtn-kpi-dijadwalkan', c.Dijadwalkan);
+  set('mtn-kpi-dikerjakan', c.Dikerjakan); set('mtn-kpi-selesai', c.Selesai);
+}
+
+function _renderMaintenance() {
+  var q = (document.getElementById('mtn-search').value || '').toLowerCase().trim();
+  var st = document.getElementById('mtn-filter-status').value;
+  var list = (_mtnData || []).filter(function(m){
+    if (st && m.status !== st) return false;
+    if (!q) return true;
+    return ((m.id||'')+' '+(m.namaProject||'')+' '+(m.customer||'')+' '+(m.noWO||'')+' '+(m.lokasi||'')).toLowerCase().indexOf(q) !== -1;
+  });
+  var box = document.getElementById('mtn-card-list');
+  if (!box) return;
+  if (!list.length) { box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Tidak ada data maintenance.</div>'; return; }
+  box.innerHTML = list.map(function(m){
+    var sb = '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
+    var pb = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
+    var woChip = m.noWO ? '<span class="text-[10px] font-mono font-bold text-slate-400">'+_mtnEsc(m.noWO)+'</span>' : '';
+    var tek = m.teknisiNama ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500"><i class="fa-solid fa-user-gear text-slate-400"></i> '+_mtnEsc(m.teknisiNama)+'</span>' : '';
+    var jad = m.tanggalJadwal ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500"><i class="fa-regular fa-calendar text-slate-400"></i> '+_mtnFmtTgl(m.tanggalJadwal)+'</span>' : '';
+    return '<div onclick="_mtnBukaDetail(&#39;'+_mtnEsc(m.id)+'&#39;)" class="bg-white rounded-2xl border border-slate-150 p-4 hover:border-sky-300 hover:shadow-sm transition cursor-pointer">'
+      + '<div class="flex items-start justify-between gap-3">'
+      +   '<div class="min-w-0">'
+      +     '<div class="flex items-center gap-2 flex-wrap">'+pb+' '+sb+' '+woChip+'</div>'
+      +     '<p class="font-bold text-slate-800 mt-1.5 truncate">'+_mtnEsc(m.namaProject)+'</p>'
+      +     '<p class="text-xs text-slate-400 mt-0.5 truncate">'+_mtnEsc(m.customer || '-')+(m.lokasi ? ' · '+_mtnEsc(m.lokasi) : '')+'</p>'
+      +     '<p class="text-xs text-slate-500 mt-1.5 line-clamp-2">'+_mtnEsc(m.jenis ? '['+m.jenis+'] ' : '')+_mtnEsc(m.deskripsi || '')+'</p>'
+      +   '</div>'
+      +   '<div class="text-right shrink-0"><p class="text-[11px] font-mono font-bold text-slate-500">'+_mtnEsc(m.id)+'</p><p class="text-[10px] text-slate-400 mt-0.5">'+_mtnFmtTgl(m.tanggalPengajuan)+'</p></div>'
+      + '</div>'
+      + ((tek||jad) ? '<div class="flex items-center gap-4 mt-3 pt-2.5 border-t border-slate-100">'+tek+jad+'</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+// ── Nav badge (jumlah Diajukan) ──────────────────────────────────────────────
+function _mtnSetNavBadge(n) {
+  var b = document.getElementById('nav-maintenance-badge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else b.classList.add('hidden');
+}
+window._maintenanceRefreshNavBadge = function() {
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(data){
+    var n = (Array.isArray(data) ? data : []).filter(function(m){ return m.status === 'Diajukan'; }).length;
+    _mtnSetNavBadge(n);
+  }).withFailureHandler(function(){}).getMaintenanceList('Diajukan');
+};
+
+// ── Ajukan ───────────────────────────────────────────────────────────────────
+function bukaFormAjukanMaintenance() {
+  ['mtn-project','mtn-customer','mtn-lokasi','mtn-kontak','mtn-deskripsi'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  document.getElementById('mtn-jenis').value = 'Perawatan Rutin';
+  document.getElementById('mtn-prioritas').value = 'Normal';
+  document.getElementById('mtn-wo').value = '';
+  _mtnLoadWOOptions();
+  document.getElementById('modal-mtn-ajukan').classList.remove('hidden');
+}
+function tutupFormAjukanMaintenance() { document.getElementById('modal-mtn-ajukan').classList.add('hidden'); }
+
+function _mtnLoadWOOptions() {
+  var sel = document.getElementById('mtn-wo');
+  if (!sel || typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res){
+    _mtnWOList = (res && res.list) ? res.list : [];
+    var opts = '<option value="">— Input manual / tanpa WO —</option>';
+    _mtnWOList.forEach(function(w){ opts += '<option value="'+_mtnEsc(w.noWO)+'">'+_mtnEsc(w.noWO)+' — '+_mtnEsc(w.namaProject||'')+'</option>'; });
+    sel.innerHTML = opts;
+  }).withFailureHandler(function(){}).getMaintenanceWOList();
+}
+function _mtnOnPilihWO() {
+  var no = document.getElementById('mtn-wo').value;
+  var w = (_mtnWOList || []).filter(function(x){ return x.noWO === no; })[0];
+  if (!w) return;
+  document.getElementById('mtn-project').value  = w.namaProject || '';
+  document.getElementById('mtn-customer').value = w.namaKlien || '';
+  if (w.alamat) document.getElementById('mtn-lokasi').value = w.alamat;
+  if (w.kontak) document.getElementById('mtn-kontak').value = w.kontak;
+}
+function submitAjukanMaintenance() {
+  var project = (document.getElementById('mtn-project').value || '').trim();
+  var deskripsi = (document.getElementById('mtn-deskripsi').value || '').trim();
+  if (!project)   return showNotification('Nama project/site wajib diisi.', 'error');
+  if (!deskripsi) return showNotification('Deskripsi keluhan/pekerjaan wajib diisi.', 'error');
+  toggleLoader(true, 'Mengirim pengajuan...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false);
+    showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { tutupFormAjukanMaintenance(); loadMaintenance(); }
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .buatMaintenance({
+      noWO: document.getElementById('mtn-wo').value,
+      namaProject: project, customer: (document.getElementById('mtn-customer').value||'').trim(),
+      lokasi: (document.getElementById('mtn-lokasi').value||'').trim(), kontak: (document.getElementById('mtn-kontak').value||'').trim(),
+      jenis: document.getElementById('mtn-jenis').value, prioritas: document.getElementById('mtn-prioritas').value,
+      deskripsi: deskripsi, namaUser: _mtnUser()
+    });
+}
+
+// ── Detail & Proses ──────────────────────────────────────────────────────────
+function _mtnBukaDetail(id) {
+  var m = (_mtnData || []).filter(function(x){ return x.id === id; })[0];
+  if (!m) return;
+  _mtnDetailCur = m;
+  document.getElementById('mtn-d-title').innerText = m.namaProject || m.id;
+  document.getElementById('mtn-d-sub').innerText = m.id + ' · ' + m.status;
+  var row = function(label, val) { return '<div class="flex gap-3 text-sm"><span class="w-32 shrink-0 text-slate-400 font-semibold">'+label+'</span><span class="text-slate-700 flex-1">'+val+'</span></div>'; };
+  var sb = '<span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
+  var pb = '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
+  var body = '<div class="flex items-center gap-2">'+sb+pb+(m.noWO?'<span class="text-[11px] font-mono font-bold text-slate-400 ml-1">'+_mtnEsc(m.noWO)+'</span>':'')+'</div>';
+  body += '<div class="space-y-2 mt-1">';
+  body += row('Diajukan', _mtnFmtTgl(m.tanggalPengajuan) + (m.diajukanOleh ? ' · '+_mtnEsc(m.diajukanOleh) : ''));
+  body += row('Customer', _mtnEsc(m.customer || '-'));
+  body += row('Lokasi', _mtnEsc(m.lokasi || '-'));
+  body += row('Kontak', _mtnEsc(m.kontak || '-'));
+  body += row('Jenis', _mtnEsc(m.jenis || '-'));
+  body += row('Deskripsi', _mtnEsc(m.deskripsi || '-'));
+  if (m.tanggalJadwal) body += row('Jadwal', _mtnFmtTgl(m.tanggalJadwal));
+  if (m.teknisiNama)   body += row('Teknisi', _mtnEsc(m.teknisiNama));
+  if (m.tanggalMulai)  body += row('Mulai', _mtnFmtTgl(m.tanggalMulai));
+  if (m.tanggalSelesai)body += row('Selesai', _mtnFmtTgl(m.tanggalSelesai));
+  if (m.catatanPC)     body += row('Catatan PC', _mtnEsc(m.catatanPC));
+  if (m.laporanHasil)  body += row('Laporan', _mtnEsc(m.laporanHasil));
+  body += '</div>';
+  // Galeri foto
+  var foto = Array.isArray(m.foto) ? m.foto : [];
+  if (foto.length) {
+    body += '<div class="mt-2"><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Foto</p><div class="grid grid-cols-3 gap-2">';
+    foto.forEach(function(f){ body += '<a href="'+_mtnEsc(f.fileUrl)+'" target="_blank" rel="noopener" class="block"><img src="'+_mtnEsc(f.fileUrl)+'" class="w-full h-20 object-cover rounded-lg border border-slate-200"></a>'; });
+    body += '</div></div>';
+  }
+  document.getElementById('mtn-d-body').innerHTML = body;
+  // Aksi kontekstual
+  var acts = '';
+  if (_mtnCanKelola() && (m.status === 'Diajukan' || m.status === 'Dijadwalkan')) {
+    acts += '<button onclick="_mtnBukaJadwal()" class="px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-calendar-check"></i> '+(m.status==='Diajukan'?'Jadwalkan':'Ubah Jadwal')+'</button>';
+  }
+  if (_mtnCanKerjakan(m) && m.status === 'Dijadwalkan') {
+    acts += '<button onclick="_mtnMulai()" class="px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-play"></i> Mulai Kerjakan</button>';
+  }
+  if (_mtnCanKerjakan(m) && (m.status === 'Dijadwalkan' || m.status === 'Dikerjakan')) {
+    acts += '<button onclick="_mtnBukaSelesai()" class="px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-clipboard-check"></i> Selesai</button>';
+  }
+  if (_mtnCanKelola() && m.status !== 'Selesai' && m.status !== 'Ditolak' && m.status !== 'Dibatalkan') {
+    acts += '<button onclick="_mtnBukaTolak()" class="px-4 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl flex items-center gap-2"><i class="fa-solid fa-ban"></i> Tolak</button>';
+  }
+  if (_mtnCanKerjakan(m) && m.status === 'Selesai') {
+    acts += '<button onclick="_mtnBukaSelesai()" class="px-4 py-2.5 text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center gap-2"><i class="fa-solid fa-camera"></i> Tambah Foto</button>';
+  }
+  acts += '<button onclick="_mtnTutupDetail()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Tutup</button>';
+  document.getElementById('mtn-d-actions').innerHTML = acts;
+  document.getElementById('modal-mtn-detail').classList.remove('hidden');
+}
+function _mtnTutupDetail() { document.getElementById('modal-mtn-detail').classList.add('hidden'); _mtnDetailCur = null; }
+
+// ── Jadwalkan & Tugaskan ─────────────────────────────────────────────────────
+function _mtnBukaJadwal() {
+  var m = _mtnDetailCur; if (!m) return;
+  document.getElementById('mtn-j-id').value = m.id;
+  document.getElementById('mtn-j-sub').innerText = m.id + ' · ' + (m.namaProject || '');
+  document.getElementById('mtn-j-tanggal').value = m.tanggalJadwal || '';
+  document.getElementById('mtn-j-catatan').value = m.catatanPC || '';
+  _mtnLoadEngineers(m.teknisiId || '');
+  document.getElementById('modal-mtn-jadwal').classList.remove('hidden');
+}
+function _mtnTutupJadwal() { document.getElementById('modal-mtn-jadwal').classList.add('hidden'); }
+function _mtnLoadEngineers(selected) {
+  var sel = document.getElementById('mtn-j-teknisi');
+  var fill = function(){ var opts = '<option value="">— Pilih teknisi —</option>'; (_mtnEngineers||[]).forEach(function(e){ opts += '<option value="'+_mtnEsc(e.id)+'"'+(e.id===selected?' selected':'')+'>'+_mtnEsc(e.nama||e.username||e.id)+'</option>'; }); sel.innerHTML = opts; };
+  if (_mtnEngineers && _mtnEngineers.length) { fill(); return; }
+  google.script.run.withSuccessHandler(function(res){ _mtnEngineers = (res && res.list) ? res.list : []; fill(); })
+    .withFailureHandler(function(){ fill(); }).getSiteEngineerList();
+}
+function _mtnSubmitJadwal() {
+  var id = document.getElementById('mtn-j-id').value;
+  var tgl = document.getElementById('mtn-j-tanggal').value;
+  var sel = document.getElementById('mtn-j-teknisi');
+  var teknisiId = sel.value, teknisiNama = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  if (!tgl) return showNotification('Tanggal rencana wajib diisi.', 'error');
+  if (!teknisiId) return showNotification('Teknisi pelaksana wajib dipilih.', 'error');
+  toggleLoader(true, 'Menyimpan jadwal...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _mtnTutupJadwal(); _mtnTutupDetail(); loadMaintenance(); }
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .jadwalkanMaintenance({ id: id, tanggalJadwal: tgl, teknisiId: teknisiId, teknisiNama: teknisiNama, namaProject: (_mtnDetailCur&&_mtnDetailCur.namaProject)||'', catatanPC: (document.getElementById('mtn-j-catatan').value||'').trim(), namaUser: _mtnUser() });
+}
+
+// ── Mulai ────────────────────────────────────────────────────────────────────
+function _mtnMulai() {
+  var m = _mtnDetailCur; if (!m) return;
+  toggleLoader(true, 'Memperbarui...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _mtnTutupDetail(); loadMaintenance(); }
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .mulaiMaintenance({ id: m.id, namaUser: _mtnUser() });
+}
+
+// ── Selesaikan (laporan + foto) ──────────────────────────────────────────────
+function _mtnBukaSelesai() {
+  var m = _mtnDetailCur; if (!m) return;
+  document.getElementById('mtn-s-id').value = m.id;
+  document.getElementById('mtn-s-sub').innerText = m.id + ' · ' + (m.namaProject || '');
+  document.getElementById('mtn-s-laporan').value = m.laporanHasil || '';
+  _mtnFotoQueue = [];
+  document.getElementById('mtn-s-foto-preview').innerHTML = '';
+  document.getElementById('modal-mtn-selesai').classList.remove('hidden');
+}
+function _mtnTutupSelesai() { document.getElementById('modal-mtn-selesai').classList.add('hidden'); _mtnFotoQueue = []; }
+function _mtnPilihFoto(input) {
+  var files = input.files || [];
+  for (var i = 0; i < files.length; i++) {
+    (function(f){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var dataUrl = e.target.result;
+        var b64 = String(dataUrl || '').split(',')[1] || '';
+        if (!b64) return;
+        _mtnFotoQueue.push({ base64: b64, mimeType: 'image/jpeg', fileName: (f.name || 'foto').replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg', preview: dataUrl });
+        _mtnRenderFotoPreview();
+      };
+      reader.readAsDataURL(f);
+    })(files[i]);
+  }
+  input.value = '';
+}
+function _mtnRenderFotoPreview() {
+  var box = document.getElementById('mtn-s-foto-preview');
+  if (!box) return;
+  box.innerHTML = _mtnFotoQueue.map(function(f, i){
+    return '<div class="relative"><img src="'+f.preview+'" class="w-full h-20 object-cover rounded-lg border border-slate-200"><button onclick="_mtnHapusFotoQueue('+i+')" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow"><i class="fa-solid fa-xmark"></i></button></div>';
+  }).join('');
+}
+function _mtnHapusFotoQueue(i) { _mtnFotoQueue.splice(i,1); _mtnRenderFotoPreview(); }
+
+function _mtnSubmitSelesai() {
+  var id = document.getElementById('mtn-s-id').value;
+  var m = _mtnDetailCur;
+  var laporan = (document.getElementById('mtn-s-laporan').value || '').trim();
+  var sudahSelesai = m && m.status === 'Selesai';
+  if (!sudahSelesai && !laporan) return showNotification('Laporan hasil wajib diisi.', 'error');
+  toggleLoader(true, 'Mengunggah & menyimpan...');
+  // Upload foto berurutan, lalu selesaikan (kecuali sudah Selesai → hanya tambah foto).
+  var idx = 0;
+  var next = function() {
+    if (idx < _mtnFotoQueue.length) {
+      var f = _mtnFotoQueue[idx++];
+      google.script.run.withSuccessHandler(function(){ next(); }).withFailureHandler(function(){ next(); })
+        .uploadFotoMaintenance({ id: id, base64Data: f.base64, mimeType: f.mimeType, fileName: f.fileName });
+      return;
+    }
+    if (sudahSelesai) {
+      toggleLoader(false); showNotification('Foto ditambahkan.', 'success'); _mtnTutupSelesai(); _mtnTutupDetail(); loadMaintenance();
+      return;
+    }
+    google.script.run.withSuccessHandler(function(res){
+      toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { _mtnTutupSelesai(); _mtnTutupDetail(); loadMaintenance(); }
+    }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+      .selesaikanMaintenance({ id: id, laporanHasil: laporan, namaUser: _mtnUser() });
+  };
+  next();
+}
+
+// ── Tolak ────────────────────────────────────────────────────────────────────
+function _mtnBukaTolak() {
+  var m = _mtnDetailCur; if (!m) return;
+  document.getElementById('mtn-t-id').value = m.id;
+  document.getElementById('mtn-t-sub').innerText = m.id + ' · ' + (m.namaProject || '');
+  document.getElementById('mtn-t-alasan').value = '';
+  document.getElementById('modal-mtn-tolak').classList.remove('hidden');
+}
+function _mtnTutupTolak() { document.getElementById('modal-mtn-tolak').classList.add('hidden'); }
+function _mtnSubmitTolak() {
+  var id = document.getElementById('mtn-t-id').value;
+  var alasan = (document.getElementById('mtn-t-alasan').value || '').trim();
+  if (!alasan) return showNotification('Alasan penolakan wajib diisi.', 'error');
+  toggleLoader(true, 'Menolak...');
+  google.script.run.withSuccessHandler(function(res){
+    toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _mtnTutupTolak(); _mtnTutupDetail(); loadMaintenance(); }
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .tolakMaintenance({ id: id, catatanPC: alasan, namaUser: _mtnUser() });
+}
+</script>

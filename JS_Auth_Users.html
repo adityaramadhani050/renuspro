@@ -41,15 +41,15 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule'],
+  admin:       ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
-  sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule'],
-  leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule'],
+  sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
+  leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
   procurement: ['workorder','purchaseorder','supplier','pricelist','bom','schedule'],
   warehouse:   ['workorder','inventory','bom','schedule'],
-  siteengineer:['qc','bom','ded','schedule'],
-  leadengineer:['workorder','qc','bom','ded','schedule'],
-  projectcoordinator:['workorder','qc','bom','ded','schedule'],   // read-only di modul lain; Schedule bisa edit
+  siteengineer:['qc','bom','ded','schedule','maintenance'],
+  leadengineer:['workorder','qc','bom','ded','schedule','maintenance'],
+  projectcoordinator:['workorder','qc','bom','ded','schedule','maintenance'],   // read-only di modul lain; Schedule bisa edit
   owner:       ['dashboard','workorder','qc','bom','ded','schedule','laporanfinance','laporanprofitabilitas','laporankeuangan']
 };
 const _ROLE_BADGE = {
@@ -88,18 +88,21 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule']
+  ['dashboard','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
     });
+
+  // Badge jumlah maintenance "Diajukan" di menu (muncul tanpa perlu buka menunya).
+  if (allowed.includes('maintenance') && typeof _maintenanceRefreshNavBadge === 'function') _maintenanceRefreshNavBadge();
 
   // Sembunyikan title grup menu yang seluruh itemnya tidak relevan dengan role user
   const navGroups = {
     'nav-group-penjualan':  ['sitesurvey','penawaran','workorder','invoice','kwitansi','customer'],
     'nav-group-masterdata': ['produk','template','supplier'],
     'nav-group-pembelian':  ['purchaseorder','inventory'],
-    'nav-group-lapangan':   ['schedule','qc','bom','ded'],
+    'nav-group-lapangan':   ['schedule','qc','bom','ded','maintenance'],
     'nav-group-keuangan':   ['pengeluaran','laporanfinance','laporanprofitabilitas','laporankeuangan'],
     'nav-group-administrasi': ['users','settings']
   };
