@@ -236,8 +236,8 @@ function _renderMutasi(list) {
   var showSaldo = !!akunFilter;
   var saldoMap = {};
   if (showSaldo) {
-    var acctAll = _mutData.filter(function(m){ return m.idAkun === akunFilter; }).slice()
-      .sort(_mutCompareDesc);  // terbaru dulu (persis urutan tampilan)
+    var acctAll = _mutData.filter(_cmAkunMatch).slice()
+      .sort(_mutCompareDesc);  // terbaru dulu (persis urutan tampilan); by id+nama
     var total = 0;
     acctAll.forEach(function(m){ total += (m.tipe === 'masuk' ? m.jumlah : -m.jumlah); });
     var running = total;
@@ -292,6 +292,22 @@ function _renderMutKPI(list) {
   e = document.getElementById('kpi-mut-count');  if (e) e.innerText = list.length;
 }
 
+// Cocokkan mutasi ke akun terpilih by ID, lalu fallback by NAMA — konsisten
+// dengan perhitungan saldo kartu (_saldoAkun). Perlu, karena data lama sering
+// menyimpan id_akun beda skema (mis. setelah akun diubah di Pengaturan) tetapi
+// nama_akun tetap konsisten.
+function _cmAkunNama(id) {
+  var a = (_inAkunList || []).filter(function(x){ return x.id === id; })[0];
+  return a ? (a.namaAkun || '').trim().toLowerCase() : '';
+}
+function _cmAkunMatch(m) {
+  var akun = _cmAkunFilter;
+  if (!akun) return true;
+  if ((m.idAkun || '') === akun) return true;
+  var nm = _cmAkunNama(akun);
+  return !!nm && (m.namaAkun || '').trim().toLowerCase() === nm;
+}
+
 // ── Filter mutasi (client-side) ────────────────────────────────
 function _applyMutFilter(data) {
   var akun   = _cmAkunFilter;
@@ -302,7 +318,7 @@ function _applyMutFilter(data) {
   var dariMs   = dari   ? new Date(dari + 'T00:00:00').getTime()   : null;
   var sampaiMs = sampai ? new Date(sampai + 'T23:59:59').getTime() : null;
   var out = data.filter(function(m) {
-    if (akun && m.idAkun !== akun) return false;
+    if (akun && !_cmAkunMatch(m)) return false;
     if (tipe && m.tipe !== tipe) return false;
     if (cari) {
       var hay = ((m.deskripsi || '') + ' ' + (m.ref || '') + ' ' + (m.id || '') + ' ' + (m.kategori || '')).toLowerCase();
