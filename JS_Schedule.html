@@ -463,7 +463,7 @@ function _schRenderDeviasi(){
     + '</div>'
     + '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
     +   '<div class="flex items-center justify-between mb-2"><p class="text-sm font-bold text-slate-700">Kurva S — Rencana vs Aktual</p>'
-    +   '<span class="text-[10px] text-slate-400">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt(_schIso(_schBaseline.setAt)) : '') + '</span></div>'
+    +   '<span class="text-[10px] text-slate-400">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt((_schBaseline.setAt || '').slice(0, 10)) : '') + '</span></div>'
     +   '<div class="relative" style="height:240px"><canvas id="sch-chart-s"></canvas></div>'
     + '</div>';
   _schRenderKurvaS(d);
