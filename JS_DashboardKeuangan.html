@@ -1,0 +1,90 @@
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  DASHBOARD KEUANGAN (admin) — kas dari getSaldoAkun, sisanya dari RPC
+//  dashboard_keuangan(). Chart.js LAZY.
+// ═══════════════════════════════════════════════════════════════════════════
+var _dkChartCf = null, _dkChartAkun = null, _dkChartLib = null;
+
+function _dkRp(n) { return 'Rp ' + (Math.round(Number(n) || 0)).toLocaleString('id-ID'); }
+function _dkEsc(s) { return (typeof _escHtml === 'function') ? _escHtml(s == null ? '' : String(s)) : String(s == null ? '' : s); }
+function _dkSet(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+function _dkChartJs() {
+  if (_dkChartLib) return Promise.resolve(_dkChartLib);
+  return import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm').then(function(m) { _dkChartLib = m.default || m.Chart || m; return _dkChartLib; });
+}
+function _dkIsStok(a) { return (a.id === 'AP001') || (String(a.nama || a.namaAkun || '').trim().toLowerCase() === 'stok') || (String(a.tipe || '').trim().toLowerCase() === 'stok'); }
+
+window.loadDashboardKeuangan = function() {
+  if (typeof google === 'undefined') return;
+  _dkSet('dk-margin-body', '');
+  document.getElementById('dk-margin-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat...</td></tr>';
+  // 1) Saldo kas per akun (route lama, id+nama teruji)
+  google.script.run.withSuccessHandler(function(res) { _dkRenderKas(res || {}); }).withFailureHandler(function() {}).getSaldoAkun();
+  // 2) Cashflow / piutang / hutang / profit (RPC)
+  google.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { document.getElementById('dk-margin-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-rose-400">' + _dkEsc((res && res.message) || 'Gagal memuat.') + '</td></tr>'; return; }
+    _dkRender(res.data || {});
+  }).withFailureHandler(function(err) {
+    document.getElementById('dk-margin-body').innerHTML = '<tr><td colspan="3" class="p-6 text-center text-rose-400">Gagal: ' + _dkEsc((err && err.message) || err) + '</td></tr>';
+  }).getDashboardKeuangan();
+};
+
+function _dkRenderKas(res) {
+  var akun = Array.isArray(res.akun) ? res.akun : [];
+  var kas = akun.filter(function(a) { return !_dkIsStok(a); });
+  var total = kas.reduce(function(s, a) { return s + (Number(a.saldo) || 0); }, 0);
+  _dkSet('dk-kpi-kas', _dkRp(total));
+  // Donut kas per akun (yang saldonya > 0)
+  _dkChartJs().then(function(Chart) {
+    var pos = kas.filter(function(a) { return (Number(a.saldo) || 0) > 0; }).sort(function(a, b) { return b.saldo - a.saldo; });
+    var ctx = document.getElementById('dk-chart-akun');
+    if (!ctx) return;
+    if (_dkChartAkun) _dkChartAkun.destroy();
+    _dkChartAkun = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: pos.map(function(a) { return a.nama || a.namaAkun; }), datasets: [{ data: pos.map(function(a) { return Number(a.saldo) || 0; }), backgroundColor: ['#059669', '#2563eb', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }, tooltip: { callbacks: { label: function(c) { return c.label + ': ' + _dkRp(c.parsed); } } } } }
+    });
+  }).catch(function() {});
+}
+
+function _dkRender(d) {
+  var bi = d.bulanIni || {}, piu = d.piutang || {}, ag = piu.aging || {}, hut = d.hutang || {}, pr = d.profit || {};
+  var net = (Number(bi.pemasukan) || 0) - (Number(bi.pengeluaran) || 0);
+  _dkSet('dk-kpi-masuk', _dkRp(bi.pemasukan));
+  _dkSet('dk-kpi-keluar', _dkRp(bi.pengeluaran));
+  _dkSet('dk-kpi-net', _dkRp(net));
+  var netEl = document.getElementById('dk-kpi-net'); if (netEl) netEl.className = 'text-lg font-extrabold leading-tight ' + (net < 0 ? 'text-rose-600' : 'text-slate-800');
+  _dkSet('dk-piutang', _dkRp(piu.total)); _dkSet('dk-piutang-jml', piu.jumlah || 0);
+  _dkSet('dk-aging-30', _dkRp(ag.b30)); _dkSet('dk-aging-60', _dkRp(ag.b60)); _dkSet('dk-aging-90', _dkRp(ag.b90));
+  _dkSet('dk-hutang', _dkRp(hut.total)); _dkSet('dk-hutang-jml', hut.jumlah || 0);
+  _dkSet('dk-profit', _dkRp(pr.profit)); _dkSet('dk-margin', (pr.marginAvg || 0) + '%');
+  _dkSet('dk-p-kontrak', _dkRp(pr.kontrak)); _dkSet('dk-p-hpp', _dkRp(pr.hpp)); _dkSet('dk-p-profit', _dkRp(pr.profit));
+
+  var mt = Array.isArray(d.marginTipis) ? d.marginTipis : [];
+  var mb = document.getElementById('dk-margin-body');
+  if (mb) mb.innerHTML = mt.length ? mt.map(function(x) {
+    var m = Number(x.margin) || 0;
+    var cls = m < 10 ? 'bg-rose-100 text-rose-700' : (m < 20 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700');
+    return '<tr class="hover:bg-slate-50"><td class="p-3"><div class="text-xs font-semibold text-slate-700 truncate max-w-[220px]" title="' + _dkEsc(x.namaProject) + '">' + _dkEsc(x.namaProject || x.noWO) + '</div><div class="text-[10px] text-slate-400 font-mono">' + _dkEsc(x.noWO) + '</div></td>'
+      + '<td class="p-3 text-right text-xs font-bold text-slate-700 whitespace-nowrap">' + _dkRp(x.kontrak) + '</td>'
+      + '<td class="p-3 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + cls + '">' + m + '%</span></td></tr>';
+  }).join('') : '<tr><td colspan="3" class="p-6 text-center text-slate-400">Belum ada project aktif.</td></tr>';
+
+  // Grafik cashflow (bar ganda masuk vs keluar)
+  _dkChartJs().then(function(Chart) {
+    var cf = Array.isArray(d.cashflow) ? d.cashflow : [];
+    var ctx = document.getElementById('dk-chart-cashflow');
+    if (!ctx) return;
+    if (_dkChartCf) _dkChartCf.destroy();
+    _dkChartCf = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: cf.map(function(t) { return t.bln; }), datasets: [
+        { label: 'Masuk', data: cf.map(function(t) { return t.masuk; }), backgroundColor: '#10b981', borderRadius: 3 },
+        { label: 'Keluar', data: cf.map(function(t) { return t.keluar; }), backgroundColor: '#f43f5e', borderRadius: 3 }
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + _dkRp(c.parsed.y); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return 'Rp ' + (v / 1e6) + 'jt'; } } } } }
+    });
+  }).catch(function() {});
+}
+</script>

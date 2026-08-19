@@ -16,3 +16,11 @@
           return { success: true, data: r.data || {} };
         }
       });
+      window.gsRoute('getDashboardKeuangan', {
+        mode: 'fn',
+        handler: async function () {
+          var r = await supa.rpc('dashboard_keuangan');
+          if (r.error) return { success: false, message: r.error.message };
+          return { success: true, data: r.data || {} };
+        }
+      });

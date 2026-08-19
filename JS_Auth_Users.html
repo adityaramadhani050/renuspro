@@ -41,7 +41,7 @@ function togglePwVisibilityLight(inputId, btn) {
 
 // ── Role config: nav items yang boleh dilihat per role ───────────────────
 const _ROLE_NAV = {
-  admin:       ['dashboard','dashboardproject','dashboardpembelian','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance'],
+  admin:       ['dashboard','dashboardproject','dashboardpembelian','dashboardkeuangan','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
   sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
   leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
@@ -88,7 +88,7 @@ function _renderUserSidebar(user) {
 
   // Sembunyikan semua nav dulu, lalu tampilkan sesuai role
   const allowed = _ROLE_NAV[role] || _ROLE_NAV.sales;
-  ['dashboard','dashboardproject','dashboardpembelian','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance']
+  ['dashboard','dashboardproject','dashboardpembelian','dashboardkeuangan','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','laporansales','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance']
     .forEach(function(page) {
       const el = document.getElementById('nav-' + page);
       if (el) el.classList.toggle('hidden', !allowed.includes(page));

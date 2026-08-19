@@ -181,6 +181,7 @@
       if(pageId === 'dashboard') loadDashboard();
       if(pageId === 'dashboardproject' && typeof loadDashboardProject === 'function') loadDashboardProject();
       if(pageId === 'dashboardpembelian' && typeof loadDashboardPembelian === 'function') loadDashboardPembelian();
+      if(pageId === 'dashboardkeuangan' && typeof loadDashboardKeuangan === 'function') loadDashboardKeuangan();
       if(pageId === 'sitesurvey') loadSiteSurvey();
       if(pageId === 'penawaran') { loadPenawaran(true); toggleFormPenawaran(false); if(!erpState.klien.length) muatSeluruhDataAwal(false); }
       if(pageId === 'workorder') loadWorkOrder(true);
