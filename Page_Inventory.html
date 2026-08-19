@@ -331,8 +331,9 @@
                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-teal-400 bg-white">
                     <option value="">-- Pilih item dari Pricelist Supplier --</option>
                   </select>
-                  <input type="text" id="ptnpo-satuan-baru" readonly placeholder="Satuan (otomatis dari pricelist)"
-                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed">
+                  <!-- Satuan tak ditampilkan (sudah tertera di label item); nilainya
+                       tetap dikirim saat simpan. -->
+                  <input type="hidden" id="ptnpo-satuan-baru">
                 </div>
               </div>
 
