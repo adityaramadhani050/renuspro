@@ -57,42 +57,133 @@
       function _waCdCheck(key) { try { var t = parseInt(localStorage.getItem('WACD_' + key) || '0', 10); var rem = 1800000 - (Date.now() - t); return rem > 0 ? Math.max(1, Math.ceil(rem / 60000)) : 0; } catch (e) { return 0; } }
       function _waCdStamp(key) { try { localStorage.setItem('WACD_' + key, Date.now().toString()); } catch (e) {} }
 
+      // ══════════════════════════════════════════════════════════════════════
+      //  TEKS PESAN NOTIFIKASI WA — TERPUSAT (edit di sini bila ingin ubah teks)
+      //  Semua notifikasi WA memakai builder di _WA_MSG. Logika penerima &
+      //  pemicu tetap di composer masing-masing; HANYA teks yang di sini.
+      //  Placeholder = properti objek `d` yang dikirim composer (mis. d.noWO).
+      // ══════════════════════════════════════════════════════════════════════
+      function _waNonEmpty(s) { return s !== ''; }
+      var _WA_MSG = {
+        // QC — perlu review (ke Lead Engineer)
+        qcLead: function (d) {
+          return '🔔 *QC Baru Perlu Direview*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nItem: ' + d.kode + (d.label ? ' · ' + d.label : '') + '\n' + (d.count ? d.count + ' file' : 'Foto') + ' diunggah oleh ' + (d.oleh || '-') + '.\n\nMohon segera direview di RenusPro.';
+        },
+        // QC — hasil review (ke pelaksana). d.approved = true/false
+        qcSite: function (d) {
+          var head = 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nItem: ' + d.kode + (d.label ? ' · ' + d.label : '') + (d.catatan ? '\n📝 Catatan: ' + d.catatan : '');
+          return d.approved ? ('✅ *QC Disetujui*\n' + head + '\n\nKerja bagus! Item ini sudah di-approve.') : ('❌ *QC Ditolak — Perlu Revisi*\n' + head + '\n\nMohon segera perbaiki & upload ulang.');
+        },
+        // DED — perlu review (ke Lead Engineer)
+        dedLead: function (d) {
+          return '📐 *Dokumen DED Baru Perlu Direview*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nDokumen: ' + d.label + '\n' + (d.count ? d.count + ' file PDF' : 'Dokumen') + ' diunggah oleh ' + (d.oleh || '-') + '.\n\nMohon segera direview di RenusPro.';
+        },
+        // DED — hasil review (ke pelaksana). d.approved = true/false
+        dedSite: function (d) {
+          var head = 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nDokumen: ' + d.label + (d.catatan ? '\n📝 Catatan: ' + d.catatan : '');
+          return d.approved ? ('✅ *DED Disetujui*\n' + head + '\n\nDokumen ini sudah di-approve.') : ('❌ *DED Ditolak — Perlu Revisi*\n' + head + '\n\nMohon perbaiki & upload ulang.');
+        },
+        // Penugasan engineer (BOM/QC/DED). d.modul = 'BOM'|'QC'|'DED'
+        assignEngineer: function (d) {
+          return '🧑‍🔧 *Penugasan ' + d.modul + '*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nAnda ditugaskan menangani ' + d.modul + ' untuk WO ini.\n\nSilakan buka menu ' + d.modul + ' di RenusPro.';
+        },
+        // PO dikirim ke gudang (ke Warehouse)
+        poKeGudang: function (d) {
+          return ['📦 *Permintaan Penerimaan Barang*', 'PO: *' + d.noPO + '*', (d.noWO ? 'WO: ' + d.noWO + (d.proj ? ' — ' + d.proj : '') : 'Peruntukan: Stok'), (d.supplier ? 'Supplier: ' + d.supplier : ''), 'Dikirim ke gudang oleh: ' + (d.oleh || '-'), '', 'Mohon proses di menu Inventory → Penerimaan Barang.'].filter(_waNonEmpty).join('\n');
+        },
+        // Barang PO diterima (ke Procurement). d.lengkap = true/false; d.catatanList = []
+        barangDiterima: function (d) {
+          var lines = [(d.lengkap ? '✅ *Barang Diterima Lengkap*' : '📥 *Barang Diterima Sebagian*'), 'PO: *' + d.noPO + '*', (d.noWO ? 'WO: ' + d.noWO + (d.proj ? ' — ' + d.proj : '') : 'Peruntukan: Stok'), 'Status PO: ' + d.statusPO, 'Diterima oleh: ' + (d.oleh || '-')];
+          if (d.catatanList && d.catatanList.length) { lines.push(''); lines.push('📝 Catatan:'); d.catatanList.forEach(function (c) { lines.push('• ' + c); }); }
+          return lines.join('\n');
+        },
+        // Request pembayaran PO/Non-PO (ke Finance)
+        requestPembayaran: function (d) {
+          return ['💰 *Request Pembayaran Baru*', 'ID: *' + d.idReq + '*', (d.ref || ''), 'Nominal: ' + _waFmtRp(d.jumlah), 'Diminta oleh: ' + (d.oleh || '-'), (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.'].filter(_waNonEmpty).join('\n');
+        },
+        // Hasil pembayaran (ke Procurement). d.disetujui = true/false
+        hasilPembayaran: function (d) {
+          return [(d.disetujui ? '✅ *Pembayaran Disetujui*' : '❌ *Pembayaran Ditolak*'), 'ID: *' + d.idReq + '*', (d.ref || ''), 'Nominal: ' + _waFmtRp(d.jumlah), (d.disetujui ? 'Disetujui' : 'Ditolak') + ' oleh: ' + (d.oleh || '-'), (!d.disetujui && d.catatanTolak ? '📝 Alasan: ' + d.catatanTolak : '')].filter(_waNonEmpty).join('\n');
+        },
+        // Request penambahan stok (ke Procurement)
+        requestStok: function (d) {
+          return ['📦 *Permintaan Penambahan Stok*', 'ID: *' + d.id + '*', 'Item: ' + (d.namaItem || '-') + ' — ' + (Number(d.qty) || 0) + ' ' + (d.satuan || ''), 'Diminta oleh: ' + (d.oleh || '-') + ' (Warehouse)', (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'].filter(_waNonEmpty).join('\n');
+        },
+        // Maintenance baru diajukan (ke Project Coordinator)
+        maintenanceBaru: function (d) {
+          return ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), 'Diajukan oleh: ' + (d.oleh || '-'), '', 'Mohon dijadwalkan di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+        },
+        // Maintenance ditugaskan ke teknisi
+        maintenanceDitugaskan: function (d) {
+          return ['🛠️ *Penugasan Maintenance*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.jadwal ? 'Jadwal: ' + d.jadwal : ''), '', 'Anda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+        },
+        // Hand Over dijadwalkan (ke peserta)
+        handOverDijadwalkan: function (d) {
+          return ['📅 *Hand Over Dijadwalkan*', 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : ''),
+            'Jadwal: ' + (d.tanggal || '-') + (d.waktu ? ' · ' + d.waktu : ''), 'Mode: ' + (d.mode || '-'),
+            (d.mode !== 'Offline' && d.link ? 'Link: ' + d.link : ''), (d.mode !== 'Online' && d.lokasi ? 'Lokasi: ' + d.lokasi : ''),
+            '💰 Pembayaran: ' + d.bayarStr, 'Dijadwalkan oleh: ' + (d.oleh || '-'), '', 'Anda terdaftar sebagai peserta Hand Over ini.'].filter(_waNonEmpty).join('\n');
+        },
+        // BOM diajukan untuk review (ke Lead Engineer)
+        bomAjukan: function (d) {
+          return '📋 *BOM Diajukan untuk Review*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nDiajukan oleh: ' + (d.oleh || '-') + '\n\nRingkasan material:\n• Total: ' + d.total + ' item (' + d.kategori + ' kategori)\n• Menunggu review: ' + d.pending + '\n\nMohon segera direview di menu BOM RenusPro.';
+        },
+        // BOM hasil review (ke pelaksana). d.rejectedList = [{nama_material,catatan_review}]
+        bomHasil: function (d) {
+          var lines = ['📋 *Hasil Review BOM*', 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : ''), 'Direview oleh: ' + (d.oleh || '-'), '', '✅ Disetujui: ' + d.approved, '❌ Ditolak: ' + d.rejectedCount];
+          if (d.pending > 0) lines.push('⏳ Belum direview: ' + d.pending);
+          if (d.rejectedList && d.rejectedList.length) { lines.push(''); lines.push('📝 Material ditolak:'); d.rejectedList.slice(0, 15).forEach(function (it) { lines.push('• ' + (it.nama_material || '-') + (it.catatan_review ? ' — ' + it.catatan_review : '')); }); if (d.rejectedList.length > 15) lines.push('• …dan ' + (d.rejectedList.length - 15) + ' lainnya'); }
+          lines.push(''); lines.push('Buka menu BOM untuk detail.');
+          return lines.join('\n');
+        },
+        // Reminder review QC/DED (ke Lead Engineer). d.modul, d.kata
+        reminderReviewLead: function (d) {
+          return '🔔 *Reminder Review ' + d.modul + '*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\n' + d.pending + ' ' + d.kata + ' menunggu direview.\n\nMohon segera direview di RenusPro.';
+        },
+        // Reminder lengkapi QC/DED (ke pelaksana). d.modul, d.parts (string gabungan)
+        reminderPelaksana: function (d) {
+          return '🔔 *Reminder ' + d.modul + '*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nMohon segera lengkapi: ' + d.parts + '.\n\nSilakan upload di RenusPro.';
+        },
+        // Reminder follow-up penawaran expired (grup). arg = list penawaran
+        reminderExpired: function (list) {
+          var lines = ['⏰ *Reminder Follow-up Penawaran*', 'Penawaran berikut akan/sudah lewat tanggal berlaku, mohon segera follow-up ke customer:', '', '📊 Total: *' + list.length + '* penawaran perlu di-follow-up', ''];
+          var groups = {}, urut = []; list.forEach(function (it) { var s = it.dibuatOleh || 'Tanpa Sales'; if (!groups[s]) { groups[s] = []; urut.push(s); } groups[s].push(it); });
+          urut.forEach(function (s, gi) { lines.push('👤 *' + s + '* (' + groups[s].length + ' penawaran)'); groups[s].forEach(function (it, i) { lines.push((i + 1) + '. ' + it.noPenawaran + ' - ' + it.namaProject + ' (' + it.namaKlien + ') #Exp. ' + it.validHingga); }); if (gi < urut.length - 1) lines.push(''); });
+          return lines.join('\n');
+        }
+      };
+
       // ── Komposer notifikasi (self-guard ENABLE_WA) ────────────────────────
       async function _qcNotifLeadReview(noWO, kode, oleh, count, wasStatus) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.qcNotif === false) return; if ((wasStatus || '') === 'Pending') return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('qc_checklist'))[kode] || '';
-        _waSend(await _waPhonesByRole('leadengineer'), '🔔 *QC Baru Perlu Direview*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nItem: ' + kode + (lbl ? ' · ' + lbl : '') + '\n' + (count ? count + ' file' : 'Foto') + ' diunggah oleh ' + (oleh || '-') + '.\n\nMohon segera direview di RenusPro.');
+        _waSend(await _waPhonesByRole('leadengineer'), _WA_MSG.qcLead({ noWO: noWO, proj: proj, kode: kode, label: lbl, count: count, oleh: oleh }));
       }
       async function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.qcNotif === false) return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('qc_checklist'))[kode] || '';
-        var head = 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nItem: ' + kode + (lbl ? ' · ' + lbl : '') + (catatan ? '\n📝 Catatan: ' + catatan : '');
-        var msg = keputusan === 'Approved' ? ('✅ *QC Disetujui*\n' + head + '\n\nKerja bagus! Item ini sudah di-approve.') : ('❌ *QC Ditolak — Perlu Revisi*\n' + head + '\n\nMohon segera perbaiki & upload ulang.');
-        _waSend(await _waPhonesForAssign('qc_assignment', noWO), msg);
+        _waSend(await _waPhonesForAssign('qc_assignment', noWO), _WA_MSG.qcSite({ noWO: noWO, proj: proj, kode: kode, label: lbl, catatan: catatan, approved: keputusan === 'Approved' }));
       }
       async function _dedNotifLeadReview(noWO, kode, oleh, count, wasStatus) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.dedNotif === false) return; if ((wasStatus || '') === 'Pending') return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('ded_checklist'))[kode] || kode;
-        _waSend(await _waPhonesByRole('leadengineer'), '📐 *Dokumen DED Baru Perlu Direview*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nDokumen: ' + lbl + '\n' + (count ? count + ' file PDF' : 'Dokumen') + ' diunggah oleh ' + (oleh || '-') + '.\n\nMohon segera direview di RenusPro.');
+        _waSend(await _waPhonesByRole('leadengineer'), _WA_MSG.dedLead({ noWO: noWO, proj: proj, label: lbl, count: count, oleh: oleh }));
       }
       async function _dedNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.dedNotif === false) return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('ded_checklist'))[kode] || kode;
-        var head = 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nDokumen: ' + lbl + (catatan ? '\n📝 Catatan: ' + catatan : '');
-        var msg = keputusan === 'Approved' ? ('✅ *DED Disetujui*\n' + head + '\n\nDokumen ini sudah di-approve.') : ('❌ *DED Ditolak — Perlu Revisi*\n' + head + '\n\nMohon perbaiki & upload ulang.');
-        _waSend(await _waPhonesForAssign('ded_assignment', noWO), msg);
+        _waSend(await _waPhonesForAssign('ded_assignment', noWO), _WA_MSG.dedSite({ noWO: noWO, proj: proj, label: lbl, catatan: catatan, approved: keputusan === 'Approved' }));
       }
       async function _notifAssignEngineer(modul, noWO, userIds) {
         if (!ENABLE_WA || !userIds || !userIds.length) return;
         var proj = await _waProjName(noWO);
         var uq = await supa.from('app_user').select('id,aktif,no_whatsapp').in('id', userIds);
         var phones = (uq.data || []).filter(function (u) { return u.aktif !== false && u.no_whatsapp; }).map(function (u) { return _normalizePhone(u.no_whatsapp); }).filter(Boolean);
-        _waSend(phones, '🧑‍🔧 *Penugasan ' + modul + '*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nAnda ditugaskan menangani ' + modul + ' untuk WO ini.\n\nSilakan buka menu ' + modul + ' di RenusPro.');
+        _waSend(phones, _WA_MSG.assignEngineer({ modul: modul, noWO: noWO, proj: proj }));
       }
       async function _notifPOKeGudang(noPO, noWO, supplier, oleh) {
         if (!ENABLE_WA) return; var proj = noWO ? await _waProjName(noWO) : '';
-        var lines = ['📦 *Permintaan Penerimaan Barang*', 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), (supplier ? 'Supplier: ' + supplier : ''), 'Dikirim ke gudang oleh: ' + (oleh || '-'), '', 'Mohon proses di menu Inventory → Penerimaan Barang.'];
-        _waSend(await _waPhonesByRole('warehouse'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(await _waPhonesByRole('warehouse'), _WA_MSG.poKeGudang({ noPO: noPO, noWO: noWO, proj: proj, supplier: supplier, oleh: oleh }));
       }
       async function _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, link, lokasi, oleh, peserta) {
         if (!ENABLE_WA) return;
@@ -115,44 +206,34 @@
         var proj = await _waProjName(noWO);
         var bayar = (typeof _woPembayaranLunas === 'function') ? await _woPembayaranLunas(noWO) : { count: 0, total: 0 };
         var bayarStr = bayar.count ? ('Lunas ' + bayar.count + ' invoice · ' + _waFmtRp(bayar.total)) : 'Belum ada pembayaran lunas';
-        var lines = ['📅 *Hand Over Dijadwalkan*', 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''),
-          'Jadwal: ' + (tanggal || '-') + (waktu ? ' · ' + waktu : ''), 'Mode: ' + (mode || '-'),
-          (mode !== 'Offline' && link ? 'Link: ' + link : ''), (mode !== 'Online' && lokasi ? 'Lokasi: ' + lokasi : ''),
-          '💰 Pembayaran: ' + bayarStr, 'Dijadwalkan oleh: ' + (oleh || '-'), '', 'Anda terdaftar sebagai peserta Hand Over ini.'];
-        _waSend(phones, lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(phones, _WA_MSG.handOverDijadwalkan({ noWO: noWO, proj: proj, tanggal: tanggal, waktu: waktu, mode: mode, link: link, lokasi: lokasi, bayarStr: bayarStr, oleh: oleh }));
       }
       async function _notifMaintenanceBaru(id, project, lokasi, oleh, jenis, prioritas) {
         if (!ENABLE_WA) return;
-        var lines = ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + id + '*', 'Site/Project: ' + (project || '-'), (lokasi ? 'Lokasi: ' + lokasi : ''), (jenis ? 'Jenis: ' + jenis : ''), 'Prioritas: ' + (prioritas || 'Normal'), 'Diajukan oleh: ' + (oleh || '-'), '', 'Mohon dijadwalkan di menu Maintenance.'];
-        _waSend(await _waPhonesByRole('projectcoordinator'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.maintenanceBaru({ id: id, project: project, lokasi: lokasi, jenis: jenis, prioritas: prioritas, oleh: oleh }));
       }
       async function _notifMaintenanceDitugaskan(teknisiId, id, project, tglJadwal) {
         if (!ENABLE_WA || !teknisiId) return;
         var uq = await supa.from('app_user').select('id,aktif,no_whatsapp').eq('id', teknisiId).maybeSingle();
         if (!uq.data || uq.data.aktif === false || !uq.data.no_whatsapp) return;
         var phone = _normalizePhone(uq.data.no_whatsapp); if (!phone) return;
-        _waSend([phone], ['🛠️ *Penugasan Maintenance*', 'ID: *' + id + '*', 'Site/Project: ' + (project || '-'), (tglJadwal ? 'Jadwal: ' + tglJadwal : ''), '', 'Anda ditugaskan menangani maintenance ini. Lihat di menu Maintenance.'].filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend([phone], _WA_MSG.maintenanceDitugaskan({ id: id, project: project, jadwal: tglJadwal }));
       }
       async function _notifRequestStok(id, namaItem, qty, satuan, oleh, catatan) {
         if (!ENABLE_WA) return;
-        var lines = ['📦 *Permintaan Penambahan Stok*', 'ID: *' + id + '*', 'Item: ' + (namaItem || '-') + ' — ' + (Number(qty) || 0) + ' ' + (satuan || ''), 'Diminta oleh: ' + (oleh || '-') + ' (Warehouse)', (catatan ? '📝 ' + catatan : ''), '', 'Mohon ditindaklanjuti di menu Purchase Order → tab Request Stok.'];
-        _waSend(await _waPhonesByRole('procurement'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(await _waPhonesByRole('procurement'), _WA_MSG.requestStok({ id: id, namaItem: namaItem, qty: qty, satuan: satuan, oleh: oleh, catatan: catatan }));
       }
       async function _notifBarangDiterima(noPO, noWO, statusPO, oleh, catatanList) {
         if (!ENABLE_WA) return; var proj = noWO ? await _waProjName(noWO) : '';
-        var lines = [(statusPO === 'Diterima' ? '✅ *Barang Diterima Lengkap*' : '📥 *Barang Diterima Sebagian*'), 'PO: *' + noPO + '*', (noWO ? 'WO: ' + noWO + (proj ? ' — ' + proj : '') : 'Peruntukan: Stok'), 'Status PO: ' + statusPO, 'Diterima oleh: ' + (oleh || '-')];
-        if (catatanList && catatanList.length) { lines.push(''); lines.push('📝 Catatan:'); catatanList.forEach(function (c) { lines.push('• ' + c); }); }
-        _waSend(await _waPhonesByRole('procurement'), lines.join('\n'));
+        _waSend(await _waPhonesByRole('procurement'), _WA_MSG.barangDiterima({ noPO: noPO, noWO: noWO, proj: proj, statusPO: statusPO, oleh: oleh, lengkap: statusPO === 'Diterima', catatanList: catatanList }));
       }
       async function _notifRequestPembayaran(idReq, ref, jumlah, oleh, catatan) {
         if (!ENABLE_WA) return;
-        var lines = ['💰 *Request Pembayaran Baru*', 'ID: *' + idReq + '*', (ref || ''), 'Nominal: ' + _waFmtRp(jumlah), 'Diminta oleh: ' + (oleh || '-'), (catatan ? '📝 ' + catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.'];
-        _waSend(await _waPhonesByRole('finance'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(await _waPhonesByRole('finance'), _WA_MSG.requestPembayaran({ idReq: idReq, ref: ref, jumlah: jumlah, oleh: oleh, catatan: catatan }));
       }
       async function _notifHasilPembayaran(idReq, ref, jumlah, disetujui, oleh, catatanTolak) {
         if (!ENABLE_WA) return;
-        var lines = [(disetujui ? '✅ *Pembayaran Disetujui*' : '❌ *Pembayaran Ditolak*'), 'ID: *' + idReq + '*', (ref || ''), 'Nominal: ' + _waFmtRp(jumlah), (disetujui ? 'Disetujui' : 'Ditolak') + ' oleh: ' + (oleh || '-'), (!disetujui && catatanTolak ? '📝 Alasan: ' + catatanTolak : '')];
-        _waSend(await _waPhonesByRole('procurement'), lines.filter(function (s) { return s !== ''; }).join('\n'));
+        _waSend(await _waPhonesByRole('procurement'), _WA_MSG.hasilPembayaran({ idReq: idReq, ref: ref, jumlah: jumlah, disetujui: disetujui, oleh: oleh, catatanTolak: catatanTolak }));
       }
 
       // ── Reminder penawaran expired (grup) — dipakai manual & pg_cron ───────
@@ -172,10 +253,7 @@
         return out;
       }
       function _waMsgReminderExpired(list) {
-        var lines = ['⏰ *Reminder Follow-up Penawaran*', 'Penawaran berikut akan/sudah lewat tanggal berlaku, mohon segera follow-up ke customer:', '', '📊 Total: *' + list.length + '* penawaran perlu di-follow-up', ''];
-        var groups = {}, urut = []; list.forEach(function (it) { var s = it.dibuatOleh || 'Tanpa Sales'; if (!groups[s]) { groups[s] = []; urut.push(s); } groups[s].push(it); });
-        urut.forEach(function (s, gi) { lines.push('👤 *' + s + '* (' + groups[s].length + ' penawaran)'); groups[s].forEach(function (it, i) { lines.push((i + 1) + '. ' + it.noPenawaran + ' - ' + it.namaProject + ' (' + it.namaKlien + ') #Exp. ' + it.validHingga); }); if (gi < urut.length - 1) lines.push(''); });
-        return lines.join('\n');
+        return _WA_MSG.reminderExpired(list);
       }
 
       // ── Route WA (aktif hanya bila ENABLE_WA) ─────────────────────────────
@@ -193,20 +271,25 @@
             if (!targets.length) return { success: false, message: 'Isi nomor atau grup ID pengujian dulu.' };
             var rp = function (n) { return 'Rp ' + (Math.round(Number(n) || 0)).toLocaleString('id-ID'); };
             var W = 'WO-UJI', P = 'Proyek Uji Coba';
+            // Contoh preview memakai builder terpusat _WA_MSG (satu sumber teks).
             var M = {
-              qc_lead: '🔔 *QC Baru Perlu Direview*\nWO: *' + W + '* — ' + P + '\nItem: A1 · Contoh Item QC\n3 file diunggah oleh Site Engineer.\n\nMohon segera direview di RenusPro.',
-              qc_site: '✅ *QC Disetujui*\nWO: *' + W + '* — ' + P + '\nItem: A1 · Contoh Item QC\n\nKerja bagus! Item ini sudah di-approve.',
-              ded_lead: '📐 *Dokumen DED Baru Perlu Direview*\nWO: *' + W + '* — ' + P + '\nDokumen: Gambar Kerja\n2 file PDF diunggah oleh Site Engineer.\n\nMohon segera direview di RenusPro.',
-              ded_site: '✅ *DED Disetujui*\nWO: *' + W + '* — ' + P + '\nDokumen: Gambar Kerja\n\nDokumen ini sudah di-approve.',
-              bom_ajukan: '📋 *BOM Diajukan untuk Review*\nWO: *' + W + '* — ' + P + '\nDiajukan oleh: Site Engineer\n\nRingkasan material:\n• Total: 8 item (3 kategori)\n• Menunggu review: 8\n\nMohon segera direview di menu BOM RenusPro.',
-              bom_hasil: '📋 *Hasil Review BOM*\nWO: *' + W + '* — ' + P + '\n✅ Approved: 6\n❌ Rejected: 2\n\nSilakan cek & perbaiki material yang ditolak di menu BOM.',
-              assign: '🧑‍🔧 *Penugasan BOM*\nWO: *' + W + '* — ' + P + '\nAnda ditugaskan menangani BOM untuk WO ini.\n\nSilakan buka menu BOM di RenusPro.',
-              po_gudang: '📦 *Permintaan Penerimaan Barang*\nPO: *PO-UJI*\nWO: ' + W + ' — ' + P + '\nSupplier: PT Contoh Supplier\nDikirim ke gudang oleh: Procurement\n\nMohon proses di menu Inventory → Penerimaan Barang.',
-              barang_diterima: '✅ *Barang Diterima Lengkap*\nPO: *PO-UJI*\nWO: ' + W + ' — ' + P + '\nStatus PO: Diterima\nDiterima oleh: Warehouse',
-              req_bayar: '💰 *Request Pembayaran Baru*\nID: *REQ-UJI*\nPO: PO-UJI · WO: ' + W + '\nNominal: ' + rp(5000000) + '\nDiminta oleh: Procurement\n\nMohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.',
-              hasil_bayar: '✅ *Pembayaran Disetujui*\nID: *REQ-UJI*\nPO: PO-UJI\nNominal: ' + rp(5000000) + '\nDisetujui oleh: Finance',
-              reminder_expired: '⏰ *Reminder Penawaran Akan Expired*\n\n• 001/QUOT/UJI — ' + P + ' (Valid s/d besok)\n\nMohon segera follow-up ke klien.',
-              remind_engineer: '🔔 *Pengingat Tugas Engineering*\nWO: *' + W + '* — ' + P + '\nMohon segera selesaikan tugas QC/DED/BOM yang masih pending di RenusPro.'
+              qc_lead: _WA_MSG.qcLead({ noWO: W, proj: P, kode: 'A1', label: 'Contoh Item QC', count: 3, oleh: 'Site Engineer' }),
+              qc_site: _WA_MSG.qcSite({ noWO: W, proj: P, kode: 'A1', label: 'Contoh Item QC', catatan: '', approved: true }),
+              ded_lead: _WA_MSG.dedLead({ noWO: W, proj: P, label: 'Gambar Kerja', count: 2, oleh: 'Site Engineer' }),
+              ded_site: _WA_MSG.dedSite({ noWO: W, proj: P, label: 'Gambar Kerja', catatan: '', approved: true }),
+              bom_ajukan: _WA_MSG.bomAjukan({ noWO: W, proj: P, oleh: 'Site Engineer', total: 8, kategori: 3, pending: 8 }),
+              bom_hasil: _WA_MSG.bomHasil({ noWO: W, proj: P, oleh: 'Lead Engineer', approved: 6, rejectedCount: 2, pending: 0, rejectedList: [{ nama_material: 'Kabel NYY 3x2.5', catatan_review: 'Merek tidak sesuai' }, { nama_material: 'MCB 32A', catatan_review: '' }] }),
+              assign: _WA_MSG.assignEngineer({ modul: 'BOM', noWO: W, proj: P }),
+              po_gudang: _WA_MSG.poKeGudang({ noPO: 'PO-UJI', noWO: W, proj: P, supplier: 'PT Contoh Supplier', oleh: 'Procurement' }),
+              barang_diterima: _WA_MSG.barangDiterima({ noPO: 'PO-UJI', noWO: W, proj: P, statusPO: 'Diterima', oleh: 'Warehouse', lengkap: true, catatanList: [] }),
+              req_bayar: _WA_MSG.requestPembayaran({ idReq: 'REQ-UJI', ref: 'PO: PO-UJI · WO: ' + W + ' — ' + P, jumlah: 5000000, oleh: 'Procurement', catatan: '' }),
+              hasil_bayar: _WA_MSG.hasilPembayaran({ idReq: 'REQ-UJI', ref: 'PO: PO-UJI', jumlah: 5000000, disetujui: true, oleh: 'Finance' }),
+              req_stok: _WA_MSG.requestStok({ id: 'REQ-STK-UJI', namaItem: 'Panel Surya 550Wp', qty: 10, satuan: 'pcs', oleh: 'Warehouse', catatan: 'Stok menipis' }),
+              maintenance_baru: _WA_MSG.maintenanceBaru({ id: 'MTN-UJI', project: P, lokasi: 'Surabaya', jenis: 'Perbaikan', prioritas: 'Tinggi', oleh: 'Sales' }),
+              maintenance_tugas: _WA_MSG.maintenanceDitugaskan({ id: 'MTN-UJI', project: P, jadwal: 'besok' }),
+              ho_dijadwalkan: _WA_MSG.handOverDijadwalkan({ noWO: W, proj: P, tanggal: '20/08/2026', waktu: '10:00', mode: 'Offline', link: '', lokasi: 'Kantor Klien', bayarStr: 'Lunas 1 invoice · ' + rp(12000000), oleh: 'Project Coordinator' }),
+              reminder_expired: _WA_MSG.reminderExpired([{ noPenawaran: '001/QUOT/UJI', namaProject: P, namaKlien: 'Klien Uji', dibuatOleh: 'Sales', validHingga: 'besok' }]),
+              remind_engineer: _WA_MSG.reminderReviewLead({ modul: 'QC', noWO: W, proj: P, pending: 3, kata: 'item' })
             };
             var base = M[jenis];
             if (!base) return { success: false, message: 'Jenis notifikasi tidak dikenal.' };
@@ -244,7 +327,7 @@
             var phones = await _waPhonesByRole('leadengineer'); if (!phones.length) return { success: false, message: 'Tidak ada Lead Engineer dengan No. WhatsApp.' };
             var kat = {}; items.forEach(function (x) { kat[(x.kategori || 'Lainnya')] = 1; });
             var proj = await _waProjName(noWO);
-            _waSend(phones, '📋 *BOM Diajukan untuk Review*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nDiajukan oleh: ' + (oleh || '-') + '\n\nRingkasan material:\n• Total: ' + items.length + ' item (' + Object.keys(kat).length + ' kategori)\n• Menunggu review: ' + pending + '\n\nMohon segera direview di menu BOM RenusPro.');
+            _waSend(phones, _WA_MSG.bomAjukan({ noWO: noWO, proj: proj, oleh: oleh, total: items.length, kategori: Object.keys(kat).length, pending: pending }));
             return { success: true, message: 'Pengajuan review terkirim ke ' + phones.length + ' Lead Engineer (' + pending + ' material menunggu review).' };
           }
         });
@@ -260,11 +343,7 @@
             if (approved + rejected.length === 0) return { success: false, message: 'Belum ada material yang direview (approve/reject).' };
             var phones = await _waPhonesForAssign('bom_assignment', noWO);
             var proj = await _waProjName(noWO);
-            var lines = ['📋 *Hasil Review BOM*', 'WO: *' + noWO + '*' + (proj ? ' — ' + proj : ''), 'Direview oleh: ' + (oleh || '-'), '', '✅ Disetujui: ' + approved, '❌ Ditolak: ' + rejected.length];
-            if (pending > 0) lines.push('⏳ Belum direview: ' + pending);
-            if (rejected.length) { lines.push(''); lines.push('📝 Material ditolak:'); rejected.slice(0, 15).forEach(function (it) { lines.push('• ' + (it.nama_material || '-') + (it.catatan_review ? ' — ' + it.catatan_review : '')); }); if (rejected.length > 15) lines.push('• …dan ' + (rejected.length - 15) + ' lainnya'); }
-            lines.push(''); lines.push('Buka menu BOM untuk detail.');
-            _waSend(phones, lines.join('\n'));
+            _waSend(phones, _WA_MSG.bomHasil({ noWO: noWO, proj: proj, oleh: oleh, approved: approved, rejectedCount: rejected.length, pending: pending, rejectedList: rejected }));
             return { success: true, message: 'Hasil review terkirim ke ' + phones.length + ' Site Engineer.' };
           }
         });
@@ -281,12 +360,12 @@
               if (isLead) {
                 if (!s.pending) return { success: false, message: 'Tidak ada ' + kata + ' menunggu review.' };
                 phones = await _waPhonesByRole('leadengineer');
-                msg = '🔔 *Reminder Review ' + modul + '*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\n' + s.pending + ' ' + kata + ' menunggu direview.\n\nMohon segera direview di RenusPro.';
+                msg = _WA_MSG.reminderReviewLead({ modul: modul, noWO: noWO, proj: proj, pending: s.pending, kata: kata });
               } else {
                 if (s.belum + s.rejected === 0) return { success: false, message: 'Tidak ada yang perlu dilengkapi.' };
                 phones = await _waPhonesForAssign(assignTable, noWO);
                 var parts = []; if (s.belum) parts.push(s.belum + ' ' + kata + ' belum diupload'); if (s.rejected) parts.push(s.rejected + ' ' + kata + ' ditolak (perlu revisi)');
-                msg = '🔔 *Reminder ' + modul + '*\nWO: *' + noWO + '*' + (proj ? ' — ' + proj : '') + '\nMohon segera lengkapi: ' + parts.join(' & ') + '.\n\nSilakan upload di RenusPro.';
+                msg = _WA_MSG.reminderPelaksana({ modul: modul, noWO: noWO, proj: proj, parts: parts.join(' & ') });
               }
               if (!phones.length) return { success: false, message: 'Tidak ada penerima dengan No. WhatsApp.' };
               _waSend(phones, msg); _waCdStamp(cdType + '_' + noWO);
