@@ -99,7 +99,7 @@
         },
         // Request pembayaran PO/Non-PO (ke Finance)
         requestPembayaran: function (d) {
-          return ['💰 *Request Pembayaran Baru*', 'ID: *' + d.idReq + '*', (d.ref || ''), 'Nominal: ' + _waFmtRp(d.jumlah), 'Diminta oleh: ' + (d.oleh || '-'), (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Permintaan Pembayaran PO.'].filter(_waNonEmpty).join('\n');
+          return ['💰 *Request Pembayaran Baru*', 'ID: *' + d.idReq + '*', (d.ref || ''), 'Nominal: ' + _waFmtRp(d.jumlah), 'Diminta oleh: ' + (d.oleh || '-'), (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Request Pembayaran.'].filter(_waNonEmpty).join('\n');
         },
         // Hasil pembayaran (ke Procurement). d.disetujui = true/false
         hasilPembayaran: function (d) {
