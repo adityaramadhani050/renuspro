@@ -280,6 +280,19 @@
     inst.reset = function() {
       inst.setValue('');
     };
+
+    // Sinkronkan tampilan saat value di-set secara programatik (native.value = x)
+    // tanpa event change — penting agar SD auto-init aman untuk prefill form.
+    try {
+      var _vd = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+      if (_vd && _vd.get && _vd.set) {
+        Object.defineProperty(native, 'value', {
+          configurable: true,
+          get: function() { return _vd.get.call(this); },
+          set: function(v) { _vd.set.call(this, v); try { inst.refresh(); } catch (e) {} }
+        });
+      }
+    } catch (e) {}
   };
 
   // ── Helper: rebuild dropdown yg sudah init ──
@@ -297,6 +310,52 @@
     const inst = _sdInstances[nativeId];
     if (inst && inst.reset) inst.reset();
   };
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  AUTO-DEFAULT: semua <select> biasa OTOMATIS jadi searchable dropdown.
+  //  Berlaku untuk select yang sudah ada DAN yang ditambahkan kemudian (fitur
+  //  baru) via MutationObserver — tanpa perlu wiring per-select.
+  //  Opt-out: tambahkan class "no-sd" atau atribut data-sd-skip="1" pada <select>.
+  //  Di-skip otomatis: <select multiple>, yang sudah di-init, dan select produk
+  //  (.select-produk/.select-hidden-produk) yang punya init khusus (onChange).
+  // ════════════════════════════════════════════════════════════════════════
+  var _sdAutoSeq = 0, _sdObsTimer = null, _sdObserver = null;
+  function _sdSkip(sel) {
+    if (!sel || sel.tagName !== 'SELECT' || sel.multiple) return true;
+    if (sel.dataset.sdInit === '1' || sel.dataset.sdSkip === '1') return true;
+    if (sel.classList.contains('no-sd') || sel.classList.contains('select-produk') || sel.classList.contains('select-hidden-produk')) return true;
+    return false;
+  }
+  window.sdAutoInit = function(root) {
+    root = root || document;
+    var sels;
+    try { sels = root.querySelectorAll ? root.querySelectorAll('select') : []; } catch (e) { return; }
+    for (var i = 0; i < sels.length; i++) {
+      var sel = sels[i];
+      if (_sdSkip(sel)) continue;
+      if (!sel.id) sel.id = 'sd-auto-' + (++_sdAutoSeq);
+      var first = sel.options && sel.options.length ? sel.options[0] : null;
+      var ph = (first && first.value === '' && (first.text || '').trim()) ? first.text.trim() : '-- Pilih --';
+      try { initSearchableDropdown(sel.id, { placeholder: ph, searchPlaceholder: 'Cari...' }); } catch (e) {}
+    }
+  };
+  function _sdAutoStart() {
+    window.sdAutoInit(document);
+    try {
+      _sdObserver = new MutationObserver(function(muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].addedNodes && muts[i].addedNodes.length) {
+            if (_sdObsTimer) return;
+            _sdObsTimer = setTimeout(function() { _sdObsTimer = null; window.sdAutoInit(document); }, 80);
+            return;
+          }
+        }
+      });
+      _sdObserver.observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _sdAutoStart);
+  else _sdAutoStart();
 
   // Diekspos agar bisa dipanggil langsung oleh muatSeluruhDataAwal()
   // untuk menginisialisasi searchable dropdown setelah data klien termuat.
