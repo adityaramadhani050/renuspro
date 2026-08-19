@@ -161,6 +161,7 @@
       }
       async function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.qcNotif === false) return;
+        if ((keputusan || '') === 'Approved') return; // notif WA saat approve dinonaktifkan (hanya reject yang dikabari)
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('qc_checklist'))[kode] || '';
         _waSend(await _waPhonesForAssign('qc_assignment', noWO), _WA_MSG.qcSite({ noWO: noWO, proj: proj, kode: kode, label: lbl, catatan: catatan, approved: keputusan === 'Approved' }));
       }
@@ -171,6 +172,7 @@
       }
       async function _dedNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.dedNotif === false) return;
+        if ((keputusan || '') === 'Approved') return; // notif WA saat approve dinonaktifkan (hanya reject yang dikabari)
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('ded_checklist'))[kode] || kode;
         _waSend(await _waPhonesForAssign('ded_assignment', noWO), _WA_MSG.dedSite({ noWO: noWO, proj: proj, label: lbl, catatan: catatan, approved: keputusan === 'Approved' }));
       }
@@ -341,6 +343,9 @@
             var rejected = items.filter(function (x) { return (x.status || '') === 'Rejected'; });
             var pending = items.filter(function (x) { return (x.status || '') === 'Pending'; }).length;
             if (approved + rejected.length === 0) return { success: false, message: 'Belum ada material yang direview (approve/reject).' };
+            // Notif WA hasil review hanya dikirim bila ada material yang ditolak.
+            // Hasil yang seluruhnya disetujui tidak lagi mengirim WA.
+            if (rejected.length === 0) return { success: true, message: 'Semua material disetujui — notifikasi WA tidak dikirim.' };
             var phones = await _waPhonesForAssign('bom_assignment', noWO);
             var proj = await _waProjName(noWO);
             _waSend(phones, _WA_MSG.bomHasil({ noWO: noWO, proj: proj, oleh: oleh, approved: approved, rejectedCount: rejected.length, pending: pending, rejectedList: rejected }));
