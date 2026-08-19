@@ -263,6 +263,17 @@
         return { success: true, list: list };
       }
 
+      // Helper bersama: status pembayaran (invoice Lunas) sebuah WO.
+      //  Dipakai guard Request Hand Over & notifikasi HO dijadwalkan.
+      async function _woPembayaranLunas(noWO) {
+        if (!noWO) return { count: 0, total: 0 };
+        var q = await supa.from('invoice').select('status_bayar,total').eq('no_wo', noWO);
+        if (q.error) return { count: 0, total: 0 };
+        var lunas = (q.data || []).filter(function (iv) { return (iv.status_bayar || '') === 'Lunas'; });
+        var total = lunas.reduce(function (s, iv) { return s + (Number(iv.total) || 0); }, 0);
+        return { count: lunas.length, total: total };
+      }
+
       // Helper bersama: master checklist QC (section + item) — dipakai
       // getQCChecklist & getQCByWO.
       async function _qcMaster() {

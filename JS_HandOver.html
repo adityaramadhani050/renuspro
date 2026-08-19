@@ -2,6 +2,7 @@
 // ════════════════ HAND OVER (panel di detail Work Order) ════════════════
 var _hoWO = '';       // No WO aktif
 var _hoRec = null;    // record HO
+var _hoHasBayar = false; // WO sudah ada pembayaran lunas?
 var _hoUsers = null;  // cache daftar user (peserta)
 
 function _hoEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -55,6 +56,7 @@ function _hoLoad(noWO) {
   panel.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-5"><div class="text-sm text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat Hand Over...</div></div>';
   google.script.run.withSuccessHandler(function(res){
     _hoRec = (res && res.success) ? (res.record || null) : null;
+    _hoHasBayar = !!(res && res.hasPembayaranLunas);
     _hoRenderPanel();
   }).withFailureHandler(function(){
     panel.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-5 text-sm text-rose-400">Gagal memuat Hand Over.</div>';
@@ -72,7 +74,8 @@ function _hoRenderPanel() {
 
   if (!st || st === 'Batal') {
     body = '<p class="text-sm text-slate-400">' + (st === 'Batal' ? 'Hand Over dibatalkan.' : 'Belum ada Hand Over untuk WO ini.') + '</p>';
-    if (_hoCanRequest()) actions = '<button onclick="_hoRequest()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i> ' + (st === 'Batal' ? 'Request Ulang' : 'Request Hand Over') + '</button>';
+    if (_hoCanRequest() && _hoHasBayar) actions = '<button onclick="_hoRequest()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3.5 py-2 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i> ' + (st === 'Batal' ? 'Request Ulang' : 'Request Hand Over') + '</button>';
+    else if (_hoCanRequest() && !_hoHasBayar) body += '<p class="text-[11px] text-amber-600 mt-1 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Request Hand Over dinonaktifkan — WO ini belum ada pembayaran lunas.</p>';
     else if (!st) body += '<p class="text-[11px] text-slate-400 mt-1">Menunggu Sales melakukan request.</p>';
   } else if (st === 'Diminta') {
     body = '<div class="text-xs text-slate-500">Diminta oleh <b class="text-slate-700">' + _hoEsc(r.dimintaOleh || '-') + '</b> · ' + _hoEsc(_hoFmtTs(r.dimintaPada)) + '</div>'

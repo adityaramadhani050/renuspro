@@ -161,6 +161,7 @@
           if ((p.meetEventId || '').toString()) upd.meet_event_id = (p.meetEventId || '').toString();
           var up = await supa.from('hand_over').update(upd).eq('no_wo', noWO);
           if (up.error) return { success: false, message: up.error.message };
+          if (typeof _notifHandOverDijadwalkan === 'function') _notifHandOverDijadwalkan(noWO, tanggal, waktu, mode, (needLink ? link : ''), (needLokasi ? lokasi : ''), (p.oleh || ''));
           return { success: true, message: 'Hand Over WO ' + noWO + ' dijadwalkan.' };
         }
       });
@@ -388,7 +389,8 @@
             invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: invUrl, invoice_file_nama: (p.invoiceFileName || '').toString()
           });
           if (ins.error) return { success: false, message: ins.error.message };
-          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'PO: ' + noPO + (po.data.no_wo ? ' · WO: ' + po.data.no_wo : '') + (po.data.nama_supplier ? ' · ' + po.data.nama_supplier : ''), jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
+          var _projPO = (po.data.no_wo && typeof _waProjName === 'function') ? await _waProjName(po.data.no_wo) : '';
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'PO: ' + noPO + (po.data.no_wo ? ' · WO: ' + po.data.no_wo + (_projPO ? ' — ' + _projPO : '') : '') + (po.data.nama_supplier ? ' · ' + po.data.nama_supplier : ''), jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
         }
       });
@@ -408,7 +410,8 @@
             invoice_file_id: (p.invoiceFileId || '').toString(), invoice_file_url: (p.invoiceFileUrl || '').toString(), invoice_file_nama: (p.invoiceFileName || '').toString(), kategori_non_po: kategori
           });
           if (ins.error) return { success: false, message: ins.error.message };
-          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'Tanpa PO' + (noWO ? ' · WO: ' + noWO : (kategori ? ' · ' + kategori : '')) + ' · ' + keterangan, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
+          var _projNP = (noWO && typeof _waProjName === 'function') ? await _waProjName(noWO) : '';
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'Tanpa PO' + (noWO ? ' · WO: ' + noWO + (_projNP ? ' — ' + _projNP : '') : (kategori ? ' · ' + kategori : '')) + ' · ' + keterangan, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
         }
       });
@@ -488,6 +491,10 @@
         handler: async function (a) {
           var noWO = (a[0] || '').toString().trim(), oleh = (a[1] || '').toString();
           if (!noWO) return { success: false, message: 'No WO wajib.' };
+          // Guard: WO harus sudah ada pembayaran lunas (cegah hand over tanpa
+          // pembayaran sama sekali).
+          var bayar = await _woPembayaranLunas(noWO);
+          if (!bayar.count) return { success: false, message: 'Tidak bisa Request Hand Over: WO ini belum ada pembayaran lunas.' };
           var ho = await supa.from('hand_over').select('status').eq('no_wo', noWO).maybeSingle();
           var init = { no_wo: noWO, status: 'Diminta', diminta_oleh: oleh, diminta_pada: new Date().toISOString(), tgl_jadwal: null, waktu: null, mode: '', link_meet: '', lokasi: '', peserta: '', catatan_undangan: '', dijadwalkan_oleh: '', dijadwalkan_pada: null, mom: '', selesai_oleh: '', selesai_pada: null, meet_event_id: '' };
           if (ho.data) {

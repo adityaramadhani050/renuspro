@@ -333,10 +333,12 @@
           if (!noWO) return { success: false, message: 'No WO wajib.' };
           var q = await supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle();
           if (q.error) return { success: false, message: q.error.message };
-          if (!q.data) return { success: true, record: null };
+          var bayar = (typeof _woPembayaranLunas === 'function') ? await _woPembayaranLunas(noWO) : { count: 0, total: 0 };
+          if (!q.data) return { success: true, record: null, hasPembayaranLunas: bayar.count > 0, bayarCount: bayar.count, bayarTotal: bayar.total };
           var r = q.data;
           return {
             success: true,
+            hasPembayaranLunas: bayar.count > 0, bayarCount: bayar.count, bayarTotal: bayar.total,
             record: {
               noWO: noWO, status: r.status || '', dimintaOleh: r.diminta_oleh || '',
               dimintaPada: _fmtTs(r.diminta_pada),
