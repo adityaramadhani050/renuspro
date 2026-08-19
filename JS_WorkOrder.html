@@ -238,8 +238,9 @@
       } else {
         invCont.innerHTML = item.invoices.map(inv => {
           const isPaid = inv.statusBayar === 'Lunas';
+          const kwArg  = JSON.stringify({ id: inv.kwitansiId, sub: (item.namaKlien || '') + (item.namaProject ? ' · ' + item.namaProject : '') }).replace(/'/g, "&#39;");
           const kwBtn  = inv.kwitansiId
-            ? `<button onclick="_exportKwDariWODetail('${inv.kwitansiId}')"
+            ? `<button onclick='_exportKwDariWODetail(${kwArg})'
                  class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition" title="${inv.kwitansiId}">
                  <i class="fa-solid fa-receipt"></i> Kwitansi
                </button>`
@@ -1598,8 +1599,12 @@
 
     // Kwitansi & Invoice dari detail WO — dibuat sisi klien (jsPDF), konsisten
     // dgn halaman Invoice/Kwitansi. Tidak lagi memakai template Apps Script.
-    function _exportKwDariWODetail(kwitansiId) {
-      if (typeof exportKwitansiPDFClient === 'function') { exportKwitansiPDFClient(kwitansiId, ''); return; }
+    function _exportKwDariWODetail(arg) {
+      // arg bisa string (id) atau objek { id, sub }. Data PDF diambil server-side
+      // by id via getKwitansiForPdf → sudah lengkap; sub hanya subtitle preview.
+      var kwitansiId = (arg && typeof arg === 'object') ? (arg.id || '') : arg;
+      var sub = (arg && typeof arg === 'object') ? (arg.sub || '') : '';
+      if (typeof exportKwitansiPDFClient === 'function') { exportKwitansiPDFClient(kwitansiId, sub); return; }
       showNotification && showNotification('Generator kwitansi belum siap.', 'error');
     }
 
