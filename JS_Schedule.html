@@ -120,6 +120,27 @@ function _schBuildTicks(start, totalDays, ppd, zoom) {
   return inner;
 }
 
+// Gabungkan interval tugas jadi segmen kontigu (hari kosong tanpa tugas = jeda).
+// Menghasilkan [{m, s, pct}] — dipakai bar home agar terpotong sesuai detail per-WO.
+function _schMergeTaskRanges(tasks) {
+  var iv = (tasks || []).filter(function(t){ return t.mulai && t.selesai && t.selesai >= t.mulai; })
+    .map(function(t){ return { m: t.mulai, s: t.selesai, dur: _schDays(t.mulai, t.selesai) + 1, prog: Number(t.progress) || 0 }; })
+    .sort(function(a, b){ return a.m < b.m ? -1 : a.m > b.m ? 1 : (a.s < b.s ? -1 : 1); });
+  var segs = [];
+  iv.forEach(function(t){
+    var last = segs[segs.length - 1];
+    // gap 0 hari (overlap/kontigu) → gabung; gap ≥1 hari kosong → segmen baru.
+    if (last && _schDays(last.s, t.m) <= 1) {
+      if (t.s > last.s) last.s = t.s;
+      last.dur += t.dur; last.wprog += t.prog * t.dur;
+    } else {
+      segs.push({ m: t.m, s: t.s, dur: t.dur, wprog: t.prog * t.dur });
+    }
+  });
+  segs.forEach(function(g){ g.pct = g.dur ? Math.round(g.wprog / g.dur) : 0; });
+  return segs;
+}
+
 // Home = SATU gantt gabungan: tiap baris = 1 WO (rentang ringkasan proyek), timeline
 // bersama agar bentrok jadwal antar-WO mudah terlihat. Klik baris → detail per-tugas.
 function _schRenderHomeGantt(list) {
@@ -149,24 +170,30 @@ function _schRenderHomeGantt(list) {
   var rows = list.map(function(w, idx){
     var s = w.summary || {};
     var pct = Number(s.progress)||0;
-    var hasR = s.tanggalMulai && s.tanggalSelesai;
     var b = _schBar(palette[idx % palette.length]);
     var removeBtn = _schCanEdit()
       ? '<button onclick="event.stopPropagation();_schRemoveProject(\'' + _schEsc(w.noWO) + '\')" class="text-slate-300 hover:text-rose-500 shrink-0" title="Keluarkan dari Schedule"><i class="fa-regular fa-trash-can text-xs"></i></button>'
       : '';
+    var jt = Number(s.jumlahTugas) || 0;
+    // Bar terpotong per segmen tugas (hari kosong = jeda), sesuai detail per-WO.
+    var segsR = _schMergeTaskRanges(w.tasks);
     var bar;
-    if (hasR) {
-      var leftPx = _schDays(start, s.tanggalMulai) * ppd;
-      var wPx = (_schDays(s.tanggalMulai, s.tanggalSelesai) + 1) * ppd; if (wPx < 6) wPx = 6;
-      var jt = Number(s.jumlahTugas) || 0;
-      var barLbl = wPx > 150 ? (_schEsc(w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas')
-                 : wPx > 90  ? (pct + '% · ' + jt + ' tugas')
-                 : wPx > 44  ? (pct + '%')
-                 : '';
-      bar = '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas">'
-          +   '<div class="h-full ' + b[1] + '" style="width:' + pct + '%"></div>'
+    if (segsR.length) {
+      var segPx = segsR.map(function(g){ var wp = (_schDays(g.m, g.s) + 1) * ppd; return wp < 6 ? 6 : wp; });
+      var widest = 0; for (var wi = 1; wi < segPx.length; wi++) { if (segPx[wi] > segPx[widest]) widest = wi; }
+      bar = segsR.map(function(g, gi){
+        var leftPx = _schDays(start, g.m) * ppd;
+        var wPx = segPx[gi];
+        var barLbl = (gi === widest)
+          ? (wPx > 150 ? (_schEsc(w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas')
+            : wPx > 90 ? (pct + '% · ' + jt + ' tugas')
+            : wPx > 44 ? (pct + '%') : '')
+          : '';
+        return '<div class="absolute rounded-md ' + b[0] + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:9px;height:22px" title="' + _schEsc(w.namaProject || w.noWO) + ' · ' + pct + '% · ' + jt + ' tugas">'
+          +   '<div class="h-full ' + b[1] + '" style="width:' + g.pct + '%"></div>'
           +   '<span class="absolute inset-0 flex items-center px-1.5 text-[10px] font-bold text-white drop-shadow-sm truncate">' + barLbl + '</span>'
           + '</div>';
+      }).join('');
     } else {
       bar = '<div class="absolute text-[10px] text-slate-300 italic" style="left:4px;top:13px">Belum ada jadwal</div>';
     }
