@@ -292,6 +292,12 @@
     inst.reset = function() {
       inst.setValue('');
     };
+
+    // Sinkronkan tampilan ke opsi yang SUDAH terpilih di native saat init
+    // (mis. baris yg dibuat ulang dgn value ter-set) — supaya teksnya tampil,
+    // bukan placeholder. Tanpa ini, dropdown per-baris (PO/BOM/Template) bisa
+    // memperlihatkan "-- Pilih --" padahal nilainya sudah ada.
+    inst.refresh();
   };
 
   // ── Helper: rebuild dropdown yg sudah init ──
