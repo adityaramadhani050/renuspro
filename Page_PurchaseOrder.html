@@ -15,7 +15,7 @@
                   placeholder="Cari No PO, supplier, No WO..."
                   class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
               </div>
-              <select id="filter-po-status" data-sd-skip="1" onchange="filterPO()"
+              <select id="filter-po-status" onchange="filterPO()"
                 class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
                 <option value="">Semua Status</option>
                 <option value="Aktif">Aktif</option>
@@ -86,7 +86,7 @@
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" id="po-riwayat-search" oninput="_poRenderRiwayat()" placeholder="Cari ID / PO / keterangan / WO..." class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
               </div>
-              <select id="po-riwayat-status" data-sd-skip="1" onchange="_poRenderRiwayat()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
+              <select id="po-riwayat-status" onchange="_poRenderRiwayat()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
                 <option value="">Semua Status</option>
                 <option value="Menunggu">Menunggu</option>
                 <option value="Disetujui">Disetujui</option>
@@ -121,7 +121,7 @@
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" id="po-reqstok-search" oninput="_poRenderReqStok()" placeholder="Cari ID / item / peminta..." class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white">
               </div>
-              <select id="po-reqstok-status" data-sd-skip="1" onchange="_poRenderReqStok()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
+              <select id="po-reqstok-status" onchange="_poRenderReqStok()" class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-600 font-medium sm:ml-auto">
                 <option value="">Semua Status</option>
                 <option value="Menunggu">Menunggu</option>
                 <option value="Diproses">Diproses</option>
