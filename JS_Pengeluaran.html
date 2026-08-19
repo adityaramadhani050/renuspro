@@ -562,31 +562,31 @@ function _renderPaymentRequestList(list) {
     if (r.status === 'Menunggu') {
       aksiHtml =
         '<button onclick="bukaApprovePayReq(\'' + _esc(r.idReq) + '\',' + (r.jumlah || 0) + ',\'' + _esc(r.noPO) + '\')" ' +
-          'class="px-2.5 py-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold transition">Setujui</button> ' +
+          'class="px-2 py-0.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white rounded-md font-bold transition" title="Setujui">Setujui</button> ' +
         '<button onclick="tolakPayReq(\'' + _esc(r.idReq) + '\')" ' +
-          'class="px-2.5 py-1 text-xs bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg font-bold transition">Tolak</button>';
+          'class="px-2 py-0.5 text-[11px] bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-md font-bold transition" title="Tolak">Tolak</button>';
     }
     html += '<tr class="hover:bg-slate-50 transition-colors">';
     var invoiceHtml = r.invoiceFileUrl
-      ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-rose-500 hover:text-rose-600 font-semibold" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i> Invoice</a>'
-      : '<span class="text-slate-300">Tanpa invoice</span>';
-    html += '<td class="p-4 whitespace-nowrap"><div class="font-mono text-xs text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-xs text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
-    var noPOCell = r.noPO ? '<div class="font-mono text-xs font-bold text-slate-700 whitespace-nowrap">' + _esc(r.noPO) + '</div>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Tanpa PO</span>';
-    html += '<td class="p-4">' + noPOCell + '<div class="text-xs text-slate-400 mt-0.5 truncate max-w-[160px]">' + _esc(r.namaSupplier || '') + '</div></td>';
-    html += '<td class="p-4 text-xs font-mono text-teal-700 whitespace-nowrap">' + _esc(r.noWO || '—') + '</td>';
-    html += '<td class="p-4 text-right text-xs text-slate-600 whitespace-nowrap">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
-    html += '<td class="p-4 text-right font-bold text-slate-800 text-sm whitespace-nowrap">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
-    html += '<td class="p-4 text-center text-xs text-slate-500 whitespace-nowrap">' + pct + '</td>';
-    html += '<td class="p-4 text-xs text-slate-500 max-w-[140px]"><div class="truncate" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
-    html += '<td class="p-4 text-xs text-center whitespace-nowrap">' + invoiceHtml + '</td>';
+      ? '<a href="' + _esc(r.invoiceFileUrl) + '" target="_blank" class="text-rose-500 hover:text-rose-600" title="Lihat invoice supplier"><i class="fa-solid fa-file-invoice"></i></a>'
+      : '<span class="text-slate-300">—</span>';
+    html += '<td class="px-2 py-2.5 whitespace-nowrap"><div class="font-mono text-[11px] text-slate-600">' + _esc(r.idReq || '') + '</div><div class="text-[10px] text-slate-400 mt-0.5">' + _esc(r.tanggalRequest || '') + '</div></td>';
+    var noPOCell = r.noPO ? '<div class="font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap">' + _esc(r.noPO) + '</div>' : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">Tanpa PO</span>';
+    html += '<td class="px-2 py-2.5">' + noPOCell + '<div class="text-[10px] text-slate-400 mt-0.5 truncate max-w-[110px]" title="' + _esc(r.namaSupplier || '') + '">' + _esc(r.namaSupplier || '') + '</div></td>';
+    html += '<td class="px-2 py-2.5 text-[11px] font-mono text-teal-700 whitespace-nowrap">' + _esc(r.noWO || '—') + '</td>';
+    html += '<td class="px-2 py-2.5 text-right text-[11px] text-slate-600 whitespace-nowrap">Rp ' + ((r.grandTotalPO || 0).toLocaleString('id-ID')) + '</td>';
+    html += '<td class="px-2 py-2.5 text-right font-bold text-slate-800 text-[11px] whitespace-nowrap">Rp ' + ((r.jumlah || 0).toLocaleString('id-ID')) + '</td>';
+    html += '<td class="px-2 py-2.5 text-center text-[11px] text-slate-500 whitespace-nowrap">' + pct + '</td>';
+    html += '<td class="px-2 py-2.5 text-[11px] text-slate-500"><div class="truncate max-w-[90px]" title="' + _esc(r.catatan) + '">' + _esc(r.catatan || '—') + '</div></td>';
+    html += '<td class="px-2 py-2.5 text-sm text-center whitespace-nowrap">' + invoiceHtml + '</td>';
     var catatanTolakHtml = (r.status === 'Ditolak' && r.catatanTolak)
-      ? '<div class="text-[10px] text-rose-500 mt-1 max-w-[140px] truncate" title="' + _esc(r.catatanTolak) + '">' + _esc(r.catatanTolak) + '</div>'
+      ? '<div class="text-[10px] text-rose-500 mt-1 max-w-[110px] truncate mx-auto" title="' + _esc(r.catatanTolak) + '">' + _esc(r.catatanTolak) + '</div>'
       : '';
     var buktiHtml = (r.status === 'Disetujui' && r.buktiFileUrl)
-      ? '<a href="' + _esc(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold text-[10px] mt-1" title="Lihat bukti transaksi"><i class="fa-solid fa-receipt"></i> Bukti Bayar</a>'
+      ? '<a href="' + _esc(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold text-[10px] mt-1" title="Lihat bukti transaksi"><i class="fa-solid fa-receipt"></i> Bukti</a>'
       : '';
-    html += '<td class="p-4 text-center"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span>' + catatanTolakHtml + (buktiHtml ? '<div>' + buktiHtml + '</div>' : '') + '</td>';
-    html += '<td class="p-4 text-center whitespace-nowrap">' + (aksiHtml || '<span class="text-xs text-slate-300">—</span>') + '</td>';
+    html += '<td class="px-2 py-2.5 text-center"><span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ' + sc + '">' + _esc(r.status || '') + '</span>' + catatanTolakHtml + (buktiHtml ? '<div>' + buktiHtml + '</div>' : '') + '</td>';
+    html += '<td class="px-2 py-2.5 text-center whitespace-nowrap">' + (aksiHtml || '<span class="text-[11px] text-slate-300">—</span>') + '</td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
