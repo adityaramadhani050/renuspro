@@ -1008,9 +1008,9 @@ function _poRenderReqStok() {
       var dj = JSON.stringify(r).replace(/'/g, "&#39;");
       aksi =
         '<button onclick=\'buatPODariReqStok('+dj+')\' class="text-orange-600 hover:text-orange-800 transition mr-2" title="Buat PO dari request ini"><i class="fa-solid fa-file-circle-plus"></i></button>' +
-        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Diproses")\' class="text-blue-600 hover:text-blue-800 transition mr-2" title="Tandai Diproses"><i class="fa-solid fa-spinner"></i></button>' +
-        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Selesai")\' class="text-emerald-600 hover:text-emerald-800 transition mr-2" title="Tandai Selesai"><i class="fa-solid fa-check"></i></button>' +
-        '<button onclick=\'prosesReqStok("'+_escHtml(r.id)+'","Ditolak")\' class="text-rose-500 hover:text-rose-700 transition" title="Tolak request"><i class="fa-solid fa-xmark"></i></button>';
+        '<button onclick=\'bukaProsesReqStok('+dj+',"Diproses")\' class="text-blue-600 hover:text-blue-800 transition mr-2" title="Tandai Diproses"><i class="fa-solid fa-spinner"></i></button>' +
+        '<button onclick=\'bukaProsesReqStok('+dj+',"Selesai")\' class="text-emerald-600 hover:text-emerald-800 transition mr-2" title="Tandai Selesai"><i class="fa-solid fa-check"></i></button>' +
+        '<button onclick=\'bukaProsesReqStok('+dj+',"Ditolak")\' class="text-rose-500 hover:text-rose-700 transition" title="Tolak request"><i class="fa-solid fa-xmark"></i></button>';
     } else {
       aksi = '<span class="text-slate-300 text-xs">—</span>';
     }
@@ -1025,19 +1025,50 @@ function _poRenderReqStok() {
       '</tr>';
   }).join('');
 }
-function prosesReqStok(id, status, noPO) {
-  var msg = status === 'Ditolak' ? 'Tolak request ini?' : (status === 'Selesai' ? 'Tandai request ini Selesai?' : null);
-  var catatanProc = '';
-  if (status === 'Ditolak') { catatanProc = prompt('Alasan penolakan (opsional):') || ''; }
-  else if (msg && !confirm(msg)) return;
+var _PRS_THEME = {
+  Diproses: { icon: 'fa-spinner', wrap: 'bg-blue-100 text-blue-600',      btn: 'bg-blue-600 hover:bg-blue-700',       title: 'Tandai Diproses',  label: 'Catatan',            btnLabel: 'Tandai Diproses' },
+  Selesai:  { icon: 'fa-check',   wrap: 'bg-emerald-100 text-emerald-600', btn: 'bg-emerald-600 hover:bg-emerald-700', title: 'Tandai Selesai',   label: 'Catatan',            btnLabel: 'Tandai Selesai'  },
+  Ditolak:  { icon: 'fa-xmark',   wrap: 'bg-rose-100 text-rose-600',       btn: 'bg-rose-600 hover:bg-rose-700',       title: 'Tolak Request',    label: 'Alasan Penolakan',   btnLabel: 'Tolak Request'   }
+};
+function bukaProsesReqStok(r, status) {
+  r = r || {};
+  var t = _PRS_THEME[status] || _PRS_THEME.Diproses;
+  document.getElementById('prs-id').value     = r.id || '';
+  document.getElementById('prs-status').value = status;
+  document.getElementById('prs-title').innerText = t.title;
+  document.getElementById('prs-sub').innerText   = r.id || '';
+  document.getElementById('prs-icon').className  = 'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ' + t.wrap;
+  document.getElementById('prs-icon').innerHTML  = '<i class="fa-solid ' + t.icon + ' text-sm"></i>';
+  document.getElementById('prs-item').innerText  = r.namaItem || '';
+  document.getElementById('prs-qty').innerText   = 'Qty diminta: ' + (r.qty || 0).toLocaleString('id-ID') + ' ' + (r.satuan || '') + (r.dimintaOleh ? ' · oleh ' + r.dimintaOleh : '');
+  document.getElementById('prs-catatan-label').innerText = t.label;
+  var ta = document.getElementById('prs-catatan');
+  ta.value = '';
+  ta.placeholder = status === 'Ditolak' ? 'Sebutkan alasan penolakan...' : 'opsional...';
+  ta.className = 'w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 bg-white ' +
+    (status === 'Ditolak' ? 'focus:border-rose-400 focus:ring-rose-100' : (status === 'Selesai' ? 'focus:border-emerald-400 focus:ring-emerald-100' : 'focus:border-blue-400 focus:ring-blue-100'));
+  var btn = document.getElementById('prs-confirm-btn');
+  btn.className = 'px-5 py-2.5 text-sm font-bold text-white rounded-xl shadow flex items-center gap-2 ' + t.btn;
+  btn.innerHTML = '<i class="fa-solid ' + t.icon + '"></i> ' + t.btnLabel;
+  document.getElementById('modal-proses-reqstok').classList.remove('hidden');
+  setTimeout(function(){ ta.focus(); }, 50);
+}
+function _tutupProsesReqStok() {
+  document.getElementById('modal-proses-reqstok').classList.add('hidden');
+}
+function _submitProsesReqStok() {
+  var id = document.getElementById('prs-id').value;
+  var status = document.getElementById('prs-status').value;
+  var catatanProc = (document.getElementById('prs-catatan').value || '').trim();
+  if (status === 'Ditolak' && !catatanProc) return showNotification('Alasan penolakan wajib diisi.', 'error');
   toggleLoader(true, 'Memperbarui request...');
   google.script.run.withSuccessHandler(function(res){
     toggleLoader(false);
     showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
-    if (res && res.success) loadPOReqStok();
+    if (res && res.success) { _tutupProsesReqStok(); loadPOReqStok(); }
   }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
     .prosesRequestStok({
-      id: id, status: status, catatanProc: catatanProc, noPO: noPO || '',
+      id: id, status: status, catatanProc: catatanProc, noPO: '',
       namaUser: (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''
     });
 }

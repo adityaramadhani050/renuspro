@@ -777,4 +777,33 @@
           </div>
         </div>
 
+        <!-- ── Modal Proses Request Stok (Diproses / Selesai / Tolak) ── -->
+        <div id="modal-proses-reqstok" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center gap-3 mb-4">
+              <span id="prs-icon" class="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-check text-sm"></i></span>
+              <div class="flex-1 min-w-0">
+                <h3 id="prs-title" class="text-base font-extrabold text-slate-800">Proses Request</h3>
+                <p id="prs-sub" class="text-xs text-slate-400 mt-0.5"></p>
+              </div>
+              <button onclick="_tutupProsesReqStok()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <input type="hidden" id="prs-id">
+            <input type="hidden" id="prs-status">
+            <div class="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 mb-4">
+              <p id="prs-item" class="text-sm font-bold text-slate-700"></p>
+              <p id="prs-qty" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+            <div id="prs-catatan-wrap">
+              <label id="prs-catatan-label" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
+              <textarea id="prs-catatan" rows="2" placeholder="opsional..."
+                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 bg-white"></textarea>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+              <button onclick="_tutupProsesReqStok()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button id="prs-confirm-btn" onclick="_submitProsesReqStok()" class="px-5 py-2.5 text-sm font-bold text-white rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Konfirmasi</button>
+            </div>
+          </div>
+        </div>
+
       </section>
