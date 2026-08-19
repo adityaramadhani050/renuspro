@@ -95,7 +95,7 @@ function _schBuildTicks(start, totalDays, ppd, zoom) {
   var inner = _schBands(start, totalDays, ppd, zoom);
   var segs = _schMonthSegs(start, totalDays);
   segs.forEach(function(s) {
-    inner += '<div class="absolute top-0.5 text-[10px] font-extrabold text-slate-500 whitespace-nowrap" style="left:' + (s.off * ppd + 3) + 'px">' + _schMonLbl(s.d0) + '</div>';
+    inner += '<div class="absolute top-0.5 text-[10px] font-extrabold text-slate-500 whitespace-nowrap text-center overflow-hidden px-1" style="left:' + (s.off * ppd) + 'px;width:' + (s.days * ppd) + 'px">' + _schMonLbl(s.d0) + '</div>';
   });
   inner += '<div class="absolute left-0 right-0 border-t border-slate-200" style="top:16px"></div>';
   if (zoom !== 'bulan') {
@@ -103,8 +103,9 @@ function _schBuildTicks(start, totalDays, ppd, zoom) {
     for (var t = 0; t <= totalDays; t += step) {
       var lx = t * ppd, iso = _schShiftIso(start, t);
       var lbl = zoom === 'hari' ? ('' + _schD(iso).getDate()) : _schFmt(iso).slice(0, 5);
+      var cw = Math.min(step * ppd, totalDays * ppd - lx); if (cw < 1) cw = step * ppd;
       inner += '<div class="absolute border-l border-slate-100" style="left:' + lx + 'px;top:16px;bottom:0"></div>'
-             + '<div class="absolute text-[10px] font-bold text-slate-400 whitespace-nowrap" style="left:' + (lx + 2) + 'px;top:17px">' + lbl + '</div>';
+             + '<div class="absolute text-[10px] font-bold text-slate-400 whitespace-nowrap text-center overflow-hidden" style="left:' + lx + 'px;width:' + cw + 'px;top:17px">' + lbl + '</div>';
     }
   }
   return inner;
@@ -471,7 +472,7 @@ function _schRenderGantt() {
     + rows
     + '</div></div>';
 }
-function _schMonLbl(d){ var m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; return m[d.getMonth()] + ' ' + d.getFullYear(); }
+function _schMonLbl(d){ var m=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']; return m[d.getMonth()] + ' ' + d.getFullYear(); }
 
 // ── Tambah Cepat / Template (bulk) ──
 var _SCH_FASE_WARNA = { 'Hand Over':'indigo', 'Engineering':'emerald', 'Pengadaan':'amber', 'Pengiriman':'sky', 'Kontruksi':'violet', 'Finishing':'rose' };
