@@ -75,20 +75,28 @@ function _schMonthSegs(start, totalDays) {
 // Latar timeline (dipakai header & tiap baris) — beda warna antar bulan + arsir akhir
 // pekan (khusus zoom hari) + garis pemisah bulan, agar timeline mudah dibaca.
 function _schBands(start, totalDays, ppd, zoom) {
-  var html = '';
+  var fills = '', lines = '', dividers = '';
   var segs = _schMonthSegs(start, totalDays);
   segs.forEach(function(s, i) {
     var lx = s.off * ppd, w = s.days * ppd;
-    if (s.mi % 2 === 1) html += '<div class="absolute top-0 bottom-0 bg-slate-500/[0.05]" style="left:' + lx + 'px;width:' + w + 'px"></div>';
-    if (i > 0) html += '<div class="absolute top-0 bottom-0 border-l-2 border-slate-200" style="left:' + lx + 'px"></div>';
+    if (s.mi % 2 === 1) fills += '<div class="absolute top-0 bottom-0 bg-slate-500/[0.05]" style="left:' + lx + 'px;width:' + w + 'px"></div>';
+    if (i > 0) dividers += '<div class="absolute top-0 bottom-0 border-l-2 border-slate-200" style="left:' + lx + 'px"></div>';
   });
   if (zoom === 'hari') {
     for (var d = 0; d < totalDays; d++) {
       var wd = _schD(_schShiftIso(start, d)).getDay(); // 0=Min, 6=Sab
-      if (wd === 0 || wd === 6) html += '<div class="absolute top-0 bottom-0 bg-slate-400/[0.10]" style="left:' + (d * ppd) + 'px;width:' + ppd + 'px"></div>';
+      if (wd === 0 || wd === 6) fills += '<div class="absolute top-0 bottom-0 bg-slate-400/[0.10]" style="left:' + (d * ppd) + 'px;width:' + ppd + 'px"></div>';
     }
   }
-  return html;
+  // Garis pemisah antar hari (zoom hari) / antar pekan (zoom minggu). Lebih tipis
+  // dari pemisah bulan; digambar di bawah pemisah bulan agar tak menimpanya.
+  if (zoom !== 'bulan') {
+    var step = zoom === 'hari' ? 1 : 7;
+    for (var g = step; g < totalDays; g += step) {
+      lines += '<div class="absolute top-0 bottom-0 border-l border-slate-200/70" style="left:' + (g * ppd) + 'px"></div>';
+    }
+  }
+  return fills + lines + dividers;
 }
 // Isi header timeline: latar (bands) + label bulan (atas) + label hari/minggu (bawah).
 function _schBuildTicks(start, totalDays, ppd, zoom) {
@@ -104,8 +112,7 @@ function _schBuildTicks(start, totalDays, ppd, zoom) {
       var lx = t * ppd, iso = _schShiftIso(start, t);
       var lbl = zoom === 'hari' ? ('' + _schD(iso).getDate()) : _schFmt(iso).slice(0, 5);
       var cw = Math.min(step * ppd, totalDays * ppd - lx); if (cw < 1) cw = step * ppd;
-      inner += '<div class="absolute border-l border-slate-100" style="left:' + lx + 'px;top:16px;bottom:0"></div>'
-             + '<div class="absolute text-[10px] font-bold text-slate-400 whitespace-nowrap text-center overflow-hidden" style="left:' + lx + 'px;width:' + cw + 'px;top:17px">' + lbl + '</div>';
+      inner += '<div class="absolute text-[10px] font-bold text-slate-400 whitespace-nowrap text-center overflow-hidden" style="left:' + lx + 'px;width:' + cw + 'px;top:17px">' + lbl + '</div>';
     }
   }
   return inner;
