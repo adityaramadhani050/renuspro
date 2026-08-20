@@ -371,13 +371,16 @@
             var tasks = taskMap[noWO] || [];
             // Deviasi ringan utk badge home (tanpa kurva). hasBaseline → baru bermakna.
             var hasBaseline = !!(p.baseline_set_at) || tasks.some(function (t) { return t.baselineMulai; });
+            var ak = tasks.length ? _schWeighted(tasks, bobot, true, function (t) { return _schClampPct(t.progress); }) : 0;
             var dev = null;
             if (hasBaseline && tasks.length) {
-              var ak = _schWeighted(tasks, bobot, true, function (t) { return _schClampPct(t.progress); });
               var re = _schWeighted(tasks, bobot, true, function (t) { return _schPlannedProgress(t, today); });
               dev = Math.round((ak - re) * 10) / 10;
             }
-            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: _schSummary(tasks), deviasi: { hasBaseline: hasBaseline, dev: dev } };
+            // "% selesai" kartu WO = progres berbobot fase (sama dgn detail).
+            var summary = _schSummary(tasks);
+            summary.progress = Math.round(ak);
+            return { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', tambahOleh: p.ditambahkan_oleh || '', siteEngineer: p.site_engineer || '', jenisWO: jenisMap[noWO] || 'Material', tasks: tasks, summary: summary, deviasi: { hasBaseline: hasBaseline, dev: dev } };
           }).filter(function (x) { return x.noWO; });
           return { success: true, list: list };
         }
@@ -406,10 +409,13 @@
           // tak bergantung snapshot). res[3] = arsip log (tak dipakai untuk garis).
           var kurvaAktual = _schBuildKurvaAktual(tasks, bobot, today);
           var hasBaseline = !!(p.baseline_set_at) || tasks.some(function (t) { return t.baselineMulai; });
+          // Samakan "% selesai" dgn Aktual (berbobot fase) agar konsisten dgn KPI/deviasi.
+          var summary = _schSummary(tasks);
+          summary.progress = Math.round(Number(deviasi.aktualPct) || 0);
           return {
             success: true,
             project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' },
-            tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus,
+            tasks: tasks, summary: summary, woStatus: woStatus,
             deviasi: deviasi, kurvaAktual: kurvaAktual,
             baseline: { hasBaseline: hasBaseline, setAt: p.baseline_set_at || '', oleh: p.baseline_oleh || '', catatan: p.baseline_catatan || '' }
           };
