@@ -86,7 +86,34 @@
         return { rencanaPct: rencana, aktualPct: aktual, deviasi: dev, spi: spi, perTask: perTask, kurvaRencana: kurva };
       }
 
-      // Rekam 1 titik progres "hari ini" (upsert per no_wo+tanggal) → kurva S aktual.
+      // Progres AKTUAL sebuah tugas pada tanggal d — direkonstruksi dari tanggal
+      // aktual (mulai/selesai) + progres saat ini. Dipakai membangun kurva S aktual
+      // secara historis (tak bergantung pada snapshot berkala).
+      function _schActualProgressAt(t, d, today) {
+        var am = t.aktualMulai; if (!am) return 0;
+        if (d < am) return 0;
+        var pr = _schClampPct(t.progress);
+        var end = t.aktualSelesai || today;
+        if (d >= end) return pr;                         // sudah selesai / sudah lewat "ujung"
+        var tot = _schDurasi(am, end), el = _schDurasi(am, d);
+        return Math.max(0, Math.min(pr, Math.round((el / tot) * pr)));
+      }
+      // Kurva S aktual (kumulatif) dari tanggal aktual paling awal sampai hari ini.
+      function _schBuildKurvaAktual(tasks, bobot, today) {
+        var starts = [];
+        (tasks || []).forEach(function (t) { if (t.aktualMulai) starts.push(t.aktualMulai); });
+        if (!starts.length) return [];
+        var gmin = starts.reduce(function (a, b) { return a < b ? a : b; });
+        var gmax = today;
+        var pts = [];
+        var pushPt = function (dd) { pts.push({ tanggal: dd, persen: _schWeighted(tasks, bobot, true, function (t) { return _schActualProgressAt(t, dd, today); }) }); };
+        var d = gmin, guard = 0;
+        while (d <= gmax && guard < 400) { pushPt(d); d = _schAddDays(d, 7); guard++; }
+        if (!pts.length || pts[pts.length - 1].tanggal !== gmax) pushPt(gmax);
+        return pts;
+      }
+
+      // Rekam 1 titik progres "hari ini" (upsert per no_wo+tanggal) → arsip audit.
       async function _schSnapshotProgress(noWO, oleh) {
         try {
           noWO = (noWO || '').toString().trim(); if (!noWO) return;

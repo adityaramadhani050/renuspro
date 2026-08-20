@@ -400,9 +400,11 @@
           var tasks = (_schTasksMap(res[1].data || [])[noWO]) || [];
           var woStatus = (res[2].data && res[2].data[0]) ? (res[2].data[0].status || '') : '';
           var bobot = await _schFaseBobot();
-          var deviasi = _schBuildDeviasi(tasks, bobot, _todayIso());
-          var kurvaAktual = (res[3].data || []).map(function (r) { return { tanggal: _schIso(r.tanggal), persen: Number(r.persen_aktual) || 0 }; })
-            .filter(function (r) { return r.tanggal; }).sort(function (a, b) { return a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : 0; });
+          var today = _todayIso();
+          var deviasi = _schBuildDeviasi(tasks, bobot, today);
+          // Kurva aktual direkonstruksi dari tanggal aktual tiap tugas (historis,
+          // tak bergantung snapshot). res[3] = arsip log (tak dipakai untuk garis).
+          var kurvaAktual = _schBuildKurvaAktual(tasks, bobot, today);
           var hasBaseline = !!(p.baseline_set_at) || tasks.some(function (t) { return t.baselineMulai; });
           return {
             success: true,
