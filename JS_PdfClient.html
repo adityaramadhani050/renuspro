@@ -435,7 +435,11 @@ function buatInvoicePDF(item) {
   var klien = _pdfKlien(item.klienId);
   var curY = 45;
   curY = _pdfBarSeksi(doc, 'Invoice to', ML, CW, curY);
-  var c1L = ML + 2, c1V = ML + 26, c2L = ML + (CW / 2) + 2, c2V = ML + (CW / 2) + 30;
+  var c1L = ML + 2, c2L = ML + (CW / 2) + 2;
+  // Value dimulai tepat setelah label terlebar tiap kolom + gap kecil (rapat, konsisten).
+  doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
+  var c1V = c1L + Math.max(doc.getTextWidth('Name'), doc.getTextWidth('Address')) + 3;
+  var c2V = c2L + Math.max(doc.getTextWidth('Company'), doc.getTextWidth('Contact')) + 3;
   function _row(lx, vx, y, label, val) {
     doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]); doc.setFontSize(PDF_FS);
     doc.text(label, lx, y);

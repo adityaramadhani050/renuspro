@@ -207,8 +207,10 @@ function buatDokumenPDF(item) {
     curY = _pdfBarSeksi(doc, 'Quotation To :', ML, CW, curY);
 
     const c1L = ML + 2;
-    const c1V = ML + 30;
     const qRowH = 4.2, qTopPad = 3.6;
+    // Value dimulai tepat setelah label terlebar + gap kecil (rapat, konsisten).
+    doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'bold');
+    const c1V = c1L + Math.max(doc.getTextWidth('Name'), doc.getTextWidth('Company'), doc.getTextWidth('Address'), doc.getTextWidth('Contact')) + 3;
 
     // Alamat dibungkus (multi-baris) agar tidak menumpuk / keluar halaman.
     doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'normal');
