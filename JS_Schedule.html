@@ -456,13 +456,13 @@ function _schRenderDeviasi(){
   var devSub = dev < -0.05 ? 'terlambat dari rencana' : (dev > 0.05 ? 'lebih cepat dari rencana' : 'sesuai rencana');
   box.innerHTML =
       '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">'
-    +   kartu('Rencana (hari ini)', (Number(d.rencanaPct)||0) + '%', 'text-slate-700')
-    +   kartu('Aktual (hari ini)', (Number(d.aktualPct)||0) + '%', 'text-indigo-600')
+    +   kartu('Plan (hari ini)', (Number(d.rencanaPct)||0) + '%', 'text-slate-700')
+    +   kartu('Actual (hari ini)', (Number(d.aktualPct)||0) + '%', 'text-indigo-600')
     +   kartu('Deviasi', devTxt, devCls, devSub)
     +   kartu('SPI', spiTxt, (d.spi != null && d.spi < 1 ? 'text-rose-600' : 'text-emerald-600'), 'Schedule Performance Index')
     + '</div>'
     + '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
-    +   '<div class="flex items-center justify-between mb-2"><p class="text-sm font-bold text-slate-700">Kurva S — Rencana vs Aktual</p>'
+    +   '<div class="flex items-center justify-between mb-2"><p class="text-sm font-bold text-slate-700">Kurva S — Plan vs Actual</p>'
     +   '<span class="text-[10px] text-slate-400">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt((_schBaseline.setAt || '').slice(0, 10)) : '') + '</span></div>'
     +   '<div class="relative" style="height:240px"><canvas id="sch-chart-s"></canvas></div>'
     + '</div>';
@@ -483,8 +483,8 @@ function _schRenderKurvaS(d){
     _schChartS = new Chart(ctx, {
       type: 'line',
       data: { labels: labels.map(function(t){ return _schFmt(t).slice(0,5); }), datasets: [
-        { label: 'Rencana', data: dataR, borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 0, fill: true },
-        { label: 'Aktual', data: dataA, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 2, fill: true }
+        { label: 'Plan', data: dataR, borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 0, fill: true },
+        { label: 'Actual', data: dataA, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.08)', borderWidth: 2, tension: 0.25, spanGaps: true, pointRadius: 2, fill: true }
       ] },
       options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' },
         plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: function(c){ return c.dataset.label + ': ' + (c.parsed.y == null ? '-' : c.parsed.y + '%'); } } } },
@@ -571,8 +571,8 @@ function _schRenderGantt() {
     var delBtn = canEd ? '<button onclick="event.stopPropagation();_schInlineDelete(\'' + _schEsc(t.id) + '\')" title="Hapus tugas" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 shrink-0 transition px-0.5"><i class="fa-regular fa-trash-can text-[11px]"></i></button>' : '';
     var nameDiv = '<div class="flex items-center gap-1">' + grip + flag + nameInner + delBtn + '</div>';
     var dateTxt = _schFmt(t.mulai) + ' → ' + _schFmt(t.selesai) + ' · ' + (_schDays(t.mulai, t.selesai) + 1) + ' hari · ' + prog + '%';
-    var aktualTxt = t.aktualMulai ? ('<div class="text-[10px] text-slate-500 whitespace-nowrap">Aktual: ' + _schFmt(t.aktualMulai) + ' → ' + (t.aktualSelesai ? _schFmt(t.aktualSelesai) : 'berjalan') + '</div>') : '';
-    var dateDiv = '<div class="text-[10px] text-slate-400 whitespace-nowrap">Rencana: ' + dateTxt + '</div>' + aktualTxt;
+    var aktualTxt = t.aktualMulai ? ('<div class="text-[10px] text-slate-500 whitespace-nowrap">Actual: ' + _schFmt(t.aktualMulai) + ' → ' + (t.aktualSelesai ? _schFmt(t.aktualSelesai) : 'berjalan') + '</div>') : '';
+    var dateDiv = '<div class="text-[10px] text-slate-400 whitespace-nowrap">Plan: ' + dateTxt + '</div>' + aktualTxt;
     // Batang aktual (di bawah batang rencana) — muncul bila tugas sudah mulai.
     var actBar = '';
     if (t.aktualMulai) {
@@ -580,7 +580,7 @@ function _schRenderGantt() {
       var aLeft = _schDays(start, t.aktualMulai) * ppd;
       var aW = (_schDays(t.aktualMulai, aEnd) + 1) * ppd; if (aW < 4) aW = 4;
       var ong = !t.aktualSelesai;
-      actBar = '<div class="absolute rounded ' + (ong ? 'bg-slate-400' : 'bg-slate-600') + '" style="left:' + aLeft + 'px;width:' + aW + 'px;top:26px;height:8px" title="Aktual: ' + _schFmt(t.aktualMulai) + ' → ' + (t.aktualSelesai ? _schFmt(t.aktualSelesai) : 'berjalan (hari ini)') + '"></div>';
+      actBar = '<div class="absolute rounded ' + (ong ? 'bg-slate-400' : 'bg-slate-600') + '" style="left:' + aLeft + 'px;width:' + aW + 'px;top:26px;height:8px" title="Actual: ' + _schFmt(t.aktualMulai) + ' → ' + (t.aktualSelesai ? _schFmt(t.aktualSelesai) : 'berjalan (hari ini)') + '"></div>';
     }
     // Kotak tugas (info kiri) → klik untuk buka modal edit tugas; drag untuk ubah urutan (dalam fase).
     var boxClick = canEd ? ' cursor-pointer hover:bg-indigo-50/50' : '';
@@ -597,7 +597,7 @@ function _schRenderGantt() {
       + '<div class="relative" style="width:' + totalPx + 'px;min-height:46px">'
       +   bands
       +   todayLine
-      +   '<div class="absolute rounded-md ' + b[0] + clickable + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:6px;height:16px"' + onclk + ' title="Rencana: ' + _schEsc(t.namaTugas) + '">'
+      +   '<div class="absolute rounded-md ' + b[0] + clickable + ' flex items-center overflow-hidden shadow-sm" style="left:' + leftPx + 'px;width:' + wPx + 'px;top:6px;height:16px"' + onclk + ' title="Plan: ' + _schEsc(t.namaTugas) + '">'
       +     '<div class="h-full ' + b[1] + '" style="width:' + prog + '%"></div>'
       +     '<span class="absolute inset-0 flex items-center px-1.5 text-[9px] font-bold text-slate-700 truncate">' + (wPx > 46 ? prog + '%' : '') + '</span>'
       +   '</div>'
@@ -646,12 +646,7 @@ function _schRenderGantt() {
     return header + gtasks.map(_schTaskRow).join('');
   }).join('');
 
-  box.innerHTML = '<div class="flex items-center flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-[10px] text-slate-500 border-b border-slate-100">'
-    +   '<span class="inline-flex items-center gap-1.5"><span class="inline-block w-5 h-2.5 rounded bg-indigo-400"></span> Rencana (batang berwarna + progres)</span>'
-    +   '<span class="inline-flex items-center gap-1.5"><span class="inline-block w-5 h-1.5 rounded bg-slate-600"></span> Aktual (selesai)</span>'
-    +   '<span class="inline-flex items-center gap-1.5"><span class="inline-block w-5 h-1.5 rounded bg-slate-400"></span> Aktual (berjalan)</span>'
-    + '</div>'
-    + '<div class="overflow-auto max-h-[calc(100vh-340px)] min-h-[280px]"><div style="min-width:' + (leftW + totalPx) + 'px">'
+  box.innerHTML = '<div class="overflow-auto max-h-[calc(100vh-340px)] min-h-[280px]"><div style="min-width:' + (leftW + totalPx) + 'px">'
     + '<div class="flex bg-slate-50 border-b border-slate-200 sticky top-0 z-30">'
     +   '<div class="shrink-0 sticky left-0 bg-slate-50 z-10 px-3 py-2 text-[11px] font-bold text-slate-500 uppercase border-r border-slate-200" style="width:' + leftW + 'px">Tugas</div>'
     +   '<div class="relative" style="width:' + totalPx + 'px;height:' + _SCH_HEAD_H + 'px">' + ticks + '</div>'
