@@ -442,19 +442,22 @@ function buatInvoicePDF(item) {
     doc.setFont(PDF_FONT, 'normal'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
     doc.text(String(val == null ? '' : val), vx, y);
   }
-  // Alamat dibungkus (multi-baris, lebar penuh) agar tidak menumpuk kolom kanan / keluar halaman.
+  // Alamat dibungkus dalam LEBAR KOLOM KIRI (berhenti sebelum kolom kanan) agar
+  // tidak terkesan melewati data Perusahaan/No.Telp.
   var _alamatInv = String(item.alamatKlien || klien.alamat || '');
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS);
-  var _addrLinesInv = _alamatInv ? doc.splitTextToSize(_alamatInv, (ML + CW) - c1V - 2) : [''];
+  var _addrMaxInv = c2L - c1V - 3;                       // batas: mepet sebelum kolom kanan
+  var _addrLinesInv = _alamatInv ? doc.splitTextToSize(_alamatInv, _addrMaxInv) : [''];
   var _rH = 4.5, _tPad = 4;
-  var _boxHInv = _tPad + _rH * 2 + _rH * _addrLinesInv.length + 1.5;
+  // Kolom kiri: Name (baris 1) + Alamat (baris 2..n). Kolom kanan: Perusahaan + No.Telp.
+  var _boxHInv = _tPad + _rH * (1 + _addrLinesInv.length) + 1.5;
   doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, _boxHInv, 'F');   // tanpa border
   // Utamakan detail yg dibawa record invoice (dari getInvoiceList), fallback ke erpState.
   _row(c1L, c1V, curY + _tPad, 'Name :', item.namaKlien || klien.nama || '');
   _row(c2L, c2V, curY + _tPad, 'Perusahaan :', item.perusahaanKlien || klien.perusahaan || '');
-  _row(c1L, c1V, curY + _tPad + _rH, 'No.Telp :', item.kontakKlien || klien.kontak || '');
+  _row(c2L, c2V, curY + _tPad + _rH, 'No.Telp :', item.kontakKlien || klien.kontak || '');
+  var _yAInv = curY + _tPad + _rH;
   doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]); doc.setFontSize(PDF_FS);
-  var _yAInv = curY + _tPad + _rH * 2;
   doc.text('Alamat :', c1L, _yAInv);
   doc.setFont(PDF_FONT, 'normal');
   _addrLinesInv.forEach(function (ln, i) { doc.text(ln, c1V, _yAInv + i * _rH); });

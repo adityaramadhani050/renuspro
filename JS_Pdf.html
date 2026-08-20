@@ -213,7 +213,9 @@ function buatDokumenPDF(item) {
     // Alamat dibungkus (multi-baris) agar tidak menumpuk / keluar halaman.
     doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'normal');
     const alamatQ = String(klien.alamat || '');
-    const addrLinesQ = alamatQ ? doc.splitTextToSize(alamatQ, (PW - MR) - c1V - 2) : [''];
+    // Batas lebar: berhenti sebelum kolom kanan (valid until / prepared by).
+    const addrMaxQ = (ML + CW * 0.60) - c1V;
+    const addrLinesQ = alamatQ ? doc.splitTextToSize(alamatQ, addrMaxQ) : [''];
     const nRowsQ = 2 + addrLinesQ.length + 1; // Name, Company, Alamat(n), Contact
     const boxHQ = qTopPad + nRowsQ * qRowH + 0.8;
 
