@@ -120,4 +120,21 @@
           </div>
         </div>
 
+        <!-- MODAL: Set Ulang Baseline (khusus Admin, wajib alasan) -->
+        <div id="sch-modal-rebaseline" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="bg-amber-100 text-amber-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-flag-checkered text-sm"></i></span>
+              <div><h3 class="text-base font-extrabold text-slate-800">Set Ulang Baseline</h3><p class="text-xs text-slate-400">Menimpa baseline lama dengan jadwal Plan saat ini.</p></div>
+            </div>
+            <p class="text-[13px] text-slate-500 mb-3">Set ulang mengubah acuan deviasi &amp; Kurva S. Lakukan hanya bila ada <b>perubahan lingkup resmi</b>. Alasan wajib dicatat.</p>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Alasan set ulang <span class="text-rose-400">*</span></label>
+            <textarea id="sch-rebaseline-alasan" rows="3" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl" placeholder="cth: Change order — tambah 4 paket, jadwal diperpanjang s/d 30/09"></textarea>
+            <div class="flex justify-end gap-2 mt-4">
+              <button onclick="_schCloseRebaseline()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
+              <button onclick="_schRebaselineSubmit()" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-flag-checkered"></i> Set Ulang</button>
+            </div>
+          </div>
+        </div>
+
       </section>

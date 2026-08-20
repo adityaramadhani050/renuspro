@@ -411,7 +411,7 @@
             project: { noWO: noWO, namaProject: p.nama_project || '', namaKlien: p.nama_klien || '', siteEngineer: p.site_engineer || '' },
             tasks: tasks, summary: _schSummary(tasks), woStatus: woStatus,
             deviasi: deviasi, kurvaAktual: kurvaAktual,
-            baseline: { hasBaseline: hasBaseline, setAt: p.baseline_set_at || '', oleh: p.baseline_oleh || '' }
+            baseline: { hasBaseline: hasBaseline, setAt: p.baseline_set_at || '', oleh: p.baseline_oleh || '', catatan: p.baseline_catatan || '' }
           };
         }
       });

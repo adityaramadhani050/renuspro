@@ -13,6 +13,7 @@ alter table schedule_task add column if not exists aktual_selesai   date;
 -- 2) Metadata baseline di level proyek ----------------------------------------
 alter table schedule_project add column if not exists baseline_set_at timestamptz;
 alter table schedule_project add column if not exists baseline_oleh   text;
+alter table schedule_project add column if not exists baseline_catatan text;   -- alasan set ulang baseline
 
 -- 3) Riwayat progres (untuk garis Aktual pada Kurva S) ------------------------
 --    Satu titik per (no_wo, tanggal): % proyek keseluruhan pada tanggal itu.

@@ -258,6 +258,7 @@
         handler: async function (args) {
           var noWO = (args[0] || '').toString().trim();
           var oleh = (args[1] || '').toString();
+          var alasan = (args[2] || '').toString().trim();
           if (!noWO) return { success: false, message: 'No WO wajib.' };
           var q = await supa.from('schedule_task').select('id,tanggal_mulai,tanggal_selesai').eq('no_wo', noWO);
           if (q.error) return { success: false, message: q.error.message };
@@ -268,7 +269,7 @@
           }));
           var errs = results.filter(function (r) { return r.error; });
           if (errs.length) return { success: false, message: errs[0].error.message };
-          var stamp = await supa.from('schedule_project').update({ baseline_set_at: new Date().toISOString(), baseline_oleh: oleh }).eq('no_wo', noWO);
+          var stamp = await supa.from('schedule_project').update({ baseline_set_at: new Date().toISOString(), baseline_oleh: oleh, baseline_catatan: alasan || null }).eq('no_wo', noWO);
           if (stamp.error) return { success: false, message: stamp.error.message };
           await _schSnapshotProgress(noWO, oleh);
           return { success: true, message: 'Baseline diset untuk ' + tasks.length + ' tugas.', count: tasks.length };

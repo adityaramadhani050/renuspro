@@ -387,9 +387,17 @@ function _schRenderDetail() {
     : '';
   var reloadBtn = '<button onclick="_engMuatUlang(\'_schReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[38px] w-[38px] rounded-lg shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
   var bulkBtn = _schCanEdit() ? '<button onclick="_schOpenBulk()" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bolt"></i><span class="hidden sm:inline"> Tambah Cepat</span></button>' : '';
-  var baselineBtn = (_schCanEdit() && _schWOStatus !== 'Closed')
-    ? '<button onclick="_schSetBaseline()" title="Bekukan jadwal saat ini sebagai baseline (acuan deviasi)" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> ' + (_schBaseline && _schBaseline.hasBaseline ? 'Set Ulang Baseline' : 'Set Baseline') + '</span></button>'
-    : '';
+  // Set Baseline pertama: PC & Admin. Set ULANG: hanya Admin (perlu alasan).
+  var _hasBl = !!(_schBaseline && _schBaseline.hasBaseline);
+  var _isAdmin = _schRole() === 'admin';
+  var baselineBtn = '';
+  if (_schCanEdit() && _schWOStatus !== 'Closed') {
+    if (!_hasBl) {
+      baselineBtn = '<button onclick="_schSetBaseline()" title="Bekukan jadwal Plan saat ini sebagai baseline (acuan deviasi)" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> Set Baseline</span></button>';
+    } else if (_isAdmin) {
+      baselineBtn = '<button onclick="_schSetBaseline()" title="Set ulang baseline (khusus Admin, wajib alasan)" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 border border-amber-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> Set Ulang Baseline</span></button>';
+    }
+  }
   actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + baselineBtn + assignBtn + bulkBtn + addBtn + '</div>';
 
   var se = _schWO.siteEngineer || '';
@@ -427,12 +435,29 @@ function _schDevWarna(dev){ return dev < -0.05 ? 'rose' : (dev > 0.05 ? 'emerald
 function _schSetBaseline(){
   if (!_schWO) return;
   var ada = _schBaseline && _schBaseline.hasBaseline;
-  showConfirm({ title: ada ? 'Set Ulang Baseline' : 'Set Baseline', message: (ada ? 'Timpa baseline lama dengan jadwal saat ini?' : 'Bekukan jadwal rencana saat ini sebagai baseline (acuan deviasi)?') + ' Progres tidak berubah.', confirmText: 'Ya, Set', icon: 'fa-flag-checkered', onConfirm: function(){
-    toggleLoader(true, 'Menyimpan baseline...');
-    google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
-      .withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
-      .setScheduleBaseline(_schWO.noWO, _schUserNama());
-  }});
+  if (!ada) {
+    // Set pertama kali — PC & Admin, tanpa alasan.
+    showConfirm({ title: 'Set Baseline', message: 'Bekukan jadwal Plan saat ini sebagai baseline (acuan deviasi)? Progres tidak berubah.', confirmText: 'Ya, Set', icon: 'fa-flag-checkered', onConfirm: function(){ _schSubmitBaseline(''); } });
+    return;
+  }
+  // Set ulang — khusus Admin + wajib alasan.
+  if (_schRole() !== 'admin') { showNotification('Set ulang baseline hanya untuk Admin.', 'error'); return; }
+  document.getElementById('sch-rebaseline-alasan').value = '';
+  document.getElementById('sch-modal-rebaseline').classList.remove('hidden');
+  setTimeout(function(){ var el = document.getElementById('sch-rebaseline-alasan'); if (el) el.focus(); }, 50);
+}
+function _schCloseRebaseline(){ document.getElementById('sch-modal-rebaseline').classList.add('hidden'); }
+function _schRebaselineSubmit(){
+  var alasan = (document.getElementById('sch-rebaseline-alasan').value || '').trim();
+  if (!alasan) return showNotification('Alasan set ulang wajib diisi.', 'error');
+  document.getElementById('sch-modal-rebaseline').classList.add('hidden');
+  _schSubmitBaseline(alasan);
+}
+function _schSubmitBaseline(alasan){
+  toggleLoader(true, 'Menyimpan baseline...');
+  google.script.run.withSuccessHandler(function(res){ toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); if (res && res.success) _schReloadDetail(); })
+    .withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+    .setScheduleBaseline(_schWO.noWO, _schUserNama(), alasan || '');
 }
 function _schRenderDeviasi(){
   var box = document.getElementById('sch-deviasi'); if (!box) return;
@@ -463,7 +488,7 @@ function _schRenderDeviasi(){
     + '</div>'
     + '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">'
     +   '<div class="flex items-center justify-between mb-2"><p class="text-sm font-bold text-slate-700">Kurva S — Plan vs Actual</p>'
-    +   '<span class="text-[10px] text-slate-400">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt((_schBaseline.setAt || '').slice(0, 10)) : '') + '</span></div>'
+    +   '<span class="text-[10px] text-slate-400" title="' + _schEsc((_schBaseline.oleh ? 'oleh ' + _schBaseline.oleh : '') + (_schBaseline.catatan ? ' · ' + _schBaseline.catatan : '')) + '">' + (_schBaseline.setAt ? 'baseline: ' + _schFmt((_schBaseline.setAt || '').slice(0, 10)) + (_schBaseline.catatan ? ' <i class="fa-solid fa-circle-info ml-0.5"></i>' : '') : '') + '</span></div>'
     +   '<div class="relative" style="height:240px"><canvas id="sch-chart-s"></canvas></div>'
     + '</div>';
   _schRenderKurvaS(d);
