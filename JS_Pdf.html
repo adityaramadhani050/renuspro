@@ -206,43 +206,46 @@ function buatDokumenPDF(item) {
     let curY = 41;
     curY = _pdfBarSeksi(doc, 'Quotation To :', ML, CW, curY);
 
-    doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]);
-    doc.rect(ML, curY, CW, 20, 'F');   // tanpa border
-
     const c1L = ML + 2;
     const c1V = ML + 30;
-    const c2L = ML + (CW / 2) + 2;
-    const c2V = PW - MR;
+    const qRowH = 4.2, qTopPad = 3.6;
 
-    const clientRows = [
-      ['Name',          klien.nama      || item.namaKlien  || '',
-       'Quotation valid until:', _pdfTglPanjang(item.validUntil) || '-'],
-      ['Company Name',  klien.perusahaan || '',
-       'Prepared by:',          item.dibuatOleh || ''],
-      ['Street Address', klien.alamat   || '', '', ''],
-      ['Contact',       klien.kontak    || '', '', ''],
-    ];
+    // Alamat dibungkus (multi-baris) agar tidak menumpuk / keluar halaman.
+    doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'normal');
+    const alamatQ = String(klien.alamat || '');
+    const addrLinesQ = alamatQ ? doc.splitTextToSize(alamatQ, (PW - MR) - c1V - 2) : [''];
+    const nRowsQ = 2 + addrLinesQ.length + 1; // Name, Company, Alamat(n), Contact
+    const boxHQ = qTopPad + nRowsQ * qRowH + 0.8;
 
-    clientRows.forEach((r, idx) => {
-      const y = curY + 3.6 + idx * 4.2;
-      doc.setFontSize(PDF_FS);
-      doc.setFont(PDF_FONT, 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text(r[0], c1L, y);
-      doc.setFont(PDF_FONT, 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(r[1], c1V, y);
-      if (r[2]) {
-        // Sejajarkan 1 kolom dgn Date/Quotation#/Rev: label rata kanan, value rata kiri.
-        doc.setFont(PDF_FONT, 'bold');
-        doc.setTextColor(0, 0, 0);
-        doc.text(r[2], PW - MR - 38, y, { align: 'right' });
-        doc.setFont(PDF_FONT, 'normal');
-        doc.setTextColor(0, 0, 0);
-        doc.text(r[3], PW - MR - 34, y);
-      }
-    });
-    curY += 22;
+    doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]);
+    doc.rect(ML, curY, CW, boxHQ, 'F');   // tanpa border
+
+    const _qL = (label, val, y) => {
+      doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+      doc.setFont(PDF_FONT, 'bold'); doc.text(label, c1L, y);
+      doc.setFont(PDF_FONT, 'normal'); doc.text(String(val || ''), c1V, y);
+    };
+    const _qR = (label, val, y) => {
+      doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
+      doc.setFont(PDF_FONT, 'bold'); doc.text(label, PW - MR - 38, y, { align: 'right' });
+      doc.setFont(PDF_FONT, 'normal'); doc.text(String(val || ''), PW - MR - 34, y);
+    };
+
+    let yq = curY + qTopPad;
+    _qL('Name', klien.nama || item.namaKlien || '', yq);
+    _qR('Quotation valid until:', _pdfTglPanjang(item.validUntil) || '-', yq);
+    yq += qRowH;
+    _qL('Company Name', klien.perusahaan || '', yq);
+    _qR('Prepared by:', item.dibuatOleh || '', yq);
+    yq += qRowH;
+    doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Street Address', c1L, yq);
+    doc.setFont(PDF_FONT, 'normal');
+    addrLinesQ.forEach((ln, i) => doc.text(ln, c1V, yq + i * qRowH));
+    yq += addrLinesQ.length * qRowH;
+    _qL('Contact', klien.kontak || '', yq);
+
+    curY += boxHQ + 2;
 
     // ── TABEL ITEM ─────────────────────────────────────────────────────────
     // Kelompok normal + kelompok DISCOUNT (jika ada) masuk ke tabel
