@@ -39,7 +39,6 @@ window.loadDED = function(fromNav) {
     _dedDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _dedWOList = _dedDash.perWO || [];
     _dedRenderCards(_dedDash.global || {});
-    _dedRenderReviewQueue(_dedDash.reviewQueue || []);
     _dedPopulateFilter();
     _dedRenderWOList();
   };
@@ -66,24 +65,6 @@ function _dedRenderCards(g) {
     + _dedCard('Approved', g.approved || 0, 'text-emerald-600')
     + _dedCard('Pending', g.pending || 0, 'text-amber-600')
     + _dedCard('Rejected', g.rejected || 0, 'text-rose-600');
-}
-
-function _dedRenderReviewQueue(q) {
-  var wrap = document.getElementById('ded-review-queue-wrap');
-  if (!wrap) return;
-  if (!_dedCanReview() || !q.length) { wrap.classList.add('hidden'); return; }
-  wrap.classList.remove('hidden');
-  var rows = q.slice(0, 12).map(function(it) {
-    var age = (it.ageDays == null) ? '' : (it.ageDays === 0 ? 'hari ini' : it.ageDays + ' hari');
-    return '<button onclick="bukaDEDDetail(\'' + _dedEsc(it.noWO) + '\')" class="w-full text-left flex items-center gap-2 bg-slate-50 hover:bg-amber-50 border border-slate-100 rounded-xl px-3 py-2 transition">'
-      + '<i class="fa-solid fa-file-pdf text-rose-400"></i>'
-      + '<div class="flex-1 min-w-0"><div class="text-xs font-bold text-slate-700 truncate">' + _dedEsc(it.label) + '</div>'
-      +   '<div class="text-[10px] text-slate-400 truncate">' + _dedEsc(it.noWO) + (it.namaProject ? ' · ' + _dedEsc(it.namaProject) : '') + ' · ' + _dedEsc(it.uploadedBy || '') + '</div></div>'
-      + '<span class="text-[10px] font-bold text-amber-600 whitespace-nowrap">' + age + '</span></button>';
-  }).join('');
-  wrap.innerHTML = '<div class="flex items-center gap-2 mb-3"><span class="bg-amber-100 text-amber-600 h-8 w-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-clock"></i></span>'
-    + '<h3 class="font-extrabold text-slate-800">Antrean Review</h3><span class="text-xs text-slate-400">(' + q.length + ' dokumen menunggu)</span></div>'
-    + '<div class="space-y-2 max-h-72 overflow-y-auto">' + rows + '</div>';
 }
 
 function _dedPopulateFilter() {
