@@ -500,12 +500,17 @@
           klienById[k.id] = k;
           if (k.nama_klien) klienByNama[k.nama_klien] = k;
         });
+        // Tanggal penawaran (untuk fallback Tgl. PO di invoice bila PO tak diinput).
+        var penTglMap = {};
+        var pq = await _all('penawaran', 'no_penawaran,tanggal');
+        if (!pq.error) (pq.data || []).forEach(function (p) { if (p.no_penawaran) penTglMap[p.no_penawaran] = p.tanggal; });
         var list = (q.data || []).map(function (r) {
           var kd = klienById[r.klien_id] || klienByNama[r.nama_klien] || {};
           return {
             id: r.no_invoice || '', noWO: r.no_wo || '', noPenawaran: r.no_penawaran || '',
             tanggal: _fmtTgl(r.tanggal), jenis: r.jenis || 'Penuh',
             persen: parseFloat(r.persen) || 0, noPO: r.no_po || '', tglPO: _fmtTgl(r.tgl_po),
+            tglPenawaran: _fmtTgl(penTglMap[r.no_penawaran] || ''),
             klienId: r.klien_id || '', namaKlien: r.nama_klien || '', namaProject: r.nama_project || '',
             perusahaanKlien: kd.perusahaan || '', alamatKlien: kd.alamat || '', kontakKlien: kd.kontak || '',
             dpp: parseFloat(r.dpp) || 0, ppnPersen: parseFloat(r.ppn_persen) || 0,

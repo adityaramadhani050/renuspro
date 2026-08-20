@@ -427,7 +427,8 @@ function buatInvoicePDF(item) {
     ['No.', item.id || ''],
     ['Date', _pdfTglPanjang(item.tanggal)],
     ['No. PO', item.noPO || ''],
-    ['Tgl. PO', _pdfTglPanjang(item.tglPO || (item.noPO ? item.tanggal : ''))]
+    // Tgl. PO: pakai tgl PO bila diinput; jika tidak, fallback ke tanggal penawaran.
+    ['Tgl. PO', _pdfTglPanjang(item.tglPO || (item.noPO ? (item.tglPenawaran || item.tanggal) : ''))]
   ], PW, MR, 25, 4.5);
 
   // ── INVOICE TO ──
