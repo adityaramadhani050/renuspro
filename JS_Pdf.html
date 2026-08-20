@@ -198,7 +198,7 @@ function buatDokumenPDF(item) {
     _pdfJudulKanan(doc, 'Quotation', PW, MR, { size: PDF_FS_TITLE, color: PDF_TITLE_COL, y: 15 });
     _pdfInfoKanan(doc, [
       ['Date',        _pdfTglPanjang(item.tanggal)],
-      ['Quotation #', item.id || ''],
+      ['No. Quot',    item.id || ''],
       ['Rev',         String(item.rev ?? '0')],
     ], PW, MR, 25, 4.5);
 
@@ -235,13 +235,13 @@ function buatDokumenPDF(item) {
 
     let yq = curY + qTopPad;
     _qL('Name', klien.nama || item.namaKlien || '', yq);
-    _qR('Quotation valid until:', _pdfTglPanjang(item.validUntil) || '-', yq);
+    _qR('Quotation valid until', _pdfTglPanjang(item.validUntil) || '-', yq);
     yq += qRowH;
-    _qL('Company Name', klien.perusahaan || '', yq);
-    _qR('Prepared by:', item.dibuatOleh || '', yq);
+    _qL('Company', klien.perusahaan || '', yq);
+    _qR('Prepared by', item.dibuatOleh || '', yq);
     yq += qRowH;
     doc.setFontSize(PDF_FS); doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(0, 0, 0);
-    doc.text('Street Address', c1L, yq);
+    doc.text('Address', c1L, yq);
     doc.setFont(PDF_FONT, 'normal');
     addrLinesQ.forEach((ln, i) => doc.text(ln, c1V, yq + i * qRowH));
     yq += addrLinesQ.length * qRowH;

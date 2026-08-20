@@ -453,12 +453,12 @@ function buatInvoicePDF(item) {
   var _boxHInv = _tPad + _rH * (1 + _addrLinesInv.length) + 1.5;
   doc.setFillColor(PDF_CLIENT_BG[0], PDF_CLIENT_BG[1], PDF_CLIENT_BG[2]); doc.rect(ML, curY, CW, _boxHInv, 'F');   // tanpa border
   // Utamakan detail yg dibawa record invoice (dari getInvoiceList), fallback ke erpState.
-  _row(c1L, c1V, curY + _tPad, 'Name :', item.namaKlien || klien.nama || '');
-  _row(c2L, c2V, curY + _tPad, 'Perusahaan :', item.perusahaanKlien || klien.perusahaan || '');
-  _row(c2L, c2V, curY + _tPad + _rH, 'No.Telp :', item.kontakKlien || klien.kontak || '');
+  _row(c1L, c1V, curY + _tPad, 'Name', item.namaKlien || klien.nama || '');
+  _row(c2L, c2V, curY + _tPad, 'Company', item.perusahaanKlien || klien.perusahaan || '');
+  _row(c2L, c2V, curY + _tPad + _rH, 'Contact', item.kontakKlien || klien.kontak || '');
   var _yAInv = curY + _tPad + _rH;
   doc.setFont(PDF_FONT, 'bold'); doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]); doc.setFontSize(PDF_FS);
-  doc.text('Alamat :', c1L, _yAInv);
+  doc.text('Address', c1L, _yAInv);
   doc.setFont(PDF_FONT, 'normal');
   _addrLinesInv.forEach(function (ln, i) { doc.text(ln, c1V, _yAInv + i * _rH); });
   curY += _boxHInv + 0.5;
