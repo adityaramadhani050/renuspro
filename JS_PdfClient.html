@@ -808,10 +808,18 @@ function buatPOPDF(data) {
   doc.setTextColor(0, 0, 0); doc.setFont(PDF_FONT, 'bold'); doc.setFontSize(PDF_FS);
   doc.text(doc.splitTextToSize('PT. RENUS GLOBAL INDONESIA', halfW - 4), ML + 2, curY + 5);
   doc.text(doc.splitTextToSize(String(sup.nama || po.namaSupplier || ''), halfW - 4), ML + halfW + 2, curY + 5);
+  // Tanda tangan pembuat PO (sisi Customer) — tersemat di celah atas nama.
+  if (po.ttdPembuat) {
+    try { doc.addImage('data:image/png;base64,' + po.ttdPembuat, 'PNG', ML + 2, curY + 7, 44, 18, undefined, 'FAST'); } catch (e) {}
+  }
   curY += 26;
   doc.setFont(PDF_FONT, 'normal'); doc.setFontSize(PDF_FS); doc.setTextColor(0, 0, 0);
   doc.text('(' + (po.dibuatOleh || 'Procurement') + ')', ML + 2, curY);
   doc.text('(............................................)', ML + halfW + 2, curY);
+  // Label peran + tanggal export di bawah nama (sisi Customer).
+  var _tglExp = _pdfTglPanjang((function () { var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); })());
+  doc.setFontSize(PDF_FS - 1); doc.setTextColor(90, 90, 90);
+  doc.text('Procurement' + (_tglExp ? '  ·  ' + _tglExp : ''), ML + 2, curY + 4.2);
 
   return doc;
 }

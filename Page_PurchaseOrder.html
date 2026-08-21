@@ -25,6 +25,10 @@
                 <option value="Selesai">Selesai</option>
                 <option value="Batal">Batal</option>
               </select>
+              <button onclick="bukaTtdSaya()" title="Kelola tanda tangan Anda (tersemat otomatis di PDF PO yang Anda buat)"
+                class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-signature text-sm"></i> <span class="hidden sm:inline">Tanda Tangan Saya</span>
+              </button>
               <button onclick="bukaReqNonPO()"
                 class="bg-white hover:bg-violet-50 text-violet-700 border border-violet-200 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-hand-holding-dollar text-sm"></i> <span class="hidden sm:inline">Request Pembayaran</span>
@@ -808,6 +812,28 @@
             <div class="flex justify-end gap-2 mt-5">
               <button onclick="_tutupProsesReqStok()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Batal</button>
               <button id="prs-confirm-btn" onclick="_submitProsesReqStok()" class="px-5 py-2.5 text-sm font-bold text-white rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Konfirmasi</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL: Tanda Tangan Saya -->
+        <div id="modal-ttd-saya" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="bg-slate-800 text-white h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-signature text-sm"></i></span>
+              <div><h3 class="text-base font-extrabold text-slate-800">Tanda Tangan Saya</h3><p class="text-xs text-slate-400">Tersemat otomatis di PDF Purchase Order yang Anda buat.</p></div>
+            </div>
+            <p class="text-[13px] text-slate-500 mb-3">Unggah gambar tanda tangan (format <b>PNG</b>, sebaiknya berlatar transparan).</p>
+            <div id="ttd-preview-wrap" class="hidden items-center justify-center bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 mb-3">
+              <img id="ttd-preview" alt="Pratinjau tanda tangan" class="max-h-28 object-contain">
+            </div>
+            <input type="file" id="ttd-file-input" accept="image/png,image/*" onchange="onTtdFileChange(event)" class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-slate-800 file:text-white hover:file:bg-slate-900 mb-4">
+            <div class="flex justify-between gap-2">
+              <button id="ttd-clear-btn" onclick="hapusTtdSaya()" class="hidden px-4 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl"><i class="fa-regular fa-trash-can mr-1"></i> Hapus</button>
+              <div class="flex gap-2 ml-auto">
+                <button onclick="tutupTtdSaya()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Tutup</button>
+                <button id="ttd-save-btn" onclick="simpanTtdSaya()" class="px-5 py-2.5 text-sm font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-check"></i> Simpan</button>
+              </div>
             </div>
           </div>
         </div>

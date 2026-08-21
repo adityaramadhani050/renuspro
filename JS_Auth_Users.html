@@ -410,6 +410,7 @@ function bukaModalTambahUser() {
   var emAdd = document.getElementById('modal-user-email'); if (emAdd) emAdd.value = '';
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
+  _adminTtdReset();  // TTD hanya untuk user yang sudah ada (mode edit)
   var leadWrap = document.getElementById('modal-user-lead-wrap');
   if (leadWrap) { leadWrap.classList.remove('hidden'); _populateLeadDropdown(); }
   document.getElementById('modal-user').classList.remove('hidden');
@@ -426,6 +427,7 @@ function _bukaEditUser(u) {
   document.getElementById('modal-user-aktif-wrap').classList.remove('hidden');
   document.getElementById('modal-user-aktif').checked         = u.aktif;
   document.getElementById('modal-user-target').value          = u.targetBulanan || '';
+  _adminTtdLoad(u.id);
   var waEdit = document.getElementById('modal-user-wa'); if (waEdit) waEdit.value = u.noWa || '';
   var emEdit = document.getElementById('modal-user-email'); if (emEdit) emEdit.value = u.email || '';
   var leadWrap = document.getElementById('modal-user-lead-wrap');
@@ -442,6 +444,54 @@ function _bukaEditUser(u) {
 
 function tutupModalUser() {
   document.getElementById('modal-user').classList.add('hidden');
+}
+
+// ── Tanda tangan per-user (Admin kelola dari modal Edit User) ──
+var _adminTtdPending = null;
+function _adminNotify(msg, type) { if (typeof showNotification === 'function') showNotification(msg, type); else if (typeof showToast === 'function') showToast(msg, type); }
+function _adminTtdSetPreview(dataUrl) {
+  var wrap = document.getElementById('modal-user-ttd-preview-wrap'), img = document.getElementById('modal-user-ttd-preview'), clr = document.getElementById('modal-user-ttd-clear');
+  if (dataUrl) { if (wrap) { wrap.classList.remove('hidden'); wrap.style.display = 'flex'; } if (img) img.src = dataUrl; if (clr) clr.classList.remove('hidden'); }
+  else { if (wrap) { wrap.classList.add('hidden'); wrap.style.display = ''; } if (img) img.src = ''; if (clr) clr.classList.add('hidden'); }
+}
+function _adminTtdReset() {
+  _adminTtdPending = null;
+  var w = document.getElementById('modal-user-ttd-wrap'); if (w) w.classList.add('hidden');
+  var fi = document.getElementById('modal-user-ttd-file'); if (fi) fi.value = '';
+  _adminTtdSetPreview('');
+}
+function _adminTtdLoad(uid) {
+  _adminTtdReset();
+  var w = document.getElementById('modal-user-ttd-wrap'); if (w) w.classList.remove('hidden');
+  if (!uid) return;
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success && res.sigBase64) _adminTtdSetPreview('data:image/png;base64,' + res.sigBase64);
+  }).withFailureHandler(function() {}).getUserSignature(uid);
+}
+function _adminTtdFileChange(event) {
+  var file = event.target.files && event.target.files[0]; if (!file) return;
+  if (file.size > 1500000) return _adminNotify('Ukuran gambar terlalu besar (maks ~1,5 MB).', 'error');
+  var reader = new FileReader();
+  reader.onload = function(e) { _adminTtdPending = e.target.result; _adminTtdSetPreview(_adminTtdPending); };
+  reader.readAsDataURL(file);
+}
+function _adminTtdSimpan() {
+  var uid = document.getElementById('modal-user-id').value;
+  if (!uid) return _adminNotify('Simpan user dulu sebelum menambah tanda tangan.', 'error');
+  if (!_adminTtdPending) return _adminNotify('Pilih gambar tanda tangan dulu.', 'error');
+  google.script.run.withSuccessHandler(function(res) {
+    _adminNotify((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) _adminTtdPending = null;
+  }).withFailureHandler(function(err) { _adminNotify((err && err.message) || 'Gagal.', 'error'); })
+    .saveUserSignature(uid, _adminTtdPending);
+}
+function _adminTtdHapus() {
+  var uid = document.getElementById('modal-user-id').value; if (!uid) return;
+  google.script.run.withSuccessHandler(function(res) {
+    _adminNotify((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _adminTtdPending = null; var fi = document.getElementById('modal-user-ttd-file'); if (fi) fi.value = ''; _adminTtdSetPreview(''); }
+  }).withFailureHandler(function(err) { _adminNotify((err && err.message) || 'Gagal.', 'error'); })
+    .clearUserSignature(uid);
 }
 
 function simpanUserModal() {
