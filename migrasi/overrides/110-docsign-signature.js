@@ -54,6 +54,43 @@
         }
       });
 
+      // ── Tanda tangan PER-AKUN (app_user.tanda_tangan) — untuk TTD pembuat PO ─
+      //  base64 PNG (tanpa prefix data:). Dikelola user sendiri / admin. TTD TIDAK
+      //  ikut di daftar user umum; hanya diambil saat perlu (PO PDF / punya sendiri).
+      window.gsRoute('getUserSignature', {
+        mode: 'fn',
+        handler: async function (a) {
+          var uid = (a[0] || '').toString().trim();
+          if (!uid) return { success: false, message: 'ID user wajib.' };
+          var q = await supa.from('app_user').select('tanda_tangan').eq('id', uid).maybeSingle();
+          if (q.error) return { success: false, message: q.error.message };
+          return { success: true, sigBase64: (q.data && q.data.tanda_tangan) || '' };
+        }
+      });
+      window.gsRoute('saveUserSignature', {
+        mode: 'fn',
+        handler: async function (a) {
+          var uid = (a[0] || '').toString().trim();
+          var b64 = (a[1] || '').toString().replace(/^data:[^;]+;base64,/, '');
+          if (!uid) return { success: false, message: 'ID user wajib.' };
+          if (!b64) return { success: false, message: 'Gambar tanda tangan kosong.' };
+          var r = await supa.from('app_user').update({ tanda_tangan: b64, updated_at: new Date().toISOString() }).eq('id', uid).select('id');
+          if (r.error) return { success: false, message: r.error.message };
+          if (!r.data || !r.data.length) return { success: false, message: 'User tidak ditemukan.' };
+          return { success: true, message: 'Tanda tangan tersimpan.' };
+        }
+      });
+      window.gsRoute('clearUserSignature', {
+        mode: 'fn',
+        handler: async function (a) {
+          var uid = (a[0] || '').toString().trim();
+          if (!uid) return { success: false, message: 'ID user wajib.' };
+          var r = await supa.from('app_user').update({ tanda_tangan: null, updated_at: new Date().toISOString() }).eq('id', uid);
+          if (r.error) return { success: false, message: r.error.message };
+          return { success: true, message: 'Tanda tangan dihapus.' };
+        }
+      });
+
       // ── Data Kwitansi untuk PDF sisi klien (buatKwitansiPDF) ───────────────
       //  Ambil kwitansi + bank account dari invoice terkait (rekening tujuan).
       window.gsRoute('getKwitansiForPdf', {
@@ -154,6 +191,13 @@
           var tc = h.term_conditions;
           if (typeof tc === 'string') { try { tc = JSON.parse(tc); } catch (e) { tc = {}; } }
           if (!tc || typeof tc !== 'object') tc = {};
+          // Tanda tangan pembuat PO (dicocokkan lewat nama dibuat_oleh).
+          var ttdPembuat = '';
+          var pembuat = (h.dibuat_oleh || '').toString().trim();
+          if (pembuat) {
+            var uq = await supa.from('app_user').select('tanda_tangan').eq('nama', pembuat).limit(1).maybeSingle();
+            if (!uq.error && uq.data) ttdPembuat = (uq.data.tanda_tangan || '').toString();
+          }
           return {
             success: true,
             data: {
@@ -165,7 +209,7 @@
                 subtotal: parseFloat(h.subtotal) || 0, diskonPersen: parseFloat(h.diskon_persen) || 0,
                 diskonNominal: parseFloat(h.diskon_nominal) || 0, ppnPersen: parseFloat(h.ppn_persen) || 0,
                 ppnNominal: parseFloat(h.ppn_nominal) || 0, grandTotal: parseFloat(h.grand_total) || 0,
-                catatan: (h.catatan || '').toString(), dibuatOleh: (h.dibuat_oleh || '').toString()
+                catatan: (h.catatan || '').toString(), dibuatOleh: pembuat, ttdPembuat: ttdPembuat
               },
               items: items, supplier: sup, tc: tc
             }
