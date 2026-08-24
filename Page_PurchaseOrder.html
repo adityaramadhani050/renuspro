@@ -3,28 +3,10 @@
         <!-- ── Tabel Daftar PO ── -->
         <div id="po-list-section">
 
-          <!-- Header -->
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-            <div>
-              <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Purchase Order</h2>
-            </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-              <div class="relative flex-1 sm:w-60">
-                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" id="search-po" oninput="filterPO()"
-                  placeholder="Cari No PO, supplier, No WO..."
-                  class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
-              </div>
-              <select id="filter-po-status" onchange="filterPO()"
-                class="text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
-                <option value="">Semua Status</option>
-                <option value="Aktif">Aktif</option>
-                <option value="Menunggu Gudang">Tunggu Gudang</option>
-                <option value="Diterima Sebagian">Diterima Sebagian</option>
-                <option value="Diterima">Diterima</option>
-                <option value="Selesai">Selesai</option>
-                <option value="Batal">Batal</option>
-              </select>
+          <!-- Header: judul + tombol aksi -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3">
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Purchase Order</h2>
+            <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
               <button onclick="bukaTtdSaya()" title="Kelola tanda tangan Anda (tersemat otomatis di PDF PO yang Anda buat)"
                 class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-signature text-sm"></i> <span class="hidden sm:inline">Tanda Tangan Saya</span>
@@ -38,6 +20,26 @@
                 <i class="fas fa-plus text-sm"></i> Buat PO Baru
               </button>
             </div>
+          </div>
+
+          <!-- Pencarian + filter status (di bawah tombol) -->
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-5">
+            <div class="relative w-full sm:w-72">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="search-po" oninput="filterPO()"
+                placeholder="Cari No PO, supplier, No WO..."
+                class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+            </div>
+            <select id="filter-po-status" onchange="filterPO()"
+              class="w-full sm:w-auto text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-orange-400 bg-white text-slate-600 font-medium">
+              <option value="">Semua Status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Menunggu Gudang">Tunggu Gudang</option>
+              <option value="Diterima Sebagian">Diterima Sebagian</option>
+              <option value="Diterima">Diterima</option>
+              <option value="Selesai">Selesai</option>
+              <option value="Batal">Batal</option>
+            </select>
           </div>
 
           <!-- ── Tabs ── -->
