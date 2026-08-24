@@ -259,6 +259,54 @@ window.onload = function() {
   }
 };
 
+// ── Tanda Tangan Saya (Self-service, dari menu akun; global) ──────────────
+var _ttdPending = null;
+function _ttdNotify(msg, type) { if (typeof showNotification === 'function') showNotification(msg, type); else if (typeof showToast === 'function') showToast(msg, type); }
+function _ttdSetPreview(dataUrl) {
+  var wrap = document.getElementById('ttd-preview-wrap'), img = document.getElementById('ttd-preview'), clr = document.getElementById('ttd-clear-btn');
+  if (dataUrl) { if (wrap) { wrap.classList.remove('hidden'); wrap.style.display = 'flex'; } if (img) img.src = dataUrl; if (clr) clr.classList.remove('hidden'); }
+  else { if (wrap) { wrap.classList.add('hidden'); wrap.style.display = ''; } if (img) img.src = ''; if (clr) clr.classList.add('hidden'); }
+}
+function bukaTtdSaya() {
+  if (!(typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id)) return _ttdNotify('Sesi pengguna tidak ditemukan.', 'error');
+  _ttdPending = null;
+  var fi = document.getElementById('ttd-file-input'); if (fi) fi.value = '';
+  _ttdSetPreview('');
+  document.getElementById('modal-ttd-saya').classList.remove('hidden');
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success && res.sigBase64) _ttdSetPreview('data:image/png;base64,' + res.sigBase64);
+  }).withFailureHandler(function() {}).getUserSignature(_currentUser.id);
+}
+function tutupTtdSaya() { document.getElementById('modal-ttd-saya').classList.add('hidden'); }
+function onTtdFileChange(event) {
+  var file = event.target.files && event.target.files[0]; if (!file) return;
+  if (file.size > 1500000) return _ttdNotify('Ukuran gambar terlalu besar (maks ~1,5 MB).', 'error');
+  var reader = new FileReader();
+  reader.onload = function(e) { _ttdPending = e.target.result; _ttdSetPreview(_ttdPending); };
+  reader.readAsDataURL(file);
+}
+function simpanTtdSaya() {
+  if (!_ttdPending) return _ttdNotify('Pilih gambar tanda tangan dulu.', 'error');
+  if (!(_currentUser && _currentUser.id)) return;
+  if (typeof toggleLoader === 'function') toggleLoader(true, 'Menyimpan tanda tangan...');
+  google.script.run.withSuccessHandler(function(res) {
+    if (typeof toggleLoader === 'function') toggleLoader(false); _ttdNotify((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+    if (res && res.success) { _ttdPending = null; tutupTtdSaya(); }
+  }).withFailureHandler(function(err) { if (typeof toggleLoader === 'function') toggleLoader(false); _ttdNotify((err && err.message) || 'Gagal menyimpan.', 'error'); })
+    .saveUserSignature(_currentUser.id, _ttdPending);
+}
+function hapusTtdSaya() {
+  if (!(_currentUser && _currentUser.id)) return;
+  showConfirm({ type: 'danger', title: 'Hapus Tanda Tangan?', message: 'Hapus tanda tangan Anda?', confirmText: 'Ya, Hapus', onConfirm: function() {
+    if (typeof toggleLoader === 'function') toggleLoader(true, 'Menghapus...');
+    google.script.run.withSuccessHandler(function(res) {
+      if (typeof toggleLoader === 'function') toggleLoader(false); _ttdNotify((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+      if (res && res.success) { _ttdPending = null; var fi = document.getElementById('ttd-file-input'); if (fi) fi.value = ''; _ttdSetPreview(''); }
+    }).withFailureHandler(function(err) { if (typeof toggleLoader === 'function') toggleLoader(false); _ttdNotify((err && err.message) || 'Gagal.', 'error'); })
+      .clearUserSignature(_currentUser.id);
+  }});
+}
+
 // ── Ganti Password (Self-service) ─────────────────────────────────────────
 function bukaGantiPassword() {
   document.getElementById('gp-old').value     = '';
