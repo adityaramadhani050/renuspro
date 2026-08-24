@@ -80,6 +80,9 @@ function _renderUserSidebar(user) {
   if (avatarEl) avatarEl.innerText = (nama.charAt(0) || 'U').toUpperCase();
 
   const role = (user.role || 'sales').toLowerCase();
+  // Tombol "Tanda Tangan Saya" hanya untuk procurement & admin.
+  var ttdBtn = document.getElementById('btn-ttd-saya');
+  if (ttdBtn) ttdBtn.classList.toggle('hidden', !(role === 'procurement' || role === 'admin'));
   const badgeCls = _ROLE_BADGE[role] || _ROLE_BADGE.sales;
   const badgeLabel = _ROLE_LABEL[role] || role.toUpperCase();
   roleEl.innerHTML = `
