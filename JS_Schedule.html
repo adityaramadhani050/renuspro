@@ -14,6 +14,10 @@ let _schKurvaAktual = [];    // titik kurva S aktual (dari progress log)
 let _schBaseline = {};       // { hasBaseline, setAt, oleh }
 let _schChartS = null;       // instance Chart.js kurva S
 let _schChartLib = null;     // cache modul Chart.js
+// SEMENTARA: Project Coordinator ikut boleh "Set Ulang Baseline" untuk penyesuaian
+// awal. Untuk kembali admin-only, hapus 'projectcoordinator' dari array ini.
+var _SCH_REBASELINE_ROLES = ['admin', 'projectcoordinator'];
+function _schBolehSetUlang(){ return _SCH_REBASELINE_ROLES.indexOf(_schRole()) !== -1; }
 
 function _schEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _schRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
@@ -387,15 +391,14 @@ function _schRenderDetail() {
     : '';
   var reloadBtn = '<button onclick="_engMuatUlang(\'_schReloadDetail\', this)" title="Muat ulang" class="inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 h-[38px] w-[38px] rounded-lg shadow-sm transition shrink-0"><i class="fa-solid fa-rotate-right"></i></button>';
   var bulkBtn = _schCanEdit() ? '<button onclick="_schOpenBulk()" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bolt"></i><span class="hidden sm:inline"> Tambah Cepat</span></button>' : '';
-  // Set Baseline pertama: PC & Admin. Set ULANG: hanya Admin (perlu alasan).
+  // Set Baseline pertama: PC & Admin. Set ULANG: Admin (+ Project Coordinator sementara).
   var _hasBl = !!(_schBaseline && _schBaseline.hasBaseline);
-  var _isAdmin = _schRole() === 'admin';
   var baselineBtn = '';
   if (_schCanEdit() && _schWOStatus !== 'Closed') {
     if (!_hasBl) {
       baselineBtn = '<button onclick="_schSetBaseline()" title="Bekukan jadwal Plan saat ini sebagai baseline (acuan deviasi)" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> Set Baseline</span></button>';
-    } else if (_isAdmin) {
-      baselineBtn = '<button onclick="_schSetBaseline()" title="Set ulang baseline (khusus Admin, wajib alasan)" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 border border-amber-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> Set Ulang Baseline</span></button>';
+    } else if (_schBolehSetUlang()) {
+      baselineBtn = '<button onclick="_schSetBaseline()" title="Set ulang baseline (wajib alasan)" class="inline-flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 border border-amber-300 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-flag-checkered"></i><span class="hidden sm:inline"> Set Ulang Baseline</span></button>';
     }
   }
   actions.innerHTML = '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + reloadBtn + zoomBtn('hari','Hari') + zoomBtn('minggu','Minggu') + zoomBtn('bulan','Bulan') + baselineBtn + assignBtn + bulkBtn + addBtn + '</div>';
@@ -440,8 +443,8 @@ function _schSetBaseline(){
     showConfirm({ title: 'Set Baseline', message: 'Bekukan jadwal Plan saat ini sebagai baseline (acuan deviasi)? Progres tidak berubah.', confirmText: 'Ya, Set', icon: 'fa-flag-checkered', onConfirm: function(){ _schSubmitBaseline(''); } });
     return;
   }
-  // Set ulang — khusus Admin + wajib alasan.
-  if (_schRole() !== 'admin') { showNotification('Set ulang baseline hanya untuk Admin.', 'error'); return; }
+  // Set ulang — Admin (+ Project Coordinator sementara) + wajib alasan.
+  if (!_schBolehSetUlang()) { showNotification('Set ulang baseline tidak diizinkan untuk peran Anda.', 'error'); return; }
   document.getElementById('sch-rebaseline-alasan').value = '';
   document.getElementById('sch-modal-rebaseline').classList.remove('hidden');
   setTimeout(function(){ var el = document.getElementById('sch-rebaseline-alasan'); if (el) el.focus(); }, 50);
