@@ -360,7 +360,9 @@ window.bukaFormPemasukan = function() {
   document.getElementById('in-jumlah').value    = '';
   document.getElementById('in-catatan').value   = '';
   _fillInAkunSelect('in-akun', '', false);
+  var _ab = document.getElementById('in-submit-add-btn'); if (_ab) _ab.classList.remove('hidden');
   document.getElementById('modal-in-langsung').classList.remove('hidden');
+  setTimeout(function(){ var d = document.getElementById('in-deskripsi'); if (d) d.focus(); }, 60);
 };
 
 window.tutupFormPemasukan = function() {
@@ -390,6 +392,7 @@ window.editPemasukan = function(id) {
   document.getElementById('in-noref').value     = it.noRef || '';
   document.getElementById('in-jumlah').value    = it.jumlah ? Math.round(it.jumlah).toLocaleString('id-ID') : '';
   document.getElementById('in-catatan').value   = it.catatan || '';
+  var _ab = document.getElementById('in-submit-add-btn'); if (_ab) _ab.classList.add('hidden');   // edit: tanpa "Tambah lagi"
   document.getElementById('modal-in-langsung').classList.remove('hidden');
 };
 
@@ -399,7 +402,11 @@ function _tglToInputIn(tgl) {
   return (p.length === 3) ? (p[2] + '-' + p[1] + '-' + p[0]) : _todayInput();
 }
 
-window.submitPemasukan = function() {
+function _inResetAfterAdd() {
+  ['in-noref', 'in-deskripsi', 'in-jumlah', 'in-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
+  var d = document.getElementById('in-deskripsi'); if (d) d.focus();
+}
+window.submitPemasukan = function(addAnother) {
   var id       = document.getElementById('in-id-field').value.trim();
   var akunSel  = document.getElementById('in-akun');
   var idAkun   = akunSel.value;
@@ -425,9 +432,9 @@ window.submitPemasukan = function() {
     toggleLoader(false);
     if (res && res.success) {
       showNotification(res.message || 'Tersimpan.');
-      tutupFormPemasukan();
       loadPemasukan();
       loadSaldoPanel();
+      if (addAnother && !id) _inResetAfterAdd(); else tutupFormPemasukan();
     } else {
       showNotification((res && res.message) || 'Gagal menyimpan.', 'error');
     }
@@ -475,13 +482,18 @@ window.bukaFormAyatSilang = function() {
   _fillInAkunSelect('tf-asal', '', false);
   _fillInAkunSelect('tf-tujuan', '', false);
   document.getElementById('modal-ayat-silang').classList.remove('hidden');
+  setTimeout(function(){ var a = document.getElementById('tf-asal'); if (a) a.focus(); }, 60);
 };
 
 window.tutupFormAyatSilang = function() {
   document.getElementById('modal-ayat-silang').classList.add('hidden');
 };
 
-window.submitAyatSilang = function() {
+function _tfResetAfterAdd() {
+  ['tf-jumlah', 'tf-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
+  var j = document.getElementById('tf-jumlah'); if (j) j.focus();
+}
+window.submitAyatSilang = function(addAnother) {
   var selA = document.getElementById('tf-asal');
   var selT = document.getElementById('tf-tujuan');
   var idA  = selA.value, idT = selT.value;
@@ -507,9 +519,9 @@ window.submitAyatSilang = function() {
       toggleLoader(false);
       if (res && res.success) {
         showNotification(res.message || 'Ayat silang tersimpan.');
-        tutupFormAyatSilang();
         loadPemasukan();
         loadSaldoPanel();
+        if (addAnother) _tfResetAfterAdd(); else tutupFormAyatSilang();
       } else {
         showNotification((res && res.message) || 'Gagal menyimpan ayat silang.', 'error');
       }

@@ -303,6 +303,10 @@
                 class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
                 Batal
               </button>
+              <button id="exp-submit-add-btn" onclick="submitPengeluaranLangsung(true)"
+                class="px-4 py-2.5 text-sm bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Simpan &amp; Tambah</span><span class="sm:hidden">+ Lagi</span>
+              </button>
               <button onclick="submitPengeluaranLangsung()"
                 class="px-6 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i> <span id="exp-submit-label">Simpan</span>
@@ -504,6 +508,9 @@
             </div>
             <div class="flex flex-col sm:flex-row sm:justify-end gap-3 pt-1">
               <button onclick="tutupFormPemasukan()" class="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 px-5 rounded-xl font-bold text-sm transition">Batal</button>
+              <button id="in-submit-add-btn" onclick="submitPemasukan(true)" class="w-full sm:w-auto bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 py-2.5 px-5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2">
+                <i class="fas fa-plus text-xs"></i> Simpan &amp; Tambah
+              </button>
               <button onclick="submitPemasukan()" id="in-submit-btn" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
                 <i class="fas fa-floppy-disk text-xs"></i> Simpan
               </button>
@@ -544,6 +551,9 @@
             </div>
             <div class="flex flex-col sm:flex-row sm:justify-end gap-3 pt-1">
               <button onclick="tutupFormAyatSilang()" class="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 px-5 rounded-xl font-bold text-sm transition">Batal</button>
+              <button id="tf-submit-add-btn" onclick="submitAyatSilang(true)" class="w-full sm:w-auto bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 py-2.5 px-5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2">
+                <i class="fas fa-plus text-xs"></i> Pindah &amp; Tambah
+              </button>
               <button onclick="submitAyatSilang()" id="tf-submit-btn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
                 <i class="fas fa-right-left text-xs"></i> Pindahkan
               </button>

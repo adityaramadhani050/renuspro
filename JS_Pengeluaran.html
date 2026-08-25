@@ -298,7 +298,9 @@ window.bukaFormPengeluaranLangsung = function(preNoWO) {
   _loadAkunOptionsExp('exp-akun', '');
   _loadKategoriPengeluaranOptions('');
   _onExpWOChange();
+  var _addBtn = document.getElementById('exp-submit-add-btn'); if (_addBtn) _addBtn.classList.remove('hidden');
   document.getElementById('modal-exp-langsung').classList.remove('hidden');
+  setTimeout(function(){ var d = document.getElementById('exp-deskripsi'); if (d) d.focus(); }, 60);
 };
 
 function _onExpWOChange() {
@@ -349,7 +351,13 @@ function _onExpAkunChange() {
   // Tidak ada logika khusus untuk Fase 1; placeholder untuk Fase 2
 }
 
-window.submitPengeluaranLangsung = function() {
+// Reset field isi (untuk "Simpan & Tambah") — pertahankan WO/tanggal/akun/kategori.
+function _expResetAfterAdd() {
+  ['exp-deskripsi', 'exp-qty', 'exp-satuan', 'exp-harga', 'exp-nopo', 'exp-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
+  if (typeof _hitungTotalExp === 'function') _hitungTotalExp();
+  var d = document.getElementById('exp-deskripsi'); if (d) d.focus();
+}
+window.submitPengeluaranLangsung = function(addAnother) {
   var noWO    = document.getElementById('exp-wo').value;
   var tanggal = document.getElementById('exp-tanggal').value;
   var idAkun  = document.getElementById('exp-akun').value;
@@ -415,8 +423,8 @@ window.submitPengeluaranLangsung = function() {
         toggleLoader(false);
         if (res.success) {
           showNotification(res.message);
-          tutupFormPengeluaranLangsung();
           _loadExpData();
+          if (addAnother) _expResetAfterAdd(); else tutupFormPengeluaranLangsung();
         } else {
           showNotification(res.message || 'Gagal menyimpan.', 'error');
         }
@@ -453,6 +461,7 @@ window.editPengeluaran = function(id) {
   _loadWOOptionsExp('exp-wo', r.noWO);
   _loadAkunOptionsExp('exp-akun', r.idAkun);
   _onExpWOChange();
+  var _addBtn = document.getElementById('exp-submit-add-btn'); if (_addBtn) _addBtn.classList.add('hidden');   // edit: tanpa "Tambah lagi"
   document.getElementById('modal-exp-langsung').classList.remove('hidden');
 };
 
