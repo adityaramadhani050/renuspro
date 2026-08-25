@@ -42,16 +42,25 @@
       _imgViewerName = name || 'gambar'; _imgViewerSrc = downloadUrl || src;
       if (_imgViewerBlobUrl && _imgViewerBlobUrl !== src) { try { URL.revokeObjectURL(_imgViewerBlobUrl); } catch (e) {} }
       _imgViewerBlobUrl = (src && src.indexOf('blob:') === 0) ? src : null;
-      var v = document.getElementById('modal-img-viewer'), im = document.getElementById('img-viewer-img'), sp = document.getElementById('img-viewer-spinner');
-      if (im) { im.classList.add('opacity-0'); im.src = src; }
+      var v = document.getElementById('modal-img-viewer'), im = document.getElementById('img-viewer-img'), sp = document.getElementById('img-viewer-spinner'), nt = document.getElementById('img-viewer-note');
+      if (nt) nt.classList.add('hidden');
       if (sp) sp.classList.remove('hidden');
+      if (im) { im.classList.add('opacity-0'); im.classList.remove('hidden'); im.onload = _imgViewerLoaded; im.onerror = _imgViewerError; im.src = src; }
       if (v) v.classList.remove('hidden');
     }
     function _imgViewerLoaded() { var sp = document.getElementById('img-viewer-spinner'); if (sp) sp.classList.add('hidden'); var im = document.getElementById('img-viewer-img'); if (im) im.classList.remove('opacity-0'); }
-    function _imgViewerError() { var sp = document.getElementById('img-viewer-spinner'); if (sp) sp.classList.add('hidden'); if (_imgViewerSrc) window.open(_imgViewerSrc, '_blank', 'noopener'); tutupImgViewer(); }
+    // Gagal muat: TIDAK membuka tab baru; tampilkan pesan + link di dalam viewer.
+    function _imgViewerError() {
+      var sp = document.getElementById('img-viewer-spinner'); if (sp) sp.classList.add('hidden');
+      var im = document.getElementById('img-viewer-img'); if (im) im.classList.add('hidden');
+      var nt = document.getElementById('img-viewer-note'), lk = document.getElementById('img-viewer-note-link');
+      if (lk) lk.href = _imgViewerSrc || '#';
+      if (nt) nt.classList.remove('hidden');
+    }
     function tutupImgViewer() {
       var v = document.getElementById('modal-img-viewer'); if (v) v.classList.add('hidden');
-      var im = document.getElementById('img-viewer-img'); if (im) im.src = '';
+      var im = document.getElementById('img-viewer-img');
+      if (im) { im.onerror = null; im.onload = null; im.removeAttribute('src'); }   // netralkan dulu → hindari onerror saat clear
       if (_imgViewerBlobUrl) { try { URL.revokeObjectURL(_imgViewerBlobUrl); } catch (e) {} _imgViewerBlobUrl = null; }
     }
     function downloadImgViewer() {
