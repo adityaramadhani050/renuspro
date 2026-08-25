@@ -88,6 +88,16 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
     function bukaFilePDFTab() { if (_filePdfSrcUrl) window.open(_filePdfSrcUrl, '_blank', 'noopener'); }
+    // Handler seragam untuk link lampiran (gambar/PDF). Return true = biarkan
+    // anchor default (mis. href kosong '#'); false = tampil preview modal.
+    function _openLampiran(a) {
+      try {
+        var h = a.getAttribute('href');
+        if (!h || h === '#') return true;
+        bukaPreviewPDF(h, a.getAttribute('data-fn') || '');
+        return false;
+      } catch (e) { return true; }
+    }
 
     // ============================================================
     // SISTEM EXPORT & PREVIEW QUOTATION PDF

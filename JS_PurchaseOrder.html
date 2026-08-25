@@ -293,7 +293,7 @@ function _renderFileFieldState(prefix, state, data, accent) {
         '</div>' +
         '<div class="flex-1 min-w-0">' +
           '<p class="text-sm font-semibold text-slate-700 truncate">' + _escHtml(data.fileName || '') + '</p>' +
-          '<a href="' + _escHtml(data.fileUrl || '#') + '" target="_blank" class="text-xs text-' + accent + '-600 hover:underline font-medium">Lihat file</a>' +
+          '<a href="' + _escHtml(data.fileUrl || '#') + '" target="_blank" data-fn="File" onclick="return _openLampiran(this)" class="text-xs text-' + accent + '-600 hover:underline font-medium">Lihat file</a>' +
         '</div>' +
         '<button type="button" onclick="_removeFileField(\'' + prefix + '\')" ' +
           'class="w-7 h-7 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-colors flex-shrink-0" title="Hapus file">' +
@@ -730,7 +730,7 @@ function _renderRiwayatPenerimaan(list) {
       return (it.catatan || '').toString().trim();
     }).filter(function(c) { return c; }).join('<br>');
     var buktiHtml = r.buktiFileUrl
-      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold" title="Lihat bukti barang diterima"><i class="fa-solid fa-image"></i> Lihat</a>'
+      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" data-fn="Bukti Penerimaan" onclick="return _openLampiran(this)" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold" title="Lihat bukti barang diterima"><i class="fa-solid fa-image"></i> Lihat</a>'
       : '<span class="text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">' + _escHtml(r.tanggal || '') + '</td>' +
@@ -761,7 +761,7 @@ function _renderPayReqs(list) {
           ? (r.catatanTolak ? '<span class="text-rose-500">' + _escHtml(r.catatanTolak) + '</span>' : '<span class="text-rose-400 text-[10px] font-bold">Ditolak</span>')
           : '—');
     var buktiHtml = (r.status === 'Disetujui' && r.buktiFileUrl)
-      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold" title="Unduh bukti transaksi pembayaran"><i class="fa-solid fa-receipt"></i> Lihat</a>'
+      ? '<a href="' + _escHtml(r.buktiFileUrl) + '" target="_blank" data-fn="Bukti Pembayaran" onclick="return _openLampiran(this)" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold" title="Unduh bukti transaksi pembayaran"><i class="fa-solid fa-receipt"></i> Lihat</a>'
       : '<span class="text-slate-300">—</span>';
     return '<tr class="border-b border-slate-100">' +
       '<td class="px-3 py-2 font-mono text-xs text-slate-600">' + _escHtml(r.idReq || '') + '</td>' +
@@ -813,7 +813,7 @@ function bukaEditPO(noPO) {
         document.getElementById('po-quot-file-url').value   = po.quotFileUrl || '';
         document.getElementById('po-quot-file-name').value  = po.quotFileName || '';
         document.getElementById('po-quot-file-status').innerHTML =
-          '<i class="fas fa-paperclip mr-1"></i>File saat ini: <a href="' + po.quotFileUrl + '" target="_blank" rel="noopener" class="text-orange-600 font-bold hover:underline">' + _escHtml(po.quotFileName || 'Lihat file') + '</a> (pilih file baru untuk mengganti)';
+          '<i class="fas fa-paperclip mr-1"></i>File saat ini: <a href="' + po.quotFileUrl + '" target="_blank" data-fn="' + _escHtml(po.quotFileName || 'File') + '" onclick="return _openLampiran(this)" rel="noopener" class="text-orange-600 font-bold hover:underline">' + _escHtml(po.quotFileName || 'Lihat file') + '</a> (pilih file baru untuk mengganti)';
       }
 
       var _poLoadPendingEdit = 3;
@@ -1150,8 +1150,8 @@ function _poRenderRiwayat() {
   var sc = { 'Menunggu':'bg-amber-100 text-amber-700','Disetujui':'bg-emerald-100 text-emerald-700','Ditolak':'bg-rose-100 text-rose-600' };
   tb.innerHTML = list.map(function(r){
     var poCell = r.noPO ? '<span class="font-mono text-xs font-bold text-slate-700">'+_escHtml(r.noPO)+'</span>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">Tanpa PO</span>';
-    var inv = r.invoiceFileUrl ? '<a href="'+_escHtml(r.invoiceFileUrl)+'" target="_blank" rel="noopener" class="text-rose-500 hover:text-rose-600 text-xs font-semibold"><i class="fa-solid fa-file-invoice"></i> Invoice</a>' : '';
-    var bukti = r.buktiFileUrl ? '<a href="'+_escHtml(r.buktiFileUrl)+'" target="_blank" rel="noopener" class="text-emerald-600 hover:text-emerald-700 text-xs font-semibold ml-2"><i class="fa-solid fa-receipt"></i> Bukti</a>' : '';
+    var inv = r.invoiceFileUrl ? '<a href="'+_escHtml(r.invoiceFileUrl)+'" target="_blank" data-fn="Invoice Supplier" onclick="return _openLampiran(this)" rel="noopener" class="text-rose-500 hover:text-rose-600 text-xs font-semibold"><i class="fa-solid fa-file-invoice"></i> Invoice</a>' : '';
+    var bukti = r.buktiFileUrl ? '<a href="'+_escHtml(r.buktiFileUrl)+'" target="_blank" data-fn="Bukti" onclick="return _openLampiran(this)" rel="noopener" class="text-emerald-600 hover:text-emerald-700 text-xs font-semibold ml-2"><i class="fa-solid fa-receipt"></i> Bukti</a>' : '';
     var dok = (inv||bukti) ? (inv+bukti) : '<span class="text-slate-300 text-xs">—</span>';
     return '<tr class="hover:bg-slate-50 transition-colors">'
       + '<td class="p-4"><div class="font-mono text-xs text-slate-600">'+_escHtml(r.idReq||'')+'</div><div class="text-[11px] text-slate-400">'+_escHtml(r.tanggalRequest||'')+'</div></td>'

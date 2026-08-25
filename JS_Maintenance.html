@@ -200,7 +200,7 @@ function _mtnBukaDetail(id) {
   var foto = Array.isArray(m.foto) ? m.foto : [];
   if (foto.length) {
     body += '<div class="mt-2"><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Foto</p><div class="grid grid-cols-3 gap-2">';
-    foto.forEach(function(f){ body += '<a href="'+_mtnEsc(f.fileUrl)+'" target="_blank" rel="noopener" class="block"><img src="'+_mtnEsc(f.fileUrl)+'" class="w-full h-20 object-cover rounded-lg border border-slate-200"></a>'; });
+    foto.forEach(function(f){ body += '<a href="'+_mtnEsc(f.fileUrl)+'" target="_blank" data-fn="Foto Maintenance" onclick="return _openLampiran(this)" rel="noopener" class="block"><img src="'+_mtnEsc(f.fileUrl)+'" class="w-full h-20 object-cover rounded-lg border border-slate-200"></a>'; });
     body += '</div></div>';
   }
   document.getElementById('mtn-d-body').innerHTML = body;

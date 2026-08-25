@@ -824,7 +824,7 @@ window._renderPenerimaan = function() {
             var mc = modeClass[r.mode] || 'bg-slate-100 text-slate-600';
             var itemList = (r.items || []).map(function(it) { return _escHtmlInv(it.namaItem || '') + ' (' + (it.qty || 0) + (it.satuan ? ' ' + _escHtmlInv(it.satuan) : '') + ')'; }).join(', ');
             var catatanList = (r.items || []).map(function(it) { return (it.catatan || '').toString().trim(); }).filter(function(c) { return c; }).join(' · ');
-            var buktiHtml = r.buktiFileUrl ? '<a href="' + _escHtmlInv(r.buktiFileUrl) + '" target="_blank" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold"><i class="fa-solid fa-image"></i> Bukti</a>' : '';
+            var buktiHtml = r.buktiFileUrl ? '<a href="' + _escHtmlInv(r.buktiFileUrl) + '" target="_blank" data-fn="Bukti" onclick="return _openLampiran(this)" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-semibold"><i class="fa-solid fa-image"></i> Bukti</a>' : '';
             return '<div class="bg-white border border-slate-100 rounded-xl p-3 text-xs">'
               + '<div class="flex items-center justify-between gap-2 flex-wrap mb-1">'
               + '<span class="font-semibold text-slate-600"><i class="fas fa-box-open text-teal-500 mr-1"></i>' + _fmtTglInv(r.tanggal) + ' <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ' + mc + '">' + _escHtmlInv(r.mode || '') + '</span></span>'
@@ -1106,7 +1106,7 @@ function _kirimRenderBoard() {
     var sjRows = sjArr.map(function(s) {
       var act = '<button onclick="_kirimExportPDF(\'' + _escHtml(s.idKirim) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-800" title="Export Surat Jalan"><i class="fa-solid fa-file-pdf text-rose-500"></i> PDF</button>';
       if (s.status === 'Dikirim') act += ' <button onclick="_kirimOpenTerima(\'' + _escHtml(s.idKirim) + '\',\'' + _escHtml(s.noSuratJalan) + '\')" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 ml-2" title="Barang Diterima"><i class="fa-solid fa-box-open"></i> Terima</button>';
-      else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
+      else if (s.buktiFileUrl) act += ' <a href="' + _escHtml(s.buktiFileUrl) + '" target="_blank" data-fn="Bukti" onclick="return _openLampiran(this)" rel="noopener" class="text-xs font-bold text-emerald-600 hover:underline ml-2"><i class="fa-solid fa-image mr-0.5"></i>Bukti</a>';
       return '<div class="flex items-center gap-2 px-3 py-2 border-t border-slate-100 flex-wrap"><span class="font-mono font-bold text-slate-600 text-xs">' + _escHtml(s.noSuratJalan) + '</span><span class="text-[11px] text-slate-400">' + _escHtml(_kirimFmtTgl(s.tanggalKirim)) + ' · ' + (s.items || []).length + ' item</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + _kirimStatusCls(s.status) + '">' + _escHtml(s.status) + '</span><span class="ml-auto">' + act + '</span></div>';
     }).join('');
     // Kolom "Surat Jalan": jumlah surat jalan ("N Surat Jalan").
