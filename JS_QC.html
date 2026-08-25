@@ -1176,9 +1176,9 @@ function _qcViewFoto(fileId, fileUrl, kode) {
   var sp = document.getElementById('qc-photo-viewer-spinner');
   img.classList.add('opacity-0');            // sembunyikan gambar lama
   if (sp) sp.classList.remove('hidden');     // tampilkan spinner
-  img.src = _fotoDisplaySrc(fileId, fileUrl, 'w1600');
-  document.getElementById('qc-photo-viewer-link').href = _fotoDisplaySrc(fileId, fileUrl, 'w1600') || fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
-  _qcViewerCtx = { fileId: fileId, kode: kode || '' };
+  var _src = _fotoDisplaySrc(fileId, fileUrl, 'w1600') || fileUrl || ('https://drive.google.com/file/d/' + fileId + '/view');
+  img.src = _src;
+  _qcViewerCtx = { fileId: fileId, kode: kode || '', url: _src };
   // Foto pada item yang sudah Approved tidak boleh ditandai.
   var it = (_qcItems || []).filter(function(x) { return x.kode === kode; })[0];
   var canEdit = kode && _qcCanReview() && it && it.status !== 'Approved';
@@ -1201,6 +1201,18 @@ function _qcCloseFoto() {
   if (!v) return;
   v.classList.add('hidden');
   document.getElementById('qc-photo-viewer-img').src = '';
+}
+// Download foto QC (fetch→blob agar andal; fallback buka langsung).
+async function _qcDownloadFoto() {
+  var src = (_qcViewerCtx && _qcViewerCtx.url) || (document.getElementById('qc-photo-viewer-img') || {}).src || '';
+  if (!src) return;
+  var name = ((_qcViewerCtx && _qcViewerCtx.kode) ? _qcViewerCtx.kode : 'foto') + '.jpg';
+  try {
+    var r = await fetch(src); if (!r.ok) throw new Error('x');
+    var b = await r.blob(); var u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { try { URL.revokeObjectURL(u); } catch (e) {} }, 1500);
+  } catch (e) { window.open(src, '_blank', 'noopener'); }
 }
 
 // ── Editor coret/anotasi foto (Lead Engineer) ─────────────────────
