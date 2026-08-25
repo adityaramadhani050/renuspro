@@ -1,0 +1,210 @@
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  CASH MANAGER — Import dari template Excel (SheetJS)
+//  3 jenis: Pemasukan / Pengeluaran / Ayat Silang. Preview validasi → konfirmasi.
+// ═══════════════════════════════════════════════════════════════════════════
+var _CMI = {
+  pemasukan:   { label: 'Pemasukan',   cols: ['Tanggal', 'Akun', 'Kategori', 'Deskripsi', 'Jumlah', 'No Referensi', 'Catatan'], example: ['01/08/2026', 'BCA', 'Pendapatan Lain', 'Contoh pemasukan', '1000000', '', ''] },
+  pengeluaran: { label: 'Pengeluaran', cols: ['Tanggal', 'Akun', 'No WO', 'Kategori', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'No PO', 'Catatan'], example: ['01/08/2026', 'BCA', '', 'Operasional', 'Contoh biaya', '1', 'ls', '500000', '', ''] },
+  ayat:        { label: 'Ayat Silang', cols: ['Tanggal', 'Akun Asal', 'Akun Tujuan', 'Jumlah', 'Catatan'], example: ['01/08/2026', 'BCA', 'Kas Kecil', '500000', ''] }
+};
+var _cmiState = { type: 'pemasukan', rows: [], loaded: false, akun: [], akunByName: {}, kategori: [], kategoriSet: {}, woSet: {} };
+
+function _cmiEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function _cmiNorm(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+function _cmiUser() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
+function _cmiProm(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) { var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject); r[fn].apply(r, args); });
+}
+function _cmiRp(n) { return 'Rp ' + (Math.round(Number(n) || 0)).toLocaleString('id-ID'); }
+
+// Angka: sel numerik Excel → angka; string "1.000.000" / "Rp 1.000.000,50" → parse.
+function _cmiNum(v) {
+  if (v == null || v === '') return NaN;
+  if (typeof v === 'number') return v;
+  var s = String(v).replace(/[^\d.,-]/g, '');
+  if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.indexOf(',') !== -1) s = s.replace(',', '.');
+  var n = parseFloat(s); return isNaN(n) ? NaN : n;
+}
+function _cmiFmtDate(y, mo, d) { if (!y || !mo || !d) return null; return ('0' + d).slice(-2) + '/' + ('0' + mo).slice(-2) + '/' + y; }
+function _cmiDate(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return _cmiFmtDate(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  if (typeof v === 'number') { try { var o = XLSX.SSF.parse_date_code(v); if (o && o.y) return _cmiFmtDate(o.y, o.m, o.d); } catch (e) {} return null; }
+  var s = String(v).trim();
+  var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/); if (m) return _cmiFmtDate(+m[3], +m[2], +m[1]);
+  var m2 = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/); if (m2) return _cmiFmtDate(+m2[1], +m2[2], +m2[3]);
+  return null;
+}
+function _cmiFindAkun(name) { return _cmiState.akunByName[_cmiNorm(name)] || null; }
+
+// ── Buka / tutup / jenis ──
+function _cmiOpen() {
+  _cmiState.rows = [];
+  document.getElementById('cm-import-file').value = '';
+  document.getElementById('cm-import-filename').textContent = '';
+  document.getElementById('cm-import-preview').classList.add('hidden');
+  document.getElementById('cm-import-summary').classList.add('hidden');
+  document.getElementById('cm-import-submit').disabled = true;
+  document.getElementById('cm-import-submit-label').textContent = 'Import';
+  _cmiSetType('pemasukan');
+  document.getElementById('modal-cm-import').classList.remove('hidden');
+  if (typeof XLSX === 'undefined') { showNotification('Modul Excel belum siap, muat ulang halaman.', 'error'); }
+  _cmiLoadRef();
+}
+function _cmiClose() { document.getElementById('modal-cm-import').classList.add('hidden'); }
+function _cmiSetType(t) {
+  _cmiState.type = t; _cmiState.rows = [];
+  document.querySelectorAll('#cm-import-types .cmi-type').forEach(function (b) {
+    var on = b.getAttribute('data-t') === t;
+    b.className = 'cmi-type px-3.5 py-2 rounded-xl text-sm font-bold border transition ' + (on ? 'bg-emerald-600 border-emerald-600 text-white shadow' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700');
+  });
+  document.getElementById('cm-import-file').value = '';
+  document.getElementById('cm-import-filename').textContent = '';
+  document.getElementById('cm-import-preview').classList.add('hidden');
+  document.getElementById('cm-import-summary').classList.add('hidden');
+  document.getElementById('cm-import-submit').disabled = true;
+  document.getElementById('cm-import-submit-label').textContent = 'Import';
+}
+async function _cmiLoadRef() {
+  try { var acc = await _cmiProm('getBankAccounts'); var list = (acc && acc.accounts) || []; _cmiState.akun = list.map(function (a) { return { id: a.id, nama: a.label }; }); }
+  catch (e) { _cmiState.akun = []; }
+  _cmiState.akunByName = {}; _cmiState.akun.forEach(function (a) { _cmiState.akunByName[_cmiNorm(a.nama)] = a; });
+  try { var kat = await _cmiProm('getKategoriPengeluaran'); _cmiState.kategori = (kat && kat.list) || []; } catch (e) { _cmiState.kategori = []; }
+  _cmiState.kategoriSet = {}; _cmiState.kategori.forEach(function (k) { _cmiState.kategoriSet[_cmiNorm(k)] = k; });
+  _cmiState.woSet = {};
+  try { var wo = await _cmiProm('getWorkOrderList'); (wo || []).forEach(function (w) { if (w && w.status === 'Deal' && w.noWO) _cmiState.woSet[String(w.noWO).trim()] = 1; }); } catch (e) {}
+  _cmiState.loaded = true;
+}
+
+// ── Download template ──
+function _cmiDownloadTemplate() {
+  if (typeof XLSX === 'undefined') return showNotification('Modul Excel belum siap.', 'error');
+  var cfg = _CMI[_cmiState.type];
+  var ws = XLSX.utils.aoa_to_sheet([cfg.cols, cfg.example]);
+  ws['!cols'] = cfg.cols.map(function () { return { wch: 18 }; });
+  var ref = [['REFERENSI (jangan diubah — hanya panduan isi)'], [''], ['Nama Akun yang valid:']];
+  _cmiState.akun.forEach(function (a) { ref.push([a.nama]); });
+  if (_cmiState.type === 'pengeluaran') {
+    ref.push(['']); ref.push(['Kategori Pengeluaran (wajib bila No WO kosong):']);
+    _cmiState.kategori.forEach(function (k) { ref.push([k]); });
+    ref.push(['']); ref.push(['Format: Tanggal DD/MM/YYYY. No WO opsional; isi bila biaya project.']);
+  } else {
+    ref.push(['']); ref.push(['Format: Tanggal DD/MM/YYYY. Jumlah angka tanpa "Rp".']);
+  }
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'Referensi');
+  XLSX.writeFile(wb, 'Template-' + cfg.label.replace(/\s+/g, '-') + '.xlsx');
+}
+
+// ── Upload & validasi ──
+function _cmiOnFile(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  document.getElementById('cm-import-filename').textContent = f.name;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      var ws = wb.Sheets['Data'] || wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true, blankrows: false });
+      _cmiValidate(aoa);
+    } catch (err) { showNotification('Gagal membaca file: ' + (err && err.message || err), 'error'); }
+  };
+  reader.readAsArrayBuffer(f);
+}
+function _cmiValidate(aoa) {
+  var cfg = _CMI[_cmiState.type];
+  var headers = (aoa[0] || []).map(_cmiNorm);
+  var idx = {}; cfg.cols.forEach(function (c) { idx[c] = headers.indexOf(_cmiNorm(c)); });
+  var rows = [];
+  for (var i = 1; i < aoa.length; i++) {
+    var raw = aoa[i] || [];
+    var nonEmpty = raw.some(function (x) { return String(x).trim() !== ''; });
+    if (!nonEmpty) continue;
+    var get = function (c) { var j = idx[c]; return (j >= 0 && raw[j] != null) ? raw[j] : ''; };
+    var rowNum = i + 1, errs = [], payload = null, ringkas = '';
+    var oleh = _cmiUser();
+    var tgl = _cmiDate(get('Tanggal')); if (!tgl) errs.push('Tanggal tidak valid');
+
+    if (_cmiState.type === 'pemasukan') {
+      var ak = _cmiFindAkun(get('Akun')); if (!ak) errs.push('Akun "' + get('Akun') + '" tidak dikenal');
+      var desk = String(get('Deskripsi')).trim(); if (!desk) errs.push('Deskripsi kosong');
+      var jml = _cmiNum(get('Jumlah')); if (isNaN(jml) || jml <= 0) errs.push('Jumlah harus > 0');
+      var kat = String(get('Kategori')).trim() || 'Pendapatan Lain';
+      if (!errs.length) payload = { tanggal: tgl, kategori: kat, idAkun: ak.id, namaAkun: ak.nama, noRef: String(get('No Referensi')).trim(), deskripsi: desk, jumlah: jml, catatan: String(get('Catatan')).trim(), dibuatOleh: oleh };
+      ringkas = (tgl || '-') + ' · ' + (ak ? ak.nama : get('Akun')) + ' · ' + _cmiRp(jml) + ' · ' + desk;
+
+    } else if (_cmiState.type === 'pengeluaran') {
+      var akx = _cmiFindAkun(get('Akun')); if (!akx) errs.push('Akun "' + get('Akun') + '" tidak dikenal');
+      var noWO = String(get('No WO')).trim();
+      var katx = String(get('Kategori')).trim();
+      if (noWO && !_cmiState.woSet[noWO]) errs.push('No WO "' + noWO + '" bukan WO Deal');
+      if (!noWO && !katx) errs.push('Kategori wajib bila tanpa No WO');
+      if (!noWO && katx && !_cmiState.kategoriSet[_cmiNorm(katx)]) errs.push('Kategori "' + katx + '" tidak dikenal');
+      var deskx = String(get('Deskripsi')).trim(); if (!deskx) errs.push('Deskripsi kosong');
+      var qty = _cmiNum(get('Qty')); if (isNaN(qty) || qty <= 0) errs.push('Qty harus > 0');
+      var harga = _cmiNum(get('Harga Satuan')); if (isNaN(harga) || harga <= 0) errs.push('Harga Satuan harus > 0');
+      if (!errs.length) payload = { noWO: noWO, tanggal: tgl, idAkun: akx.id, namaAkun: akx.nama, noPO: String(get('No PO')).trim(), deskripsi: deskx, qty: qty, satuan: String(get('Satuan')).trim(), hargaSatuan: harga, catatan: String(get('Catatan')).trim(), kategori: noWO ? '' : katx, dibuatOleh: oleh };
+      ringkas = (tgl || '-') + ' · ' + (akx ? akx.nama : get('Akun')) + ' · ' + (noWO || 'Operasional') + ' · ' + _cmiRp((qty || 0) * (harga || 0)) + ' · ' + deskx;
+
+    } else {
+      var aA = _cmiFindAkun(get('Akun Asal')); if (!aA) errs.push('Akun Asal "' + get('Akun Asal') + '" tidak dikenal');
+      var aT = _cmiFindAkun(get('Akun Tujuan')); if (!aT) errs.push('Akun Tujuan "' + get('Akun Tujuan') + '" tidak dikenal');
+      if (aA && aT && aA.id === aT.id) errs.push('Akun asal & tujuan tidak boleh sama');
+      var jmlx = _cmiNum(get('Jumlah')); if (isNaN(jmlx) || jmlx <= 0) errs.push('Jumlah harus > 0');
+      if (!errs.length) payload = { tanggal: tgl, idAkunAsal: aA.id, namaAkunAsal: aA.nama, idAkunTujuan: aT.id, namaAkunTujuan: aT.nama, jumlah: jmlx, catatan: String(get('Catatan')).trim(), dibuatOleh: oleh };
+      ringkas = (tgl || '-') + ' · ' + (aA ? aA.nama : get('Akun Asal')) + ' → ' + (aT ? aT.nama : get('Akun Tujuan')) + ' · ' + _cmiRp(jmlx);
+    }
+    rows.push({ n: rowNum, ok: errs.length === 0, errors: errs, payload: payload, ringkas: ringkas });
+  }
+  _cmiState.rows = rows;
+  _cmiRenderPreview();
+}
+function _cmiRenderPreview() {
+  var rows = _cmiState.rows;
+  var valid = rows.filter(function (r) { return r.ok; }).length, inval = rows.length - valid;
+  var sum = document.getElementById('cm-import-summary');
+  sum.className = 'text-sm bg-slate-50 border border-slate-150 rounded-xl p-3'; sum.classList.remove('hidden');
+  if (!rows.length) { sum.innerHTML = '<span class="text-slate-500">Tidak ada baris data terbaca. Pastikan header sesuai template.</span>'; document.getElementById('cm-import-preview').classList.add('hidden'); document.getElementById('cm-import-submit').disabled = true; return; }
+  sum.innerHTML = '<b>' + rows.length + '</b> baris · <b class="text-emerald-700">' + valid + ' valid</b>' + (inval ? (' · <b class="text-rose-600">' + inval + ' error</b>') : '') + (valid ? ' <span class="text-slate-400">— hanya baris valid yang diimport.</span>' : '');
+  var body = rows.map(function (r) {
+    var st = r.ok ? '<span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full whitespace-nowrap">Valid</span>' : '<span class="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full whitespace-nowrap">Error</span>';
+    var det = r.ok ? '' : '<div class="text-[11px] text-rose-500 mt-0.5">' + r.errors.map(_cmiEsc).join('; ') + '</div>';
+    return '<tr class="border-t border-slate-100"><td class="px-3 py-2 text-xs text-slate-400 align-top">' + r.n + '</td><td class="px-3 py-2 text-xs text-slate-700 align-top">' + _cmiEsc(r.ringkas) + det + '</td><td class="px-3 py-2 align-top">' + st + '</td></tr>';
+  }).join('');
+  var pv = document.getElementById('cm-import-preview'); pv.classList.remove('hidden');
+  pv.innerHTML = '<div class="max-h-64 overflow-y-auto"><table class="w-full text-left"><thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400 sticky top-0"><tr><th class="px-3 py-2">#</th><th class="px-3 py-2">Ringkasan</th><th class="px-3 py-2">Status</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  document.getElementById('cm-import-submit').disabled = valid === 0;
+  document.getElementById('cm-import-submit-label').textContent = valid ? ('Import ' + valid + ' baris') : 'Import';
+}
+
+// ── Import (baris valid) ──
+async function _cmiImport() {
+  var valid = _cmiState.rows.filter(function (r) { return r.ok; });
+  if (!valid.length) return;
+  var fnName = _cmiState.type === 'pemasukan' ? 'simpanPemasukanLangsung' : (_cmiState.type === 'pengeluaran' ? 'simpanPengeluaranLangsung' : 'simpanAyatSilang');
+  var btn = document.getElementById('cm-import-submit'), lbl = document.getElementById('cm-import-submit-label');
+  btn.disabled = true;
+  var okc = 0, failc = 0, failMsgs = [];
+  for (var i = 0; i < valid.length; i++) {
+    lbl.textContent = 'Menyimpan ' + (i + 1) + '/' + valid.length + '…';
+    try { var res = await _cmiProm(fnName, valid[i].payload); if (res && res.success) okc++; else { failc++; failMsgs.push('Baris ' + valid[i].n + ': ' + ((res && res.message) || 'gagal')); } }
+    catch (e) { failc++; failMsgs.push('Baris ' + valid[i].n + ': ' + ((e && e.message) || e)); }
+  }
+  lbl.textContent = 'Import';
+  if (typeof loadPemasukan === 'function') loadPemasukan();
+  if (typeof loadSaldoPanel === 'function') loadSaldoPanel();
+  if (typeof _loadExpData === 'function') _loadExpData();
+  var sum = document.getElementById('cm-import-summary'); sum.classList.remove('hidden');
+  sum.className = 'text-sm bg-slate-50 border border-slate-150 rounded-xl p-3';
+  sum.innerHTML = '<b class="text-emerald-700">' + okc + ' berhasil</b>' + (failc ? (' · <b class="text-rose-600">' + failc + ' gagal</b><div class="mt-1 text-xs text-rose-500">' + failMsgs.map(_cmiEsc).join('<br>') + '</div>') : '');
+  showNotification(okc + ' transaksi diimport' + (failc ? (', ' + failc + ' gagal') : '') + '.', failc ? 'error' : 'success');
+  _cmiState.rows = [];
+  document.getElementById('cm-import-preview').classList.add('hidden');
+  document.getElementById('cm-import-file').value = '';
+  document.getElementById('cm-import-filename').textContent = '';
+}
+</script>

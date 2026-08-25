@@ -751,6 +751,41 @@
   </div>
 </div>
 
+<!-- MODAL IMPORT EXCEL — Cash Manager (Pemasukan/Pengeluaran/Ayat Silang) -->
+<div id="modal-cm-import" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4 py-6">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-slate-100 flex flex-col" style="max-height:92vh">
+    <div class="flex items-center gap-3 px-6 py-4 border-b border-slate-100 shrink-0">
+      <span class="bg-emerald-100 text-emerald-600 h-10 w-10 rounded-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-file-excel"></i></span>
+      <div class="flex-1 min-w-0"><h3 class="text-base font-extrabold text-slate-800">Import dari Excel</h3><p class="text-xs text-slate-400">Unduh template, isi, lalu unggah. Sistem memvalidasi sebelum menyimpan.</p></div>
+      <button onclick="_cmiClose()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+      <div>
+        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis Transaksi</p>
+        <div id="cm-import-types" class="flex flex-wrap gap-2">
+          <button data-t="pemasukan" onclick="_cmiSetType('pemasukan')" class="cmi-type px-3.5 py-2 rounded-xl text-sm font-bold border transition">Pemasukan</button>
+          <button data-t="pengeluaran" onclick="_cmiSetType('pengeluaran')" class="cmi-type px-3.5 py-2 rounded-xl text-sm font-bold border transition">Pengeluaran</button>
+          <button data-t="ayat" onclick="_cmiSetType('ayat')" class="cmi-type px-3.5 py-2 rounded-xl text-sm font-bold border transition">Ayat Silang</button>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button onclick="_cmiDownloadTemplate()" class="inline-flex items-center justify-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-4 py-2.5 rounded-xl transition"><i class="fa-solid fa-download"></i> Download Template</button>
+        <label class="inline-flex items-center justify-center gap-2 text-sm font-bold text-white bg-slate-800 hover:bg-slate-900 px-4 py-2.5 rounded-xl transition cursor-pointer">
+          <i class="fa-solid fa-file-arrow-up"></i> Pilih File Excel
+          <input type="file" id="cm-import-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_cmiOnFile(this)">
+        </label>
+        <span id="cm-import-filename" class="text-xs text-slate-400 self-center truncate"></span>
+      </div>
+      <div id="cm-import-summary" class="hidden text-sm"></div>
+      <div id="cm-import-preview" class="hidden border border-slate-150 rounded-xl overflow-hidden"></div>
+    </div>
+    <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
+      <button onclick="_cmiClose()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Tutup</button>
+      <button id="cm-import-submit" onclick="_cmiImport()" disabled class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> <span id="cm-import-submit-label">Import</span></button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL VIEWER GAMBAR (global, gaya seperti foto QC) -->
 <div id="modal-img-viewer" class="hidden fixed inset-0 z-[330] flex flex-col items-center justify-center bg-slate-900/90 px-4 py-6" onclick="if(event.target===this) tutupImgViewer()">
   <button onclick="tutupImgViewer()" class="absolute top-4 right-4 text-white/80 hover:text-white h-11 w-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl transition"><i class="fa-solid fa-xmark"></i></button>
