@@ -755,6 +755,23 @@
   </div>
 </div>
 
+<!-- MODAL PREVIEW FILE PDF (dari Supabase Storage — render canvas + tombol download) -->
+<div id="modal-file-pdf" class="hidden fixed inset-0 z-[330] flex flex-col bg-slate-900/70 px-2 py-3 sm:p-6">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-auto flex flex-col overflow-hidden" style="max-height:calc(100vh - 24px)">
+    <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+      <i class="fa-solid fa-file-pdf text-rose-500 shrink-0"></i>
+      <p id="file-pdf-title" class="text-sm font-bold text-slate-700 truncate flex-1 min-w-0">Dokumen.pdf</p>
+      <button onclick="downloadFilePDF()" class="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg shrink-0"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> Download</span></button>
+      <button onclick="bukaFilePDFTab()" title="Buka di tab baru" class="inline-flex items-center justify-center text-slate-500 hover:bg-slate-100 h-8 w-8 rounded-lg shrink-0"><i class="fa-solid fa-up-right-from-square text-xs"></i></button>
+      <button onclick="tutupPreviewFilePDF()" title="Tutup" class="inline-flex items-center justify-center text-slate-500 hover:bg-slate-100 h-8 w-8 rounded-lg shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="relative flex-1 overflow-y-auto bg-slate-100 p-3">
+      <div id="file-pdf-loading" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2"></div>
+      <div id="file-pdf-canvas-wrap" class="hidden"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL TANDA TANGAN SAYA (Self-service, global) -->
 <div id="modal-ttd-saya" class="hidden fixed inset-0 z-[320] flex items-center justify-center bg-slate-900/50 px-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">

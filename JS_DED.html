@@ -319,7 +319,7 @@ function _dedItemHtml(it) {
       : '';
     var cap = (f.by || f.at) ? '<div class="text-[10px] text-slate-400">' + (f.by ? _dedEsc(f.by) : '') + (f.by && f.at ? ' · ' : '') + (f.at ? _dedEsc(f.at) : '') + '</div>' : '';
     return '<div class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">'
-      + '<a href="' + _dedEsc(f.fileUrl) + '" target="_blank" class="flex items-center gap-2 flex-1 min-w-0 text-rose-600 hover:text-rose-700">'
+      + '<a href="' + _dedEsc(f.fileUrl) + '" target="_blank" data-fn="' + _dedEsc(f.fileName || 'Dokumen.pdf') + '" onclick="return bukaPreviewPDF(this.href, this.dataset.fn), false;" class="flex items-center gap-2 flex-1 min-w-0 text-rose-600 hover:text-rose-700">'
       +   '<i class="fa-solid fa-file-pdf text-lg shrink-0"></i>'
       +   '<div class="min-w-0"><div class="text-xs font-semibold truncate">' + _dedEsc(f.fileName || 'Dokumen.pdf') + '</div>' + cap + '</div>'
       + '</a>' + del + '</div>';
@@ -328,7 +328,7 @@ function _dedItemHtml(it) {
   // Lampiran file revisi dari Lead Engineer (drawing beranotasi) — dilihat Site Engineer.
   var reviewFilesHtml = (it.reviewFiles && it.reviewFiles.length)
     ? '<div class="mt-1.5 flex flex-wrap gap-1.5">' + it.reviewFiles.map(function(rf) {
-        return '<a href="' + _dedEsc(rf.fileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 px-2.5 py-1 rounded-lg"><i class="fa-solid fa-file-pdf"></i>' + _dedEsc(rf.fileName || 'Revisi.pdf') + '</a>';
+        return '<a href="' + _dedEsc(rf.fileUrl) + '" target="_blank" rel="noopener" data-fn="' + _dedEsc(rf.fileName || 'Revisi.pdf') + '" onclick="return bukaPreviewPDF(this.href, this.dataset.fn), false;" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 px-2.5 py-1 rounded-lg"><i class="fa-solid fa-file-pdf"></i>' + _dedEsc(rf.fileName || 'Revisi.pdf') + '</a>';
       }).join('') + '</div>' : '';
   var rejectNote = (it.status === 'Rejected' && (it.catatanReview || reviewFilesHtml))
     ? '<div class="mt-2 text-[11px] bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-3 py-2">' + (it.catatanReview ? '<i class="fa-solid fa-circle-exclamation mr-1"></i><b>Revisi Lead:</b> ' + _dedEsc(it.catatanReview) : '<i class="fa-solid fa-paperclip mr-1"></i><b>File revisi Lead terlampir</b>') + reviewFilesHtml + '</div>' : '';
