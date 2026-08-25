@@ -419,7 +419,8 @@
           var p = a[0] || {}; var noWO = (p.noWO || '').toString().trim(), kode = (p.kode || '').toString().trim(), oleh = (p.oleh || '').toString();
           if (!noWO || !kode) return { success: false, message: 'No WO & kode item wajib.' };
           if (!(p.base64Data || '').toString()) return { success: false, message: 'File tidak boleh kosong.' };
-          var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), p.base64Data.toString(), (p.mimeType || 'image/jpeg').toString(), kode + '.jpg');
+          var _ext1 = (/pdf/i.test(p.mimeType || '') || /\.pdf$/i.test(p.fileName || '')) ? '.pdf' : '.jpg';
+          var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), p.base64Data.toString(), (p.mimeType || 'image/jpeg').toString(), kode + _ext1);
           if (!r.ok) return { success: false, message: r.message };
           var foto = { fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) };
           var res = await _engAppendFiles('qc_item', 'foto', 'QCI', noWO, kode, [foto], oleh);
@@ -438,7 +439,8 @@
           var added = [];
           for (var i = 0; i < files.length; i++) {
             var fl = files[i] || {}; if (!(fl.base64Data || '').toString()) continue;
-            var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), fl.base64Data.toString(), (fl.mimeType || 'image/jpeg').toString(), kode + '.jpg');
+            var _extB = (/pdf/i.test(fl.mimeType || '') || /\.pdf$/i.test(fl.fileName || '')) ? '.pdf' : '.jpg';
+            var r = await _putStorage('qc/' + noWO.replace(/[^\w.\-]/g, '_'), fl.base64Data.toString(), (fl.mimeType || 'image/jpeg').toString(), kode + _extB);
             if (!r.ok) return { success: false, message: r.message };
             added.push({ fileId: r.fileId, fileUrl: r.fileUrl, fileName: r.fileName, by: oleh, at: _fmtTs(new Date()) });
           }

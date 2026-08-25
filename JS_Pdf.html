@@ -52,7 +52,10 @@
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         var blob = await resp.blob();
         _filePdfBlobUrl = URL.createObjectURL(blob);
-        if (isImg || /^image\//.test(blob.type)) {
+        // Tentukan dari isi (blob.type) — ekstensi URL bisa keliru (mis. PDF ber-URL .jpg).
+        var typeImg = /^image\//.test(blob.type), typePdf = /pdf/i.test(blob.type);
+        var asImage = typeImg || (isImg && !typePdf);
+        if (asImage) {
           _showImg(_filePdfBlobUrl);        // _done/_fail dipicu oleh onload/onerror
         } else {
           await _renderPdfDoc(await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise);
