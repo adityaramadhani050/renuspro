@@ -755,19 +755,14 @@
   </div>
 </div>
 
-<!-- MODAL PREVIEW FILE PDF (dari Supabase Storage — render canvas + tombol download) -->
-<div id="modal-file-pdf" class="hidden fixed inset-0 z-[330] flex items-center justify-center bg-slate-900/70 p-3 sm:p-6">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden" style="max-height:calc(100vh - 32px)">
-    <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
-      <i class="fa-solid fa-file-pdf text-rose-500 shrink-0"></i>
-      <p id="file-pdf-title" class="text-sm font-bold text-slate-700 truncate flex-1 min-w-0">Dokumen.pdf</p>
-      <button onclick="downloadFilePDF()" class="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg shrink-0"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> Download</span></button>
-      <button onclick="bukaFilePDFTab()" title="Buka di tab baru" class="inline-flex items-center justify-center text-slate-500 hover:bg-slate-100 h-8 w-8 rounded-lg shrink-0"><i class="fa-solid fa-up-right-from-square text-xs"></i></button>
-      <button onclick="tutupPreviewFilePDF()" title="Tutup" class="inline-flex items-center justify-center text-slate-500 hover:bg-slate-100 h-8 w-8 rounded-lg shrink-0"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="relative flex-1 overflow-y-auto bg-slate-100 p-3" style="min-height:200px">
-      <div id="file-pdf-loading" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2 px-6 text-center"></div>
-      <div id="file-pdf-canvas-wrap" class="hidden"></div>
+<!-- MODAL VIEWER GAMBAR (global, gaya seperti foto QC) -->
+<div id="modal-img-viewer" class="hidden fixed inset-0 z-[330] flex flex-col items-center justify-center bg-slate-900/90 px-4 py-6" onclick="if(event.target===this) tutupImgViewer()">
+  <div class="relative flex flex-col items-center gap-4 max-w-4xl w-full">
+    <div id="img-viewer-spinner" class="absolute inset-0 flex items-center justify-center text-white/80"><div class="animate-spin rounded-full h-9 w-9 border-4 border-white/30 border-t-white"></div></div>
+    <img id="img-viewer-img" src="" alt="Preview gambar" onload="_imgViewerLoaded()" onerror="_imgViewerError()" class="opacity-0 transition-opacity duration-200 max-w-full rounded-lg shadow-2xl" style="max-height:80vh;object-fit:contain;background:#fff">
+    <div class="flex items-center gap-3">
+      <button onclick="downloadImgViewer()" class="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg"><i class="fa-solid fa-download"></i> Download</button>
+      <button onclick="tutupImgViewer()" class="inline-flex items-center gap-1.5 text-xs font-bold text-white/80 hover:text-white px-3 py-2 rounded-lg"><i class="fa-solid fa-xmark"></i> Tutup</button>
     </div>
   </div>
 </div>

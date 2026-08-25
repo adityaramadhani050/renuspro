@@ -1,93 +1,63 @@
 <script>
-    // ── Preview PDF dari URL (Supabase Storage) — render canvas + download ──
-    //  Android sering menampilkan blank saat buka URL PDF langsung; di sini PDF
-    //  diambil lalu dirender ke canvas (pdf.js) + tombol Download yang andal.
-    var _filePdfBlobUrl = null, _filePdfName = 'dokumen.pdf', _filePdfSrcUrl = '';
+    // ── Preview lampiran (konsisten): PDF → modal preview invoice/PO;
+    //  Gambar → viewer gambar fullscreen (gaya foto QC). Google Drive → buka langsung.
+    function _blobToB64(blob) {
+      return new Promise(function (resolve, reject) {
+        var r = new FileReader();
+        r.onload = function () { resolve((r.result || '').toString().split(',')[1] || ''); };
+        r.onerror = reject; r.readAsDataURL(blob);
+      });
+    }
     async function bukaPreviewPDF(url, filename) {
       if (!url) return;
-      // File lama Google Drive tak bisa di-fetch/dirender lintas-origin — buka
-      // langsung di viewer Drive (perilaku lama yang memang berfungsi).
-      if (/drive\.google\.com|docs\.google\.com|googleusercontent\.com/i.test(url)) {
-        window.open(url, '_blank', 'noopener');
-        return;
-      }
-      _filePdfSrcUrl = url;
-      // Nama file apa adanya (jangan tambah/paksa ekstensi — hindari 'H1.jpg.pdf').
-      _filePdfName = (filename || (decodeURIComponent(url.split('?')[0].split('/').pop() || '')) || 'dokumen').toString();
-      var modal = document.getElementById('modal-file-pdf');
-      var wrap = document.getElementById('file-pdf-canvas-wrap');
-      var loading = document.getElementById('file-pdf-loading');
-      var titleEl = document.getElementById('file-pdf-title');
-      if (titleEl) titleEl.textContent = _filePdfName;
-      if (wrap) { wrap.innerHTML = ''; wrap.classList.add('hidden'); wrap.style.visibility = 'hidden'; }
-      if (loading) { loading.classList.remove('hidden'); loading.innerHTML = '<div class="animate-spin rounded-full h-10 w-10 border-4 border-slate-300 border-t-blue-500"></div><p class="text-sm font-medium">Memuat dokumen...</p>'; }
-      if (modal) modal.classList.remove('hidden');
-      if (_filePdfBlobUrl) { try { URL.revokeObjectURL(_filePdfBlobUrl); } catch (e) {} _filePdfBlobUrl = null; }
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      var isImg = /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(url);
-      wrap.style.display = 'flex'; wrap.style.flexDirection = 'column'; wrap.style.alignItems = 'center';
-      var wrapW = Math.min(wrap.clientWidth || 340, 820);
-      var _renderPdfDoc = async function (pdfDoc) {
-        for (var p = 1; p <= pdfDoc.numPages; p++) {
-          var page = await pdfDoc.getPage(p);
-          var vp1 = page.getViewport({ scale: 1 });
-          var vp = page.getViewport({ scale: (wrapW - 8) / vp1.width });
-          var c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
-          c.style.cssText = 'width:100%;max-width:820px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.22);background:#fff;display:block;margin-bottom:10px;';
-          wrap.appendChild(c);
-          await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-        }
-      };
-      var _done = function () { wrap.style.visibility = 'visible'; wrap.classList.remove('hidden'); if (loading) loading.classList.add('hidden'); };
-      var _fail = function () {
-        wrap.classList.add('hidden');
-        if (loading) { loading.classList.remove('hidden'); loading.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl"></i>'
-          + '<p class="text-sm text-rose-500">Preview tidak bisa dimuat di sini.</p>'
-          + '<a href="' + url + '" target="_blank" rel="noopener" class="text-sm font-bold text-blue-600 underline">Buka / unduh file langsung</a>'; }
-      };
-      // Tampilkan gambar; gagal load → jatuh ke fallback link.
-      var _showImg = function (src) {
-        var im = document.createElement('img'); im.alt = _filePdfName;
-        im.style.cssText = 'max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.22);background:#fff;display:block;';
-        im.onload = _done; im.onerror = _fail;
-        wrap.appendChild(im); im.src = src;
-      };
+      if (/drive\.google\.com|docs\.google\.com|googleusercontent\.com/i.test(url)) { window.open(url, '_blank', 'noopener'); return; }
+      var name = (filename || decodeURIComponent(url.split('?')[0].split('/').pop() || '') || 'file').toString();
+      var isImgExt = /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(url);
+      var isPdfExt = /\.pdf(\?|$)/i.test(url);
       try {
-        // 1) Ambil sebagai blob → render lokal + tombol Download andal (termasuk Android).
-        var resp = await fetch(url);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var resp = await fetch(url); if (!resp.ok) throw new Error('HTTP ' + resp.status);
         var blob = await resp.blob();
-        _filePdfBlobUrl = URL.createObjectURL(blob);
-        // Tentukan dari isi (blob.type) — ekstensi URL bisa keliru (mis. PDF ber-URL .jpg).
         var typeImg = /^image\//.test(blob.type), typePdf = /pdf/i.test(blob.type);
-        var asImage = typeImg || (isImg && !typePdf);
+        var asImage = typeImg || (isImgExt && !typePdf);
         if (asImage) {
-          _showImg(_filePdfBlobUrl);        // _done/_fail dipicu oleh onload/onerror
+          _openImgViewer(URL.createObjectURL(blob), name, url);        // viewer gambar (gaya QC)
         } else {
-          await _renderPdfDoc(await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise);
-          _done();
+          // PDF → modal preview yang SAMA dengan invoice/PO/penawaran.
+          var b64 = await _blobToB64(blob);
+          _activePdfDoc = null; _activePdfBase64 = b64;
+          _activePdfName = /\.pdf$/i.test(name) ? name : (name + '.pdf');
+          _pdfBukaPreview(name, '');
+          await renderPDFDariBase64(b64);
         }
-      } catch (err) {
-        // 2) fetch gagal (mis. CORS/bucket privat). Coba render langsung dari URL.
-        try {
-          if (isImg) { _showImg(url); }     // img langsung; onerror → _fail
-          else { await _renderPdfDoc(await pdfjsLib.getDocument({ url: url, withCredentials: false }).promise); _done(); }
-        } catch (err2) {
-          _fail();
-        }
+      } catch (e) {
+        // fetch gagal (mis. CORS/bucket privat) → tampilkan langsung sebisanya.
+        if (isImgExt || !isPdfExt) { _openImgViewer(url, name, url); }
+        else { window.open(url, '_blank', 'noopener'); }
       }
     }
-    function tutupPreviewFilePDF() {
-      var m = document.getElementById('modal-file-pdf'); if (m) m.classList.add('hidden');
-      var w = document.getElementById('file-pdf-canvas-wrap'); if (w) { w.innerHTML = ''; w.classList.add('hidden'); }
-      if (_filePdfBlobUrl) { try { URL.revokeObjectURL(_filePdfBlobUrl); } catch (e) {} _filePdfBlobUrl = null; }
+
+    // ── Viewer gambar global (fullscreen, gaya seperti foto QC) ──
+    var _imgViewerBlobUrl = null, _imgViewerName = 'gambar', _imgViewerSrc = '';
+    function _openImgViewer(src, name, downloadUrl) {
+      _imgViewerName = name || 'gambar'; _imgViewerSrc = downloadUrl || src;
+      if (_imgViewerBlobUrl && _imgViewerBlobUrl !== src) { try { URL.revokeObjectURL(_imgViewerBlobUrl); } catch (e) {} }
+      _imgViewerBlobUrl = (src && src.indexOf('blob:') === 0) ? src : null;
+      var v = document.getElementById('modal-img-viewer'), im = document.getElementById('img-viewer-img'), sp = document.getElementById('img-viewer-spinner');
+      if (im) { im.classList.add('opacity-0'); im.src = src; }
+      if (sp) sp.classList.remove('hidden');
+      if (v) v.classList.remove('hidden');
     }
-    function downloadFilePDF() {
-      var href = _filePdfBlobUrl || _filePdfSrcUrl; if (!href) return;
-      var a = document.createElement('a'); a.href = href; a.download = _filePdfName;
-      document.body.appendChild(a); a.click(); a.remove();
+    function _imgViewerLoaded() { var sp = document.getElementById('img-viewer-spinner'); if (sp) sp.classList.add('hidden'); var im = document.getElementById('img-viewer-img'); if (im) im.classList.remove('opacity-0'); }
+    function _imgViewerError() { var sp = document.getElementById('img-viewer-spinner'); if (sp) sp.classList.add('hidden'); if (_imgViewerSrc) window.open(_imgViewerSrc, '_blank', 'noopener'); tutupImgViewer(); }
+    function tutupImgViewer() {
+      var v = document.getElementById('modal-img-viewer'); if (v) v.classList.add('hidden');
+      var im = document.getElementById('img-viewer-img'); if (im) im.src = '';
+      if (_imgViewerBlobUrl) { try { URL.revokeObjectURL(_imgViewerBlobUrl); } catch (e) {} _imgViewerBlobUrl = null; }
     }
-    function bukaFilePDFTab() { if (_filePdfSrcUrl) window.open(_filePdfSrcUrl, '_blank', 'noopener'); }
+    function downloadImgViewer() {
+      var href = _imgViewerBlobUrl || _imgViewerSrc; if (!href) return;
+      var a = document.createElement('a'); a.href = href; a.download = _imgViewerName; document.body.appendChild(a); a.click(); a.remove();
+    }
     // Handler seragam untuk link lampiran (gambar/PDF). Return true = biarkan
     // anchor default (mis. href kosong '#'); false = tampil preview modal.
     function _openLampiran(a) {
