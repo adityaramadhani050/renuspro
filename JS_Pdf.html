@@ -6,8 +6,8 @@
     async function bukaPreviewPDF(url, filename) {
       if (!url) return;
       _filePdfSrcUrl = url;
-      _filePdfName = (filename || (url.split('?')[0].split('/').pop()) || 'dokumen.pdf').toString();
-      if (!/\.pdf$/i.test(_filePdfName)) _filePdfName += '.pdf';
+      // Nama file apa adanya (jangan tambah/paksa ekstensi — hindari 'H1.jpg.pdf').
+      _filePdfName = (filename || (decodeURIComponent(url.split('?')[0].split('/').pop() || '')) || 'dokumen').toString();
       var modal = document.getElementById('modal-file-pdf');
       var wrap = document.getElementById('file-pdf-canvas-wrap');
       var loading = document.getElementById('file-pdf-loading');
@@ -32,12 +32,20 @@
           await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
         }
       };
-      var _showImg = function (src) {
-        var im = document.createElement('img'); im.src = src; im.alt = _filePdfName;
-        im.style.cssText = 'max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.22);background:#fff;display:block;';
-        wrap.appendChild(im);
-      };
       var _done = function () { wrap.style.visibility = 'visible'; wrap.classList.remove('hidden'); if (loading) loading.classList.add('hidden'); };
+      var _fail = function () {
+        wrap.classList.add('hidden');
+        if (loading) { loading.classList.remove('hidden'); loading.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl"></i>'
+          + '<p class="text-sm text-rose-500">Preview tidak bisa dimuat di sini.</p>'
+          + '<a href="' + url + '" target="_blank" rel="noopener" class="text-sm font-bold text-blue-600 underline">Buka / unduh file langsung</a>'; }
+      };
+      // Tampilkan gambar; gagal load → jatuh ke fallback link.
+      var _showImg = function (src) {
+        var im = document.createElement('img'); im.alt = _filePdfName;
+        im.style.cssText = 'max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.22);background:#fff;display:block;';
+        im.onload = _done; im.onerror = _fail;
+        wrap.appendChild(im); im.src = src;
+      };
       try {
         // 1) Ambil sebagai blob → render lokal + tombol Download andal (termasuk Android).
         var resp = await fetch(url);
@@ -45,21 +53,18 @@
         var blob = await resp.blob();
         _filePdfBlobUrl = URL.createObjectURL(blob);
         if (isImg || /^image\//.test(blob.type)) {
-          if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(_filePdfName)) _filePdfName = _filePdfName.replace(/\.pdf$/i, '') + '.jpg';
-          _showImg(_filePdfBlobUrl);
+          _showImg(_filePdfBlobUrl);        // _done/_fail dipicu oleh onload/onerror
         } else {
           await _renderPdfDoc(await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise);
+          _done();
         }
-        _done();
       } catch (err) {
         // 2) fetch gagal (mis. CORS/bucket privat). Coba render langsung dari URL.
         try {
-          if (isImg) { _showImg(url); _done(); }
+          if (isImg) { _showImg(url); }     // img langsung; onerror → _fail
           else { await _renderPdfDoc(await pdfjsLib.getDocument({ url: url, withCredentials: false }).promise); _done(); }
         } catch (err2) {
-          if (loading) loading.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-400 text-2xl"></i>'
-            + '<p class="text-sm text-rose-500">Preview tidak bisa dimuat di sini.</p>'
-            + '<a href="' + url + '" target="_blank" rel="noopener" class="text-sm font-bold text-blue-600 underline">Buka / unduh file langsung</a>';
+          _fail();
         }
       }
     }
