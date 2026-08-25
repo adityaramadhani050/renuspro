@@ -5,6 +5,12 @@
     var _filePdfBlobUrl = null, _filePdfName = 'dokumen.pdf', _filePdfSrcUrl = '';
     async function bukaPreviewPDF(url, filename) {
       if (!url) return;
+      // File lama Google Drive tak bisa di-fetch/dirender lintas-origin — buka
+      // langsung di viewer Drive (perilaku lama yang memang berfungsi).
+      if (/drive\.google\.com|docs\.google\.com|googleusercontent\.com/i.test(url)) {
+        window.open(url, '_blank', 'noopener');
+        return;
+      }
       _filePdfSrcUrl = url;
       // Nama file apa adanya (jangan tambah/paksa ekstensi — hindari 'H1.jpg.pdf').
       _filePdfName = (filename || (decodeURIComponent(url.split('?')[0].split('/').pop() || '')) || 'dokumen').toString();
