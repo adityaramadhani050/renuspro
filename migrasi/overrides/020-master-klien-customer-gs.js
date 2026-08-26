@@ -312,12 +312,16 @@
         handler: async function (args) {
           var idSupplier = (args[0] || '').toString().trim();
           var q = await supa.from('pricelist')
-            .select('id,nama_material,spesifikasi,satuan,harga_beli').eq('id_supplier', idSupplier);
+            .select('id,nama_material,spesifikasi,merek,satuan,harga_beli').eq('id_supplier', idSupplier);
           if (q.error) return { success: false, list: [], message: q.error.message };
           var list = (q.data || []).map(function (it) {
+            // `nama` (label lama = "nama - spesifikasi") dipertahankan agar nama item
+            // yang tersimpan di PO tak berubah. Field terpisah dipakai frontend untuk
+            // menyusun label konsisten "Merek - Nama Material (Spesifikasi/Tipe)".
             var label = (it.nama_material || '') + (it.spesifikasi ? ' - ' + it.spesifikasi : '');
             return {
               id: it.id || '', nama: label, unit: it.satuan || '',
+              namaMaterial: it.nama_material || '', merek: it.merek || '', spesifikasi: it.spesifikasi || '',
               hargaBeli: Number(it.harga_beli) || 0, leadTime: ''
             };
           }).sort(function (a, b) { return a.nama.localeCompare(b.nama); });

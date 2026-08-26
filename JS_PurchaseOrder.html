@@ -413,7 +413,11 @@ function renderItemsPO() {
       _poSupplierProduk.forEach(function(p) {
         var selAttr = (item.produkId && item.produkId === p.id) ? ' selected' : '';
         if (selAttr) matched = true;
-        opts += '<option value="' + p.id + '" data-nama="' + _escHtml(p.nama) + '" data-unit="' + _escHtml(p.unit || '') + '" data-harga="' + (p.hargaBeli || 0) + '"' + selAttr + '>' + _escHtml(p.nama) + '</option>';
+        // Label konsisten PO/BOM/Inventory: "Merek - Nama Material (Spesifikasi/Tipe)".
+        // data-nama tetap p.nama agar nama item yang tersimpan di PO tak berubah.
+        var _mrk = (p.merek || '').toString().trim(), _spec = (p.spesifikasi || '').toString().trim(), _nm = p.namaMaterial || p.nama;
+        var _lbl = (_mrk ? _mrk + ' - ' : '') + _nm + (_spec ? ' (' + _spec + ')' : '');
+        opts += '<option value="' + p.id + '" data-nama="' + _escHtml(p.nama) + '" data-unit="' + _escHtml(p.unit || '') + '" data-harga="' + (p.hargaBeli || 0) + '"' + selAttr + '>' + _escHtml(_lbl) + '</option>';
       });
       // Item lama (dari PO yg diedit) yg tak ada di katalog supplier ini → tetap
       // ditampilkan sbg opsi terpilih agar tak hilang; pilih ulang utk mengganti.

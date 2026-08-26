@@ -146,15 +146,14 @@ function _populateMutasiProdukFilter(data) {
 
 // ── Render functions (called by _pgRender) ─────────────────────
 
-// Keterangan kecil merek · spesifikasi di bawah nama item (dari pricelist).
-function _invMerekSpecHtml(nama) {
-  var info = _pricelistInfoMap[_invNormNama(nama)];
-  if (!info) return '';
-  var parts = [];
-  if (info.merek) parts.push(info.merek);
-  if (info.spesifikasi) parts.push(info.spesifikasi);
-  if (!parts.length) return '';
-  return '<div class="text-[11px] text-slate-400 font-normal mt-0.5 leading-tight">' + _escHtml(parts.join(' · ')) + '</div>';
+// Sel Nama Item: merek (teks kecil) DI ATAS nama, dan spesifikasi/tipe
+// digabung dengan nama material → "Nama Material (Spesifikasi/Tipe)".
+function _invNamaItemHtml(nama) {
+  var info = _pricelistInfoMap[_invNormNama(nama)] || {};
+  var mrk = info.merek || '', spec = info.spesifikasi || '';
+  var top = mrk ? '<div class="text-[11px] text-slate-400 font-normal leading-tight mb-0.5">' + _escHtml(mrk) + '</div>' : '';
+  var namaLine = _escHtml(nama) + (spec ? ' <span class="font-normal text-slate-500">(' + _escHtml(spec) + ')</span>' : '');
+  return top + namaLine;
 }
 
 function _pgRenderStok(data) {
@@ -191,7 +190,7 @@ function _pgRenderStok(data) {
       hapusBtn;
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="px-4 py-4 font-mono text-xs font-bold text-slate-500 whitespace-nowrap" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
-      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + _invMerekSpecHtml(d.namaProduk) + '</td>' +
+      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _invNamaItemHtml(d.namaProduk) + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap" data-label="Reserved">' + reservedCell + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap ' + qtyClass + '" data-label="Stok">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
@@ -572,7 +571,9 @@ function _loadPricelistOptions(selId) {
     var opts = '<option value="">-- Pilih item dari Pricelist Supplier --</option>';
     list.forEach(function(p) {
       var _spec = (p.spesifikasi || '').toString().trim();
-      var label = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + (_spec ? ' — ' + _spec : '') + (p.satuan ? ' (' + p.satuan + ')' : '');
+      var _mrk = (p.merek || '').toString().trim();
+      // Format konsisten PO/BOM/Inventory: "Merek - Nama Material (Spesifikasi/Tipe)".
+      var label = (_mrk ? _mrk + ' - ' : '') + p.namaMaterial + (_spec ? ' (' + _spec + ')' : '');
       opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-merek="' + _escHtml(p.merek || '') + '" data-spesifikasi="' + _escHtml(_spec) + '" data-satuan="' + _escHtml(p.satuan) + '" data-harga="' + (Number(p.hargaBeli) || 0) + '">' + _escHtml(label) + '</option>';
     });
     sel.innerHTML = opts;

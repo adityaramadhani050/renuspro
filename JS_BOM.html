@@ -1169,9 +1169,9 @@ function _bomOptsForCat(kat) {
   list.sort(function(a, b){ return a.namaMaterial.localeCompare(b.namaMaterial, 'id'); });
   var opts = '<option value="">-- Pilih material --</option>';
   list.forEach(function(p){
-    // Label = nama material saja (+ spesifikasi bila ada). Merek & supplier
-    // sudah punya kolom sendiri, jadi tak diulang di sini.
-    var lbl = p.namaMaterial + (p.spesifikasi ? ' (' + p.spesifikasi + ')' : '');
+    // Format konsisten PO/BOM/Inventory: "Merek - Nama Material (Spesifikasi/Tipe)".
+    var _mrk = (p.merek || '').toString().trim(), _spec = (p.spesifikasi || '').toString().trim();
+    var lbl = (_mrk ? _mrk + ' - ' : '') + p.namaMaterial + (_spec ? ' (' + _spec + ')' : '');
     opts += '<option value="' + _bomEsc(p.id) + '" data-nama="' + _bomEsc(p.namaMaterial) + '" data-merek="' + _bomEsc(p.merek) + '" data-supplier="' + _bomEsc(p.namaSupplier) + '" data-satuan="' + _bomEsc(p.satuan) + '">' + _bomEsc(lbl) + '</option>';
   });
   // Material hanya dari pricelist supplier — tidak ada input manual.
