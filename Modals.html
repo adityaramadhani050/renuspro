@@ -209,6 +209,104 @@
       </div>
     </div>
 
+    <!-- MODAL TAMBAH WO MANUAL (khusus admin) -->
+    <div id="modal-wo-manual" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/50 px-4 py-6 overflow-y-auto">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-xl my-auto">
+        <div class="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+          <span class="bg-blue-50 text-blue-600 h-9 w-9 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-clipboard-list"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-800">Tambah Work Order Manual</h3>
+            <p class="text-xs text-slate-400">Untuk WO lama tanpa penawaran (mis. project tahun lalu)</p>
+          </div>
+          <button onclick="document.getElementById('modal-wo-manual').classList.add('hidden')"
+            class="ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">No WO <span class="text-rose-500">*</span></label>
+              <input type="text" id="wom-nowo" class="input-field text-sm" placeholder="mis. 25012">
+              <p class="text-[11px] text-slate-400 mt-1">Ketik nomor WO lama persis. Harus unik.</p>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Project <span class="text-rose-500">*</span></label>
+              <input type="text" id="wom-project" class="input-field text-sm" placeholder="Nama project">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Klien <span class="text-rose-500">*</span></label>
+            <select id="wom-klien" onchange="_woManualToggleKlienBaru()" class="input-field text-sm">
+              <option value="">— Pilih klien —</option>
+            </select>
+          </div>
+          <div id="wom-klien-baru-wrap" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 border border-slate-150 rounded-xl p-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Klien Baru <span class="text-rose-500">*</span></label>
+              <input type="text" id="wom-klien-nama" class="input-field text-sm" placeholder="Nama klien">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori / Perusahaan</label>
+              <input type="text" id="wom-klien-perusahaan" class="input-field text-sm" placeholder="(opsional)">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kontak PIC</label>
+              <input type="text" id="wom-klien-kontak" class="input-field text-sm" placeholder="(opsional)">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alamat</label>
+              <input type="text" id="wom-klien-alamat" class="input-field text-sm" placeholder="(opsional)">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal WO</label>
+              <input type="date" id="wom-tanggal" class="input-field text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Deal</label>
+              <input type="date" id="wom-tanggal-deal" class="input-field text-sm">
+              <p class="text-[11px] text-slate-400 mt-1">Kosongkan → ikut Tanggal WO.</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nilai Kontrak (exclude PPN)</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
+                <input type="text" id="wom-nilai" inputmode="numeric" oninput="_woManualFmtRp(this)" class="input-field text-sm pl-9" placeholder="0">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Estimasi HPP (exclude PPN)</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
+                <input type="text" id="wom-hpp" inputmode="numeric" oninput="_woManualFmtRp(this)" class="input-field text-sm pl-9" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div id="wom-margin-preview" class="hidden text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-150 rounded-lg px-3 py-2"></div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catatan</label>
+            <textarea id="wom-catatan" rows="2" class="input-field text-sm" placeholder="(opsional)"></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 px-6 pb-5 pt-1 border-t border-slate-100">
+          <button onclick="document.getElementById('modal-wo-manual').classList.add('hidden')"
+            class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition">
+            Batal
+          </button>
+          <button id="wom-submit-btn" onclick="simpanWOManual()"
+            class="px-6 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk"></i> Simpan WO
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL KONFIRMASI HAPUS -->
     <div id="modal-hapus" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
       <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm">

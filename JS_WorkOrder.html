@@ -159,6 +159,9 @@
       var listView = document.getElementById('wo-list-view');
       if (detailView) detailView.classList.add('hidden');
       if (listView) listView.classList.remove('hidden');
+      // Tombol "WO Manual" khusus admin.
+      var _btnWOM = document.getElementById('btn-tambah-wo-manual');
+      if (_btnWOM) _btnWOM.classList.toggle('hidden', !(typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin'));
       var render = function(res) {
         const data = (res && res.woList) ? res.woList : (Array.isArray(res) ? res : []);
         _cachedWorkOrderData = data;
@@ -183,6 +186,104 @@
       if (typeof google !== 'undefined') {
         google.script.run.withSuccessHandler(function(res) { navCacheSet('workorder', res); render(res); }).getWorkOrderDashboard();
       }
+    };
+
+    // ── Tambah WO Manual (khusus admin) ──────────────────────────────
+    function _woManualFmtRp(el) {
+      var raw = (el.value || '').replace(/\D/g, '');
+      el.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
+      _woManualUpdateMargin();
+    }
+    function _woManualParseRp(id) {
+      var el = document.getElementById(id);
+      return el ? (parseInt((el.value || '').replace(/\D/g, ''), 10) || 0) : 0;
+    }
+    function _woManualUpdateMargin() {
+      var box = document.getElementById('wom-margin-preview');
+      if (!box) return;
+      var nilai = _woManualParseRp('wom-nilai'), hpp = _woManualParseRp('wom-hpp');
+      if (nilai <= 0) { box.classList.add('hidden'); return; }
+      var profit = nilai - hpp, margin = nilai > 0 ? (profit / nilai * 100) : 0;
+      box.classList.remove('hidden');
+      box.innerHTML = 'Estimasi profit: <b class="text-slate-700">Rp ' + profit.toLocaleString('id-ID')
+        + '</b> · Margin: <b class="text-slate-700">' + margin.toFixed(1) + '%</b>';
+    }
+    function _woManualToggleKlienBaru() {
+      var sel = document.getElementById('wom-klien');
+      var wrap = document.getElementById('wom-klien-baru-wrap');
+      if (!sel || !wrap) return;
+      wrap.classList.toggle('hidden', sel.value !== '__baru__');
+    }
+    window.bukaTambahWOManual = function() {
+      if (!(typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin')) {
+        return showNotification('Hanya admin yang dapat menambah WO manual.', 'error');
+      }
+      // Reset form
+      ['wom-nowo','wom-project','wom-klien-nama','wom-klien-perusahaan','wom-klien-kontak','wom-klien-alamat','wom-nilai','wom-hpp','wom-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value=''; });
+      var today = new Date();
+      var iso = today.getFullYear() + '-' + ('0'+(today.getMonth()+1)).slice(-2) + '-' + ('0'+today.getDate()).slice(-2);
+      var t1 = document.getElementById('wom-tanggal'); if (t1) t1.value = iso;
+      var t2 = document.getElementById('wom-tanggal-deal'); if (t2) t2.value = '';
+      var box = document.getElementById('wom-margin-preview'); if (box) box.classList.add('hidden');
+      var sel = document.getElementById('wom-klien');
+      if (sel) sel.innerHTML = '<option value="">Memuat klien...</option>';
+      document.getElementById('wom-klien-baru-wrap').classList.add('hidden');
+      document.getElementById('modal-wo-manual').classList.remove('hidden');
+      // Muat daftar klien
+      google.script.run.withSuccessHandler(function(list){
+        var arr = Array.isArray(list) ? list : [];
+        var opts = '<option value="">— Pilih klien —</option>';
+        arr.forEach(function(k){ opts += '<option value="' + k.id + '">' + (k.nama || k.id) + (k.perusahaan ? ' (' + k.perusahaan + ')' : '') + '</option>'; });
+        opts += '<option value="__baru__">➕ Tambah klien baru…</option>';
+        if (sel) { sel.innerHTML = opts; if (typeof sdEnsure === 'function') sdEnsure('wom-klien', '— Pilih klien —', 'Cari klien...'); }
+      }).withFailureHandler(function(){
+        if (sel) sel.innerHTML = '<option value="">— Pilih klien —</option><option value="__baru__">➕ Tambah klien baru…</option>';
+      }).getCustomerList();
+    };
+    window.simpanWOManual = function() {
+      var noWO = (document.getElementById('wom-nowo').value || '').trim();
+      var namaProject = (document.getElementById('wom-project').value || '').trim();
+      var klienSel = (document.getElementById('wom-klien').value || '').trim();
+      if (!noWO) return showNotification('No WO wajib diisi.', 'error');
+      if (!namaProject) return showNotification('Nama project wajib diisi.', 'error');
+      var payload = {
+        noWO: noWO, namaProject: namaProject,
+        tanggal: (document.getElementById('wom-tanggal').value || ''),
+        tanggalDeal: (document.getElementById('wom-tanggal-deal').value || ''),
+        nilaiKontrak: _woManualParseRp('wom-nilai'),
+        estimasiHPP: _woManualParseRp('wom-hpp'),
+        catatan: (document.getElementById('wom-catatan').value || '').trim(),
+        dibuatOleh: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''
+      };
+      if (klienSel === '__baru__') {
+        var namaKlienBaru = (document.getElementById('wom-klien-nama').value || '').trim();
+        if (!namaKlienBaru) return showNotification('Isi nama klien baru atau pilih klien dari daftar.', 'error');
+        payload.namaKlienBaru = namaKlienBaru;
+        payload.perusahaanKlienBaru = (document.getElementById('wom-klien-perusahaan').value || '').trim();
+        payload.kontakKlienBaru = (document.getElementById('wom-klien-kontak').value || '').trim();
+        payload.alamatKlienBaru = (document.getElementById('wom-klien-alamat').value || '').trim();
+      } else if (klienSel) {
+        payload.klienId = klienSel;
+      } else {
+        return showNotification('Pilih klien atau tambah klien baru.', 'error');
+      }
+      var btn = document.getElementById('wom-submit-btn');
+      if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+      toggleLoader(true, 'Menyimpan WO manual...');
+      google.script.run.withSuccessHandler(function(res){
+        toggleLoader(false);
+        if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+        showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+        if (res && res.success) {
+          document.getElementById('modal-wo-manual').classList.add('hidden');
+          if (typeof invalidateNavCache === 'function') invalidateNavCache('workorder');
+          loadWorkOrder();
+        }
+      }).withFailureHandler(function(err){
+        toggleLoader(false);
+        if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+        showNotification((err && err.message) || 'Gagal menyimpan WO.', 'error');
+      }).tambahWOManual(payload);
     };
 
     window.filterWorkOrder = function() {

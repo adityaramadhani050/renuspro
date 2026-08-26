@@ -5,8 +5,13 @@
 
           <!-- ── Header ── -->
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-            <div>
+            <div class="flex items-center gap-3">
               <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Work Order</h2>
+              <button id="btn-tambah-wo-manual" onclick="bukaTambahWOManual()"
+                class="hidden inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-2 rounded-xl shadow-sm transition whitespace-nowrap"
+                title="Tambah WO manual (untuk WO lama tanpa penawaran)">
+                <i class="fa-solid fa-plus"></i> WO Manual
+              </button>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
               <div class="relative flex-1 sm:w-60">

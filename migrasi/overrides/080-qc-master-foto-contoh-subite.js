@@ -325,6 +325,63 @@
         }
       });
 
+      // ── Tambah WO manual (khusus admin) ───────────────────────────────────
+      //  WO di sistem = baris penawaran ber-no_wo & status Deal/Closed. Fitur ini
+      //  membuat baris penawaran "sintetis" untuk WO lama yang tak punya penawaran
+      //  (mis. project tahun lalu). No penawaran = MANUAL-<noWO> (tak bentrok
+      //  dengan format /QUOT/). Klien boleh existing atau dibuat baru inline.
+      window.gsRoute('tambahWOManual', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var noWO = (p.noWO || '').toString().trim();
+          var namaProject = (p.namaProject || '').toString().trim();
+          var klienId = (p.klienId || '').toString().trim();
+          var namaKlienBaru = (p.namaKlienBaru || '').toString().trim();
+          if (!noWO) return { success: false, message: 'No WO wajib diisi.' };
+          if (!namaProject) return { success: false, message: 'Nama project wajib diisi.' };
+          // No WO harus unik (tidak dipakai penawaran/WO lain).
+          var dup = await supa.from('penawaran').select('no_penawaran').eq('no_wo', noWO).limit(1);
+          if (dup.error) return { success: false, message: dup.error.message };
+          if (dup.data && dup.data.length) return { success: false, message: 'No WO "' + noWO + '" sudah dipakai. Gunakan nomor lain.' };
+          // Klien: pakai existing, atau buat baru bila diisi nama klien baru.
+          if (!klienId) {
+            if (!namaKlienBaru) return { success: false, message: 'Pilih klien atau isi nama klien baru.' };
+            var kq = await _all('klien', 'id');
+            if (kq.error) return { success: false, message: kq.error.message };
+            var maxNum = 0; (kq.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^K(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
+            klienId = 'K' + ('000' + (maxNum + 1)).slice(-3);
+            var insK = await supa.from('klien').insert({ id: klienId, nama_klien: namaKlienBaru, perusahaan: (p.perusahaanKlienBaru || '').toString(), alamat: (p.alamatKlienBaru || '').toString(), kontak: (p.kontakKlienBaru || '').toString() });
+            if (insK.error) return { success: false, message: 'Gagal membuat klien baru: ' + insK.error.message };
+          } else {
+            var ck = await supa.from('klien').select('id').eq('id', klienId).maybeSingle();
+            if (!ck.data) return { success: false, message: 'Klien tidak ditemukan.' };
+          }
+          // No penawaran sintetis unik untuk WO manual.
+          var noPen = 'MANUAL-' + noWO;
+          var exPen = await supa.from('penawaran').select('no_penawaran').eq('no_penawaran', noPen).limit(1);
+          if (exPen.data && exPen.data.length) return { success: false, message: 'WO manual dengan No ini sudah ada.' };
+          // Nilai kontrak & HPP exclude PPN → margin estimasi.
+          var subtotal = Math.max(0, Number(p.nilaiKontrak) || 0);
+          var hpp = Math.max(0, Number(p.estimasiHPP) || 0);
+          var profit = subtotal - hpp;
+          var margin = subtotal > 0 ? (profit / subtotal * 100) : 0;
+          var tglIso = _isoDate(p.tanggal) || _todayIso();
+          var tglDeal = _isoDate(p.tanggalDeal) || tglIso;
+          var ins = await supa.from('penawaran').insert({
+            no_penawaran: noPen, rev: 0, tanggal: tglIso, valid_hingga: null,
+            nama_project: namaProject, klien_id: klienId, dibuat_oleh: (p.dibuatOleh || '').toString(),
+            subtotal: subtotal, diskon: 0, pajak: 0, grand_total: subtotal,
+            total_hpp: hpp, estimasi_keuntungan: profit, margin_persen: margin,
+            term_conditions: { catatan: (p.catatan || '').toString(), woManual: true }, items: [],
+            status: 'Deal', no_wo: noWO, tanggal_deal: tglDeal,
+            channel_marketing: '', catatan_fail: '', reminder_expired: null, kode_win: '', catatan_win: '', kode_lost: '', tanggal_fail: null, lesson_learned: '', action: ''
+          });
+          if (ins.error) return { success: false, message: 'Gagal menyimpan WO: ' + ins.error.message };
+          return { success: true, message: 'WO manual ' + noWO + ' berhasil ditambahkan.', noWO: noWO };
+        }
+      });
+
       // ── Group B: Stok langsung ────────────────────────────────────────────
       window.gsRoute('editItemStok', {
         mode: 'fn',
