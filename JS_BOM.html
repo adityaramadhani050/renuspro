@@ -672,7 +672,16 @@ function _bomStatusItemBadge(status) {
 // Lead Engineer → tampilan read-only + approve/reject.
 function _bomRenderBody() {
   if (_bomCanEdit()) { _bomLoadPricelist(function(){ _bomRenderEditable(); }); return; }
+  // Procurement/admin: butuh daftar supplier untuk dropdown supplier per item
+  // di tampilan review (pilih supplier mana material dibeli).
+  if (_bomSupplierEditable()) { _bomLoadSupplierList(function(){ _bomRenderReview(); }); return; }
   _bomRenderReview();
+}
+// Muat daftar supplier saja (untuk dropdown supplier di tampilan review).
+function _bomLoadSupplierList(cb) {
+  if (_bomSupplierList) { cb(); return; }
+  google.script.run.withSuccessHandler(function(res) { _bomSupplierList = Array.isArray(res) ? res : ((res && res.list) ? res.list : []); cb(); })
+    .withFailureHandler(function() { _bomSupplierList = []; cb(); }).getSupplierList();
 }
 
 // Sisa reserved material yang BELUM di-request kirim (bisa ditambah ke request).
@@ -721,6 +730,36 @@ function _bomProcBadge(it) {
   return '<div class="flex flex-col gap-0.5 items-center">' + parts.join('') + '</div>';
 }
 
+// Sel supplier di tampilan review. Procurement/admin (WO belum Closed) →
+// dropdown untuk memilih/mengganti supplier (langsung tersimpan). Role lain →
+// teks read-only.
+function _bomReviewSupplierCell(it) {
+  if (_bomSupplierEditable() && _bomWOStatus !== 'Closed') {
+    return '<select onchange="_bomSetSupplier(\'' + _bomEsc(it.id) + '\', this)" data-prev="' + _bomEsc(it.supplier || '') + '" '
+      + 'class="bom-sup-sel w-full max-w-[9rem] px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">'
+      + _bomSupplierOptions(it.supplier || '') + '</select>';
+  }
+  return '<span class="text-xs text-slate-600">' + (_bomEsc(it.supplier) || '-') + '</span>';
+}
+// Simpan perubahan supplier item BOM (procurement).
+function _bomSetSupplier(id, sel) {
+  var val = sel.value;
+  var prev = sel.getAttribute('data-prev') || '';
+  if (val === prev) return;
+  sel.disabled = true;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      sel.disabled = false;
+      if (res && res.success === false) { sel.value = prev; showNotification(res.message || 'Gagal memperbarui supplier.', 'error'); return; }
+      sel.setAttribute('data-prev', val);
+      var it = (_bomItems || []).filter(function(x){ return x.id === id; })[0];
+      if (it) it.supplier = val;
+      showNotification('Supplier diperbarui.', 'success');
+    })
+    .withFailureHandler(function(err) { sel.disabled = false; sel.value = prev; showNotification((err && err.message) || 'Gagal memperbarui supplier.', 'error'); })
+    .updateBOMItemSupplier(id, val, _bomUserNama());
+}
+
 function _bomRenderReview() {
   var body = document.getElementById('bom-detail-body');
   var canReview = _bomCanReview();
@@ -762,7 +801,7 @@ function _bomRenderReview() {
         + '<td class="p-2 text-center text-xs font-bold text-slate-400 col-no">' + (i + 1) + '</td>'
         + '<td class="p-2 col-desk" data-label="Nama Material"><div class="text-sm font-semibold text-slate-700">' + _bomEsc(it.namaMaterial) + '</div>' + cat + rej + '</td>'
         + '<td class="p-2 col-merek" data-label="Merek"><span class="text-xs text-slate-600">' + (_bomEsc(it.merek) || '-') + '</span></td>'
-        + '<td class="p-2 col-supplier" data-label="Supplier"><span class="text-xs text-slate-600">' + (_bomEsc(it.supplier) || '-') + '</span></td>'
+        + '<td class="p-2 col-supplier" data-label="Supplier">' + _bomReviewSupplierCell(it) + '</td>'
         + '<td class="p-2 text-center col-satuan" data-label="Satuan"><span class="text-xs text-slate-500">' + (_bomEsc(it.satuan) || '-') + '</span></td>'
         + '<td class="p-2 text-center col-qty" data-label="Qty"><span class="text-sm font-extrabold text-indigo-700">' + _bomRp(it.qty) + '</span></td>'
         + '<td class="p-2 text-center col-status" data-label="Status">' + _bomStatusItemBadge(it.status) + '</td>'

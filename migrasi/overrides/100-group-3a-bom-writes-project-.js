@@ -75,6 +75,23 @@
           return { success: true, message: 'Material ' + (keputusan === 'Approved' ? 'disetujui' : 'ditolak') + '.' };
         }
       });
+      // Procurement mengubah supplier item BOM (pilih supplier mana material
+      // akan dibeli). Supplier = atribut procurement, tak mengubah status/approve
+      // material, dan boleh diubah walau item sudah Approved. Terkunci bila WO Closed.
+      window.gsRoute('updateBOMItemSupplier', {
+        mode: 'fn',
+        handler: async function (a) {
+          var id = (a[0] || '').toString().trim(), supplier = (a[1] || '').toString().trim(), oleh = (a[2] || '').toString();
+          if (!id) return { success: false, message: 'ID item wajib.' };
+          var r = await supa.from('bom_item').select('no_wo').eq('id', id).maybeSingle();
+          if (!r.data) return { success: false, message: 'Item tidak ditemukan.' };
+          var noWO = (r.data.no_wo || '').toString();
+          if ((await _woStatus(noWO)) === 'Closed') return { success: false, message: 'Work Order sudah Closed.' };
+          var up = await supa.from('bom_item').update({ supplier: supplier }).eq('id', id);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Supplier diperbarui.' };
+        }
+      });
       window.gsRoute('addBOMProject', {
         mode: 'fn',
         handler: async function (a) {
