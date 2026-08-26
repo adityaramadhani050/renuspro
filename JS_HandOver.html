@@ -94,14 +94,54 @@ function _hoRenderPanel() {
       + '<p class="text-[11px] text-emerald-700 font-semibold mt-2"><i class="fa-solid fa-circle-check mr-1"></i>Selesai oleh <b>' + _hoEsc(r.selesaiOleh || '-') + '</b>' + (r.selesaiPada ? ' · ' + _hoEsc(_hoFmtTs(r.selesaiPada)) : '') + '</p>';
   }
 
+  // Override status HO manual (admin/PC) — untuk WO lama/manual di luar alur normal.
+  var override = '';
+  if (_hoCanManage()) {
+    var stNow = st || '';
+    var overOpts = ['', 'Diminta', 'Dijadwalkan', 'Selesai', 'Batal'].map(function(v){
+      var lab = v === '' ? 'Belum HO' : v;
+      return '<option value="' + v + '"' + (v === stNow ? ' selected' : '') + '>' + lab + '</option>';
+    }).join('');
+    override = '<div class="flex items-center gap-1" title="Set status Hand Over manual (admin/PC) — override alur normal">'
+      + '<span class="text-[10px] text-slate-400 font-semibold whitespace-nowrap"><i class="fa-solid fa-sliders mr-0.5"></i>Set status:</span>'
+      + '<select onchange="_hoSetStatusManual(this)" class="text-[10px] border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-600 font-semibold">' + overOpts + '</select>'
+      + '</div>';
+  }
+
   panel.innerHTML =
       '<div class="bg-white rounded-2xl border border-slate-150 p-5">'
     + '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">'
     +   '<p class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-handshake text-indigo-400"></i> Hand Over ' + badge + '</p>'
-    +   '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + actions + '</div>'
+    +   '<div class="flex items-center gap-1.5 flex-wrap justify-end">' + override + actions + '</div>'
     + '</div>'
     + body
     + '</div>';
+}
+
+// Set status HO manual (admin/PC).
+function _hoSetStatusManual(sel) {
+  if (!_hoWO) return;
+  var val = sel.value;
+  var cur = (_hoRec && _hoRec.status) ? _hoRec.status : '';
+  sel.value = cur;   // reset tampilan; baru diterapkan bila dikonfirmasi (showConfirm tak punya onCancel)
+  if (val === cur) return;
+  var labelMap = { '': 'Belum HO', 'Diminta': 'Diminta', 'Dijadwalkan': 'Dijadwalkan', 'Selesai': 'Selesai', 'Batal': 'Batal' };
+  showConfirm({
+    title: 'Set Status Hand Over', type: 'warning', icon: 'fa-sliders',
+    message: 'Ubah status Hand Over WO ' + _hoWO + ' menjadi "' + (labelMap[val] || val) + '" secara manual? Ini melewati alur normal HO (request → jadwal → selesai).',
+    confirmText: 'Ya, Set Status',
+    onConfirm: function() {
+      toggleLoader(true, 'Menyimpan status HO...');
+      google.script.run.withSuccessHandler(function(res){
+        toggleLoader(false);
+        showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+        if (res && res.success) { _hoLoad(_hoWO); if (typeof invalidateNavCache === 'function') invalidateNavCache('workorder'); }
+      }).withFailureHandler(function(err){
+        toggleLoader(false);
+        showNotification((err && err.message) || 'Gagal menyet status HO.', 'error');
+      }).setStatusHOManual({ noWO: _hoWO, status: val, oleh: _hoUserNama() });
+    }
+  });
 }
 
 function _hoJadwalInfo(r) {

@@ -238,28 +238,16 @@
             </div>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Klien <span class="text-rose-500">*</span></label>
-            <select id="wom-klien" onchange="_woManualToggleKlienBaru()" class="input-field text-sm">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Klien <span class="text-rose-500">*</span></label>
+              <button type="button" onclick="bukaTambahKlienWOManual()" title="+ Tambah Klien"
+                class="flex items-center gap-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1 rounded-lg transition">
+                <i class="fa-solid fa-user-plus text-xs"></i> Tambah Klien
+              </button>
+            </div>
+            <select id="wom-klien" class="input-field text-sm">
               <option value="">— Pilih klien —</option>
             </select>
-          </div>
-          <div id="wom-klien-baru-wrap" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 border border-slate-150 rounded-xl p-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Klien Baru <span class="text-rose-500">*</span></label>
-              <input type="text" id="wom-klien-nama" class="input-field text-sm" placeholder="Nama klien">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kategori / Perusahaan</label>
-              <input type="text" id="wom-klien-perusahaan" class="input-field text-sm" placeholder="(opsional)">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kontak PIC</label>
-              <input type="text" id="wom-klien-kontak" class="input-field text-sm" placeholder="(opsional)">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Alamat</label>
-              <input type="text" id="wom-klien-alamat" class="input-field text-sm" placeholder="(opsional)">
-            </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

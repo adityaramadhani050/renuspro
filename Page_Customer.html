@@ -8,7 +8,7 @@
                 placeholder="Cari nama, kategori, kota..."
                 class="w-full pl-8 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 bg-white">
             </div>
-            <button onclick="document.getElementById('modal-customer').classList.remove('hidden')"
+            <button onclick="window._customerAfterSave=null;window._customerDariForm=false;document.getElementById('modal-customer').classList.remove('hidden')"
               class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
               <i class="fas fa-user-plus text-sm"></i> Tambah Klien Baru
             </button>

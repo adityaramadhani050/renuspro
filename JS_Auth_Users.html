@@ -596,6 +596,7 @@ function simpanUserModal() {
 
 function bukaModalCustomerDariForm() {
   window._customerDariForm = true;
+  window._customerAfterSave = null;   // pastikan hook generik (mis. WO manual) tidak nyangkut
   const form = document.querySelector('#modal-customer form');
   if (form) form.reset();
 

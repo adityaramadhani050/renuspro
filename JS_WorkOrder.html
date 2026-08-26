@@ -208,18 +208,29 @@
       box.innerHTML = 'Estimasi profit: <b class="text-slate-700">Rp ' + profit.toLocaleString('id-ID')
         + '</b> · Margin: <b class="text-slate-700">' + margin.toFixed(1) + '%</b>';
     }
-    function _woManualToggleKlienBaru() {
-      var sel = document.getElementById('wom-klien');
-      var wrap = document.getElementById('wom-klien-baru-wrap');
-      if (!sel || !wrap) return;
-      wrap.classList.toggle('hidden', sel.value !== '__baru__');
-    }
+    // Reuse modul tambah klien (modal-customer) yang sama dengan form penawaran.
+    window.bukaTambahKlienWOManual = function() {
+      window._customerAfterSave = function(k) {
+        var sel = document.getElementById('wom-klien');
+        if (!sel) return;
+        var exists = Array.prototype.some.call(sel.options, function(o){ return o.value === k.id; });
+        if (!exists) sel.add(new Option((k.nama || k.id) + (k.perusahaan ? ' (' + k.perusahaan + ')' : ''), k.id));
+        if (typeof sdSetValue === 'function') { sdSetValue('wom-klien', k.id); if (typeof sdRefresh === 'function') sdRefresh('wom-klien'); }
+        else sel.value = k.id;
+      };
+      var form = document.querySelector('#modal-customer form');
+      if (form) form.reset();
+      var modal = document.getElementById('modal-customer');
+      if (modal.parentElement !== document.body) document.body.appendChild(modal);
+      modal.style.zIndex = '340';   // di atas modal WO manual (z-300)
+      modal.classList.remove('hidden');
+    };
     window.bukaTambahWOManual = function() {
       if (!(typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'admin')) {
         return showNotification('Hanya admin yang dapat menambah WO manual.', 'error');
       }
       // Reset form
-      ['wom-nowo','wom-project','wom-klien-nama','wom-klien-perusahaan','wom-klien-kontak','wom-klien-alamat','wom-nilai','wom-hpp','wom-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value=''; });
+      ['wom-nowo','wom-project','wom-nilai','wom-hpp','wom-catatan'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value=''; });
       var today = new Date();
       var iso = today.getFullYear() + '-' + ('0'+(today.getMonth()+1)).slice(-2) + '-' + ('0'+today.getDate()).slice(-2);
       var t1 = document.getElementById('wom-tanggal'); if (t1) t1.value = iso;
@@ -227,17 +238,15 @@
       var box = document.getElementById('wom-margin-preview'); if (box) box.classList.add('hidden');
       var sel = document.getElementById('wom-klien');
       if (sel) sel.innerHTML = '<option value="">Memuat klien...</option>';
-      document.getElementById('wom-klien-baru-wrap').classList.add('hidden');
       document.getElementById('modal-wo-manual').classList.remove('hidden');
       // Muat daftar klien
       google.script.run.withSuccessHandler(function(list){
         var arr = Array.isArray(list) ? list : [];
         var opts = '<option value="">— Pilih klien —</option>';
         arr.forEach(function(k){ opts += '<option value="' + k.id + '">' + (k.nama || k.id) + (k.perusahaan ? ' (' + k.perusahaan + ')' : '') + '</option>'; });
-        opts += '<option value="__baru__">➕ Tambah klien baru…</option>';
         if (sel) { sel.innerHTML = opts; if (typeof sdEnsure === 'function') sdEnsure('wom-klien', '— Pilih klien —', 'Cari klien...'); }
       }).withFailureHandler(function(){
-        if (sel) sel.innerHTML = '<option value="">— Pilih klien —</option><option value="__baru__">➕ Tambah klien baru…</option>';
+        if (sel) sel.innerHTML = '<option value="">— Pilih klien —</option>';
       }).getCustomerList();
     };
     window.simpanWOManual = function() {
@@ -246,8 +255,9 @@
       var klienSel = (document.getElementById('wom-klien').value || '').trim();
       if (!noWO) return showNotification('No WO wajib diisi.', 'error');
       if (!namaProject) return showNotification('Nama project wajib diisi.', 'error');
+      if (!klienSel) return showNotification('Pilih klien, atau tambah klien baru lewat tombol "Tambah Klien".', 'error');
       var payload = {
-        noWO: noWO, namaProject: namaProject,
+        noWO: noWO, namaProject: namaProject, klienId: klienSel,
         tanggal: (document.getElementById('wom-tanggal').value || ''),
         tanggalDeal: (document.getElementById('wom-tanggal-deal').value || ''),
         nilaiKontrak: _woManualParseRp('wom-nilai'),
@@ -255,18 +265,6 @@
         catatan: (document.getElementById('wom-catatan').value || '').trim(),
         dibuatOleh: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''
       };
-      if (klienSel === '__baru__') {
-        var namaKlienBaru = (document.getElementById('wom-klien-nama').value || '').trim();
-        if (!namaKlienBaru) return showNotification('Isi nama klien baru atau pilih klien dari daftar.', 'error');
-        payload.namaKlienBaru = namaKlienBaru;
-        payload.perusahaanKlienBaru = (document.getElementById('wom-klien-perusahaan').value || '').trim();
-        payload.kontakKlienBaru = (document.getElementById('wom-klien-kontak').value || '').trim();
-        payload.alamatKlienBaru = (document.getElementById('wom-klien-alamat').value || '').trim();
-      } else if (klienSel) {
-        payload.klienId = klienSel;
-      } else {
-        return showNotification('Pilih klien atau tambah klien baru.', 'error');
-      }
       var btn = document.getElementById('wom-submit-btn');
       if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
       toggleLoader(true, 'Menyimpan WO manual...');

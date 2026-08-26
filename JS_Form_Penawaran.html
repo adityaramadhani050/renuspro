@@ -924,6 +924,20 @@
               return;
             }
 
+            // Hook generik: dipakai form lain (mis. WO manual) agar bisa reuse
+            // modul tambah klien tanpa menduplikasi kode. Callback menerima klien
+            // baru {id,nama,perusahaan,kontak,alamat} lalu menangani sendiri.
+            if (typeof window._customerAfterSave === 'function') {
+              var _cb = window._customerAfterSave;
+              window._customerAfterSave = null;
+              window._customerDariForm = false;
+              toggleLoader(false);
+              try { form.reset(); } catch (e) {}
+              _cb({ id: (res.newId || ''), nama: nama, perusahaan: perusahaan, kontak: telepon, alamat: alamat });
+              showNotification('Klien "' + nama + '" berhasil ditambah & dipilih!');
+              return;
+            }
+
             // Tahap 2: refresh data (loader tetap aktif)
             if (window._customerDariForm) {
               toggleLoader(true, "Memuat ulang daftar klien...");

@@ -523,6 +523,42 @@
           return { success: true, message: 'Hand Over WO ' + noWO + ' selesai. WO siap dieksekusi.' };
         }
       });
+      // Set status Hand Over manual (admin/PC) — override alur normal HO.
+      // Berguna untuk WO lama/manual yang tak melewati alur request→jadwal→selesai.
+      // 'Belum HO' (status kosong) → hapus baris HO.
+      window.gsRoute('setStatusHOManual', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var noWO = (p.noWO || '').toString().trim();
+          var status = (p.status || '').toString().trim();
+          var oleh = (p.oleh || '').toString();
+          if (!noWO) return { success: false, message: 'No WO wajib.' };
+          var valid = ['', 'Diminta', 'Dijadwalkan', 'Selesai', 'Batal'];
+          if (valid.indexOf(status) === -1) return { success: false, message: 'Status HO tidak valid.' };
+          var nowIso = new Date().toISOString();
+          if (status === '') {
+            var del = await supa.from('hand_over').delete().eq('no_wo', noWO);
+            if (del.error) return { success: false, message: del.error.message };
+            return { success: true, message: 'Status Hand Over WO ' + noWO + ' di-reset (Belum HO).' };
+          }
+          var cur = await supa.from('hand_over').select('*').eq('no_wo', noWO).maybeSingle();
+          var upd = { status: status };
+          if (status === 'Diminta' && !(cur.data && cur.data.diminta_oleh)) { upd.diminta_oleh = oleh; upd.diminta_pada = nowIso; }
+          if (status === 'Dijadwalkan' && !(cur.data && cur.data.dijadwalkan_oleh)) { upd.dijadwalkan_oleh = oleh; upd.dijadwalkan_pada = nowIso; }
+          if (status === 'Selesai') { upd.selesai_oleh = oleh; upd.selesai_pada = nowIso; }
+          if (cur.data) {
+            var up = await supa.from('hand_over').update(upd).eq('no_wo', noWO);
+            if (up.error) return { success: false, message: up.error.message };
+          } else {
+            var row = { no_wo: noWO, status: status, diminta_oleh: '', diminta_pada: null, tgl_jadwal: null, waktu: null, mode: '', link_meet: '', lokasi: '', peserta: '', catatan_undangan: '', dijadwalkan_oleh: '', dijadwalkan_pada: null, mom: '', selesai_oleh: '', selesai_pada: null, meet_event_id: '' };
+            for (var k in upd) row[k] = upd[k];
+            var ins = await supa.from('hand_over').insert(row);
+            if (ins.error) return { success: false, message: ins.error.message };
+          }
+          return { success: true, message: 'Status Hand Over WO ' + noWO + ' diset: ' + status + '.' };
+        }
+      });
       window.gsRoute('linkBeliLangsung', {
         mode: 'fn',
         handler: async function (a) {
