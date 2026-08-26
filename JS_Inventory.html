@@ -7,6 +7,30 @@ let _cachedStokData   = [];
 let _cachedMutasiData = [];
 let _cachedReqStokData = [];
 let _invActiveTab     = 'stok';
+// Peta merek/spesifikasi per nama material (dari pricelist) untuk keterangan
+// kecil di bawah nama item pada tabel Inventory. Inventory tidak terkait
+// supplier, jadi merek/spesifikasi diambil di level material (bukan supplier).
+let _pricelistInfoMap = {};
+
+function _invNormNama(s) { return (s || '').toString().trim().toLowerCase(); }
+
+function _loadPricelistInfoMap() {
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res) {
+    var list = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
+    var map = {};
+    list.forEach(function(p) {
+      var key = _invNormNama(p.namaMaterial);
+      if (!key) return;
+      if (!map[key]) map[key] = { merek: '', spesifikasi: '' };
+      if (!map[key].merek && p.merek) map[key].merek = (p.merek || '').toString().trim();
+      if (!map[key].spesifikasi && p.spesifikasi) map[key].spesifikasi = (p.spesifikasi || '').toString().trim();
+    });
+    _pricelistInfoMap = map;
+    // Re-render tabel stok bila datanya sudah termuat agar keterangan muncul.
+    if (_cachedStokData && _cachedStokData.length && typeof _pgRender === 'function') _pgRender('stok');
+  }).withFailureHandler(function() {}).getPricelistAll();
+}
 
 function _fmtCurrencyInv(el) {
   var raw = el.value.replace(/\D/g, '');
@@ -67,6 +91,7 @@ function _showInvSection(sectionId) {
 window.loadInventory = function() {
   _showInvSection('inv-list-section');
   switchInvTab('stok');
+  _loadPricelistInfoMap();
   _loadStok();
   loadPenerimaanBarang();   // isi badge Penerimaan tanpa perlu buka tabnya
   loadPengirimanBarang();   // isi badge Pengiriman tanpa perlu buka tabnya
@@ -121,6 +146,17 @@ function _populateMutasiProdukFilter(data) {
 
 // ── Render functions (called by _pgRender) ─────────────────────
 
+// Keterangan kecil merek · spesifikasi di bawah nama item (dari pricelist).
+function _invMerekSpecHtml(nama) {
+  var info = _pricelistInfoMap[_invNormNama(nama)];
+  if (!info) return '';
+  var parts = [];
+  if (info.merek) parts.push(info.merek);
+  if (info.spesifikasi) parts.push(info.spesifikasi);
+  if (!parts.length) return '';
+  return '<div class="text-[11px] text-slate-400 font-normal mt-0.5 leading-tight">' + _escHtml(parts.join(' · ')) + '</div>';
+}
+
 function _pgRenderStok(data) {
   const tbody = document.getElementById('table-stok');
   if (!data || !data.length) {
@@ -155,7 +191,7 @@ function _pgRenderStok(data) {
       hapusBtn;
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="px-4 py-4 font-mono text-xs font-bold text-slate-500 whitespace-nowrap" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
-      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + '</td>' +
+      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _escHtml(d.namaProduk) + _invMerekSpecHtml(d.namaProduk) + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap" data-label="Reserved">' + reservedCell + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap ' + qtyClass + '" data-label="Stok">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
@@ -535,8 +571,9 @@ function _loadPricelistOptions(selId) {
     var list = (res && res.list) ? res.list : (Array.isArray(res) ? res : []);
     var opts = '<option value="">-- Pilih item dari Pricelist Supplier --</option>';
     list.forEach(function(p) {
-      var label = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + ' — ' + (p.namaSupplier || '-') + (p.satuan ? ' (' + p.satuan + ')' : '');
-      opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-satuan="' + _escHtml(p.satuan) + '" data-harga="' + (Number(p.hargaBeli) || 0) + '">' + _escHtml(label) + '</option>';
+      var _spec = (p.spesifikasi || '').toString().trim();
+      var label = p.namaMaterial + (p.merek ? ' · ' + p.merek : '') + (_spec ? ' — ' + _spec : '') + (p.satuan ? ' (' + p.satuan + ')' : '');
+      opts += '<option value="' + _escHtml(p.id) + '" data-nama="' + _escHtml(p.namaMaterial) + '" data-merek="' + _escHtml(p.merek || '') + '" data-spesifikasi="' + _escHtml(_spec) + '" data-satuan="' + _escHtml(p.satuan) + '" data-harga="' + (Number(p.hargaBeli) || 0) + '">' + _escHtml(label) + '</option>';
     });
     sel.innerHTML = opts;
     if (typeof sdEnsure === 'function') sdEnsure(selId, '-- Pilih item Pricelist --', 'Cari item pricelist...');   // data-banyak → searchable

@@ -13,6 +13,7 @@ let _bomWOStatus = '';    // status WO (Closed?)
 let _bomAssigned = [];    // [{id, nama}]
 let _bomPricelist = null; // cache katalog pricelist
 let _bomKategori = null;  // cache master kategori (untuk dropdown blok)
+let _bomSupplierList = null; // cache master supplier (untuk dropdown supplier per item)
 let _bomSiteEngineers = null;
 let _bomPlInited = false;
 let _bomBusyIds = {};     // id material yang sedang di-approve/reject/proses (loading inline)
@@ -51,6 +52,7 @@ window.loadBOM = function(fromNav) {
   // material yang baru dibuat di menu Pricelist langsung muncul (tanpa reload).
   _bomPricelist = null;
   _bomKategori = null;
+  _bomSupplierList = null;
   _bomNeedList = null;   // paksa muat ulang daftar belanja saat masuk menu
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
@@ -902,7 +904,7 @@ function _bomRowHtml(optsStr) {
     +   '<div class="bom-new-extra"></div>'
     + '</td>'
     + '<td class="p-2 col-merek" data-label="Merek"><input class="bom-new-merek w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Merek"></td>'
-    + '<td class="p-2 col-supplier" data-label="Supplier"><input class="bom-new-supplier w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs" placeholder="Supplier"></td>'
+    + '<td class="p-2 col-supplier" data-label="Supplier"><select class="bom-new-supplier w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white">' + _bomSupplierOptions('') + '</select></td>'
     + '<td class="p-2 col-satuan" data-label="Satuan"><input class="bom-new-satuan w-full px-2 py-1.5 border border-slate-200 rounded-md text-center text-xs" placeholder="Satuan"></td>'
     + '<td class="p-2 col-qty" data-label="Qty"><input type="number" step="any" min="0" value="1" class="bom-new-qty w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold"></td>'
     + '<td class="p-2 text-center col-status" data-label="Status"><span class="bom-new-status"></span></td>'
@@ -940,7 +942,8 @@ function _bomAppendRowToBlock(block, optsStr, item) {
     }
     _bomOnPickRow(sel);
     tr.querySelector('.bom-new-merek').value = item.merek || '';
-    tr.querySelector('.bom-new-supplier').value = item.supplier || '';
+    var _spSel = tr.querySelector('.bom-new-supplier');
+    if (_spSel) _spSel.innerHTML = _bomSupplierOptions(item.supplier || '');
     tr.querySelector('.bom-new-satuan').value = item.satuan || '';
     tr.querySelector('.bom-new-qty').value = (item.qty || item.qty === 0) ? item.qty : 1;
     tr.querySelector('.bom-new-status').innerHTML = _bomStatusItemBadge(item.status || 'Pending');
@@ -1013,22 +1016,28 @@ function _bomRemoveRow(btn) {
   btn.closest('tr').remove();
   if (block) _bomRenumberBlock(block);
 }
-// Pilih material → auto-isi merek/supplier/satuan (read-only bila dari pricelist).
+// Pilih material → auto-isi merek/satuan (read-only bila dari pricelist).
+// Supplier TIDAK dikunci: dropdown supplier bisa dipilih bebas oleh procurement
+// (1 material bisa dibeli dari beberapa supplier). Saran supplier dari pricelist
+// hanya dipakai sebagai nilai awal bila belum ada supplier yang dipilih.
 function _bomOnPickRow(sel) {
   var tr = sel.closest('tr');
   var mk = tr.querySelector('.bom-new-merek'), sp = tr.querySelector('.bom-new-supplier'), st = tr.querySelector('.bom-new-satuan');
   var opt = sel.options[sel.selectedIndex];
   var ro = function(el, on) { el.readOnly = on; el.classList.toggle('bg-slate-100', on); el.classList.toggle('text-slate-500', on); };
-  // Material selalu dari pricelist (atau opsi data lama) → merek/supplier/satuan
-  // terisi otomatis & read-only.
   if (opt && opt.value) {
     mk.value = opt.getAttribute('data-merek') || '';
-    sp.value = opt.getAttribute('data-supplier') || '';
     st.value = opt.getAttribute('data-satuan') || '';
-    ro(mk, true); ro(sp, true); ro(st, true);
+    ro(mk, true); ro(st, true);
+    // Saran supplier dari pricelist → hanya jadi default bila dropdown supplier
+    // masih kosong; jangan menimpa pilihan procurement.
+    if (sp && !sp.value) {
+      var saran = opt.getAttribute('data-supplier') || '';
+      if (saran) { for (var _i = 0; _i < sp.options.length; _i++) { if (sp.options[_i].value === saran) { sp.value = saran; break; } } }
+    }
   } else {
-    mk.value = ''; sp.value = ''; st.value = '';
-    ro(mk, true); ro(sp, true); ro(st, true);
+    mk.value = ''; st.value = '';
+    ro(mk, true); ro(st, true);
   }
 }
 function _bomEditSave() {
@@ -1070,11 +1079,28 @@ function _bomEditSave() {
 
 // ── Katalog pricelist (lazy) ────────────────────────────────────
 function _bomLoadPricelist(cb) {
-  if (_bomPricelist && _bomKategori) { cb(); return; }
+  if (_bomPricelist && _bomKategori && _bomSupplierList) { cb(); return; }
   var need = 0, done = function() { if (--need <= 0) cb(); };
   if (!_bomPricelist) { need++; google.script.run.withSuccessHandler(function(res) { _bomPricelist = (res && res.success) ? (res.list || []) : []; done(); }).withFailureHandler(function() { _bomPricelist = []; done(); }).getPricelistAll(); }
   if (!_bomKategori) { need++; google.script.run.withSuccessHandler(function(res) { _bomKategori = (res && res.success) ? (res.list || []) : []; done(); }).withFailureHandler(function() { _bomKategori = []; done(); }).getKategoriList(); }
+  if (!_bomSupplierList) { need++; google.script.run.withSuccessHandler(function(res) { _bomSupplierList = Array.isArray(res) ? res : ((res && res.list) ? res.list : []); done(); }).withFailureHandler(function() { _bomSupplierList = []; done(); }).getSupplierList(); }
   if (need === 0) cb();
+}
+// Opsi <option> nama supplier untuk dropdown supplier per item BOM. Inventory/
+// BOM tidak mengunci 1 material ke 1 supplier — procurement bebas memilih dari
+// supplier mana material akan dibeli (1 material bisa dari beberapa supplier).
+function _bomSupplierOptions(selectedName) {
+  var sel = (selectedName || '').toString().trim();
+  var opts = '<option value="">-- Pilih supplier --</option>';
+  var found = false;
+  (_bomSupplierList || []).forEach(function(s) {
+    var nm = (s.alias && s.alias.trim()) ? s.alias.trim() : (s.nama || '').trim();
+    if (!nm) return;
+    if (nm === sel) found = true;
+    opts += '<option value="' + _bomEsc(nm) + '"' + (nm === sel ? ' selected' : '') + '>' + _bomEsc(nm) + '</option>';
+  });
+  if (sel && !found) opts += '<option value="' + _bomEsc(sel) + '" selected>' + _bomEsc(sel) + ' (lama)</option>';
+  return opts;
 }
 
 // ── Blok kategori + material (mirip sub-paket penawaran) ────────
