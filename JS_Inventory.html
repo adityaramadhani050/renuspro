@@ -605,8 +605,7 @@ function submitPenerimaanTanpaPO() {
   var harga      = _parseCurrencyInv(document.getElementById('ptnpo-harga').value);
   var keterangan = document.getElementById('ptnpo-keterangan').value.trim();
 
-  if (!tanggal)  return showNotification('Tanggal wajib diisi.', 'error');
-  if (qty <= 0)  return showNotification('Qty harus lebih dari 0.', 'error');
+  if (qty < 0)   return showNotification('Qty tidak boleh negatif.', 'error');   // qty 0 boleh (stok awal); tanggal opsional
   if (harga <= 0) return showNotification('Harga satuan harus lebih dari 0.', 'error');
 
   var panelBaru = document.getElementById('ptnpo-panel-baru');

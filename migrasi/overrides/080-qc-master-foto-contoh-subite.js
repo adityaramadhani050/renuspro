@@ -476,9 +476,8 @@
       window.gsRoute('simpanPenerimaanTanpaPO', {
         mode: 'fn',
         handler: async function (a) {
-          var p = a[0] || {}; var qty = Number(p.qty) || 0, harga = Number(p.hargaSatuan) || 0, tgl = _isoDate(p.tanggal), namaUser = (p.namaUser || '').toString();
-          if (qty <= 0) return { success: false, message: 'Qty harus lebih dari 0.' };
-          if (!tgl) return { success: false, message: 'Tanggal wajib diisi.' };
+          var p = a[0] || {}; var qty = Number(p.qty) || 0, harga = Number(p.hargaSatuan) || 0, tgl = _isoDate(p.tanggal) || _todayIso(), namaUser = (p.namaUser || '').toString();
+          if (qty < 0) return { success: false, message: 'Qty tidak boleh negatif.' };   // qty 0 diperbolehkan (stok awal)
           var idProduk = (p.idStok || p.idProduk || '').toString().trim();
           if (!idProduk && (p.namaBaru || '').toString().trim()) {
             idProduk = await _nextSeqId('stok', 'id_produk', 'STK-');
