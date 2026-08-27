@@ -175,12 +175,12 @@ function _mtnBukaDetail(id) {
   var m = (_mtnData || []).filter(function(x){ return x.id === id; })[0];
   if (!m) return;
   _mtnDetailCur = m;
-  document.getElementById('mtn-d-title').innerText = m.namaProject || m.id;
+  document.getElementById('mtn-d-title').innerText = (m.noWO ? m.noWO + ' — ' : '') + (m.namaProject || m.id);
   document.getElementById('mtn-d-sub').innerText = m.id + ' · ' + m.status;
   var row = function(label, val) { return '<div class="flex gap-3 text-sm"><span class="w-32 shrink-0 text-slate-400 font-semibold">'+label+'</span><span class="text-slate-700 flex-1">'+val+'</span></div>'; };
   var sb = '<span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
   var pb = '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
-  var body = '<div class="flex items-center gap-2">'+sb+pb+(m.noWO?'<span class="text-[11px] font-mono font-bold text-slate-400 ml-1">'+_mtnEsc(m.noWO)+'</span>':'')+'</div>';
+  var body = '<div class="flex items-center gap-2">'+sb+pb+'</div>';
   body += '<div class="space-y-2 mt-1">';
   body += row('Tgl Diajukan', _mtnFmtTs(m.dibuatPada) + (m.diajukanOleh ? ' · '+_mtnEsc(m.diajukanOleh) : ''));
   if (m.diprosesPada)  body += row('Tgl Diproses', _mtnFmtTs(m.diprosesPada) + (m.diprosesOleh ? ' · '+_mtnEsc(m.diprosesOleh) : ''));

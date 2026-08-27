@@ -13,16 +13,19 @@
         handler: async function () {
           var _safe = function (p) { return p.then(function (r) { return r; }).catch(function (e) { return { data: [], error: e }; }); };
           var res = await Promise.all([
-            _safe(_all('work_order', 'no_wo,nama_project,nama_klien,status')),
+            _safe(_all('work_order', 'no_wo,nama_project,nama_klien,klien_id,status')),
             _safe(supa.from('hand_over').select('no_wo,status')),
-            _safe(_all('klien', 'nama_klien,alamat,kontak'))
+            _safe(_all('klien', 'id,nama_klien,alamat,kontak'))
           ]);
           var hoMap = {}; (res[1].data || []).forEach(function (h) { if (h.no_wo) hoMap[h.no_wo] = h.status || ''; });
-          var klienMap = {}; (res[2].data || []).forEach(function (k) { if (k.nama_klien) klienMap[k.nama_klien] = k; });
+          // Cocokkan klien by id (utama) & by nama (fallback) agar kontak/alamat
+          // tetap terisi walau nama klien di WO tak sama persis.
+          var klienById = {}, klienByNama = {};
+          (res[2].data || []).forEach(function (k) { if (k.id != null) klienById[(k.id).toString()] = k; if (k.nama_klien) klienByNama[k.nama_klien] = k; });
           var list = (res[0].data || []).filter(function (wo) {
             var w = (wo.no_wo || '').toString(); return (hoMap[w] || '') === 'Selesai';
           }).map(function (wo) {
-            var kd = klienMap[wo.nama_klien] || {};
+            var kd = klienById[(wo.klien_id || '').toString()] || klienByNama[wo.nama_klien] || {};
             return { noWO: wo.no_wo || '', namaProject: wo.nama_project || '', namaKlien: wo.nama_klien || '', alamat: kd.alamat || '', kontak: kd.kontak || '' };
           });
           return { success: true, list: list };
@@ -47,7 +50,7 @@
             diajukan_oleh: (p.namaUser || '').toString().trim() || null, dibuat_pada: new Date().toISOString()
           });
           if (ins.error) return { success: false, message: ins.error.message };
-          if (typeof _notifMaintenanceBaru === 'function') _notifMaintenanceBaru(id, project, (p.lokasi || p.customer || ''), (p.namaUser || ''), (p.jenis || ''), (p.prioritas || 'Normal'));
+          if (typeof _notifMaintenanceBaru === 'function') _notifMaintenanceBaru(id, project, (p.lokasi || p.customer || ''), (p.namaUser || ''), (p.jenis || ''), (p.prioritas || 'Normal'), (p.noWO || '').toString().trim(), deskripsi);
           return { success: true, message: 'Pengajuan maintenance "' + project + '" berhasil dikirim ke Project Coordinator.', id: id };
         }
       });

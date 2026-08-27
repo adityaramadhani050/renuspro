@@ -111,7 +111,7 @@
         },
         // Maintenance baru diajukan (ke Project Coordinator)
         maintenanceBaru: function (d) {
-          return ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), 'Diajukan oleh: ' + (d.oleh || '-'), '', '\nMohon dijadwalkan di menu Maintenance.'].filter(_waNonEmpty).join('\n');
+          return ['🛠️ *Pengajuan Maintenance Baru*', 'ID: *' + d.id + '*', 'Site/Project: ' + (d.noWO ? d.noWO + ' — ' : '') + (d.project || '-'), (d.lokasi ? 'Lokasi: ' + d.lokasi : ''), (d.jenis ? 'Jenis: ' + d.jenis : ''), 'Prioritas: ' + (d.prioritas || 'Normal'), (d.deskripsi ? 'Deskripsi: ' + d.deskripsi : ''), 'Diajukan oleh: ' + (d.oleh || '-'), '', '\nMohon dijadwalkan di menu Maintenance.'].filter(_waNonEmpty).join('\n');
         },
         // Maintenance ditugaskan ke teknisi
         maintenanceDitugaskan: function (d) {
@@ -210,9 +210,9 @@
         var bayarStr = bayar.count ? ('Lunas ' + bayar.count + ' invoice · ' + _waFmtRp(bayar.total)) : 'Belum ada pembayaran lunas';
         _waSend(phones, _WA_MSG.handOverDijadwalkan({ noWO: noWO, proj: proj, tanggal: tanggal, waktu: waktu, mode: mode, link: link, lokasi: lokasi, bayarStr: bayarStr, oleh: oleh }));
       }
-      async function _notifMaintenanceBaru(id, project, lokasi, oleh, jenis, prioritas) {
+      async function _notifMaintenanceBaru(id, project, lokasi, oleh, jenis, prioritas, noWO, deskripsi) {
         if (!ENABLE_WA) return;
-        _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.maintenanceBaru({ id: id, project: project, lokasi: lokasi, jenis: jenis, prioritas: prioritas, oleh: oleh }));
+        _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.maintenanceBaru({ id: id, project: project, lokasi: lokasi, jenis: jenis, prioritas: prioritas, oleh: oleh, noWO: noWO, deskripsi: deskripsi }));
       }
       async function _notifMaintenanceDitugaskan(teknisiId, id, project, tglJadwal, lokasi, jenis, prioritas) {
         if (!ENABLE_WA || !teknisiId) return;
