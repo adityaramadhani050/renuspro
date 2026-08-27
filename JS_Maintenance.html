@@ -79,8 +79,7 @@ window.loadMaintenance = function(fromNav) {
     _mtnData = _mtnFilterByRole(Array.isArray(data) ? data : []);
     _renderMaintenance();
     _mtnRenderKPI();
-    // Badge "Diajukan" hanya relevan untuk yang menjadwalkan (PC/Admin).
-    _mtnSetNavBadge(_mtnCanKelola() ? _mtnData.filter(function(m){ return m.status === 'Diajukan'; }).length : 0);
+    _mtnSetNavBadge(_mtnBadgeCount(_mtnData));
   }).withFailureHandler(function() {
     if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-rose-400">Gagal memuat data.</div>';
   }).getMaintenanceList('');
@@ -136,14 +135,22 @@ function _mtnSetNavBadge(n) {
   if (!b) return;
   if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else b.classList.add('hidden');
 }
+// Hitung badge sesuai role dari daftar (yang SUDAH terfilter role):
+// - PC/Admin: maintenance "Diajukan" (perlu dijadwalkan).
+// - Site Engineer: tugasnya yang "Dijadwalkan"/"Dikerjakan" (perlu dikerjakan).
+function _mtnBadgeCount(list) {
+  list = list || [];
+  if (_mtnRole() === 'siteengineer') return list.filter(function(m){ return m.status === 'Dijadwalkan' || m.status === 'Dikerjakan'; }).length;
+  if (_mtnCanKelola()) return list.filter(function(m){ return m.status === 'Diajukan'; }).length;
+  return 0;
+}
 window._maintenanceRefreshNavBadge = function() {
   if (typeof google === 'undefined') return;
-  // Badge "Diajukan" hanya untuk yang menjadwalkan (PC/Admin).
-  if (!_mtnCanKelola()) { _mtnSetNavBadge(0); return; }
+  if (!_mtnCanKelola() && _mtnRole() !== 'siteengineer') { _mtnSetNavBadge(0); return; }
   google.script.run.withSuccessHandler(function(data){
-    var n = (Array.isArray(data) ? data : []).filter(function(m){ return m.status === 'Diajukan'; }).length;
-    _mtnSetNavBadge(n);
-  }).withFailureHandler(function(){}).getMaintenanceList('Diajukan');
+    var list = _mtnFilterByRole(Array.isArray(data) ? data : []);
+    _mtnSetNavBadge(_mtnBadgeCount(list));
+  }).withFailureHandler(function(){}).getMaintenanceList('');
 };
 
 // ── Ajukan ───────────────────────────────────────────────────────────────────

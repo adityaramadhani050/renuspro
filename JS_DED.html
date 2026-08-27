@@ -23,6 +23,26 @@ function _dedUserId()   { return (typeof _currentUser !== 'undefined' && _curren
 function _dedCanUpload(){ var r = _dedRole(); return r === 'siteengineer' || r === 'admin'; }
 function _dedCanReview(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
 function _dedCanAssign(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
+
+// Nav badge: task menunggu aksi user (Lead/Admin: Pending; Site Engineer: Rejected).
+function _dedBadgeCount(res) {
+  var g = (res && res.global) ? res.global : {};
+  if (_dedCanReview()) return Number(g.pending) || 0;
+  if (_dedCanUpload()) return Number(g.rejected) || 0;
+  return 0;
+}
+function _dedSetNavBadge(n) {
+  var b = document.getElementById('nav-ded-badge'); if (!b) return;
+  if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else b.classList.add('hidden');
+}
+window._dedRefreshNavBadge = function() {
+  if (typeof google === 'undefined' || !(_dedCanReview() || _dedCanUpload())) { _dedSetNavBadge(0); return; }
+  var arg = (_dedRole() === 'siteengineer') ? { siteUserId: _dedUserId() } : {};
+  google.script.run.withSuccessHandler(function(res){
+    if (typeof navCacheSet === 'function' && res) navCacheSet('ded', res);
+    _dedSetNavBadge(_dedBadgeCount(res));
+  }).withFailureHandler(function(){}).getDEDDashboard(arg);
+};
 function _dedEsc(s){ return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // ── HOME ────────────────────────────────────────────────────────
@@ -38,6 +58,7 @@ window.loadDED = function(fromNav) {
   var render = function(res) {
     _dedDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _dedWOList = _dedDash.perWO || [];
+    _dedSetNavBadge(_dedBadgeCount(_dedDash));
     _dedRenderCards(_dedDash.global || {});
     _dedPopulateFilter();
     _dedRenderWOList();

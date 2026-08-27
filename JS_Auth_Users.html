@@ -97,8 +97,11 @@ function _renderUserSidebar(user) {
       if (el) el.classList.toggle('hidden', !allowed.includes(page));
     });
 
-  // Badge jumlah maintenance "Diajukan" di menu (muncul tanpa perlu buka menunya).
+  // Badge jumlah task di menu (muncul tanpa perlu buka menunya).
   if (allowed.includes('maintenance') && typeof _maintenanceRefreshNavBadge === 'function') _maintenanceRefreshNavBadge();
+  if (allowed.includes('qc')  && typeof _qcRefreshNavBadge  === 'function') _qcRefreshNavBadge();
+  if (allowed.includes('bom') && typeof _bomRefreshNavBadge === 'function') _bomRefreshNavBadge();
+  if (allowed.includes('ded') && typeof _dedRefreshNavBadge === 'function') _dedRefreshNavBadge();
 
   // Sembunyikan title grup menu yang seluruh itemnya tidak relevan dengan role user
   const navGroups = {

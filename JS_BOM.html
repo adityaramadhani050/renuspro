@@ -37,6 +37,31 @@ function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r =
 function _bomCanReserve(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // reserve/alokasi dari stok (warehouse)
 function _bomCanBelanja(){ var r = _bomRole(); return r === 'warehouse' || r === 'procurement' || r === 'admin'; }  // lihat tab Perlu Dibelanjakan (warehouse & procurement)
 function _bomCanBuatPO(){ var r = _bomRole(); return r === 'procurement' || r === 'admin'; }  // tombol "Buat PO" pada item Tunggu Beli (procurement)
+
+// Nav badge: task yang menunggu aksi user (dijumlah dari perWO).
+// - Lead Engineer/Admin: item Pending (perlu direview).
+// - Site Engineer: item Rejected (perlu revisi; sudah difilter ke WO-nya).
+// - Warehouse/Procurement: item Approved yang belum diproses (perlu diproses/beli).
+function _bomBadgeCount(res) {
+  var list = (res && res.perWO) ? res.perWO : [];
+  var sum = function(k){ return list.reduce(function(a, w){ return a + (Number(w[k]) || 0); }, 0); };
+  if (_bomCanReview()) return sum('pending');
+  if (_bomRole() === 'siteengineer') return sum('rejected');
+  if (_bomCanReserve() || _bomCanBuatPO()) return sum('procPending');
+  return 0;
+}
+function _bomSetNavBadge(n) {
+  var b = document.getElementById('nav-bom-badge'); if (!b) return;
+  if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else b.classList.add('hidden');
+}
+window._bomRefreshNavBadge = function() {
+  if (typeof google === 'undefined') { _bomSetNavBadge(0); return; }
+  var arg = (_bomRole() === 'siteengineer') ? { siteUserId: _bomUserId() } : {};
+  google.script.run.withSuccessHandler(function(res){
+    if (typeof navCacheSet === 'function' && res) navCacheSet('bom', res);
+    _bomSetNavBadge(_bomBadgeCount(res));
+  }).withFailureHandler(function(){}).getBOMDashboard(arg);
+};
 function _bomIsAssigned(){ var id = _bomUserId(); return (_bomAssigned || []).some(function(a){ return a.id === id; }); }
 // Hanya Site Engineer yang di-assign (& Admin) yang bisa tambah/edit/hapus material.
 function _bomCanEdit()  {
@@ -70,6 +95,7 @@ window.loadBOM = function(fromNav) {
 
   var render = function(res) {
     _bomWOList = (res && res.success) ? (res.perWO || []) : [];
+    _bomSetNavBadge(_bomBadgeCount(res));
     _bomRenderCards((res && res.global) || {});
     _bomRenderWOList();
     _bomRefreshNeedBadge();

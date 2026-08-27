@@ -47,6 +47,28 @@ function _qcUserId() { return (typeof _currentUser !== 'undefined' && _currentUs
 function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r === 'admin'; }
 function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
 function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
+
+// Nav badge: jumlah task yang menunggu aksi user.
+// - Lead Engineer/Admin: item Pending (perlu direview).
+// - Site Engineer: item Rejected (perlu revisi; sudah difilter ke WO-nya).
+function _qcBadgeCount(res) {
+  var g = (res && res.global) ? res.global : {};
+  if (_qcCanReview()) return Number(g.pending) || 0;
+  if (_qcCanUpload()) return Number(g.rejected) || 0;
+  return 0;
+}
+function _qcSetNavBadge(n) {
+  var b = document.getElementById('nav-qc-badge'); if (!b) return;
+  if (n > 0) { b.textContent = n; b.classList.remove('hidden'); } else b.classList.add('hidden');
+}
+window._qcRefreshNavBadge = function() {
+  if (typeof google === 'undefined' || !(_qcCanReview() || _qcCanUpload())) { _qcSetNavBadge(0); return; }
+  var arg = (_qcRole() === 'siteengineer') ? { siteUserId: _qcUserId() } : {};
+  google.script.run.withSuccessHandler(function(res){
+    if (typeof navCacheSet === 'function' && res) navCacheSet('qc', res);
+    _qcSetNavBadge(_qcBadgeCount(res));
+  }).withFailureHandler(function(){}).getQCDashboard(arg);
+};
 function _qcEsc(s) { return (s == null ? '' : s.toString()).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function _qcThumb(fileId, fileUrl, sz) { return _fotoDisplaySrc(fileId, fileUrl, sz || 'w200'); }  // Supabase pakai fileUrl, Drive lama pakai thumbnail fileId
 function _qcJs(s) { return _qcEsc(JSON.stringify(s == null ? '' : s)); }  // aman utk arg string di dalam onclick="..."
@@ -73,6 +95,7 @@ window.loadQC = function(fromNav) {
   var render = function(res) {
     _qcDash = (res && res.success) ? res : { global: {}, perWO: [] };
     _qcWOList = _qcDash.perWO || [];
+    _qcSetNavBadge(_qcBadgeCount(_qcDash));
     _qcRenderCards();
     _qcRenderReviewQueue();
     _qcRenderTeamStats();
