@@ -16,7 +16,7 @@
       async function _dashboardRawData(namaUser, isAdmin, role, userId) {
         try {
           namaUser = (namaUser || '').toString();
-          var pq = await _all('penawaran', 'no_penawaran,rev,tanggal,tanggal_deal,nama_project,klien_id,dibuat_oleh,subtotal,diskon,grand_total,status,channel_marketing,catatan_fail');
+          var pq = await _all('penawaran', 'no_penawaran,rev,tanggal,tanggal_deal,nama_project,klien_id,dibuat_oleh,subtotal,diskon,grand_total,total_hpp,status,channel_marketing,catatan_fail');
           if (pq.error) throw new Error(pq.error.message);
           var kq = await _all('klien', 'id,nama_klien');
           var klienMap = {}; (kq.data || []).forEach(function (k) { if (k.id != null) klienMap[k.id.toString()] = k.nama_klien || ''; });
