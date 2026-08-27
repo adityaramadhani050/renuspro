@@ -86,15 +86,14 @@ function _renderMaintenance() {
   box.innerHTML = list.map(function(m){
     var sb = '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
     var pb = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
-    var woChip = m.noWO ? '<span class="text-[10px] font-mono font-bold text-slate-400">'+_mtnEsc(m.noWO)+'</span>' : '';
     var tek = m.teknisiNama ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500"><i class="fa-solid fa-user-gear text-slate-400"></i> '+_mtnEsc(m.teknisiNama)+'</span>' : '';
     var jad = m.tanggalJadwal ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500" title="Tanggal dijadwalkan/diproses"><i class="fa-regular fa-calendar text-slate-400"></i> '+_mtnFmtTgl(m.tanggalJadwal)+'</span>' : '';
     var sel = m.tanggalSelesai ? '<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600" title="Tanggal selesai"><i class="fa-solid fa-circle-check"></i> '+_mtnFmtTgl(m.tanggalSelesai)+'</span>' : '';
     return '<div onclick="_mtnBukaDetail(&#39;'+_mtnEsc(m.id)+'&#39;)" class="bg-white rounded-2xl border border-slate-150 p-4 hover:border-sky-300 hover:shadow-sm transition cursor-pointer">'
       + '<div class="flex items-start justify-between gap-3">'
       +   '<div class="min-w-0">'
-      +     '<div class="flex items-center gap-2 flex-wrap">'+pb+' '+sb+' '+woChip+'</div>'
-      +     '<p class="font-bold text-slate-800 mt-1.5 truncate">'+_mtnEsc(m.namaProject)+'</p>'
+      +     '<div class="flex items-center gap-2 flex-wrap">'+pb+' '+sb+'</div>'
+      +     '<p class="font-bold text-slate-800 mt-1.5 truncate">'+(m.noWO ? _mtnEsc(m.noWO)+' — ' : '')+_mtnEsc(m.namaProject)+'</p>'
       +     '<p class="text-xs text-slate-400 mt-0.5 truncate">'+_mtnEsc(m.customer || '-')+(m.lokasi ? ' · '+_mtnEsc(m.lokasi) : '')+'</p>'
       +     '<p class="text-xs text-slate-500 mt-1.5 line-clamp-2">'+_mtnEsc(m.jenis ? '['+m.jenis+'] ' : '')+_mtnEsc(m.deskripsi || '')+'</p>'
       +   '</div>'
