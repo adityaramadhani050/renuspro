@@ -120,7 +120,7 @@
               tanggalJadwal: o.tanggal_jadwal, teknisiId: o.teknisi_id || '', teknisiNama: o.teknisi_nama || '',
               tanggalMulai: o.tanggal_mulai, tanggalSelesai: o.tanggal_selesai, laporanHasil: o.laporan_hasil || '',
               catatanPC: o.catatan_pc || '', foto: _arr(o.foto), diajukanOleh: o.diajukan_oleh || '',
-              diprosesOleh: o.diproses_oleh || '', dibuatPada: o.dibuat_pada, diubahPada: o.diubah_pada
+              diprosesOleh: o.diproses_oleh || '', diprosesPada: o.diproses_pada, dibuatPada: o.dibuat_pada, diubahPada: o.diubah_pada
             };
           });
         }
@@ -144,7 +144,8 @@
           if (!id) return { success: false, message: 'ID maintenance wajib.' };
           if (!tglJadwal) return { success: false, message: 'Tanggal rencana pengerjaan wajib diisi.' };
           if (!teknisiNama) return { success: false, message: 'Teknisi pelaksana wajib dipilih.' };
-          var mrow = await supa.from('maintenance').select('status,nama_project,lokasi,jenis,prioritas,diproses_pada').eq('id', id).maybeSingle();
+          var mrow = await supa.from('maintenance').select('status,nama_project,lokasi,jenis,prioritas,no_wo,deskripsi,diproses_pada').eq('id', id).maybeSingle();
+          if (mrow.error) return { success: false, message: mrow.error.message };
           if (!mrow.data) return { success: false, message: 'Maintenance tidak ditemukan.' };
           var st = (mrow.data.status || '');
           if (_mtnFinal(st)) return { success: false, message: 'Maintenance berstatus "' + st + '" sudah final.' };
@@ -207,6 +208,7 @@
           if (!id) return { success: false, message: 'ID maintenance wajib.' };
           if (!alasan) return { success: false, message: 'Alasan penolakan wajib diisi.' };
           var frow = await supa.from('maintenance').select('status,diproses_pada').eq('id', id).maybeSingle();
+          if (frow.error) return { success: false, message: frow.error.message };
           if (!frow.data) return { success: false, message: 'Maintenance tidak ditemukan.' };
           var st = (frow.data.status || '');
           if (_mtnFinal(st)) return { success: false, message: 'Maintenance berstatus "' + st + '" sudah final.' };

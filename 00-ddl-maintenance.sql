@@ -31,6 +31,7 @@ create table if not exists maintenance (
   foto              jsonb,                         -- array {fileId,fileUrl,fileName}
   diajukan_oleh     text,
   diproses_oleh     text,
+  diproses_pada     timestamptz,                   -- waktu respon pertama PC (untuk response time)
   dibuat_pada       timestamptz default now(),
   diubah_pada       timestamptz
 );
