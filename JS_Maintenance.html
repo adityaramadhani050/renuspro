@@ -20,6 +20,8 @@ function _mtnCanKerjakan(m) {
   }
   return false;
 }
+// Hanya pengaju yang bisa menghapus, dan hanya selama masih Diajukan.
+function _mtnCanHapus(m) { return !!(m && m.status === 'Diajukan' && m.diajukanOleh && m.diajukanOleh === _mtnUser()); }
 
 var _MTN_STATUS_CLS = {
   'Diajukan':'bg-amber-100 text-amber-700', 'Dijadwalkan':'bg-blue-100 text-blue-700',
@@ -236,11 +238,33 @@ function _mtnBukaDetail(id) {
   if (_mtnCanKerjakan(m) && m.status === 'Selesai') {
     acts += '<button onclick="_mtnBukaSelesai()" class="px-4 py-2.5 text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center gap-2"><i class="fa-solid fa-camera"></i> Tambah Foto</button>';
   }
+  if (_mtnCanHapus(m)) {
+    acts += '<button onclick="_mtnHapus()" class="px-4 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl flex items-center gap-2"><i class="fa-regular fa-trash-can"></i> Hapus</button>';
+  }
   acts += '<button onclick="_mtnTutupDetail()" class="px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Tutup</button>';
   document.getElementById('mtn-d-actions').innerHTML = acts;
   document.getElementById('modal-mtn-detail').classList.remove('hidden');
 }
 function _mtnTutupDetail() { document.getElementById('modal-mtn-detail').classList.add('hidden'); _mtnDetailCur = null; }
+
+function _mtnHapus() {
+  var m = _mtnDetailCur; if (!m) return;
+  if (!_mtnCanHapus(m)) return showNotification('Hanya pengaju yang dapat menghapus, selama status masih Diajukan.', 'error');
+  showConfirm({
+    title: 'Hapus Pengajuan Maintenance', type: 'danger', icon: 'fa-trash-can',
+    message: 'Hapus pengajuan maintenance "' + (m.namaProject || m.id) + '"? Tindakan ini tidak dapat dibatalkan.',
+    confirmText: 'Ya, Hapus',
+    onConfirm: function() {
+      toggleLoader(true, 'Menghapus...');
+      google.script.run.withSuccessHandler(function(res){
+        toggleLoader(false);
+        showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+        if (res && res.success) { _mtnTutupDetail(); loadMaintenance(); }
+      }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
+        .hapusMaintenance(m.id, _mtnUser());
+    }
+  });
+}
 
 // ── Jadwalkan & Tugaskan ─────────────────────────────────────────────────────
 function _mtnBukaJadwal() {

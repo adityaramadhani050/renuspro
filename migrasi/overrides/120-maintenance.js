@@ -55,6 +55,24 @@
         }
       });
 
+      // Hapus pengajuan maintenance — hanya bila masih 'Diajukan' DAN oleh
+      // pengaju itu sendiri (diajukan_oleh === namaUser).
+      window.gsRoute('hapusMaintenance', {
+        mode: 'fn',
+        handler: async function (a) {
+          var id = (a[0] || '').toString().trim();
+          var namaUser = (a[1] || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          var m = await supa.from('maintenance').select('status,diajukan_oleh').eq('id', id).maybeSingle();
+          if (!m.data) return { success: false, message: 'Data maintenance tidak ditemukan.' };
+          if ((m.data.status || '') !== 'Diajukan') return { success: false, message: 'Hanya pengajuan berstatus Diajukan yang bisa dihapus.' };
+          if (!namaUser || (m.data.diajukan_oleh || '').toString().trim() !== namaUser) return { success: false, message: 'Hanya pengaju yang dapat menghapus pengajuan ini.' };
+          var del = await supa.from('maintenance').delete().eq('id', id);
+          if (del.error) return { success: false, message: del.error.message };
+          return { success: true, message: 'Pengajuan maintenance ' + id + ' dihapus.' };
+        }
+      });
+
       window.gsRoute('getMaintenanceList', {
         mode: 'fn',
         handler: async function (a) {
