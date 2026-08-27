@@ -1117,7 +1117,7 @@ function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
       body.innerHTML = order.map(function(key, gi) {
         var g = groups[key];
         var accId = 'db-stale-' + gi;
-        var open = isSalesView || (gi === 0); // sales: selalu terbuka; lainnya: grup teratas
+        var open = isSalesView; // sales: statis terbuka; admin/lead: accordion tertutup (tak auto-open)
         var rows = g.offers.map(function(o) {
           var umurCls = _dbAgingBadgeCls(o.umurHari);
           return '<tr class="hover:bg-slate-50 transition">'
