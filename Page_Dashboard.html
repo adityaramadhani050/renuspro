@@ -68,7 +68,7 @@
   <div id="db-main-content" class="hidden space-y-6">
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
         <div class="flex items-center gap-1 mb-1">
           <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Revenue Deal</p>
@@ -80,6 +80,19 @@
         </div>
         <p id="db-kpi-revenue" class="text-xl font-extrabold text-emerald-600 leading-tight">—</p>
         <p id="db-kpi-revenue-sub" class="text-[10px] text-slate-400 mt-1"></p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
+        <div class="flex items-center gap-1 mb-1">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Margin Deal</p>
+          <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+            data-tip="Total estimasi margin (keuntungan) rupiah dari penawaran yang Deal dalam periode ini, beserta persentasenya terhadap Revenue Deal. Basis exclude PPN.">
+            <i class="fa-solid fa-circle-info text-[10px]"></i>
+          </span>
+          <span id="db-kpi-margin-badge" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1"></span>
+        </div>
+        <p id="db-kpi-margin" class="text-xl font-extrabold text-violet-600 leading-tight">—</p>
+        <p id="db-kpi-margin-sub" class="text-[10px] text-slate-400 mt-1"></p>
       </div>
 
       <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">

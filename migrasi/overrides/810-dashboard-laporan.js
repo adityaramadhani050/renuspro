@@ -43,7 +43,7 @@
               id: no, rev: r._rev, tanggal: _epochJk(_isoDate(r.tanggal)), tanggalDeal: _epochJk(_isoDate(r.tanggal_deal)),
               namaProject: (r.nama_project || '').toString(), klienId: kid, namaKlien: klienMap[kid] || kid,
               dibuatOleh: (r.dibuat_oleh || '').toString(), nilaiKontrak: Math.max(0, (parseFloat(r.subtotal) || 0) - (parseFloat(r.diskon) || 0)),
-              grandTotal: parseFloat(r.grand_total) || 0, status: (r.status || 'On-Progress').toString(),
+              grandTotal: parseFloat(r.grand_total) || 0, totalHpp: parseFloat(r.total_hpp) || 0, status: (r.status || 'On-Progress').toString(),
               channelMarketing: (r.channel_marketing || '').toString(), catatanFail: (r.catatan_fail || '').toString()
             };
           });

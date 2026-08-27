@@ -406,6 +406,31 @@ function _dbRenderKPIs(summary, prev, salesList, items, ms) {
   if (pipEl) pipEl.textContent = _rp(summary.teamPipelineValue || 0);
   var pipSub = document.getElementById('db-kpi-pipeline-sub');
   if (pipSub) pipSub.textContent = (summary.teamPipelineCount || 0) + ' penawaran';
+
+  // Margin Deal (nilai + %) — cohort SAMA dengan Revenue Deal (status Deal &
+  // tanggal deal dalam periode). Nilai margin = Σ (nilaiKontrak − HPP) exclude
+  // PPN; persentase = nilai margin ÷ revenue deal (definisi margin konsisten
+  // dengan Statistik Konversi & kolom Margin per penawaran).
+  var marginValue = 0, revBasis = 0;
+  (items || []).forEach(function(it) {
+    if (it.status !== 'Deal') return;
+    var d = it.tanggalDeal || it.tanggal;
+    if (!d || d < pFrom || d > pTo) return;
+    var nilai = (it.nilaiKontrak !== undefined ? it.nilaiKontrak : it.grandTotal) || 0;
+    var hpp = Number(it.totalHpp) || 0;
+    marginValue += (nilai - hpp);
+    revBasis += nilai;
+  });
+  var marginPct = revBasis > 0 ? (marginValue / revBasis * 100) : 0;
+  var margEl = document.getElementById('db-kpi-margin');
+  if (margEl) margEl.textContent = _rp(Math.round(marginValue));
+  var margBadge = document.getElementById('db-kpi-margin-badge');
+  if (margBadge) {
+    margBadge.textContent = _pct(marginPct);
+    margBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 bg-violet-100 text-violet-700';
+  }
+  var margSub = document.getElementById('db-kpi-margin-sub');
+  if (margSub) margSub.textContent = 'Estimasi keuntungan (excl. PPN)';
 }
 
 // ── Target progress bar ────────────────────────────────────────
