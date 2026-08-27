@@ -47,6 +47,17 @@ function _mtnFmtTs(s) {
   return d.getDate() + ' ' + bln[d.getMonth()] + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
+// Site engineer hanya melihat maintenance yang ditugaskan ke dirinya
+// (mirip QC/BOM/DED). Role lain melihat semua.
+function _mtnFilterByRole(list) {
+  if (_mtnRole() !== 'siteengineer') return list;
+  var uid = (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.id || '') : '';
+  var unm = _mtnUser();
+  return (list || []).filter(function(m){
+    return (m.teknisiId && m.teknisiId === uid) || (m.teknisiNama && m.teknisiNama === unm);
+  });
+}
+
 // ── Load ───────────────────────────────────────────────────────────────────
 window.loadMaintenance = function(fromNav) {
   var btn = document.getElementById('mtn-btn-ajukan');
@@ -55,9 +66,10 @@ window.loadMaintenance = function(fromNav) {
   var box = document.getElementById('mtn-card-list');
   if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat data maintenance...</div>';
   google.script.run.withSuccessHandler(function(data) {
-    _mtnData = Array.isArray(data) ? data : [];
+    _mtnData = _mtnFilterByRole(Array.isArray(data) ? data : []);
     _renderMaintenance();
     _mtnRenderKPI();
+    // Site engineer tak menangani status Diajukan → badge dari data terfilter.
     _mtnSetNavBadge(_mtnData.filter(function(m){ return m.status === 'Diajukan'; }).length);
   }).withFailureHandler(function() {
     if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-rose-400">Gagal memuat data.</div>';
@@ -86,14 +98,15 @@ function _renderMaintenance() {
   box.innerHTML = list.map(function(m){
     var sb = '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
     var pb = '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
+    var woBadge = m.noWO ? '<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">'+_mtnEsc(m.noWO)+'</span>' : '';
     var tek = m.teknisiNama ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500"><i class="fa-solid fa-user-gear text-slate-400"></i> '+_mtnEsc(m.teknisiNama)+'</span>' : '';
     var jad = m.tanggalJadwal ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500" title="Tanggal dijadwalkan/diproses"><i class="fa-regular fa-calendar text-slate-400"></i> '+_mtnFmtTgl(m.tanggalJadwal)+'</span>' : '';
     var sel = m.tanggalSelesai ? '<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600" title="Tanggal selesai"><i class="fa-solid fa-circle-check"></i> '+_mtnFmtTgl(m.tanggalSelesai)+'</span>' : '';
     return '<div onclick="_mtnBukaDetail(&#39;'+_mtnEsc(m.id)+'&#39;)" class="bg-white rounded-2xl border border-slate-150 p-4 hover:border-sky-300 hover:shadow-sm transition cursor-pointer">'
       + '<div class="flex items-start justify-between gap-3">'
       +   '<div class="min-w-0">'
-      +     '<div class="flex items-center gap-2 flex-wrap">'+pb+' '+sb+'</div>'
-      +     '<p class="font-bold text-slate-800 mt-1.5 truncate">'+(m.noWO ? _mtnEsc(m.noWO)+' — ' : '')+_mtnEsc(m.namaProject)+'</p>'
+      +     '<div class="flex items-center gap-2 flex-wrap">'+woBadge+' '+pb+' '+sb+'</div>'
+      +     '<p class="font-bold text-slate-800 mt-1.5 truncate">'+_mtnEsc(m.namaProject)+'</p>'
       +     '<p class="text-xs text-slate-400 mt-0.5 truncate">'+_mtnEsc(m.customer || '-')+(m.lokasi ? ' · '+_mtnEsc(m.lokasi) : '')+'</p>'
       +     '<p class="text-xs text-slate-500 mt-1.5 line-clamp-2">'+_mtnEsc(m.jenis ? '['+m.jenis+'] ' : '')+_mtnEsc(m.deskripsi || '')+'</p>'
       +   '</div>'
@@ -112,6 +125,8 @@ function _mtnSetNavBadge(n) {
 }
 window._maintenanceRefreshNavBadge = function() {
   if (typeof google === 'undefined') return;
+  // Site engineer tak menangani status Diajukan → tak perlu badge.
+  if (_mtnRole() === 'siteengineer') { _mtnSetNavBadge(0); return; }
   google.script.run.withSuccessHandler(function(data){
     var n = (Array.isArray(data) ? data : []).filter(function(m){ return m.status === 'Diajukan'; }).length;
     _mtnSetNavBadge(n);
@@ -174,12 +189,13 @@ function _mtnBukaDetail(id) {
   var m = (_mtnData || []).filter(function(x){ return x.id === id; })[0];
   if (!m) return;
   _mtnDetailCur = m;
-  document.getElementById('mtn-d-title').innerText = (m.noWO ? m.noWO + ' — ' : '') + (m.namaProject || m.id);
+  document.getElementById('mtn-d-title').innerText = m.namaProject || m.id;
   document.getElementById('mtn-d-sub').innerText = m.id + ' · ' + m.status;
   var row = function(label, val) { return '<div class="flex gap-3 text-sm"><span class="w-32 shrink-0 text-slate-400 font-semibold">'+label+'</span><span class="text-slate-700 flex-1">'+val+'</span></div>'; };
   var sb = '<span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full '+(_MTN_STATUS_CLS[m.status]||'bg-slate-100 text-slate-600')+'">'+_mtnEsc(m.status)+'</span>';
   var pb = '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(_MTN_PRIO_CLS[m.prioritas]||'bg-slate-100 text-slate-500')+'">'+_mtnEsc(m.prioritas)+'</span>';
-  var body = '<div class="flex items-center gap-2">'+sb+pb+'</div>';
+  var wob = m.noWO ? '<span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">'+_mtnEsc(m.noWO)+'</span>' : '';
+  var body = '<div class="flex items-center gap-2 flex-wrap">'+wob+pb+sb+'</div>';
   body += '<div class="space-y-2 mt-1">';
   body += row('Tgl Diajukan', _mtnFmtTs(m.dibuatPada) + (m.diajukanOleh ? ' · '+_mtnEsc(m.diajukanOleh) : ''));
   if (m.diprosesPada)  body += row('Tgl Diproses', _mtnFmtTs(m.diprosesPada) + (m.diprosesOleh ? ' · '+_mtnEsc(m.diprosesOleh) : ''));
