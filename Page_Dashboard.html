@@ -71,6 +71,31 @@
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
         <div class="flex items-center gap-1 mb-1">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penawaran Dibuat</p>
+          <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+            data-tip="Jumlah penawaran yang dibuat dalam periode ini, termasuk semua status (Deal, On-Progress, Fail).">
+            <i class="fa-solid fa-circle-info text-[10px]"></i>
+          </span>
+        </div>
+        <p id="db-kpi-penawaran" class="text-xl font-extrabold text-blue-600 leading-tight">—</p>
+        <p class="text-[10px] text-slate-400 mt-1">Termasuk semua status</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
+        <div class="flex items-center gap-1 mb-1">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Deal</p>
+          <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
+            data-tip="Jumlah penawaran yang berhasil ditandai Deal. Win Rate = Deal ÷ Total Penawaran × 100%.">
+            <i class="fa-solid fa-circle-info text-[10px]"></i>
+          </span>
+          <span id="db-kpi-deal-badge" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1"></span>
+        </div>
+        <p id="db-kpi-deal" class="text-xl font-extrabold text-slate-800 leading-tight">—</p>
+        <p id="db-kpi-deal-sub" class="text-[10px] text-slate-400 mt-1 leading-snug"></p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
+        <div class="flex items-center gap-1 mb-1">
           <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Revenue Deal</p>
           <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
             data-tip="Total nilai rupiah dari penawaran yang berhasil Deal dalam periode ini. Dihitung berdasarkan tanggal deal, bukan tanggal penawaran dibuat.">
@@ -93,31 +118,6 @@
         </div>
         <p id="db-kpi-margin" class="text-xl font-extrabold text-violet-600 leading-tight">—</p>
         <p id="db-kpi-margin-sub" class="text-[10px] text-slate-400 mt-1"></p>
-      </div>
-
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
-        <div class="flex items-center gap-1 mb-1">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penawaran Dibuat</p>
-          <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
-            data-tip="Jumlah penawaran yang dibuat dalam periode ini, termasuk semua status (Deal, On-Progress, Fail).">
-            <i class="fa-solid fa-circle-info text-[10px]"></i>
-          </span>
-        </div>
-        <p id="db-kpi-penawaran" class="text-xl font-extrabold text-blue-600 leading-tight">—</p>
-        <p class="text-[10px] text-slate-400 mt-1">Termasuk semua status</p>
-      </div>
-
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
-        <div class="flex items-center gap-1 mb-1">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Deal</p>
-          <span class="db-tooltip-trigger text-slate-300 hover:text-blue-400 cursor-default ml-auto"
-            data-tip="Jumlah penawaran yang berhasil ditandai Deal. Win Rate = Deal ÷ Total Penawaran × 100%.">
-            <i class="fa-solid fa-circle-info text-[10px]"></i>
-          </span>
-          <span id="db-kpi-deal-badge" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1"></span>
-        </div>
-        <p id="db-kpi-deal" class="text-xl font-extrabold text-slate-800 leading-tight">—</p>
-        <p id="db-kpi-deal-sub" class="text-[10px] text-slate-400 mt-1 leading-snug"></p>
       </div>
 
       <div class="bg-white rounded-2xl shadow-sm border border-slate-150 p-5 relative">
