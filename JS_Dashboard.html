@@ -401,11 +401,9 @@ function _dbRenderKPIs(summary, prev, salesList, items, ms) {
   var dealSub = document.getElementById('db-kpi-deal-sub');
   if (dealSub) dealSub.textContent = 'Penawaran periode ini: ' + split.fromThis + '. sebelumnya: ' + split.fromLast;
 
-  // Pipeline
-  var pipEl = document.getElementById('db-kpi-pipeline');
-  if (pipEl) pipEl.textContent = _rp(summary.teamPipelineValue || 0);
-  var pipSub = document.getElementById('db-kpi-pipeline-sub');
-  if (pipSub) pipSub.textContent = (summary.teamPipelineCount || 0) + ' penawaran';
+  // Nilai Penawaran (total nilai seluruh penawaran dibuat dalam periode)
+  var npEl = document.getElementById('db-kpi-nilaipenawaran');
+  if (npEl) npEl.textContent = _rp(summary.teamNilaiPenawaran || 0);
 
   // Margin Deal (nilai + %) — cohort SAMA dengan Revenue Deal (status Deal &
   // tanggal deal dalam periode). Nilai margin = Σ (nilaiKontrak − HPP) exclude

@@ -142,8 +142,8 @@
           salesList.sort(function (a, b) { return b.dealRevenue - a.dealRevenue; });
 
           // team summary
-          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamPipelineValue = 0, teamPipelineCount = 0, teamMarginSum = 0, teamMarginCount = 0;
-          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; teamMarginSum += s.dealMarginSum; teamMarginCount += s.dealMarginCount; });
+          var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamNilaiPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamPipelineValue = 0, teamPipelineCount = 0, teamMarginSum = 0, teamMarginCount = 0;
+          salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamNilaiPenawaran += s.totalNilaiPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; teamMarginSum += s.dealMarginSum; teamMarginCount += s.dealMarginCount; });
           var teamTarget = 0;
           if (isAdmin) { Object.keys(userMap).forEach(function (nm) { teamTarget += userMap[nm].target; }); }
           else if (role === 'leadsales' && teamNames && teamNames.length) { teamNames.forEach(function (nm) { teamTarget += (userMap[nm] ? userMap[nm].target : 0); }); }
@@ -200,7 +200,7 @@
           return {
             success: true, dateFrom: _fmtTgl(fromISO), dateTo: _fmtTgl(toISO),
             summary: {
-              teamRevenue: teamRevenue, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamDealCount: teamDealCount,
+              teamRevenue: teamRevenue, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamNilaiPenawaran: teamNilaiPenawaran, teamDealCount: teamDealCount,
               teamWinRate: teamPenawaran > 0 ? (teamDealCohort / teamPenawaran) * 100 : 0,
               teamPipelineValue: teamPipelineValue, teamPipelineCount: teamPipelineCount,
               teamAvgMarginDeal: teamMarginCount > 0 ? (teamMarginSum / teamMarginCount) : 0,
