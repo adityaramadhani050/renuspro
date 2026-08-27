@@ -106,7 +106,7 @@
             diubah_pada: new Date().toISOString()
           }).eq('id', id);
           if (up.error) return { success: false, message: up.error.message };
-          if (typeof _notifMaintenanceDitugaskan === 'function') _notifMaintenanceDitugaskan(teknisiId, id, (mrow.data.nama_project || p.namaProject || ''), tglJadwal, (mrow.data.lokasi || ''), (mrow.data.jenis || ''), (mrow.data.prioritas || ''));
+          if (typeof _notifMaintenanceDitugaskan === 'function') _notifMaintenanceDitugaskan(teknisiId, id, (mrow.data.nama_project || p.namaProject || ''), tglJadwal, (mrow.data.lokasi || ''), (mrow.data.jenis || ''), (mrow.data.prioritas || ''), (mrow.data.no_wo || ''), (mrow.data.deskripsi || ''));
           return { success: true, message: 'Maintenance ' + id + ' dijadwalkan & ditugaskan ke ' + teknisiNama + '.' };
         }
       });
