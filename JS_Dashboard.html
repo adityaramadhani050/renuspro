@@ -1225,13 +1225,16 @@ window.exportDashboardPDF = function() {
     // KPI Summary
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
     doc.text('RINGKASAN TIM', ML, y); y += 5;
+    var VIOLET = [124,58,237];
+    var _teamMarginVal = (s.teamRevenue || 0) - (s.teamHppDeal || 0);
+    var _teamMarginPct = (s.teamRevenue > 0) ? (_teamMarginVal / s.teamRevenue * 100) : 0;
     var kpiData = [
-      { label:'Revenue Deal',     value:rp(s.teamRevenue),           color:GREEN },
-      { label:'Penawaran Dibuat', value:String(s.teamPenawaran||0),  color:BLUE  },
-      { label:'Total Deal',       value:String(s.teamDealCount||0),  color:DARK  },
-      { label:'Win Rate Tim',     value:pct(s.teamWinRate),          color:DARK  },
-      { label:'Pipeline Aktif',   value:rp(s.teamPipelineValue),     color:AMBER },
-      { label:'Target Tim',       value:rp(s.teamTarget),            color:SLATE },
+      { label:'Penawaran Dibuat', value:String(s.teamPenawaran||0),        color:BLUE   },
+      { label:'Nilai Penawaran',  value:rp(s.teamNilaiPenawaran),          color:BLUE   },
+      { label:'Total Deal',       value:String(s.teamDealCount||0),        color:DARK   },
+      { label:'Revenue Deal',     value:rp(s.teamRevenue),                 color:GREEN  },
+      { label:'Margin Deal',      value:rp(_teamMarginVal)+' ('+pct(_teamMarginPct)+')', color:VIOLET },
+      { label:'Win Rate Tim',     value:pct(s.teamWinRate),                color:DARK   },
     ];
     var boxW = (CW-5)/3, boxH = 14, gap = 2.5;
     kpiData.forEach(function(k, i) {
@@ -1258,23 +1261,26 @@ window.exportDashboardPDF = function() {
     // Leaderboard
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
     doc.text('LEADERBOARD SALES', ML, y); y += 3;
+    var VIOLET_LB = [124,58,237];
     doc.autoTable({
       startY: y, margin: { left:ML, right:MR },
-      head: [['#','Nama Sales','Penawaran','Nilai Total','Deal','Revenue Deal','Win Rate','Target','Capaian']],
+      head: [['#','Nama Sales','Pnwrn','Nilai Total','Deal','Revenue Deal','Nilai Margin','Margin','Win Rate','Target','Capaian']],
       body: list.map(function(s, i) {
-        return [i+1, s.nama, s.totalPenawaran, rp(s.totalNilaiPenawaran), s.dealCount, rp(s.dealRevenue), pct(s.winRate), s.targetBulanan>0?rp(s.targetBulanan):'-', s.achievement!=null?pct(s.achievement):'No Target'];
+        var mVal = (s.dealRevenue || 0) - (s.dealHpp || 0);
+        return [i+1, s.nama, s.totalPenawaran, rp(s.totalNilaiPenawaran), s.dealCount, rp(s.dealRevenue), (s.avgMarginDeal!=null?rp(mVal):'-'), (s.avgMarginDeal!=null?pct(s.avgMarginDeal):'-'), pct(s.winRate), s.targetBulanan>0?rp(s.targetBulanan):'-', s.achievement!=null?pct(s.achievement):'No Target'];
       }),
       theme:'grid',
-      headStyles: { fillColor:BLUE, textColor:WHITE, fontStyle:'bold', fontSize:7, halign:'center' },
-      bodyStyles: { fontSize:7, textColor:DARK },
-      columnStyles: { 0:{halign:'center',cellWidth:8}, 1:{fontStyle:'bold',cellWidth:32}, 2:{halign:'center',cellWidth:18}, 3:{halign:'right',cellWidth:28}, 4:{halign:'center',cellWidth:12}, 5:{halign:'right',fontStyle:'bold',cellWidth:28}, 6:{halign:'center',cellWidth:16}, 7:{halign:'right',cellWidth:24}, 8:{halign:'center',cellWidth:18} },
+      headStyles: { fillColor:BLUE, textColor:WHITE, fontStyle:'bold', fontSize:6, halign:'center' },
+      bodyStyles: { fontSize:6, textColor:DARK },
+      columnStyles: { 0:{halign:'center',cellWidth:6}, 1:{fontStyle:'bold',cellWidth:24}, 2:{halign:'center',cellWidth:12}, 3:{halign:'right',cellWidth:22}, 4:{halign:'center',cellWidth:9}, 5:{halign:'right',fontStyle:'bold',cellWidth:24}, 6:{halign:'right',cellWidth:22}, 7:{halign:'center',cellWidth:13}, 8:{halign:'center',cellWidth:13}, 9:{halign:'right',cellWidth:20}, 10:{halign:'center',cellWidth:'auto'} },
       alternateRowStyles: { fillColor:[248,250,252] },
       didParseCell: function(d) {
-        if (d.section==='body' && d.column.index===8 && d.row.index<list.length) {
+        if (d.section==='body' && d.column.index===10 && d.row.index<list.length) {
           var ach = list[d.row.index].achievement;
           if (ach>=100) d.cell.styles.textColor=GREEN; else if (ach>=50) d.cell.styles.textColor=BLUE; else if (ach!=null) d.cell.styles.textColor=RED;
         }
         if (d.section==='body' && d.column.index===5) d.cell.styles.textColor=GREEN;
+        if (d.section==='body' && (d.column.index===6 || d.column.index===7)) d.cell.styles.textColor=VIOLET_LB;
       }
     });
     y = doc.lastAutoTable.finalY + 6;
@@ -1296,20 +1302,23 @@ window.exportDashboardPDF = function() {
       }
       doc.autoTable({
         startY: y, margin: { left:ML, right:MR },
-        head: [['No Penawaran','Klien','Project','Nilai','Margin','Tanggal','Status','Tgl Deal']],
-        body: sales.penawaran.map(function(p) { return [p.id, p.namaKlien||'-', p.namaProject||'-', rp(p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal), pct(p.marginPersen), p.tanggal||'-', p.status, p.tanggalDeal||'-']; }),
+        head: [['No Penawaran','Klien','Project','Nilai Penawaran','Nilai Margin','Margin','Tanggal','Status','Tgl Deal']],
+        body: sales.penawaran.map(function(p) {
+          var nilai = (p.nilaiKontrak !== undefined ? p.nilaiKontrak : p.grandTotal) || 0;
+          return [p.id, p.namaKlien||'-', p.namaProject||'-', rp(nilai), rp(nilai - (p.totalHpp||0)), pct(p.marginPersen), p.tanggal||'-', p.status, p.tanggalDeal||'-'];
+        }),
         theme:'grid',
-        headStyles: { fillColor:[51,65,85], textColor:WHITE, fontStyle:'bold', fontSize:6.5, halign:'center' },
-        bodyStyles: { fontSize:6.5, textColor:DARK },
-        columnStyles: { 0:{cellWidth:30}, 1:{cellWidth:20}, 2:{cellWidth:40}, 3:{halign:'right',cellWidth:24}, 4:{halign:'center',cellWidth:16}, 5:{halign:'center',cellWidth:18}, 6:{halign:'center',cellWidth:18}, 7:{halign:'center',cellWidth:18} },
+        headStyles: { fillColor:[51,65,85], textColor:WHITE, fontStyle:'bold', fontSize:6, halign:'center' },
+        bodyStyles: { fontSize:6, textColor:DARK },
+        columnStyles: { 0:{cellWidth:26}, 1:{cellWidth:18}, 2:{cellWidth:32}, 3:{halign:'right',cellWidth:22}, 4:{halign:'right',cellWidth:22}, 5:{halign:'center',cellWidth:12}, 6:{halign:'center',cellWidth:16}, 7:{halign:'center',cellWidth:16}, 8:{halign:'center',cellWidth:16} },
         alternateRowStyles: { fillColor:[248,250,252] },
         didParseCell: function(d) {
-          if (d.section==='body' && d.column.index===6) {
+          if (d.section==='body' && d.column.index===7) {
             var st = d.cell.raw;
             d.cell.styles.textColor = st==='Deal'?GREEN : st==='Fail'?RED : BLUE;
             d.cell.styles.fontStyle = 'bold';
           }
-          if (d.section==='body' && d.column.index===4) {
+          if (d.section==='body' && d.column.index===5) {
             d.cell.styles.textColor = (d.cell.raw && parseFloat(d.cell.raw) < 25) ? RED : GREEN;
             d.cell.styles.fontStyle = 'bold';
           }

@@ -200,7 +200,7 @@
           return {
             success: true, dateFrom: _fmtTgl(fromISO), dateTo: _fmtTgl(toISO),
             summary: {
-              teamRevenue: teamRevenue, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamNilaiPenawaran: teamNilaiPenawaran, teamDealCount: teamDealCount,
+              teamRevenue: teamRevenue, teamHppDeal: teamHppDeal, teamTarget: teamTarget, teamPenawaran: teamPenawaran, teamNilaiPenawaran: teamNilaiPenawaran, teamDealCount: teamDealCount,
               teamWinRate: teamPenawaran > 0 ? (teamDealCohort / teamPenawaran) * 100 : 0,
               teamPipelineValue: teamPipelineValue, teamPipelineCount: teamPipelineCount,
               teamAvgMarginDeal: teamMarginCount > 0 ? (teamMarginSum / teamMarginCount) : 0,
