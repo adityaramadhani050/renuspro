@@ -12,14 +12,15 @@ function _mtnRole() { return (typeof _currentUser !== 'undefined' && _currentUse
 function _mtnUser() { return (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''; }
 function _mtnCanAjukan()  { var r = _mtnRole(); return r === 'sales' || r === 'leadsales' || r === 'admin'; }
 function _mtnCanKelola()  { var r = _mtnRole(); return r === 'projectcoordinator' || r === 'admin'; }
-function _mtnCanKerjakan(m) {
-  var r = _mtnRole();
-  if (r === 'admin' || r === 'projectcoordinator') return true;
-  if ((r === 'siteengineer' || r === 'leadengineer') && m) {
-    return (m.teknisiId && _currentUser && m.teknisiId === _currentUser.id) || (m.teknisiNama && m.teknisiNama === _mtnUser());
-  }
-  return false;
+// Apakah user saat ini adalah teknisi yang ditugaskan pada maintenance ini.
+function _mtnIsAssignedEngineer(m) {
+  if (!m) return false;
+  var uid = (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.id || '') : '';
+  return !!((m.teknisiId && m.teknisiId === uid) || (m.teknisiNama && m.teknisiNama === _mtnUser()));
 }
+// Aksi lapangan (Mulai Kerjakan / Selesai / Tambah Foto) hanya oleh teknisi yang
+// ditugaskan. Admin tetap bisa sebagai superuser.
+function _mtnCanKerjakan(m) { return _mtnRole() === 'admin' || _mtnIsAssignedEngineer(m); }
 // Pengaju atau admin bisa hapus/edit, hanya selama status masih Diajukan.
 function _mtnIsPengajuOrAdmin(m) { return !!(m && ((m.diajukanOleh && m.diajukanOleh === _mtnUser()) || _mtnRole() === 'admin')); }
 function _mtnCanHapus(m) { return !!(m && m.status === 'Diajukan' && _mtnIsPengajuOrAdmin(m)); }
@@ -55,15 +56,16 @@ function _mtnFmtTs(s) {
   return d.getDate() + ' ' + bln[d.getMonth()] + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
-// Site engineer hanya melihat maintenance yang ditugaskan ke dirinya
-// (mirip QC/BOM/DED). Role lain melihat semua.
+// Cakupan daftar maintenance per role:
+// - PC, Lead Engineer, Admin → seluruh maintenance.
+// - Site Engineer → hanya yang ditugaskan ke dirinya.
+// - Lainnya (pengaju: sales/lead sales, dll.) → hanya yang mereka ajukan.
 function _mtnFilterByRole(list) {
-  if (_mtnRole() !== 'siteengineer') return list;
-  var uid = (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.id || '') : '';
+  var r = _mtnRole();
+  if (r === 'projectcoordinator' || r === 'leadengineer' || r === 'admin') return list || [];
+  if (r === 'siteengineer') return (list || []).filter(function(m){ return _mtnIsAssignedEngineer(m); });
   var unm = _mtnUser();
-  return (list || []).filter(function(m){
-    return (m.teknisiId && m.teknisiId === uid) || (m.teknisiNama && m.teknisiNama === unm);
-  });
+  return (list || []).filter(function(m){ return m.diajukanOleh && m.diajukanOleh === unm; });
 }
 
 // ── Load ───────────────────────────────────────────────────────────────────
@@ -77,8 +79,8 @@ window.loadMaintenance = function(fromNav) {
     _mtnData = _mtnFilterByRole(Array.isArray(data) ? data : []);
     _renderMaintenance();
     _mtnRenderKPI();
-    // Site engineer tak menangani status Diajukan → badge dari data terfilter.
-    _mtnSetNavBadge(_mtnData.filter(function(m){ return m.status === 'Diajukan'; }).length);
+    // Badge "Diajukan" hanya relevan untuk yang menjadwalkan (PC/Admin).
+    _mtnSetNavBadge(_mtnCanKelola() ? _mtnData.filter(function(m){ return m.status === 'Diajukan'; }).length : 0);
   }).withFailureHandler(function() {
     if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-6 text-center text-rose-400">Gagal memuat data.</div>';
   }).getMaintenanceList('');
@@ -136,8 +138,8 @@ function _mtnSetNavBadge(n) {
 }
 window._maintenanceRefreshNavBadge = function() {
   if (typeof google === 'undefined') return;
-  // Site engineer tak menangani status Diajukan → tak perlu badge.
-  if (_mtnRole() === 'siteengineer') { _mtnSetNavBadge(0); return; }
+  // Badge "Diajukan" hanya untuk yang menjadwalkan (PC/Admin).
+  if (!_mtnCanKelola()) { _mtnSetNavBadge(0); return; }
   google.script.run.withSuccessHandler(function(data){
     var n = (Array.isArray(data) ? data : []).filter(function(m){ return m.status === 'Diajukan'; }).length;
     _mtnSetNavBadge(n);
