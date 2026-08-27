@@ -858,7 +858,7 @@ function _dbRenderLeaderboard(salesList) {
   var tbody = document.getElementById('db-leaderboard-body');
   if (!tbody) return;
   if (!salesList || !salesList.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-xs text-slate-400 py-8">Tidak ada data pada periode ini.</td></tr>';
     return;
   }
   tbody.innerHTML = salesList.map(function(s, idx) {
@@ -870,6 +870,7 @@ function _dbRenderLeaderboard(salesList) {
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600">' + s.dealCount + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-emerald-600 whitespace-nowrap">' + _rp(s.dealRevenue) + '</td>'
       + '<td class="px-4 py-3 text-xs font-bold text-violet-600">' + (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '<span class="text-slate-300">—</span>') + '</td>'
+      + '<td class="px-4 py-3 text-xs font-bold text-violet-600 whitespace-nowrap">' + (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600">' + _pct(s.winRate) + '</td>'
       + '<td class="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">' + (s.targetBulanan ? _rp(s.targetBulanan) : '<span class="text-slate-300">—</span>') + '</td>'
       + '<td class="px-4 py-3">' + _achieveBadge(s.achievement) + '</td>'
@@ -931,6 +932,7 @@ function _dbDetailInner(s, idx) {
     + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Nilai Penawaran', _rp(s.avgNilaiPenawaran || 0), 'text-blue-600 text-xs leading-tight')
     + _dbMiniKPI('Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
+    + _dbMiniKPI('Nilai Margin', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-xs leading-tight')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
     + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
