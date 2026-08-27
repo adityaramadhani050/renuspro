@@ -24,6 +24,10 @@ function _mtnCanKerjakan(m) {
 function _mtnIsPengajuOrAdmin(m) { return !!(m && ((m.diajukanOleh && m.diajukanOleh === _mtnUser()) || _mtnRole() === 'admin')); }
 function _mtnCanHapus(m) { return !!(m && m.status === 'Diajukan' && _mtnIsPengajuOrAdmin(m)); }
 function _mtnCanEdit(m)  { return !!(m && m.status === 'Diajukan' && _mtnIsPengajuOrAdmin(m)); }
+// Aksi edit/hapus langsung dari card (cegah buka detail).
+function _mtnFind(id) { return (_mtnData || []).filter(function(x){ return x.id === id; })[0]; }
+function _mtnEditCard(ev, id) { if (ev) ev.stopPropagation(); var m = _mtnFind(id); if (m) bukaFormEditMaintenance(m); }
+function _mtnHapusCard(ev, id) { if (ev) ev.stopPropagation(); var m = _mtnFind(id); if (m) _mtnHapus(m); }
 
 var _MTN_STATUS_CLS = {
   'Diajukan':'bg-amber-100 text-amber-700', 'Dijadwalkan':'bg-blue-100 text-blue-700',
@@ -106,6 +110,9 @@ function _renderMaintenance() {
     var tek = m.teknisiNama ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500"><i class="fa-solid fa-user-gear text-slate-400"></i> '+_mtnEsc(m.teknisiNama)+'</span>' : '';
     var jad = m.tanggalJadwal ? '<span class="inline-flex items-center gap-1 text-[11px] text-slate-500" title="Tanggal dijadwalkan/diproses"><i class="fa-regular fa-calendar text-slate-400"></i> '+_mtnFmtTgl(m.tanggalJadwal)+'</span>' : '';
     var sel = m.tanggalSelesai ? '<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600" title="Tanggal selesai"><i class="fa-solid fa-circle-check"></i> '+_mtnFmtTgl(m.tanggalSelesai)+'</span>' : '';
+    var cardActs = '';
+    if (_mtnCanEdit(m)) cardActs += '<button onclick="_mtnEditCard(event,&#39;'+_mtnEsc(m.id)+'&#39;)" title="Edit pengajuan" class="text-sky-600 hover:bg-sky-50 rounded-lg p-1.5 transition"><i class="fa-solid fa-pen text-xs"></i></button>';
+    if (_mtnCanHapus(m)) cardActs += '<button onclick="_mtnHapusCard(event,&#39;'+_mtnEsc(m.id)+'&#39;)" title="Hapus pengajuan" class="text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition"><i class="fa-regular fa-trash-can text-xs"></i></button>';
     return '<div onclick="_mtnBukaDetail(&#39;'+_mtnEsc(m.id)+'&#39;)" class="bg-white rounded-2xl border border-slate-150 p-4 hover:border-sky-300 hover:shadow-sm transition cursor-pointer">'
       + '<div class="flex items-start justify-between gap-3">'
       +   '<div class="min-w-0">'
@@ -114,7 +121,7 @@ function _renderMaintenance() {
       +     '<p class="text-xs text-slate-400 mt-0.5 truncate">'+_mtnEsc(m.customer || '-')+(m.lokasi ? ' · '+_mtnEsc(m.lokasi) : '')+'</p>'
       +     '<p class="text-xs text-slate-500 mt-1.5 line-clamp-2">'+_mtnEsc(m.jenis ? '['+m.jenis+'] ' : '')+_mtnEsc(m.deskripsi || '')+'</p>'
       +   '</div>'
-      +   '<div class="text-right shrink-0"><p class="text-[11px] font-mono font-bold text-slate-500">'+_mtnEsc(m.id)+'</p><p class="text-[10px] text-slate-400 mt-0.5">'+_mtnFmtTgl(m.tanggalPengajuan)+'</p></div>'
+      +   '<div class="text-right shrink-0"><p class="text-[11px] font-mono font-bold text-slate-500">'+_mtnEsc(m.id)+'</p><p class="text-[10px] text-slate-400 mt-0.5">'+_mtnFmtTgl(m.tanggalPengajuan)+'</p>'+(cardActs?'<div class="flex items-center justify-end gap-1 mt-1">'+cardActs+'</div>':'')+'</div>'
       + '</div>'
       + ((tek||jad||sel) ? '<div class="flex items-center gap-3 flex-wrap mt-3 pt-2.5 border-t border-slate-100">'+tek+jad+sel+'</div>' : '')
       + '</div>';
@@ -150,9 +157,10 @@ function bukaFormAjukanMaintenance() {
   document.getElementById('modal-mtn-ajukan').classList.remove('hidden');
 }
 // Buka form dalam mode EDIT (prefill dari maintenance yang sedang dibuka).
-function bukaFormEditMaintenance() {
-  var m = _mtnDetailCur; if (!m) return;
+function bukaFormEditMaintenance(m) {
+  m = m || _mtnDetailCur; if (!m) return;
   if (!_mtnCanEdit(m)) return showNotification('Hanya pengaju atau admin yang dapat mengedit, selama status masih Diajukan.', 'error');
+  _mtnDetailCur = m;
   document.getElementById('mtn-edit-id').value = m.id;
   document.getElementById('mtn-modal-title').innerText = 'Edit Pengajuan Maintenance';
   document.getElementById('mtn-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan';
@@ -278,9 +286,9 @@ function _mtnBukaDetail(id) {
 }
 function _mtnTutupDetail() { document.getElementById('modal-mtn-detail').classList.add('hidden'); _mtnDetailCur = null; }
 
-function _mtnHapus() {
-  var m = _mtnDetailCur; if (!m) return;
-  if (!_mtnCanHapus(m)) return showNotification('Hanya pengaju yang dapat menghapus, selama status masih Diajukan.', 'error');
+function _mtnHapus(m) {
+  m = m || _mtnDetailCur; if (!m) return;
+  if (!_mtnCanHapus(m)) return showNotification('Hanya pengaju atau admin yang dapat menghapus, selama status masih Diajukan.', 'error');
   showConfirm({
     title: 'Hapus Pengajuan Maintenance', type: 'danger', icon: 'fa-trash-can',
     message: 'Hapus pengajuan maintenance "' + (m.namaProject || m.id) + '"? Tindakan ini tidak dapat dibatalkan.',
