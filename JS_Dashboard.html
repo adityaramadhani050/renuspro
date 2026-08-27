@@ -937,7 +937,7 @@ function _dbDetailInner(s, idx) {
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
     + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Nilai Deal', _rp(avgNilaiDeal), 'text-emerald-600 text-xs leading-tight')
-    + _dbMiniKPI('Nilai Margin', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-xs leading-tight')
+    + _dbMiniKPI('Nilai Margin Deal', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-xs leading-tight')
     + _dbMiniKPI('Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
     + '</div>'
     + factorBlock
@@ -947,7 +947,7 @@ function _dbDetailInner(s, idx) {
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">No Penawaran</th>'
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Klien</th>'
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Project</th>'
-    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai</th>'
+    + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai Penawaran</th>'
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Nilai Margin</th>'
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 text-center whitespace-nowrap">Margin</th>'
     + '<th class="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>'
