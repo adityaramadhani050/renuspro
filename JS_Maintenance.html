@@ -265,7 +265,7 @@ function _mtnBukaDetail(id) {
   if (_mtnCanKerjakan(m) && m.status === 'Dijadwalkan') {
     acts += '<button onclick="_mtnMulai()" class="px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-play"></i> Mulai Kerjakan</button>';
   }
-  if (_mtnCanKerjakan(m) && (m.status === 'Dijadwalkan' || m.status === 'Dikerjakan')) {
+  if (_mtnCanKerjakan(m) && m.status === 'Dikerjakan') {
     acts += '<button onclick="_mtnBukaSelesai()" class="px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow flex items-center gap-2"><i class="fa-solid fa-clipboard-check"></i> Selesai</button>';
   }
   if (_mtnCanKelola() && m.status !== 'Selesai' && m.status !== 'Ditolak' && m.status !== 'Dibatalkan') {
