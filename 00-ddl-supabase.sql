@@ -36,6 +36,9 @@ create table stok (
   qty_tersedia            numeric      default 0,
   harga_beli_terakhir     numeric(15,2) default 0,
   nilai_stok              numeric(15,2) default 0,
+  merek                   text,                      -- diisi dari pricelist saat terima item baru
+  spesifikasi             text,                      -- diisi dari pricelist saat terima item baru
+  pricelist_id            text,                      -- jejak item pricelist asal (opsional)
   terakhir_diubah_pada    timestamptz,
   created_at              timestamptz default now(),
   updated_at              timestamptz

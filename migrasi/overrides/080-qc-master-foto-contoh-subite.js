@@ -97,6 +97,24 @@
         });
       }
 
+      // Peta atribut stok (merek/spesifikasi) per id_produk. Dibaca langsung dari
+      // tabel stok (bukan edge function get-stok-list) agar tabel Inventory bisa
+      // menampilkan merek/spesifikasi PERSIS item yang dipilih dari pricelist,
+      // bukan tebakan berdasarkan nama. Aman bila kolom belum dimigrasi (balik map kosong).
+      window.gsRoute('getStokAtributMap', {
+        mode: 'fn',
+        handler: async function () {
+          var q = await supa.from('stok').select('id_produk,merek,spesifikasi');
+          if (q.error) return { success: false, map: {} };   // kolom belum ada → fallback lookup nama di klien
+          var map = {};
+          (q.data || []).forEach(function (r) {
+            var id = (r.id_produk || '').toString(); if (!id) return;
+            map[id] = { merek: (r.merek || '').toString(), spesifikasi: (r.spesifikasi || '').toString() };
+          });
+          return { success: true, map: map };
+        }
+      });
+
       // ═══════════════════════════════════════════════════════════════════════
       //  M8 — TULIS transaksi: Penawaran, Stok, PO, BOM procurement, Pengiriman,
       //  Hand Over. Meniru logika Apps Script (efek samping stok/HPP/pengeluaran).
@@ -536,9 +554,35 @@
           var p = a[0] || {}; var qty = Number(p.qty) || 0, harga = Number(p.hargaSatuan) || 0, tgl = _isoDate(p.tanggal) || _todayIso(), namaUser = (p.namaUser || '').toString();
           if (qty < 0) return { success: false, message: 'Qty tidak boleh negatif.' };   // qty 0 diperbolehkan (stok awal)
           var idProduk = (p.idStok || p.idProduk || '').toString().trim();
-          if (!idProduk && (p.namaBaru || '').toString().trim()) {
-            idProduk = await _nextSeqId('stok', 'id_produk', 'STK-');
-            await supa.from('stok').insert({ id_produk: idProduk, nama_produk: (p.namaBaru || '').toString().trim(), satuan: ((p.satuanBaru || '').toString().trim() || 'unit'), qty_tersedia: 0, harga_beli_terakhir: 0, nilai_stok: 0, terakhir_diubah_pada: new Date().toISOString() });
+          if (!idProduk) {
+            // Item baru dari pricelist supplier: pakai ID pricelist sebagai sumber
+            // kebenaran (nama/merek/spesifikasi/satuan diambil dari record itu),
+            // agar tak salah cocok saat nama material sama tapi merek/spec beda.
+            var namaNew = (p.namaBaru || '').toString().trim();
+            var satuanNew = (p.satuanBaru || '').toString().trim();
+            var merekNew = (p.merekBaru || '').toString().trim();
+            var specNew = (p.spesifikasiBaru || '').toString().trim();
+            var plId = (p.pricelistId || '').toString().trim();
+            if (plId) {
+              var pl = await supa.from('pricelist').select('nama_material,merek,spesifikasi,satuan').eq('id', plId).maybeSingle();
+              if (pl.data) {
+                namaNew = (pl.data.nama_material || namaNew).toString().trim();
+                merekNew = (pl.data.merek || '').toString().trim();
+                specNew = (pl.data.spesifikasi || '').toString().trim();
+                if (!satuanNew) satuanNew = (pl.data.satuan || '').toString().trim();
+              }
+            }
+            if (namaNew) {
+              idProduk = await _nextSeqId('stok', 'id_produk', 'STK-');
+              var rowStok = { id_produk: idProduk, nama_produk: namaNew, satuan: (satuanNew || 'unit'), merek: merekNew, spesifikasi: specNew, pricelist_id: (plId || null), qty_tersedia: 0, harga_beli_terakhir: 0, nilai_stok: 0, terakhir_diubah_pada: new Date().toISOString() };
+              var insS = await supa.from('stok').insert(rowStok);
+              // Fallback bila kolom merek/spesifikasi/pricelist_id belum dimigrasi.
+              if (insS.error && /merek|spesifikasi|pricelist_id|column/i.test(insS.error.message || '')) {
+                var rowStok2 = {}; for (var _k in rowStok) { if (['merek', 'spesifikasi', 'pricelist_id'].indexOf(_k) === -1) rowStok2[_k] = rowStok[_k]; }
+                insS = await supa.from('stok').insert(rowStok2);
+              }
+              if (insS.error) return { success: false, message: 'Gagal membuat item stok: ' + insS.error.message };
+            }
           }
           if (!idProduk) return { success: false, message: 'Item stok wajib dipilih atau nama item baru wajib diisi.' };
           var s = await supa.from('stok').select('nama_produk,satuan').eq('id_produk', idProduk).maybeSingle();

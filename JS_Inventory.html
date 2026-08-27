@@ -11,8 +11,20 @@ let _invActiveTab     = 'stok';
 // kecil di bawah nama item pada tabel Inventory. Inventory tidak terkait
 // supplier, jadi merek/spesifikasi diambil di level material (bukan supplier).
 let _pricelistInfoMap = {};
+// Atribut merek/spesifikasi tersimpan per id_produk (sumber utama, presisi).
+let _stokAtributMap = {};
 
 function _invNormNama(s) { return (s || '').toString().trim().toLowerCase(); }
+
+// Muat merek/spesifikasi tersimpan per item stok (dari tabel stok). Ini sumber
+// utama; peta pricelist (by nama) hanya fallback untuk data lama tanpa atribut.
+function _loadStokAtributMap() {
+  if (typeof google === 'undefined') return;
+  google.script.run.withSuccessHandler(function(res) {
+    _stokAtributMap = (res && res.map) ? res.map : {};
+    if (_cachedStokData && _cachedStokData.length && typeof _pgRender === 'function') _pgRender('stok');
+  }).withFailureHandler(function() { _stokAtributMap = {}; }).getStokAtributMap();
+}
 
 function _loadPricelistInfoMap() {
   if (typeof google === 'undefined') return;
@@ -92,6 +104,7 @@ window.loadInventory = function() {
   _showInvSection('inv-list-section');
   switchInvTab('stok');
   _loadPricelistInfoMap();
+  _loadStokAtributMap();
   _loadStok();
   loadPenerimaanBarang();   // isi badge Penerimaan tanpa perlu buka tabnya
   loadPengirimanBarang();   // isi badge Pengiriman tanpa perlu buka tabnya
@@ -148,9 +161,18 @@ function _populateMutasiProdukFilter(data) {
 
 // Sel Nama Item: merek (teks kecil) DI ATAS nama, dan spesifikasi/tipe
 // digabung dengan nama material → "Nama Material (Spesifikasi/Tipe)".
-function _invNamaItemHtml(nama) {
-  var info = _pricelistInfoMap[_invNormNama(nama)] || {};
-  var mrk = info.merek || '', spec = info.spesifikasi || '';
+// Sumber merek/spesifikasi: atribut tersimpan per item stok (presisi). Bila item
+// lama belum punya atribut tersimpan → fallback ke pricelist berdasarkan nama.
+function _invNamaItemHtml(d) {
+  var nama = (d && d.namaProduk) || '';
+  var id = (d && (d.idStok || d.idProduk)) || '';
+  var st = _stokAtributMap[id];
+  var mrk = st ? (st.merek || '') : '';
+  var spec = st ? (st.spesifikasi || '') : '';
+  if (!mrk && !spec) {   // fallback data lama
+    var pl = _pricelistInfoMap[_invNormNama(nama)] || {};
+    mrk = pl.merek || ''; spec = pl.spesifikasi || '';
+  }
   var top = mrk ? '<div class="text-[11px] text-slate-400 font-normal leading-tight mb-0.5">' + _escHtml(mrk) + '</div>' : '';
   var namaLine = _escHtml(nama) + (spec ? ' <span class="font-normal text-slate-500">(' + _escHtml(spec) + ')</span>' : '');
   return top + namaLine;
@@ -190,7 +212,7 @@ function _pgRenderStok(data) {
       hapusBtn;
     return '<tr class="border-b border-slate-100 hover:bg-slate-50 transition' + (lowStock ? ' bg-red-50' : '') + '">' +
       '<td class="px-4 py-4 font-mono text-xs font-bold text-slate-500 whitespace-nowrap" data-label="ID Stok">' + _escHtml(idStok) + '</td>' +
-      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _invNamaItemHtml(d.namaProduk) + '</td>' +
+      '<td class="px-4 py-4 font-semibold text-slate-800" data-label="Nama Item">' + _invNamaItemHtml(d) + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap" data-label="Reserved">' + reservedCell + '</td>' +
       '<td class="px-3 py-4 text-center whitespace-nowrap ' + qtyClass + '" data-label="Stok">' + d.qtyTersedia.toLocaleString('id-ID') +
         (lowStock ? ' <span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Habis</span>' : '') + '</td>' +
@@ -648,14 +670,17 @@ function submitPenerimaanTanpaPO() {
 
   var panelBaru = document.getElementById('ptnpo-panel-baru');
   var isNewMode = !panelBaru.classList.contains('hidden');
-  var idStok = '', namaBaru = '', satuanBaru = '';
+  var idStok = '', namaBaru = '', satuanBaru = '', merekBaru = '', spesifikasiBaru = '', pricelistId = '';
 
   if (isNewMode) {
     var selPl = document.getElementById('ptnpo-pricelist');
     if (!selPl.value) return showNotification('Pilih item dari Pricelist Supplier.', 'error');
     var optPl = selPl.options[selPl.selectedIndex];
-    namaBaru   = (optPl.getAttribute('data-nama') || '').trim();
-    satuanBaru = (optPl.getAttribute('data-satuan') || '').trim();
+    pricelistId     = (selPl.value || '').trim();   // id pricelist = sumber kebenaran
+    namaBaru        = (optPl.getAttribute('data-nama') || '').trim();
+    satuanBaru      = (optPl.getAttribute('data-satuan') || '').trim();
+    merekBaru       = (optPl.getAttribute('data-merek') || '').trim();
+    spesifikasiBaru = (optPl.getAttribute('data-spesifikasi') || '').trim();
     if (!namaBaru) return showNotification('Item pricelist tidak valid.', 'error');
   } else {
     idStok = document.getElementById('sel-produk-ptnpo').value;
@@ -683,6 +708,7 @@ function submitPenerimaanTanpaPO() {
     .simpanPenerimaanTanpaPO({
       tanggal: tanggal, idStok: idStok,
       namaBaru: namaBaru, satuanBaru: satuanBaru,
+      merekBaru: merekBaru, spesifikasiBaru: spesifikasiBaru, pricelistId: pricelistId,
       qty: qty, hargaSatuan: harga,
       keterangan: keterangan,
       namaUser: (_currentUser && _currentUser.nama) || ''
