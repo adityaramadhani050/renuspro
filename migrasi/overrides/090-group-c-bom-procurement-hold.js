@@ -390,7 +390,7 @@
           });
           if (ins.error) return { success: false, message: ins.error.message };
           var _projPO = (po.data.no_wo && typeof _waProjName === 'function') ? await _waProjName(po.data.no_wo) : '';
-          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'PO: ' + noPO + (po.data.no_wo ? ' · WO: ' + po.data.no_wo + (_projPO ? ' — ' + _projPO : '') : '') + (po.data.nama_supplier ? ' · ' + po.data.nama_supplier : ''), jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, { noPO: noPO, project: (po.data.no_wo ? 'WO: ' + po.data.no_wo + (_projPO ? ' — ' + _projPO : '') : ''), supplier: (po.data.nama_supplier || '') }, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request ' + idReq + ' berhasil dikirim ke Finance.', idReq: idReq };
         }
       });
@@ -411,7 +411,7 @@
           });
           if (ins.error) return { success: false, message: ins.error.message };
           var _projNP = (noWO && typeof _waProjName === 'function') ? await _waProjName(noWO) : '';
-          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, 'Tanpa PO' + (noWO ? ' · WO: ' + noWO + (_projNP ? ' — ' + _projNP : '') : (kategori ? ' · ' + kategori : '')) + ' · ' + keterangan, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
+          if (typeof _notifRequestPembayaran === 'function') _notifRequestPembayaran(idReq, { noPO: 'Tanpa PO', project: (noWO ? 'WO: ' + noWO + (_projNP ? ' — ' + _projNP : '') : (kategori || '')), keterangan: keterangan }, jumlah, (p.dibuatOleh || ''), (p.catatan || ''));
           return { success: true, message: 'Request pembayaran (Tanpa PO) ' + idReq + ' dikirim ke Finance.', idReq: idReq };
         }
       });

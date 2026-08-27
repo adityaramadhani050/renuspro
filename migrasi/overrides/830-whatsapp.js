@@ -99,7 +99,14 @@
         },
         // Request pembayaran PO/Non-PO (ke Finance)
         requestPembayaran: function (d) {
-          return ['💰 *Request Pembayaran Baru*', 'ID: *' + d.idReq + '*', (d.ref || ''), 'Nominal: ' + _waFmtRp(d.jumlah), 'Diminta oleh: ' + (d.oleh || '-'), (d.catatan ? '📝 ' + d.catatan : ''), '', 'Mohon direview di menu Cash Manager → tab Request Pembayaran.'].filter(_waNonEmpty).join('\n');
+          return ['💰 *Request Pembayaran Baru*', 'ID: *' + d.idReq + '*',
+            (d.noPO ? 'PO: ' + d.noPO : ''),
+            (d.project ? 'Project: ' + d.project : ''),
+            (d.supplier ? 'Supplier: ' + d.supplier : ''),
+            (d.keterangan ? 'Keterangan: ' + d.keterangan : ''),
+            'Nominal: ' + _waFmtRp(d.jumlah), 'Diminta oleh: ' + (d.oleh || '-'),
+            (d.catatan ? '📝 ' + d.catatan : ''), '',
+            'Mohon direview di menu Cash Manager → tab Request Pembayaran.'].filter(_waNonEmpty).join('\n');
         },
         // Hasil pembayaran (ke Procurement). d.disetujui = true/false
         hasilPembayaran: function (d) {
@@ -229,9 +236,10 @@
         if (!ENABLE_WA) return; var proj = noWO ? await _waProjName(noWO) : '';
         _waSend(await _waPhonesByRole('procurement'), _WA_MSG.barangDiterima({ noPO: noPO, noWO: noWO, proj: proj, statusPO: statusPO, oleh: oleh, lengkap: statusPO === 'Diterima', catatanList: catatanList }));
       }
-      async function _notifRequestPembayaran(idReq, ref, jumlah, oleh, catatan) {
+      async function _notifRequestPembayaran(idReq, meta, jumlah, oleh, catatan) {
         if (!ENABLE_WA) return;
-        _waSend(await _waPhonesByRole('finance'), _WA_MSG.requestPembayaran({ idReq: idReq, ref: ref, jumlah: jumlah, oleh: oleh, catatan: catatan }));
+        meta = meta || {};
+        _waSend(await _waPhonesByRole('finance'), _WA_MSG.requestPembayaran({ idReq: idReq, noPO: meta.noPO || '', project: meta.project || '', supplier: meta.supplier || '', keterangan: meta.keterangan || '', jumlah: jumlah, oleh: oleh, catatan: catatan }));
       }
       async function _notifHasilPembayaran(idReq, ref, jumlah, disetujui, oleh, catatanTolak) {
         if (!ENABLE_WA) return;
@@ -284,7 +292,7 @@
               assign: _WA_MSG.assignEngineer({ modul: 'BOM', noWO: W, proj: P }),
               po_gudang: _WA_MSG.poKeGudang({ noPO: 'PO-UJI', noWO: W, proj: P, supplier: 'PT Contoh Supplier', oleh: 'Procurement' }),
               barang_diterima: _WA_MSG.barangDiterima({ noPO: 'PO-UJI', noWO: W, proj: P, statusPO: 'Diterima', oleh: 'Warehouse', lengkap: true, catatanList: [] }),
-              req_bayar: _WA_MSG.requestPembayaran({ idReq: 'REQ-UJI', ref: 'PO: PO-UJI · WO: ' + W + ' — ' + P, jumlah: 5000000, oleh: 'Procurement', catatan: '' }),
+              req_bayar: _WA_MSG.requestPembayaran({ idReq: 'REQ-UJI', noPO: 'PO-UJI', project: 'WO: ' + W + ' — ' + P, supplier: 'Supplier Uji', jumlah: 5000000, oleh: 'Procurement', catatan: 'TOP 30 Days After Invoice' }),
               hasil_bayar: _WA_MSG.hasilPembayaran({ idReq: 'REQ-UJI', ref: 'PO: PO-UJI', jumlah: 5000000, disetujui: true, oleh: 'Finance' }),
               req_stok: _WA_MSG.requestStok({ id: 'REQ-STK-UJI', namaItem: 'Panel Surya 550Wp', qty: 10, satuan: 'pcs', oleh: 'Warehouse', catatan: 'Stok menipis' }),
               maintenance_baru: _WA_MSG.maintenanceBaru({ id: 'MTN-UJI', project: P, lokasi: 'Surabaya', jenis: 'Perbaikan', prioritas: 'Tinggi', oleh: 'Sales' }),
