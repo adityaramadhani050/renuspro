@@ -177,7 +177,7 @@
           var res = await Promise.all([
             _safe(supa.from('bom_assignment').select('no_wo,id_user,nama_user')),
             _safe(supa.from('bom_project').select('no_wo,nama_project,nama_klien')),
-            _safe(_all('bom_item', 'no_wo,kategori,status,proc_status'))
+            _safe(_all('bom_item', 'no_wo,kategori,status,proc_status,qty_reserved,qty_dikirim'))
           ]);
           var aq = res[0], pq = res[1], iq = res[2];
           var assignedMap = {};
@@ -190,7 +190,7 @@
           }).filter(function (r) { return r.noWO; });
           if (siteUserId) regs = regs.filter(function (r) { return (assignedMap[r.noWO] || []).some(function (a) { return a.id === siteUserId; }); });
           var visible = {}; regs.forEach(function (r) { visible[r.noWO] = true; });
-          var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {}, procPend = {}, procDone = {};
+          var cnt = {}, katSet = {}, appr = {}, pend = {}, rej = {}, procPend = {}, procDone = {}, siapKirim = {};
           (iq.data || []).forEach(function (it) {
             var w = (it.no_wo || '').toString().trim(); if (!w || !visible[w]) return;
             cnt[w] = (cnt[w] || 0) + 1;
@@ -201,6 +201,8 @@
               appr[w] = (appr[w] || 0) + 1;
               if ((it.proc_status || '').toString().trim()) procDone[w] = (procDone[w] || 0) + 1;
               else procPend[w] = (procPend[w] || 0) + 1;
+              // Siap kirim: sudah di-reserve warehouse & belum dikirim penuh.
+              if (((Number(it.qty_reserved) || 0) - (Number(it.qty_dikirim) || 0)) > 0) siapKirim[w] = (siapKirim[w] || 0) + 1;
             } else if (st === 'Rejected') rej[w] = (rej[w] || 0) + 1;
             else pend[w] = (pend[w] || 0) + 1;
           });
@@ -211,7 +213,7 @@
               status: (total > 0 && a === total) ? 'Final' : 'Draft', jumlahItem: total,
               jumlahKategori: katSet[r.noWO] ? Object.keys(katSet[r.noWO]).length : 0,
               approved: a, pending: pend[r.noWO] || 0, rejected: rej[r.noWO] || 0,
-              procPending: procPend[r.noWO] || 0, procDone: procDone[r.noWO] || 0,
+              procPending: procPend[r.noWO] || 0, procDone: procDone[r.noWO] || 0, siapKirim: siapKirim[r.noWO] || 0,
               assigned: assignedMap[r.noWO] || []
             };
           });

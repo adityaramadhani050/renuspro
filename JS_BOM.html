@@ -41,12 +41,15 @@ function _bomCanBuatPO(){ var r = _bomRole(); return r === 'procurement' || r ==
 // Nav badge: task yang menunggu aksi user (dijumlah dari perWO).
 // - Lead Engineer/Admin: item Pending (perlu direview).
 // - Site Engineer: item Rejected (perlu revisi; sudah difilter ke WO-nya).
+// - Project Coordinator: material SIAP KIRIM = Approved (lead) yang sudah
+//   di-reserve warehouse & belum dikirim → PC bisa Request Pengiriman.
 // - Warehouse/Procurement: item Approved yang belum diproses (perlu diproses/beli).
 function _bomBadgeCount(res) {
   var list = (res && res.perWO) ? res.perWO : [];
   var sum = function(k){ return list.reduce(function(a, w){ return a + (Number(w[k]) || 0); }, 0); };
   if (_bomCanReview()) return sum('pending');
   if (_bomRole() === 'siteengineer') return sum('rejected');
+  if (_bomRole() === 'projectcoordinator') return sum('siapKirim');
   if (_bomCanReserve() || _bomCanBuatPO()) return sum('procPending');
   return 0;
 }
