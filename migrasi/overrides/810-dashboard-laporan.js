@@ -131,8 +131,9 @@
               dealCount: s.dealCount, dealRevenue: s.dealRevenue, dealHpp: s.dealHpp, dealMarginSum: s.dealMarginSum, dealMarginCount: s.dealMarginCount, pipelineCount: s.pipelineCount, pipelineValue: s.pipelineValue,
               failCount: s.failCount, dealCohort: s.dealCohort,
               winRate: s.totalPenawaran > 0 ? (s.dealCohort / s.totalPenawaran) * 100 : 0,
-              // Rata-rata SEDERHANA: mean margin per deal (tiap deal bobot sama).
-              avgMarginDeal: s.dealMarginCount > 0 ? (s.dealMarginSum / s.dealMarginCount) : null,
+              // Margin Deal TERTIMBANG: total margin ÷ total revenue deal
+              // (bukan rata-rata sederhana per deal). Basis exclude PPN.
+              avgMarginDeal: s.dealRevenue > 0 ? ((s.dealRevenue - s.dealHpp) / s.dealRevenue) * 100 : null,
               avgSalesCycle: cycleCount > 0 ? cycleSum / cycleCount : null,
               achievement: s.targetBulanan > 0 ? (s.dealRevenue / s.targetBulanan) * 100 : null,
               penawaran: pen
