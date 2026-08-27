@@ -930,7 +930,7 @@ function _dbDetailInner(s, idx) {
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
     + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
     + _dbMiniKPI('Avg Nilai Penawaran', _rp(s.avgNilaiPenawaran || 0), 'text-blue-600 text-xs leading-tight')
-    + _dbMiniKPI('Avg Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
+    + _dbMiniKPI('Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
     + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
