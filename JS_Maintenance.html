@@ -20,8 +20,10 @@ function _mtnCanKerjakan(m) {
   }
   return false;
 }
-// Hanya pengaju yang bisa menghapus, dan hanya selama masih Diajukan.
-function _mtnCanHapus(m) { return !!(m && m.status === 'Diajukan' && m.diajukanOleh && m.diajukanOleh === _mtnUser()); }
+// Pengaju atau admin bisa hapus/edit, hanya selama status masih Diajukan.
+function _mtnIsPengajuOrAdmin(m) { return !!(m && ((m.diajukanOleh && m.diajukanOleh === _mtnUser()) || _mtnRole() === 'admin')); }
+function _mtnCanHapus(m) { return !!(m && m.status === 'Diajukan' && _mtnIsPengajuOrAdmin(m)); }
+function _mtnCanEdit(m)  { return !!(m && m.status === 'Diajukan' && _mtnIsPengajuOrAdmin(m)); }
 
 var _MTN_STATUS_CLS = {
   'Diajukan':'bg-amber-100 text-amber-700', 'Dijadwalkan':'bg-blue-100 text-blue-700',
@@ -137,6 +139,9 @@ window._maintenanceRefreshNavBadge = function() {
 
 // ── Ajukan ───────────────────────────────────────────────────────────────────
 function bukaFormAjukanMaintenance() {
+  document.getElementById('mtn-edit-id').value = '';
+  document.getElementById('mtn-modal-title').innerText = 'Ajukan Maintenance';
+  document.getElementById('mtn-submit-btn').innerHTML = '<i class="fa-solid fa-paper-plane"></i> Ajukan';
   ['mtn-project','mtn-customer','mtn-lokasi','mtn-kontak','mtn-deskripsi'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
   document.getElementById('mtn-jenis').value = 'Perawatan Rutin';
   document.getElementById('mtn-prioritas').value = 'Normal';
@@ -144,9 +149,27 @@ function bukaFormAjukanMaintenance() {
   _mtnLoadWOOptions();
   document.getElementById('modal-mtn-ajukan').classList.remove('hidden');
 }
+// Buka form dalam mode EDIT (prefill dari maintenance yang sedang dibuka).
+function bukaFormEditMaintenance() {
+  var m = _mtnDetailCur; if (!m) return;
+  if (!_mtnCanEdit(m)) return showNotification('Hanya pengaju atau admin yang dapat mengedit, selama status masih Diajukan.', 'error');
+  document.getElementById('mtn-edit-id').value = m.id;
+  document.getElementById('mtn-modal-title').innerText = 'Edit Pengajuan Maintenance';
+  document.getElementById('mtn-submit-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan';
+  document.getElementById('mtn-project').value  = m.namaProject || '';
+  document.getElementById('mtn-customer').value = m.customer || '';
+  document.getElementById('mtn-lokasi').value   = m.lokasi || '';
+  document.getElementById('mtn-kontak').value   = m.kontak || '';
+  document.getElementById('mtn-jenis').value    = m.jenis || 'Perawatan Rutin';
+  document.getElementById('mtn-prioritas').value= m.prioritas || 'Normal';
+  document.getElementById('mtn-deskripsi').value= m.deskripsi || '';
+  _mtnLoadWOOptions(m.noWO || '');
+  _mtnTutupDetail();
+  document.getElementById('modal-mtn-ajukan').classList.remove('hidden');
+}
 function tutupFormAjukanMaintenance() { document.getElementById('modal-mtn-ajukan').classList.add('hidden'); }
 
-function _mtnLoadWOOptions() {
+function _mtnLoadWOOptions(preselect) {
   var sel = document.getElementById('mtn-wo');
   if (!sel || typeof google === 'undefined') return;
   google.script.run.withSuccessHandler(function(res){
@@ -154,7 +177,8 @@ function _mtnLoadWOOptions() {
     var opts = '<option value="">— Input manual / tanpa WO —</option>';
     _mtnWOList.forEach(function(w){ opts += '<option value="'+_mtnEsc(w.noWO)+'">'+_mtnEsc(w.noWO)+' — '+_mtnEsc(w.namaProject||'')+'</option>'; });
     sel.innerHTML = opts;
-    if (typeof sdEnsure === 'function') sdEnsure('mtn-wo', '— Input manual / tanpa WO —', 'Cari No WO / project...');   // data-banyak → searchable
+    if (preselect) sel.value = preselect;
+    if (typeof sdEnsure === 'function') { sdEnsure('mtn-wo', '— Input manual / tanpa WO —', 'Cari No WO / project...'); if (preselect && typeof sdSetValue === 'function') sdSetValue('mtn-wo', preselect); }
   }).withFailureHandler(function(){}).getMaintenanceWOList();
 }
 function _mtnOnPilihWO() {
@@ -167,23 +191,27 @@ function _mtnOnPilihWO() {
   if (w.kontak) document.getElementById('mtn-kontak').value = w.kontak;
 }
 function submitAjukanMaintenance() {
+  var editId = (document.getElementById('mtn-edit-id').value || '').trim();
   var project = (document.getElementById('mtn-project').value || '').trim();
   var deskripsi = (document.getElementById('mtn-deskripsi').value || '').trim();
   if (!project)   return showNotification('Nama project/site wajib diisi.', 'error');
   if (!deskripsi) return showNotification('Deskripsi keluhan/pekerjaan wajib diisi.', 'error');
-  toggleLoader(true, 'Mengirim pengajuan...');
-  google.script.run.withSuccessHandler(function(res){
+  var payload = {
+    noWO: document.getElementById('mtn-wo').value,
+    namaProject: project, customer: (document.getElementById('mtn-customer').value||'').trim(),
+    lokasi: (document.getElementById('mtn-lokasi').value||'').trim(), kontak: (document.getElementById('mtn-kontak').value||'').trim(),
+    jenis: document.getElementById('mtn-jenis').value, prioritas: document.getElementById('mtn-prioritas').value,
+    deskripsi: deskripsi, namaUser: _mtnUser()
+  };
+  var isEdit = !!editId;
+  toggleLoader(true, isEdit ? 'Menyimpan perubahan...' : 'Mengirim pengajuan...');
+  var run = google.script.run.withSuccessHandler(function(res){
     toggleLoader(false);
     showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
     if (res && res.success) { tutupFormAjukanMaintenance(); loadMaintenance(); }
-  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
-    .buatMaintenance({
-      noWO: document.getElementById('mtn-wo').value,
-      namaProject: project, customer: (document.getElementById('mtn-customer').value||'').trim(),
-      lokasi: (document.getElementById('mtn-lokasi').value||'').trim(), kontak: (document.getElementById('mtn-kontak').value||'').trim(),
-      jenis: document.getElementById('mtn-jenis').value, prioritas: document.getElementById('mtn-prioritas').value,
-      deskripsi: deskripsi, namaUser: _mtnUser()
-    });
+  }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); });
+  if (isEdit) { payload.id = editId; payload.role = _mtnRole(); run.editMaintenance(payload); }
+  else run.buatMaintenance(payload);
 }
 
 // ── Detail & Proses ──────────────────────────────────────────────────────────
@@ -238,6 +266,9 @@ function _mtnBukaDetail(id) {
   if (_mtnCanKerjakan(m) && m.status === 'Selesai') {
     acts += '<button onclick="_mtnBukaSelesai()" class="px-4 py-2.5 text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center gap-2"><i class="fa-solid fa-camera"></i> Tambah Foto</button>';
   }
+  if (_mtnCanEdit(m)) {
+    acts += '<button onclick="bukaFormEditMaintenance()" class="px-4 py-2.5 text-sm font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl flex items-center gap-2"><i class="fa-solid fa-pen"></i> Edit</button>';
+  }
   if (_mtnCanHapus(m)) {
     acts += '<button onclick="_mtnHapus()" class="px-4 py-2.5 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl flex items-center gap-2"><i class="fa-regular fa-trash-can"></i> Hapus</button>';
   }
@@ -261,7 +292,7 @@ function _mtnHapus() {
         showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
         if (res && res.success) { _mtnTutupDetail(); loadMaintenance(); }
       }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal menghapus.', 'error'); })
-        .hapusMaintenance(m.id, _mtnUser());
+        .hapusMaintenance(m.id, _mtnUser(), _mtnRole());
     }
   });
 }

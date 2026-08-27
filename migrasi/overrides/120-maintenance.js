@@ -56,20 +56,51 @@
       });
 
       // Hapus pengajuan maintenance — hanya bila masih 'Diajukan' DAN oleh
-      // pengaju itu sendiri (diajukan_oleh === namaUser).
+      // pengaju itu sendiri atau admin.
       window.gsRoute('hapusMaintenance', {
         mode: 'fn',
         handler: async function (a) {
           var id = (a[0] || '').toString().trim();
           var namaUser = (a[1] || '').toString().trim();
+          var isAdmin = ((a[2] || '').toString().trim() === 'admin');
           if (!id) return { success: false, message: 'ID wajib.' };
           var m = await supa.from('maintenance').select('status,diajukan_oleh').eq('id', id).maybeSingle();
           if (!m.data) return { success: false, message: 'Data maintenance tidak ditemukan.' };
           if ((m.data.status || '') !== 'Diajukan') return { success: false, message: 'Hanya pengajuan berstatus Diajukan yang bisa dihapus.' };
-          if (!namaUser || (m.data.diajukan_oleh || '').toString().trim() !== namaUser) return { success: false, message: 'Hanya pengaju yang dapat menghapus pengajuan ini.' };
+          if (!isAdmin && (!namaUser || (m.data.diajukan_oleh || '').toString().trim() !== namaUser)) return { success: false, message: 'Hanya pengaju atau admin yang dapat menghapus pengajuan ini.' };
           var del = await supa.from('maintenance').delete().eq('id', id);
           if (del.error) return { success: false, message: del.error.message };
           return { success: true, message: 'Pengajuan maintenance ' + id + ' dihapus.' };
+        }
+      });
+
+      // Edit pengajuan maintenance — hanya bila masih 'Diajukan' DAN oleh pengaju
+      // itu sendiri atau admin.
+      window.gsRoute('editMaintenance', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var id = (p.id || '').toString().trim();
+          var namaUser = (p.namaUser || '').toString().trim();
+          var isAdmin = ((p.role || '').toString().trim() === 'admin');
+          var project = (p.namaProject || '').toString().trim();
+          var deskripsi = (p.deskripsi || '').toString().trim();
+          if (!id) return { success: false, message: 'ID wajib.' };
+          if (!project) return { success: false, message: 'Nama project/site wajib diisi.' };
+          if (!deskripsi) return { success: false, message: 'Deskripsi keluhan/pekerjaan wajib diisi.' };
+          var m = await supa.from('maintenance').select('status,diajukan_oleh').eq('id', id).maybeSingle();
+          if (!m.data) return { success: false, message: 'Data maintenance tidak ditemukan.' };
+          if ((m.data.status || '') !== 'Diajukan') return { success: false, message: 'Hanya pengajuan berstatus Diajukan yang bisa diedit.' };
+          if (!isAdmin && (!namaUser || (m.data.diajukan_oleh || '').toString().trim() !== namaUser)) return { success: false, message: 'Hanya pengaju atau admin yang dapat mengedit pengajuan ini.' };
+          var up = await supa.from('maintenance').update({
+            no_wo: (p.noWO || '').toString().trim() || null, nama_project: project,
+            customer: (p.customer || '').toString().trim() || null, lokasi: (p.lokasi || '').toString().trim() || null,
+            kontak: (p.kontak || '').toString().trim() || null, jenis: (p.jenis || '').toString().trim() || null,
+            prioritas: (p.prioritas || 'Normal').toString().trim(), deskripsi: deskripsi,
+            diubah_pada: new Date().toISOString()
+          }).eq('id', id);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Pengajuan maintenance ' + id + ' diperbarui.' };
         }
       });
 
