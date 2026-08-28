@@ -515,7 +515,8 @@
               mo = parseInt(parts.find(function (p) { return p.type === 'month'; }).value, 10) - 1;
               yr = parseInt(parts.find(function (p) { return p.type === 'year'; }).value, 10);
             } catch (e) {}
-            var nextNo = ('00' + (maxId + 1)).slice(-3) + '/QUOT/' + roman[mo] + '/' + yr;
+            // padStart (min 3 digit) — jangan slice(-3) agar tak wrap ke '000' setelah >999.
+            var nextNo = String(maxId + 1).padStart(3, '0') + '/QUOT/' + roman[mo] + '/' + yr;
 
             // success:true selama tak ada exception fatal — klien tetap tampil
             // walau template/penawaran gagal (mereka hanya memengaruhi menu lain).
