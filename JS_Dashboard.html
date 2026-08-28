@@ -926,16 +926,14 @@ function _dbDetailInner(s, idx) {
         + '</div>'
         + '</div></div>')
     : '';
-  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50">'
+  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-slate-50">'
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
-    + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-xs leading-tight')
-    + _dbMiniKPI('Avg Nilai Penawaran', _rp(s.avgNilaiPenawaran || 0), 'text-blue-600 text-xs leading-tight')
+    + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-sm leading-tight')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
     + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
-    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-xs leading-tight')
-    + _dbMiniKPI('Avg Nilai Deal', _rp(avgNilaiDeal), 'text-emerald-600 text-xs leading-tight')
-    + _dbMiniKPI('Nilai Margin Deal', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-xs leading-tight')
+    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-sm leading-tight')
+    + _dbMiniKPI('Nilai Margin Deal', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-sm leading-tight')
     + _dbMiniKPI('Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
     + '</div>'
     + factorBlock
@@ -1005,9 +1003,9 @@ function _dbRenderSalesOwnDetail(salesList) {
 }
 
 function _dbMiniKPI(label, val, cls) {
-  return '<div class="bg-white rounded-xl p-3 border border-slate-100">'
-    + '<p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">' + label + '</p>'
-    + '<p class="text-base font-extrabold ' + cls + '">' + val + '</p>'
+  return '<div class="bg-white rounded-xl p-4 border border-slate-100">'
+    + '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">' + label + '</p>'
+    + '<p class="text-xl font-extrabold ' + cls + '">' + val + '</p>'
     + '</div>';
 }
 
