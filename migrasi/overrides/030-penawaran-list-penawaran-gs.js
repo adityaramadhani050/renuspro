@@ -40,8 +40,12 @@
               };
             }
           });
+          // Urut berdasarkan nomor urut (NNN) numerik, terbaru di atas. String sort
+          // salah untuk 4 digit ('1000' < '101'), jadi parse angka depan. Fallback
+          // ke urutan fetch bila format tak terbaca.
+          var _seq = function (no) { var m = (no || '').toString().match(/^(\d+)/); return m ? parseInt(m[1], 10) : -1; };
           return Object.keys(latestMap)
-            .sort(function (a, b) { return orderMap[b] - orderMap[a]; })
+            .sort(function (a, b) { var d = _seq(b) - _seq(a); return d !== 0 ? d : (orderMap[b] - orderMap[a]); })
             .map(function (no) { var it = Object.assign({}, latestMap[no]); delete it._rev; return it; });
         }
       });
