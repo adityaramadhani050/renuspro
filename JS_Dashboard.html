@@ -928,12 +928,12 @@ function _dbDetailInner(s, idx) {
     : '';
   return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-slate-50">'
     + _dbMiniKPI('Penawaran', s.totalPenawaran, 'text-slate-700')
-    + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 text-sm leading-tight')
+    + _dbMiniKPI('Nilai Penawaran', _rp(s.totalNilaiPenawaran), 'text-blue-600 leading-tight')
     + _dbMiniKPI('Win Rate', _pct(s.winRate), 'text-slate-700')
     + _dbMiniKPI('Avg Sales Cycle', (s.avgSalesCycle != null ? Math.round(s.avgSalesCycle) + ' hari' : '—'), 'text-cyan-600')
     + _dbMiniKPI('Deal', s.dealCount, 'text-emerald-600')
-    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 text-sm leading-tight')
-    + _dbMiniKPI('Nilai Margin Deal', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 text-sm leading-tight')
+    + _dbMiniKPI('Revenue Deal', _rp(s.dealRevenue), 'text-emerald-600 leading-tight')
+    + _dbMiniKPI('Nilai Margin Deal', (s.avgMarginDeal != null ? _rp(Math.round((s.dealRevenue || 0) - (s.dealHpp || 0))) : '—'), 'text-violet-600 leading-tight')
     + _dbMiniKPI('Margin Deal', (s.avgMarginDeal != null ? _pct(s.avgMarginDeal) : '—'), 'text-violet-600')
     + '</div>'
     + factorBlock
