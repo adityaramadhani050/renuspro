@@ -235,11 +235,19 @@
         if (!v) return false; var s = v.toString(); var m = s.match(/^(\d{4})-(\d{2})/); if (!m) { var d = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (d) { var t2 = _jkMonthYear(); return parseInt(d[3], 10) === t2.yr && parseInt(d[2], 10) === (t2.mo + 1); } return false; }
         var t = _jkMonthYear(); return parseInt(m[1], 10) === t.yr && parseInt(m[2], 10) === (t.mo + 1);
       }
-      async function _nextQuotationNumber() {
+      // Nomor urut penawaran GLOBAL. Pakai padStart (min 3 digit) — JANGAN slice(-3)
+      // karena akan memotong ke 3 digit & wrap ke '000' setelah >999 → bentrok PK.
+      async function _maxQuotationSeq() {
         var q = await _all('penawaran', 'no_penawaran'); var maxId = 0;
         (q.data || []).forEach(function (r) { var m = (r.no_penawaran || '').toString().match(/^(\d+)\/QUOT/); if (m) { var n = parseInt(m[1], 10); if (n > maxId) maxId = n; } });
+        return maxId;
+      }
+      function _fmtQuotationNo(seq) {
         var t = _jkMonthYear();
-        return ('00' + (maxId + 1)).slice(-3) + '/QUOT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
+        return String(seq).padStart(3, '0') + '/QUOT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
+      }
+      async function _nextQuotationNumber() {
+        return _fmtQuotationNo((await _maxQuotationSeq()) + 1);
       }
       // term_conditions penawaran: buang 7 field angka internal, sisipkan catatan.
       function _cleanTC(tc, catatan) {
@@ -267,17 +275,24 @@
         mode: 'fn',
         handler: async function (a) {
           var p = a[0] || {}, tc = p.termConditions || {};
-          var noPen = await _nextQuotationNumber();
-          var ins = await supa.from('penawaran').insert({
-            no_penawaran: noPen, rev: 0, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
+          var base = { rev: 0, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
             nama_project: (p.namaProject || '').toString(), klien_id: (p.klienId || '') || null, dibuat_oleh: (p.namaUser || 'Sales Executive').toString(),
             subtotal: Number(p.subtotal) || 0, diskon: Number(tc.diskonNominal) || 0, pajak: Number(tc.pajakNominal) || 0, grand_total: Number(p.grandTotal) || 0,
             total_hpp: Number(tc.hppTotalGabungan) || 0, estimasi_keuntungan: Number(tc.estimasiProfitBersih) || 0, margin_persen: parseFloat(tc.marginPersenInternal) || 0,
             term_conditions: _cleanTC(tc, p.catatan), items: Array.isArray(p.items) ? p.items : [], status: 'On-Progress', no_wo: '', tanggal_deal: null,
-            channel_marketing: (p.channelMarketing || '').toString(), catatan_fail: '', reminder_expired: null, kode_win: '', catatan_win: '', kode_lost: '', tanggal_fail: null, lesson_learned: '', action: ''
-          });
-          if (ins.error) return { success: false, message: 'Gagal menyimpan: ' + ins.error.message };
-          return { success: true, message: 'Penawaran ' + noPen + ' berhasil disimpan!', nextNo: await _nextQuotationNumber() };
+            channel_marketing: (p.channelMarketing || '').toString(), catatan_fail: '', reminder_expired: null, kode_win: '', catatan_win: '', kode_lost: '', tanggal_fail: null, lesson_learned: '', action: '' };
+          // Coba insert; bila nomor bentrok (race / sisa data lama), naikkan seq & ulang.
+          var seq = (await _maxQuotationSeq()) + 1, noPen = '', ins = null;
+          for (var att = 0; att < 25; att++) {
+            noPen = _fmtQuotationNo(seq);
+            var row = { no_penawaran: noPen }; for (var k in base) row[k] = base[k];
+            ins = await supa.from('penawaran').insert(row);
+            if (!ins.error) break;
+            if (!/duplicate key|penawaran_pkey/i.test(ins.error.message || '')) break;
+            seq++;   // nomor sudah dipakai → coba nomor berikutnya
+          }
+          if (ins && ins.error) return { success: false, message: 'Gagal menyimpan: ' + ins.error.message };
+          return { success: true, message: 'Penawaran ' + noPen + ' berhasil disimpan!', nextNo: _fmtQuotationNo(seq + 1) };
         }
       });
       window.gsRoute('editPenawaran', {
