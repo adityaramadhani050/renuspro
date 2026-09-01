@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
       const rows = await all(table, idField);
       let max = 0;
       for (const r of rows) { const id = (r[idField] || '').toString(); if (id.startsWith(prefix)) { const s = parseInt(id.slice(prefix.length), 10) || 0; if (s > max) max = s; } }
-      return prefix + ('000' + (max + 1)).slice(-3);
+      return prefix + String(max + 1).padStart(3, '0');
     }
 
     // ═══════════════════════ CREATE ═══════════════════════
@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
       const invIds = await all('invoice', 'no_invoice');
       for (const r of invIds) { const m = (r.no_invoice || '').toString().match(/^(\d+)\/RGI(?:-INV|\/INV)/); if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; } }
       const { mon, yr } = romanMonthYear();
-      const noInvoice = `${('00' + (maxId + 1)).slice(-3)}/RGI/INV/${mon}/${yr}`;
+      const noInvoice = `${String(maxId + 1).padStart(3, '0')}/RGI/INV/${mon}/${yr}`;
 
       const ins = await sb.from('invoice').insert({
         no_invoice: noInvoice, no_wo: isPredeal ? '' : p.noWO, no_penawaran: wo.id, tanggal: (p.tanggal && /^\d{4}-\d{2}-\d{2}/.test(p.tanggal)) ? p.tanggal.slice(0, 10) : todayIso(),
@@ -193,7 +193,7 @@ Deno.serve(async (req: Request) => {
           const kwIds = await all('kwitansi', 'no_kwitansi');
           let kmax = 0; for (const r of kwIds) { const m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { const n = parseInt(m[1], 10); if (n > kmax) kmax = n; } }
           const { mon, yr } = romanMonthYear();
-          noKwitansi = `${('00' + (kmax + 1)).slice(-3)}/RGI/KWT/${mon}/${yr}`;
+          noKwitansi = `${String(kmax + 1).padStart(3, '0')}/RGI/KWT/${mon}/${yr}`;
           const untuk = 'Pembayaran ' + jenis + (persen > 0 ? ' ' + persen + '%' : '') + ' - ' + (row.nama_project || '');
           const ik = await sb.from('kwitansi').insert({ no_kwitansi: noKwitansi, no_invoice: idInvoice, no_wo: row.no_wo || '', tanggal: todayIso(), terima_dari: row.nama_klien || '', jumlah: Number(row.total) || 0, untuk_pembayaran: untuk, metode: 'Transfer', catatan: '', dibuat_oleh: 'Sistem' });
           if (ik.error) return json({ success: false, message: ik.error.message });

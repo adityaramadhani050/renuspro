@@ -333,7 +333,7 @@
           if (!items.length) return { success: false, message: 'PO harus memiliki minimal 1 item.' };
           var noWO = (p.noWO || '').toString().trim();
           if (noWO) { var st = await _hoStatus(noWO); if (st !== 'Selesai') { var msg = st === 'Dijadwalkan' ? 'Hand Over WO ini masih Dijadwalkan — selesaikan HO dulu.' : st === 'Diminta' ? 'Hand Over WO ini baru Diminta — jadwalkan & selesaikan HO dulu.' : 'WO ini belum melewati Hand Over. Selesaikan Hand Over dulu sebelum lanjut.'; return { success: false, message: 'PO untuk WO ini belum bisa dibuat. ' + msg }; } }
-          var noPO = await _nextRomanSeq('purchase_order', 'no_po', 'RGI/PO'), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
+          var noPO = await _nextRomanSeq('purchase_order', 'no_po', 'RGI/PO', true), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
           var ins = await supa.from('purchase_order').insert({
             no_po: noPO, tanggal: _isoDate(p.tanggal) || _todayIso(), id_supplier: idSupplier, nama_supplier: (p.namaSupplier || '').toString(), peruntukan: (p.peruntukan || '').toString(), no_wo: noWO,
             status_po: 'Aktif', subtotal: calc.subtotal, ppn_persen: calc.ppnPersen, ppn_nominal: calc.ppnNominal, grand_total: calc.grandTotal, catatan: (p.catatan || '').toString(), status_bayar: 'Belum Dibayar', total_dibayar: 0,

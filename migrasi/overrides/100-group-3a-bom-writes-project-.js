@@ -341,7 +341,7 @@
       async function _nextKwitansiNumber() {
         var q = await _all('kwitansi', 'no_kwitansi'); var maxId = 0;
         (q.data || []).forEach(function (r) { var m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { var n = parseInt(m[1], 10); if (n > maxId) maxId = n; } });
-        var t = _jkMonthYear(); return ('00' + (maxId + 1)).slice(-3) + '/RGI/KWT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
+        var t = _jkMonthYear(); return String(maxId + 1).padStart(3, '0') + '/RGI/KWT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
       }
       window.gsRoute('simpanKwitansi', {
         mode: 'fn',

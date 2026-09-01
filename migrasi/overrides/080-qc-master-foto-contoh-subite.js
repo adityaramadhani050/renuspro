@@ -132,12 +132,15 @@
         return { mo: mo, yr: yr };
       }
       // ID NNN/<mid>/<Roman>/<Year> per-bulan (mis. pembayaran PO, surat jalan).
-      async function _nextRomanSeq(table, idField, mid) {
+      // continuous=true → nomor berjalan GLOBAL (tak reset per bulan), tetap
+      // memakai bulan/tahun berjalan di format. padStart (min 3 digit, boleh 4+)
+      // agar tak wrap ke '000' setelah 999.
+      async function _nextRomanSeq(table, idField, mid, continuous) {
         var t = _jkMonthYear(), roman = _ROMAN_MO[t.mo], yr = t.yr;
         var q = await _all(table, idField), maxSeq = 0;
-        var re = new RegExp('^(\\d+)/' + mid + '/' + roman + '/' + yr + '$');
+        var re = continuous ? new RegExp('^(\\d+)/' + mid + '/') : new RegExp('^(\\d+)/' + mid + '/' + roman + '/' + yr + '$');
         (q.data || []).forEach(function (r) { var m = (r[idField] || '').toString().match(re); if (m) { var n = parseInt(m[1], 10); if (n > maxSeq) maxSeq = n; } });
-        return ('00' + (maxSeq + 1)).slice(-3) + '/' + mid + '/' + roman + '/' + yr;
+        return String(maxSeq + 1).padStart(3, '0') + '/' + mid + '/' + roman + '/' + yr;
       }
       // Status WO (dari penawaran; '' bila WO tak ada).
       async function _woStatus(noWO) {
