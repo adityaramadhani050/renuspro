@@ -335,8 +335,11 @@
               if (predeal.length) await supa.from('invoice').update({ no_wo: noWO }).in('no_invoice', predeal);
             }
           } else {
-            if (noWO) { upd.no_wo = ''; noWO = ''; }
-            upd.tanggal_deal = null;
+            // Keluar dari Deal (mis. sengaja di-On-Progress-kan). JANGAN hapus
+            // no_wo maupun tanggal_deal — agar bila kembali Deal, nomor WO &
+            // tanggal deal yang SAMA dipakai ulang (cegah WO ganda untuk satu
+            // penawaran, sekaligus tutup celah bypass kunci revisi). WO view
+            // tetap tak menampilkannya karena statusnya bukan Deal/Closed.
           }
           if (statusBaru === 'Fail') { if (statusLama !== 'Fail' && !row.tanggal_fail) upd.tanggal_fail = _todayIso(); }
           else upd.tanggal_fail = null;
