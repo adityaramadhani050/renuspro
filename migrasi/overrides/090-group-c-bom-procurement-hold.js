@@ -332,7 +332,18 @@
           var p = a[0] || {};
           var noPen = (p.noPenawaran || '').toString().trim();
           var unlocked = p.unlocked === true;
-          if (((p.role || '').toString().trim()) !== 'admin') return { success: false, message: 'Hanya admin yang dapat mengubah kunci penawaran.' };
+          // Verifikasi admin dari SESI login (auth_uid → app_user.role), bukan
+          // sekadar percaya field yang dikirim klien.
+          var isAdmin = false;
+          try {
+            var au = await supa.auth.getUser();
+            var uid = (au && au.data && au.data.user) ? au.data.user.id : '';
+            if (uid) {
+              var me = await supa.from('app_user').select('role,aktif').eq('auth_uid', uid).maybeSingle();
+              isAdmin = !!(me.data && me.data.aktif !== false && (me.data.role || '').toString() === 'admin');
+            }
+          } catch (e) { isAdmin = false; }
+          if (!isAdmin) return { success: false, message: 'Hanya admin yang dapat mengubah kunci penawaran.' };
           if (!noPen) return { success: false, message: 'No Penawaran wajib.' };
           var up = await supa.from('penawaran').update({ edit_unlocked: unlocked }).eq('no_penawaran', noPen);
           if (up.error) return { success: false, message: up.error.message };
