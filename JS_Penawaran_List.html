@@ -5,12 +5,15 @@
     // Penawaran Deal terkunci bila: (a) Hand Over WO sudah Selesai, ATAU
     // (b) tanggal deal sudah lewat bulan ini (jaga laporan deal bulan lalu).
     function _isDealEditableBulanIni(item) {
+      // Utamakan hasil hitung SERVER (WIB) agar cocok dgn guard saat menyimpan.
+      if (typeof item.dealEditable === 'boolean') return item.dealEditable;
       if (item.status !== 'Deal') return true;
       if (item.editUnlocked === true) return true;   // admin sudah membuka kunci
       return !_isDealNaturallyLocked(item);
     }
     // Terkunci oleh aturan (abaikan status buka-kunci admin).
     function _isDealNaturallyLocked(item) {
+      if (typeof item.dealLockedByRule === 'boolean') return item.dealLockedByRule;
       if (item.status !== 'Deal') return false;
       if ((item.hoStatus || '') === 'Selesai') return true;
       if (!item.tanggalDeal) return true;

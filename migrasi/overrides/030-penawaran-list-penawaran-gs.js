@@ -21,8 +21,15 @@
             var rev = parseInt(r.rev) || 0;
             if (!(no in orderMap)) orderMap[no] = counter++;
             if (!(no in latestMap) || rev > (latestMap[no]._rev || 0)) {
+              // Status kunci dihitung SERVER (WIB) agar sama persis dgn guard saat
+              // menyimpan revisi — tak bergantung jam browser.
+              var _st = (r.status || 'On-Progress').toString();
+              var _hoSt = r.no_wo ? (hoMap[r.no_wo] || '') : '';
+              var _lockedRule = (_st === 'Deal') && ((_hoSt === 'Selesai') || !_isSameJkMonth(r.tanggal_deal));
               latestMap[no] = {
                 _rev: rev, id: no, rev: rev.toString(),
+                dealLockedByRule: _lockedRule,
+                dealEditable: (_st !== 'Deal') || (r.edit_unlocked === true) || !_lockedRule,
                 tanggal: _fmtTgl(r.tanggal), validUntil: _fmtTgl(r.valid_hingga),
                 namaProject: r.nama_project || '', klienId: r.klien_id || '',
                 namaKlien: klienMap[r.klien_id] || r.klien_id || '', dibuatOleh: r.dibuat_oleh || '',
