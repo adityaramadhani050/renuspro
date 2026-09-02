@@ -304,9 +304,10 @@
           var list = rows.data || []; if (!list.length) return { success: false, message: 'Penawaran tidak ditemukan.' };
           list.sort(function (x, y) { return (Number(y.rev) || 0) - (Number(x.rev) || 0); });
           var latest = list[0], maxRev = Number(latest.rev) || 0, currentStatus = (latest.status || '').toString();
-          if (currentStatus === 'Deal') {
-            if (!_isSameJkMonth(latest.tanggal_deal)) return { success: false, message: 'Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah.' };
-            if ((await _hoStatus(latest.no_wo)) === 'Selesai') return { success: false, message: 'Penawaran Deal tidak dapat direvisi karena Hand Over WO ' + (latest.no_wo || '') + ' sudah Selesai (project sudah diserahterimakan ke tim project).' };
+          // Guard revisi Deal di-bypass bila admin sudah membuka kunci (edit_unlocked).
+          if (currentStatus === 'Deal' && latest.edit_unlocked !== true) {
+            if (!_isSameJkMonth(latest.tanggal_deal)) return { success: false, message: 'Penawaran Deal bulan sebelumnya tidak dapat direvisi lagi, agar laporan deal bulan lalu tidak berubah. (Minta admin membuka kunci bila perlu.)' };
+            if ((await _hoStatus(latest.no_wo)) === 'Selesai') return { success: false, message: 'Penawaran Deal tidak dapat direvisi karena Hand Over WO ' + (latest.no_wo || '') + ' sudah Selesai. (Minta admin membuka kunci bila perlu.)' };
           }
           var newRev = maxRev + 1, tc = p.termConditions || {}, statusBaru = currentStatus === 'Deal' ? 'Deal' : (p.status || 'On-Progress'), isDeal = statusBaru === 'Deal';
           var ins = await supa.from('penawaran').insert({
@@ -317,10 +318,25 @@
             term_conditions: _cleanTC(tc, p.catatan), items: Array.isArray(p.items) ? p.items : [], status: statusBaru,
             no_wo: isDeal ? (latest.no_wo || '') : '', tanggal_deal: isDeal ? (latest.tanggal_deal || null) : null, channel_marketing: (p.channelMarketing || '').toString(),
             catatan_fail: '', reminder_expired: null, kode_win: isDeal ? (latest.kode_win || '') : '', catatan_win: '', kode_lost: '', tanggal_fail: null,
-            lesson_learned: isDeal ? (latest.lesson_learned || '') : '', action: isDeal ? (latest.action || '') : ''
+            lesson_learned: isDeal ? (latest.lesson_learned || '') : '', action: isDeal ? (latest.action || '') : '',
+            edit_unlocked: latest.edit_unlocked === true   // pertahankan status buka-kunci antar revisi
           });
           if (ins.error) return { success: false, message: 'Gagal: ' + ins.error.message };
           return { success: true, message: noPen + ' berhasil direvisi → Rev' + newRev + '!', nextNo: await _nextQuotationNumber() };
+        }
+      });
+      // Admin buka/kunci penawaran (bypass guard revisi Deal bulan lalu / HO Selesai).
+      window.gsRoute('setPenawaranLock', {
+        mode: 'fn',
+        handler: async function (a) {
+          var p = a[0] || {};
+          var noPen = (p.noPenawaran || '').toString().trim();
+          var unlocked = p.unlocked === true;
+          if (((p.role || '').toString().trim()) !== 'admin') return { success: false, message: 'Hanya admin yang dapat mengubah kunci penawaran.' };
+          if (!noPen) return { success: false, message: 'No Penawaran wajib.' };
+          var up = await supa.from('penawaran').update({ edit_unlocked: unlocked }).eq('no_penawaran', noPen);
+          if (up.error) return { success: false, message: up.error.message };
+          return { success: true, message: 'Penawaran ' + noPen + (unlocked ? ' dibuka kuncinya (bisa direvisi).' : ' dikunci kembali.') };
         }
       });
       window.gsRoute('simpanPO', {

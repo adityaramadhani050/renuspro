@@ -6,18 +6,47 @@
     // (b) tanggal deal sudah lewat bulan ini (jaga laporan deal bulan lalu).
     function _isDealEditableBulanIni(item) {
       if (item.status !== 'Deal') return true;
-      if ((item.hoStatus || '') === 'Selesai') return false;
-      if (!item.tanggalDeal) return false;
+      if (item.editUnlocked === true) return true;   // admin sudah membuka kunci
+      return !_isDealNaturallyLocked(item);
+    }
+    // Terkunci oleh aturan (abaikan status buka-kunci admin).
+    function _isDealNaturallyLocked(item) {
+      if (item.status !== 'Deal') return false;
+      if ((item.hoStatus || '') === 'Selesai') return true;
+      if (!item.tanggalDeal) return true;
       const p = item.tanggalDeal.split('/'); // dd/MM/yyyy
-      if (p.length !== 3) return false;
+      if (p.length !== 3) return true;
       const d = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
       const now = new Date();
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      return !(d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth());
     }
     // Alasan kunci (untuk tooltip & pesan).
     function _dealLockReason(item) {
       if ((item.hoStatus || '') === 'Selesai') return 'Hand Over WO sudah Selesai';
       return 'Deal sudah melewati bulan ini';
+    }
+    // Admin membuka/mengunci penawaran.
+    function _togglePenawaranLock(item) {
+      const isAdmin = _currentUser && _currentUser.role === 'admin';
+      if (!isAdmin) return;
+      const unlock = !(item.editUnlocked === true);
+      showConfirm({
+        title: unlock ? 'Buka Kunci Penawaran' : 'Kunci Penawaran',
+        type: unlock ? 'warning' : 'info', icon: unlock ? 'fa-lock-open' : 'fa-lock',
+        message: (unlock
+          ? 'Buka kunci penawaran ' + item.id + ' agar bisa direvisi walau ' + _dealLockReason(item).toLowerCase() + '? Revisi akan mengubah data deal terkait.'
+          : 'Kunci kembali penawaran ' + item.id + ' agar tidak bisa direvisi?'),
+        confirmText: unlock ? 'Ya, Buka Kunci' : 'Ya, Kunci',
+        onConfirm: function() {
+          toggleLoader(true, 'Menyimpan...');
+          google.script.run.withSuccessHandler(function(res){
+            toggleLoader(false);
+            showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
+            if (res && res.success) loadPenawaran();
+          }).withFailureHandler(function(err){ toggleLoader(false); showNotification((err && err.message) || 'Gagal.', 'error'); })
+            .setPenawaranLock({ noPenawaran: item.id, unlocked: unlock, role: (_currentUser && _currentUser.role) || '' });
+        }
+      });
     }
     function _isiDropdownFilterPenawaran(data) {
       const isAdmin = _currentUser && _currentUser.role === 'admin';      
@@ -138,10 +167,17 @@
                       </span>`
                     : `<button onclick='muatPenawaranKeForm(${JSON.stringify(i).replace(/'/g,"&#39;")})'
                         class="text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition"
-                        title="${i.status === 'Deal' ? 'Edit Revisi (Deal — bulan ini & HO belum Selesai)' : 'Edit / Revisi'}">
+                        title="${i.status === 'Deal' ? (i.editUnlocked ? 'Edit Revisi (kunci dibuka admin)' : 'Edit Revisi (Deal — bulan ini & HO belum Selesai)') : 'Edit / Revisi'}">
                         <i class="fa-solid fa-pen-to-square"></i>
                       </button>`
                   }
+                  ${isAdmin && i.status === 'Deal' && (_isDealNaturallyLocked(i) || i.editUnlocked)
+                    ? `<button onclick='_togglePenawaranLock(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                        class="${i.editUnlocked ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'} p-1.5 rounded-lg transition"
+                        title="${i.editUnlocked ? 'Kunci kembali penawaran (Admin)' : 'Buka kunci agar bisa direvisi (Admin)'}">
+                        <i class="fa-solid ${i.editUnlocked ? 'fa-lock' : 'fa-lock-open'}"></i>
+                      </button>`
+                    : ''}
                   <button onclick="konfirmasiHapus('penawaran','${i.id}|${i.rev}','${i.id}')"
                     class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
                     <i class="fa-regular fa-trash-can"></i>

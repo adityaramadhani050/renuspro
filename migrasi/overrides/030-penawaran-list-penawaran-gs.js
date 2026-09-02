@@ -32,6 +32,7 @@
                 marginPersen: parseFloat(r.margin_persen) || 0,
                 termConditions: _jsonStr(r.term_conditions, '{}'), items: _jsonStr(r.items, '[]'),
                 status: r.status || 'On-Progress', noWO: r.no_wo || '',
+                editUnlocked: r.edit_unlocked === true,
                 hoStatus: r.no_wo ? (hoMap[r.no_wo] || '') : '',
                 tanggalDeal: _fmtTgl(r.tanggal_deal), channelMarketing: r.channel_marketing || '',
                 catatanFail: r.catatan_fail || '', kodeWin: r.kode_win || '', catatanWin: r.catatan_win || '',
