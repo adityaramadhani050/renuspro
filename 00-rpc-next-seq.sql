@@ -66,27 +66,22 @@ begin
   return p_prefix || lpad(n::text, 3, '0');
 end $$;
 
--- 3) next_quotation_seq(): nomor urut penawaran GLOBAL & berkelanjutan (gapless).
---    Mengembalikan INTEGER saja; frontend tetap memformat
---    'NNN/QUOT/<Romawi bulan>/<Tahun>' seperti biasa (format tak berubah).
+-- 3) next_quotation_seq(): nomor urut penawaran GLOBAL.
+--    Basis MAX+1 (baca nomor tertinggi di tabel) → bila penawaran TERAKHIR
+--    dihapus, nomornya DIPAKAI ULANG (tanpa gap). Aman dari duplikat karena
+--    simpanPenawaran memakai retry anti-duplikat. Mengembalikan INTEGER;
+--    frontend tetap memformat 'NNN/QUOT/<Romawi bulan>/<Tahun>'.
 create or replace function next_quotation_seq()
 returns bigint
 language plpgsql
 security definer
 set search_path = public
 as $$
-declare cur bigint; n bigint;
+declare mx bigint;
 begin
-  insert into app_seq(scope, val) values ('penawaran_quot', 0)
-    on conflict (scope) do nothing;
-  select val into cur from app_seq where scope = 'penawaran_quot' for update;
-  if cur = 0 then
-    select coalesce(max((substring(no_penawaran from '^(\d+)/QUOT'))::bigint), 0)
-      into cur from penawaran where no_penawaran ~ '^\d+/QUOT';
-  end if;
-  n := cur + 1;
-  update app_seq set val = n where scope = 'penawaran_quot';
-  return n;
+  select coalesce(max((substring(no_penawaran from '^(\d+)/QUOT'))::bigint), 0)
+    into mx from penawaran where no_penawaran ~ '^\d+/QUOT';
+  return mx + 1;
 end $$;
 
 -- 3b) next_doc_seq(): nomor dokumen finansial GLOBAL & berkelanjutan (gapless) —
