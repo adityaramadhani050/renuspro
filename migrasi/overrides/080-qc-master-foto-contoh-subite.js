@@ -374,7 +374,7 @@
             var kq = await _all('klien', 'id');
             if (kq.error) return { success: false, message: kq.error.message };
             var maxNum = 0; (kq.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^K(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-            klienId = 'K' + ('000' + (maxNum + 1)).slice(-3);
+            klienId = 'K' + String(maxNum + 1).padStart(3, '0');
             var insK = await supa.from('klien').insert({ id: klienId, nama_klien: namaKlienBaru, perusahaan: (p.perusahaanKlienBaru || '').toString(), alamat: (p.alamatKlienBaru || '').toString(), kontak: (p.kontakKlienBaru || '').toString() });
             if (insK.error) return { success: false, message: 'Gagal membuat klien baru: ' + insK.error.message };
           } else {

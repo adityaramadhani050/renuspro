@@ -130,14 +130,23 @@
             var up = await supa.from(itemTable).update({ status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: akt }).eq('id', found.id);
             if (up.error) return { success: false, message: up.error.message };
           } else {
-            var q = await _all(itemTable, 'id'); var maxNum = 0;
-            var re = new RegExp('^' + idPrefix + '(\\d+)', 'i');
-            (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(re); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-            var id = idPrefix + ('000' + (maxNum + 1)).slice(-3);
-            var row = { id: id, no_wo: noWO, kode: kode, status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: [naEv] };
-            row[filesCol] = [];
-            var ins = await supa.from(itemTable).insert(row);
-            if (ins.error) return { success: false, message: ins.error.message };
+            // Aman-balapan + anti-wrap (lihat _engNextItemId): bila bentrok PK,
+            // re-select — bila baris sudah ada → tandai NA; bila belum → id baru.
+            var naOk = false;
+            for (var naTry = 0; naTry < 6; naTry++) {
+              var exist = await supa.from(itemTable).select('id').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+              if (exist.data) {
+                var upE = await supa.from(itemTable).update({ status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: [naEv] }).eq('id', exist.data.id);
+                if (upE.error) return { success: false, message: upE.error.message };
+                naOk = true; break;
+              }
+              var row = { id: await _engNextItemId(itemTable, idPrefix), no_wo: noWO, kode: kode, status: 'NA', diupload_oleh: (oleh || '').toString(), diupload_pada: whenIso, aktivitas: [naEv] };
+              row[filesCol] = [];
+              var ins = await supa.from(itemTable).insert(row);
+              if (!ins.error) { naOk = true; break; }
+              if (ins.error.code !== '23505' || naTry === 5) return { success: false, message: ins.error.message };
+            }
+            if (!naOk) return { success: false, message: 'Gagal menyimpan item (bentrok id berulang).' };
           }
         } else if (found) {
           var files = _arr(found[filesCol]);
@@ -153,7 +162,7 @@
       async function _nextSeqId(table, idField, prefix) {
         var q = await _all(table, idField); var maxSeq = 0;
         (q.data || []).forEach(function (r) { var id = (r[idField] || '').toString(); if (id.indexOf(prefix) === 0) { var s = parseInt(id.slice(prefix.length), 10) || 0; if (s > maxSeq) maxSeq = s; } });
-        return prefix + ('000' + (maxSeq + 1)).slice(-3);
+        return prefix + String(maxSeq + 1).padStart(3, '0');
       }
 
       // ── Cash: Pemasukan langsung (simpan/edit/hapus) ──────────────────────
@@ -389,27 +398,40 @@
         }
       });
 
+      // Helper: id item engineering berikutnya (QCI/DEDI/…) — padStart, TANPA
+      // slice(-3) agar tidak wrap ke '000' setelah >999 (akar duplicate *_pkey).
+      async function _engNextItemId(table, idPrefix) {
+        var q = await _all(table, 'id'); var mx = 0; var re = new RegExp('^' + idPrefix + '(\\d+)', 'i');
+        (q.data || []).forEach(function (x) { var m = (x.id || '').toString().match(re); if (m) mx = Math.max(mx, parseInt(m[1], 10)); });
+        return idPrefix + String(mx + 1).padStart(3, '0');
+      }
+
       // Helper: tambahkan file terunggah ke item DED/QC (foto/files) + aktivitas.
+      //  Aman-balapan: bila insert bentrok PK (dua upload item baru nyaris
+      //  bersamaan), re-select — bila baris (no_wo,kode) sudah ada → append via
+      //  update; bila belum → regenerate id lebih tinggi lalu insert ulang.
       async function _engAppendFiles(table, filesCol, idPrefix, noWO, kode, added, oleh) {
-        var f = await supa.from(table).select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
-        var found = f.data;
-        var all = (found ? _arr(found[filesCol]) : []).concat(added);
         var evts = added.map(function (x) { return { type: 'upload', by: oleh, at: x.at, note: x.fileName }; });
         var whenIso = new Date().toISOString();
-        if (found) {
-          var upd = { status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: _arr(found.aktivitas).concat(evts) };
-          upd[filesCol] = all;
-          var up = await supa.from(table).update(upd).eq('id', found.id);
-          if (up.error) return { ok: false, message: up.error.message };
-        } else {
-          var q = await _all(table, 'id'); var mx = 0; var re = new RegExp('^' + idPrefix + '(\\d+)', 'i');
-          (q.data || []).forEach(function (x) { var m = (x.id || '').toString().match(re); if (m) mx = Math.max(mx, parseInt(m[1], 10)); });
-          var row = { id: idPrefix + ('000' + (mx + 1)).slice(-3), no_wo: noWO, kode: kode, status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: evts };
+        for (var attempt = 0; attempt < 6; attempt++) {
+          var f = await supa.from(table).select('*').eq('no_wo', noWO).eq('kode', kode).maybeSingle();
+          var found = f.data;
+          var all = (found ? _arr(found[filesCol]) : []).concat(added);
+          if (found) {
+            var upd = { status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: _arr(found.aktivitas).concat(evts) };
+            upd[filesCol] = all;
+            var up = await supa.from(table).update(upd).eq('id', found.id);
+            if (up.error) return { ok: false, message: up.error.message };
+            return { ok: true, list: all, prevStatus: found.status || '' };
+          }
+          var row = { id: await _engNextItemId(table, idPrefix), no_wo: noWO, kode: kode, status: 'Pending', diupload_oleh: oleh, diupload_pada: whenIso, aktivitas: evts };
           row[filesCol] = all;
           var ins = await supa.from(table).insert(row);
-          if (ins.error) return { ok: false, message: ins.error.message };
+          if (!ins.error) return { ok: true, list: all, prevStatus: '' };
+          // Bukan bentrok unik → error nyata, hentikan. Bentrok unik → ulangi loop.
+          if (ins.error.code !== '23505' || attempt === 5) return { ok: false, message: ins.error.message };
         }
-        return { ok: true, list: all, prevStatus: found ? (found.status || '') : '' };
+        return { ok: false, message: 'Gagal menyimpan item (bentrok id berulang).' };
       }
 
       // QC foto: single + batch

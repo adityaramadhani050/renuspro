@@ -169,7 +169,7 @@
           if (!label) return { success: false, message: 'Nama dokumen wajib diisi.' };
           var items = await _all('ded_checklist', 'kode'); var maxNum = 0, cnt = (items.data || []).length;
           (items.data || []).forEach(function (x) { var m = (x.kode || '').toString().match(/^D(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var kode = 'D' + ('00' + (maxNum + 1)).slice(-3);
+          var kode = 'D' + String(maxNum + 1).padStart(3, '0');
           var ins = await supa.from('ded_checklist').insert({ kode: kode, label: label, wajib: !!wajib, urutan: cnt + 1, instruksi: (instruksi || '').toString() });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Dokumen "' + label + '" ditambahkan.', kode: kode };

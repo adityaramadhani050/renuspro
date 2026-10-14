@@ -315,7 +315,7 @@
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0;
           (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^SVY(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          return { success: true, id: 'SVY' + ('000' + (maxNum + 1)).slice(-3) };
+          return { success: true, id: 'SVY' + String(maxNum + 1).padStart(3, '0') };
         }
       });
 
