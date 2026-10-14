@@ -158,8 +158,15 @@
       window.gsRoute('setDEDItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('ded_item', 'files', 'DEDI', a[0], a[1], a[2], a[3], 'Status dokumen diperbarui.'); } });
       window.gsRoute('setQCItemNA', { mode: 'fn', handler: function (a) { return _setItemNA('qc_item', 'foto', 'QCI', a[0], a[1], a[2], a[3], 'Status item diperbarui.'); } });
 
-      // Helper: id berurut per-bulan (prefix-YYYYMM-###).
+      // Helper: id berurut berprefix (prefix-YYYYMM-### atau prefix###).
+      //  Utama: RPC next_seq (atomik di server → tak bisa kembar walau banyak
+      //  user menyimpan bersamaan). Fallback: cara lama scan+max (padStart,
+      //  anti-wrap) bila RPC belum ter-deploy / error → operasional tetap jalan.
       async function _nextSeqId(table, idField, prefix) {
+        try {
+          var r = await supa.rpc('next_seq', { p_table: table, p_field: idField, p_prefix: prefix });
+          if (r && !r.error && typeof r.data === 'string' && r.data) return r.data;
+        } catch (e) { /* fallback di bawah */ }
         var q = await _all(table, idField); var maxSeq = 0;
         (q.data || []).forEach(function (r) { var id = (r[idField] || '').toString(); if (id.indexOf(prefix) === 0) { var s = parseInt(id.slice(prefix.length), 10) || 0; if (s > maxSeq) maxSeq = s; } });
         return prefix + String(maxSeq + 1).padStart(3, '0');

@@ -246,8 +246,17 @@
         var t = _jkMonthYear();
         return String(seq).padStart(3, '0') + '/QUOT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
       }
+      // Nomor urut penawaran berikut secara ATOMIK (RPC next_quotation_seq).
+      //  Fallback ke cara lama (scan+max)+1 bila RPC belum ter-deploy / error.
+      async function _nextQuotationSeqAtomic() {
+        try {
+          var r = await supa.rpc('next_quotation_seq');
+          if (r && !r.error && r.data != null) { var n = parseInt(r.data, 10); if (n > 0) return n; }
+        } catch (e) { /* fallback di bawah */ }
+        return (await _maxQuotationSeq()) + 1;
+      }
       async function _nextQuotationNumber() {
-        return _fmtQuotationNo((await _maxQuotationSeq()) + 1);
+        return _fmtQuotationNo(await _nextQuotationSeqAtomic());
       }
       // term_conditions penawaran: buang 7 field angka internal, sisipkan catatan.
       function _cleanTC(tc, catatan) {
@@ -281,8 +290,9 @@
             total_hpp: Number(tc.hppTotalGabungan) || 0, estimasi_keuntungan: Number(tc.estimasiProfitBersih) || 0, margin_persen: parseFloat(tc.marginPersenInternal) || 0,
             term_conditions: _cleanTC(tc, p.catatan), items: Array.isArray(p.items) ? p.items : [], status: 'On-Progress', no_wo: '', tanggal_deal: null,
             channel_marketing: (p.channelMarketing || '').toString(), catatan_fail: '', reminder_expired: null, kode_win: '', catatan_win: '', kode_lost: '', tanggal_fail: null, lesson_learned: '', action: '' };
-          // Coba insert; bila nomor bentrok (race / sisa data lama), naikkan seq & ulang.
-          var seq = (await _maxQuotationSeq()) + 1, noPen = '', ins = null;
+          // Nomor penawaran atomik via RPC (fallback scan+max). Bila masih bentrok
+          // (sisa data lama / transisi versi), naikkan seq & ulang (retry).
+          var seq = await _nextQuotationSeqAtomic(), noPen = '', ins = null;
           for (var att = 0; att < 25; att++) {
             noPen = _fmtQuotationNo(seq);
             var row = { no_penawaran: noPen }; for (var k in base) row[k] = base[k];

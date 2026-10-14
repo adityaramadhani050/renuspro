@@ -42,6 +42,12 @@ Deno.serve(async (req: Request) => {
       return out;
     }
     async function nextSeq(table: string, idField: string, prefix: string) {
+      // Utama: RPC next_seq (atomik, sumber tunggal dengan frontend → tak bentrok
+      // dengan pemasukan yang dibuat manual). Fallback: scan+max bila RPC error.
+      try {
+        const r = await sb.rpc('next_seq', { p_table: table, p_field: idField, p_prefix: prefix });
+        if (!r.error && typeof r.data === 'string' && r.data) return r.data as string;
+      } catch (_e) { /* fallback di bawah */ }
       const rows = await all(table, idField);
       let max = 0;
       for (const r of rows) { const id = (r[idField] || '').toString(); if (id.startsWith(prefix)) { const s = parseInt(id.slice(prefix.length), 10) || 0; if (s > max) max = s; } }
