@@ -364,7 +364,16 @@
           var p = a[0] || {}, jumlah = parseFloat(p.jumlah) || 0;
           if (jumlah <= 0) return { success: false, message: 'Jumlah kwitansi harus lebih dari 0.' };
           var noK = await _nextKwitansiNumber();
-          var ins = await supa.from('kwitansi').insert({ no_kwitansi: noK, no_invoice: (p.noInvoice || '') || null, no_wo: (p.noWO || '').toString(), tanggal: _isoDate(p.tanggal) || _todayIso(), terima_dari: (p.terimaDari || '').toString(), jumlah: jumlah, untuk_pembayaran: (p.untuk || '').toString(), metode: (p.metode || 'Transfer').toString(), catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || 'Sales Executive').toString() });
+          var kwRow = { no_kwitansi: noK, no_invoice: (p.noInvoice || '') || null, no_wo: (p.noWO || '').toString(), tanggal: _isoDate(p.tanggal) || _todayIso(), terima_dari: (p.terimaDari || '').toString(), jumlah: jumlah, untuk_pembayaran: (p.untuk || '').toString(), metode: (p.metode || 'Transfer').toString(), catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || 'Sales Executive').toString() };
+          // Anti-balapan: no_kwitansi gapless (max+1) bisa bentrok → nomor berikut & ulang.
+          var ins = null;
+          for (var attKw = 0; attKw < 25; attKw++) {
+            kwRow.no_kwitansi = noK;
+            ins = await supa.from('kwitansi').insert(kwRow);
+            if (!ins.error) break;
+            if (!/duplicate key|kwitansi_pkey/i.test(ins.error.message || '')) break;
+            noK = await _nextKwitansiNumber();
+          }
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Kwitansi ' + noK + ' berhasil dibuat!', noKwitansi: noK };
         }

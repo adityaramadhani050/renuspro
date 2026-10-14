@@ -110,24 +110,34 @@ Deno.serve(async (req: Request) => {
       let scope: any = []; try { scope = typeof wo.items === 'string' ? JSON.parse(wo.items || '[]') : (wo.items || []); } catch (_) { scope = []; }
       const meta = { scope, nilaiKontrak, inputMode: p.inputMode || 'persen' };
 
-      // Nomor invoice: NNN/RGI/INV/{roman}/{year} — gapless via RPC, fallback scan.
-      let seqInv = await nextDocSeq('invoice');
-      if (seqInv == null) {
-        let maxId = 0;
-        const invIds = await all('invoice', 'no_invoice');
-        for (const r of invIds) { const m = (r.no_invoice || '').toString().match(/^(\d+)\/RGI(?:-INV|\/INV)/); if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; } }
-        seqInv = maxId + 1;
-      }
+      // Nomor invoice: NNN/RGI/INV/{roman}/{year} — gapless (max+1) + retry anti-duplikat.
       const { mon, yr } = romanMonthYear();
-      const noInvoice = `${String(seqInv).padStart(3, '0')}/RGI/INV/${mon}/${yr}`;
-
-      const ins = await sb.from('invoice').insert({
+      async function computeInvoiceNo(): Promise<string> {
+        let seqInv = await nextDocSeq('invoice');
+        if (seqInv == null) {
+          let maxId = 0;
+          const invIds = await all('invoice', 'no_invoice');
+          for (const r of invIds) { const m = (r.no_invoice || '').toString().match(/^(\d+)\/RGI(?:-INV|\/INV)/); if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; } }
+          seqInv = maxId + 1;
+        }
+        return `${String(seqInv).padStart(3, '0')}/RGI/INV/${mon}/${yr}`;
+      }
+      let noInvoice = await computeInvoiceNo();
+      const invoiceRow: Record<string, unknown> = {
         no_invoice: noInvoice, no_wo: isPredeal ? '' : p.noWO, no_penawaran: wo.id, tanggal: (p.tanggal && /^\d{4}-\d{2}-\d{2}/.test(p.tanggal)) ? p.tanggal.slice(0, 10) : todayIso(),
         jenis, persen, no_po: p.noPO || '', tgl_po: (p.tglPO && /^\d{4}-\d{2}-\d{2}/.test(p.tglPO)) ? p.tglPO.slice(0, 10) : null,
         klien_id: wo.klienId, nama_klien: wo.namaKlien, nama_project: wo.namaProject,
         dpp, ppn_persen: ppnPersen, ppn_nominal: ppnNominal, total, rincian_item: meta,
         status_bayar: 'Belum Lunas', catatan: p.catatan || '', dibuat_oleh: p.dibuatOleh || 'Finance', bank_account: p.bankAccount || '',
-      });
+      };
+      let ins: any = null;
+      for (let att = 0; att < 25; att++) {
+        invoiceRow.no_invoice = noInvoice;
+        ins = await sb.from('invoice').insert(invoiceRow);
+        if (!ins.error) break;
+        if (!/duplicate key|invoice_pkey/i.test(ins.error.message || '')) break;
+        noInvoice = await computeInvoiceNo();
+      }
       if (ins.error) return json({ success: false, message: ins.error.message });
       return json({ success: true, message: 'Invoice ' + noInvoice + ' berhasil dibuat!', noInvoice });
     }
@@ -208,16 +218,28 @@ Deno.serve(async (req: Request) => {
         const kw = await sb.from('kwitansi').select('no_kwitansi').eq('no_invoice', idInvoice).maybeSingle();
         if (kw.data) { noKwitansi = kw.data.no_kwitansi; }
         else {
-          let seqKw = await nextDocSeq('kwitansi');
-          if (seqKw == null) {
-            const kwIds = await all('kwitansi', 'no_kwitansi');
-            let kmax = 0; for (const r of kwIds) { const m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { const n = parseInt(m[1], 10); if (n > kmax) kmax = n; } }
-            seqKw = kmax + 1;
-          }
           const { mon, yr } = romanMonthYear();
-          noKwitansi = `${String(seqKw).padStart(3, '0')}/RGI/KWT/${mon}/${yr}`;
+          async function computeKwitansiNo(): Promise<string> {
+            let seqKw = await nextDocSeq('kwitansi');
+            if (seqKw == null) {
+              const kwIds = await all('kwitansi', 'no_kwitansi');
+              let kmax = 0; for (const r of kwIds) { const m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { const n = parseInt(m[1], 10); if (n > kmax) kmax = n; } }
+              seqKw = kmax + 1;
+            }
+            return `${String(seqKw).padStart(3, '0')}/RGI/KWT/${mon}/${yr}`;
+          }
           const untuk = 'Pembayaran ' + jenis + (persen > 0 ? ' ' + persen + '%' : '') + ' - ' + (row.nama_project || '');
-          const ik = await sb.from('kwitansi').insert({ no_kwitansi: noKwitansi, no_invoice: idInvoice, no_wo: row.no_wo || '', tanggal: todayIso(), terima_dari: row.nama_klien || '', jumlah: Number(row.total) || 0, untuk_pembayaran: untuk, metode: 'Transfer', catatan: '', dibuat_oleh: 'Sistem' });
+          noKwitansi = await computeKwitansiNo();
+          const kwRow: Record<string, unknown> = { no_kwitansi: noKwitansi, no_invoice: idInvoice, no_wo: row.no_wo || '', tanggal: todayIso(), terima_dari: row.nama_klien || '', jumlah: Number(row.total) || 0, untuk_pembayaran: untuk, metode: 'Transfer', catatan: '', dibuat_oleh: 'Sistem' };
+          // Anti-balapan: no_kwitansi gapless (max+1) bisa bentrok → nomor berikut & ulang.
+          let ik: any = null;
+          for (let att = 0; att < 25; att++) {
+            kwRow.no_kwitansi = noKwitansi;
+            ik = await sb.from('kwitansi').insert(kwRow);
+            if (!ik.error) break;
+            if (!/duplicate key|kwitansi_pkey/i.test(ik.error.message || '')) break;
+            noKwitansi = await computeKwitansiNo();
+          }
           if (ik.error) return json({ success: false, message: ik.error.message });
           kwitansiBaru = true;
         }

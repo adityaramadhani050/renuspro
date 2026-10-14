@@ -389,12 +389,21 @@
           var noWO = (p.noWO || '').toString().trim();
           if (noWO) { var st = await _hoStatus(noWO); if (st !== 'Selesai') { var msg = st === 'Dijadwalkan' ? 'Hand Over WO ini masih Dijadwalkan — selesaikan HO dulu.' : st === 'Diminta' ? 'Hand Over WO ini baru Diminta — jadwalkan & selesaikan HO dulu.' : 'WO ini belum melewati Hand Over. Selesaikan Hand Over dulu sebelum lanjut.'; return { success: false, message: 'PO untuk WO ini belum bisa dibuat. ' + msg }; } }
           var noPO = await _nextPONumber(), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
-          var ins = await supa.from('purchase_order').insert({
+          var poRow = {
             no_po: noPO, tanggal: _isoDate(p.tanggal) || _todayIso(), id_supplier: idSupplier, nama_supplier: (p.namaSupplier || '').toString(), peruntukan: (p.peruntukan || '').toString(), no_wo: noWO,
             status_po: 'Aktif', subtotal: calc.subtotal, ppn_persen: calc.ppnPersen, ppn_nominal: calc.ppnNominal, grand_total: calc.grandTotal, catatan: (p.catatan || '').toString(), status_bayar: 'Belum Dibayar', total_dibayar: 0,
             dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString(), diubah_oleh: '', diubah_pada: null, diskon_persen: calc.diskonPersen, diskon_nominal: calc.diskonNominal,
             no_quotation: (p.quotNo || '').toString(), tanggal_quotation: _isoDate(p.quotTanggal), term_conditions: _poTC(p.termConditions), quot_file_id: (p.quotFileId || '').toString(), quot_file_url: (p.quotFileUrl || '').toString(), quot_file_nama: (p.quotFileName || '').toString()
-          });
+          };
+          // Anti-balapan: no_po gapless (max+1) bisa bentrok → ambil nomor berikut & ulang.
+          var ins = null;
+          for (var attPO = 0; attPO < 25; attPO++) {
+            poRow.no_po = noPO;
+            ins = await supa.from('purchase_order').insert(poRow);
+            if (!ins.error) break;
+            if (!/duplicate key|purchase_order_pkey/i.test(ins.error.message || '')) break;
+            noPO = await _nextPONumber();
+          }
           if (ins.error) return { success: false, message: ins.error.message };
           var insI = await supa.from('po_item').insert(_poItemRows(items, noPO));
           if (insI.error) return { success: false, message: insI.error.message };
