@@ -326,14 +326,23 @@
           }
           if (rev === maxRev) return { success: false, message: 'Revisi ini sudah menjadi revisi terbaru.' };
           var newRev = maxRev + 1, isDeal = currentStatus === 'Deal';
-          var ins = await supa.from('penawaran').insert({
+          var rowRev = {
             no_penawaran: noPen, rev: newRev, tanggal: target.tanggal, valid_hingga: target.valid_hingga, nama_project: target.nama_project, klien_id: target.klien_id,
             dibuat_oleh: (namaUser || target.dibuat_oleh || ''), subtotal: target.subtotal, diskon: target.diskon, pajak: target.pajak, grand_total: target.grand_total,
             total_hpp: target.total_hpp, estimasi_keuntungan: target.estimasi_keuntungan, margin_persen: target.margin_persen, term_conditions: target.term_conditions, items: target.items,
             status: isDeal ? 'Deal' : 'On-Progress', no_wo: isDeal ? (latest.no_wo || '') : '', tanggal_deal: isDeal ? (latest.tanggal_deal || null) : null, channel_marketing: target.channel_marketing,
             catatan_fail: '', reminder_expired: null, kode_win: isDeal ? (latest.kode_win || '') : '', catatan_win: '', kode_lost: '', tanggal_fail: null,
             lesson_learned: isDeal ? (latest.lesson_learned || '') : '', action: isDeal ? (latest.action || '') : ''
-          });
+          };
+          // Anti-balapan: bila rev bentrok (dua editor paralel), naikkan rev & ulang.
+          var ins = null;
+          for (var attRev = 0; attRev < 25; attRev++) {
+            rowRev.rev = newRev;
+            ins = await supa.from('penawaran').insert(rowRev);
+            if (!ins.error) break;
+            if (!/duplicate key|penawaran_pkey/i.test(ins.error.message || '')) break;
+            newRev++;
+          }
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Rev' + rev + ' berhasil dipulihkan sebagai revisi terbaru → Rev' + newRev + '!', newRev: newRev };
         }

@@ -93,7 +93,7 @@
           var guard = await _bomEditGuard(noWO); if (!guard.ok) return { success: false, message: guard.message };
           var reqItems = Array.isArray(p.items) ? p.items : [];
           if (!reqItems.length) return { success: false, message: 'Pilih item & qty yang dikirim.' };
-          var noSJ = await _nextRomanSeq('pengiriman', 'no_surat_jalan', 'RGI/SJ'), tgl = _isoDate(p.tanggal) || _todayIso(), lines = [];
+          var noSJ = await _nextRomanViaRpc('pengiriman', 'no_surat_jalan', 'RGI/SJ'), tgl = _isoDate(p.tanggal) || _todayIso(), lines = [];
           for (var i = 0; i < reqItems.length; i++) {
             var ri = reqItems[i], bomId = (ri.bomItemId || '').toString(), qty = Number(ri.qty) || 0;
             var br = await supa.from('bom_item').select('*').eq('id', bomId).maybeSingle(); if (!br.data) continue;
@@ -329,7 +329,7 @@
             if ((await _hoStatus(latest.no_wo)) === 'Selesai') return { success: false, message: 'Penawaran Deal tidak dapat direvisi karena Hand Over WO ' + (latest.no_wo || '') + ' sudah Selesai. (Minta admin membuka kunci bila perlu.)' };
           }
           var newRev = maxRev + 1, tc = p.termConditions || {}, statusBaru = currentStatus === 'Deal' ? 'Deal' : (p.status || 'On-Progress'), isDeal = statusBaru === 'Deal';
-          var ins = await supa.from('penawaran').insert({
+          var rowRev = {
             no_penawaran: noPen, rev: newRev, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
             nama_project: (p.namaProject || '').toString(), klien_id: (p.klienId || '') || null, dibuat_oleh: (p.namaUser || 'Sales Executive').toString(),
             subtotal: Number(p.subtotal) || 0, diskon: Number(tc.diskonNominal) || 0, pajak: Number(tc.pajakNominal) || 0, grand_total: Number(p.grandTotal) || 0,
@@ -339,7 +339,16 @@
             catatan_fail: '', reminder_expired: null, kode_win: isDeal ? (latest.kode_win || '') : '', catatan_win: '', kode_lost: '', tanggal_fail: null,
             lesson_learned: isDeal ? (latest.lesson_learned || '') : '', action: isDeal ? (latest.action || '') : '',
             edit_unlocked: latest.edit_unlocked === true   // pertahankan status buka-kunci antar revisi
-          });
+          };
+          // Anti-balapan: bila rev bentrok (dua editor paralel), naikkan rev & ulang.
+          var ins = null;
+          for (var attRev = 0; attRev < 25; attRev++) {
+            rowRev.rev = newRev;
+            ins = await supa.from('penawaran').insert(rowRev);
+            if (!ins.error) break;
+            if (!/duplicate key|penawaran_pkey/i.test(ins.error.message || '')) break;
+            newRev++;
+          }
           if (ins.error) return { success: false, message: 'Gagal: ' + ins.error.message };
           return { success: true, message: noPen + ' berhasil direvisi → Rev' + newRev + '!', nextNo: await _nextQuotationNumber() };
         }

@@ -44,7 +44,7 @@ begin
       ('mutasi_stok','id_mutasi'),  ('stok_request','id'),
       ('stok','id_produk'),         ('penerimaan_tanpa_po','id'),
       ('po_payment_request','id_request'), ('bom_item','id'),
-      ('maintenance','id')
+      ('maintenance','id'),         ('site_survey','id')
   ) then
     raise exception 'next_seq: scope tidak diizinkan (% / %)', p_table, p_field;
   end if;
@@ -129,10 +129,70 @@ begin
   return n;
 end $$;
 
+-- 3c) next_wo_seq(): nomor Work Order 'YYNNN' (YY=2 digit tahun WIB, reset per
+--     tahun). Mengembalikan STRING siap pakai. Lazy-seed dari MAX no_wo tahun ini.
+create or replace function next_wo_seq()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare yy text; cur bigint; n bigint; v_scope text;
+begin
+  yy := to_char((now() at time zone 'Asia/Jakarta'), 'YY');
+  v_scope := 'wo:' || yy;
+  insert into app_seq(scope, val) values (v_scope, 0) on conflict (scope) do nothing;
+  select val into cur from app_seq where scope = v_scope for update;
+  if cur = 0 then
+    select coalesce(max(substring(no_wo from 3)::bigint), 0) into cur
+      from penawaran
+      where no_wo ~ ('^' || yy || '\d+$');
+  end if;
+  n := cur + 1;
+  update app_seq set val = n where scope = v_scope;
+  return yy || lpad(n::text, 3, '0');
+end $$;
+
+-- 3d) next_roman_seq(): nomor dokumen RESET PER BULAN 'NNN/<mid>/<Romawi>/<Tahun>'
+--     — pembayaran PO (RGI/POP) & surat jalan (RGI/SJ). Mengembalikan INTEGER;
+--     pemanggil memformat seperti biasa. Scope per (mid + bulan + tahun).
+create or replace function next_roman_seq(p_table text, p_field text, p_mid text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare rmn text; yr text; cur bigint; n bigint; v_scope text;
+begin
+  if (p_table, p_field, p_mid) not in (
+      ('pembayaran_po','id_bayar','RGI/POP'),
+      ('pengiriman','no_surat_jalan','RGI/SJ')
+  ) then
+    raise exception 'next_roman_seq: scope tidak diizinkan (% / % / %)', p_table, p_field, p_mid;
+  end if;
+  rmn := (array['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'])
+         [extract(month from (now() at time zone 'Asia/Jakarta'))::int];
+  yr  := to_char((now() at time zone 'Asia/Jakarta'), 'YYYY');
+  v_scope := 'roman:' || p_mid || ':' || rmn || ':' || yr;
+  insert into app_seq(scope, val) values (v_scope, 0) on conflict (scope) do nothing;
+  select val into cur from app_seq where scope = v_scope for update;
+  if cur = 0 then
+    execute format(
+      'select coalesce(max((substring(%I from ''^(\d+)/''))::bigint), 0) from %I where %I like %L',
+      p_field, p_table, p_field, '%/' || p_mid || '/' || rmn || '/' || yr
+    ) into cur;
+  end if;
+  n := cur + 1;
+  update app_seq set val = n where scope = v_scope;
+  return n;
+end $$;
+
 -- 4) Izin eksekusi (user login = role 'authenticated'; edge function = service_role).
 grant execute on function next_seq(text, text, text) to authenticated, service_role;
 grant execute on function next_quotation_seq()        to authenticated, service_role;
 grant execute on function next_doc_seq(text)          to authenticated, service_role;
+grant execute on function next_wo_seq()               to authenticated, service_role;
+grant execute on function next_roman_seq(text, text, text) to authenticated, service_role;
 
 -- =============================================================================
 --  Verifikasi (opsional, read-only):

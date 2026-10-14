@@ -142,6 +142,15 @@
         (q.data || []).forEach(function (r) { var m = (r[idField] || '').toString().match(re); if (m) { var n = parseInt(m[1], 10); if (n > maxSeq) maxSeq = n; } });
         return String(maxSeq + 1).padStart(3, '0') + '/' + mid + '/' + roman + '/' + yr;
       }
+      // Nomor dokumen reset-per-bulan (pembayaran PO RGI/POP, surat jalan RGI/SJ)
+      //  secara ATOMIK via RPC next_roman_seq; fallback ke _nextRomanSeq (scan).
+      async function _nextRomanViaRpc(table, idField, mid) {
+        try {
+          var r = await supa.rpc('next_roman_seq', { p_table: table, p_field: idField, p_mid: mid });
+          if (r && !r.error && r.data != null) { var n = parseInt(r.data, 10); if (n > 0) { var t = _jkMonthYear(); return String(n).padStart(3, '0') + '/' + mid + '/' + _ROMAN_MO[t.mo] + '/' + t.yr; } }
+        } catch (e) { /* fallback di bawah */ }
+        return _nextRomanSeq(table, idField, mid);
+      }
       // Status WO (dari penawaran; '' bila WO tak ada).
       async function _woStatus(noWO) {
         if (!noWO) return '';
@@ -280,7 +289,7 @@
         var grandTotal = Number(po.data.grand_total) || 0, ppnNominal = Number(po.data.ppn_nominal) || 0;
         var noWOPO = (po.data.no_wo || '').toString(), namaSupplier = (po.data.nama_supplier || '').toString();
         if (noWOPO && (await _woStatus(noWOPO)) === 'Closed') return { success: false, message: 'Work Order sudah Closed — tidak bisa mencatat pembayaran.' };
-        var idBayar = await _nextRomanSeq('pembayaran_po', 'id_bayar', 'RGI/POP');
+        var idBayar = await _nextRomanViaRpc('pembayaran_po', 'id_bayar', 'RGI/POP');
         var jumlah = parseFloat(pp.jumlah) || 0, tglIso = _isoDate(pp.tanggalBayar) || _todayIso();
         var insB = await supa.from('pembayaran_po').insert({ id_bayar: idBayar, no_po: noPO, tanggal_bayar: tglIso, id_akun: (pp.idAkun || ''), nama_akun: (pp.namaAkun || ''), jumlah: jumlah, catatan: (pp.catatan || ''), dibuat_oleh: (pp.dibuatOleh || ''), dibuat_pada: new Date().toISOString() });
         if (insB.error) return { success: false, message: insB.error.message };
@@ -301,6 +310,11 @@
 
       // ── Group E: Penawaran ────────────────────────────────────────────────
       async function _nextWONumber() {
+        // Atomik via RPC next_wo_seq; fallback scan+max (padStart) bila RPC error.
+        try {
+          var rw = await supa.rpc('next_wo_seq');
+          if (rw && !rw.error && typeof rw.data === 'string' && rw.data) return rw.data;
+        } catch (e) { /* fallback di bawah */ }
         var t = _jkMonthYear(), yy = String(t.yr).slice(-2);
         var q = await _all('penawaran', 'no_wo'); var maxSeq = 0;
         (q.data || []).forEach(function (r) { var val = (r.no_wo == null ? '' : r.no_wo).toString().trim(); if (val.length >= 4 && val.slice(0, 2) === yy) { var seq = parseInt(val.slice(2), 10); if (!isNaN(seq) && seq > maxSeq) maxSeq = seq; } });

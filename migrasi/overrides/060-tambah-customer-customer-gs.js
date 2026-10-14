@@ -7,7 +7,7 @@
           var q = await _all('klien', 'id');   // ambil semua id → cari nomor terbesar
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^K(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var nextId = 'K' + ('000' + (maxNum + 1)).slice(-3);
+          var nextId = 'K' + String(maxNum + 1).padStart(3, '0');
           var ins = await supa.from('klien').insert({ id: nextId, nama_klien: nama, perusahaan: perusahaan, alamat: alamat, kontak: telepon });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Klien (' + nextId + ') berhasil ditambahkan!', newId: nextId };
@@ -57,7 +57,7 @@
           var q = await _all('supplier', 'id_supplier');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id_supplier || '').toString().match(/^S(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var id = 'S' + ('000' + (maxNum + 1)).slice(-3);
+          var id = 'S' + String(maxNum + 1).padStart(3, '0');
           var ins = await supa.from('supplier').insert({ id_supplier: id, nama: p.nama || '', pic: p.pic || '', telepon: p.telepon || '', email: p.email || '', alamat: p.alamat || '', catatan: p.catatan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString(), nama_alias: p.alias || '' });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Supplier (' + id + ') berhasil ditambahkan!', newId: id };
@@ -97,7 +97,7 @@
           var q = await _all('akun_pembayaran', 'id');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^AP(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var id = 'AP' + ('000' + (maxNum + 1)).slice(-3);
+          var id = 'AP' + String(maxNum + 1).padStart(3, '0');
           var ins = await supa.from('akun_pembayaran').insert({ id: id, nama_akun: p.namaAkun, tipe: p.tipe || 'Bank', keterangan: p.keterangan || '', status: 'Aktif', dibuat_oleh: p.dibuatOleh || '', dibuat_pada: new Date().toISOString(), detail: p.detail || '' });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Akun ' + id + ' berhasil ditambahkan.', newId: id };
@@ -137,7 +137,7 @@
           var q = await _all('produk', 'id');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^P(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var id = 'P' + ('000' + (maxNum + 1)).slice(-3);
+          var id = 'P' + String(maxNum + 1).padStart(3, '0');
           var hppFinal = Number(hpp) || 0, qty = 0;
           if (stokId) { var si = await _stokInfo(stokId); qty = si.qty; if (!hppFinal) hppFinal = si.harga; }
           var ins = await supa.from('produk').insert({ id: id, nama: nama, unit: unit, harga_satuan: Number(harga) || 0, hpp: hppFinal, tipe: tipe || '', stok_id: stokId || '', qty_tersedia: qty });
@@ -200,7 +200,7 @@
           for (var i = 0; i < payload.length; i++) {
             var a = payload[i] || {};
             var id = (a.id || '').toString();
-            if (!id || !/^AP\d+/i.test(id)) { maxNum++; id = 'AP' + ('000' + maxNum).slice(-3); } // id baru
+            if (!id || !/^AP\d+/i.test(id)) { maxNum++; id = 'AP' + String(maxNum).padStart(3, '0'); } // id baru
             keep[id] = true;
             var label = (a.label || '').toString(), detail = (a.detail || '').toString();
             if (curIds[id]) { var u = await supa.from('akun_pembayaran').update({ nama_akun: label, detail: detail }).eq('id', id); if (u.error) return { success: false, message: u.error.message }; }
@@ -330,7 +330,7 @@
           var q = await _all('pricelist', 'id');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0; (q.data || []).forEach(function (r) { var m = (r.id || '').toString().match(/^PL(\d+)/i); if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10)); });
-          var id = 'PL' + ('000' + (maxNum + 1)).slice(-3);
+          var id = 'PL' + String(maxNum + 1).padStart(3, '0');
           var ins = await supa.from('pricelist').insert({ id: id, id_supplier: p.idSupplier, kategori: p.kategori || '', nama_material: p.namaMaterial || '', spesifikasi: p.spesifikasi || '', merek: p.merek || '', satuan: p.satuan || '', harga_beli: Number(p.hargaBeli) || 0, termasuk_ppn: !!p.termasukPPN, lead_time: '', masa_berlaku_harga: '', dibuat_pada: new Date().toISOString(), ready: !!p.ready });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Item pricelist ' + id + ' ditambahkan.', id: id };
@@ -389,7 +389,7 @@
           var prefix = 'TF-' + ym + '-';
           var q = await _all('ayat_silang', 'id');
           var maxSeq = 0; (q.data || []).forEach(function (r) { var id = (r.id || '').toString(); if (id.indexOf(prefix) === 0) { var s = parseInt(id.slice(prefix.length), 10) || 0; if (s > maxSeq) maxSeq = s; } });
-          var id = prefix + ('000' + (maxSeq + 1)).slice(-3);
+          var id = prefix + String(maxSeq + 1).padStart(3, '0');
           var ins = await supa.from('ayat_silang').insert({ id: id, tanggal: _isoDate(p.tanggal) || _todayIso(), id_akun_asal: idAsal, nama_asal: (p.namaAkunAsal || idAsal).toString(), id_akun_tujuan: idTujuan, nama_tujuan: (p.namaAkunTujuan || idTujuan).toString(), jumlah: jumlah, catatan: (p.catatan || '').toString(), dibuat_oleh: (p.dibuatOleh || '').toString(), dibuat_pada: new Date().toISOString() });
           if (ins.error) return { success: false, message: ins.error.message };
           return { success: true, message: 'Ayat silang ' + id + ' berhasil dicatat.', id: id };

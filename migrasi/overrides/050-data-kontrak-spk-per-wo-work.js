@@ -311,6 +311,11 @@
       window.gsRoute('getNextSiteSurveyId', {
         mode: 'fn',
         handler: async function () {
+          // Atomik via RPC next_seq; fallback scan+max (padStart) bila RPC error.
+          try {
+            var rs = await supa.rpc('next_seq', { p_table: 'site_survey', p_field: 'id', p_prefix: 'SVY' });
+            if (rs && !rs.error && typeof rs.data === 'string' && rs.data) return { success: true, id: rs.data };
+          } catch (e) { /* fallback di bawah */ }
           var q = await _all('site_survey', 'id');
           if (q.error) return { success: false, message: q.error.message };
           var maxNum = 0;
