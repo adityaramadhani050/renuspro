@@ -65,7 +65,7 @@
       // ══════════════════════════════════════════════════════════════════════
       function _waNonEmpty(s) { return s !== ''; }
       var _WA_MSG = {
-        // QC — perlu review (ke Lead Engineer)
+        // QC — perlu review (ke Project Coordinator)
         qcLead: function (d) {
           return '🔔 *QC Baru Perlu Direview*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nItem: ' + d.kode + (d.label ? ' · ' + d.label : '') + '\n' + (d.count ? d.count + ' file' : 'Foto') + ' diunggah oleh ' + (d.oleh || '-') + '.\n\nMohon segera direview di RenusPro.';
         },
@@ -74,7 +74,7 @@
           var head = 'WO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nItem: ' + d.kode + (d.label ? ' · ' + d.label : '') + (d.catatan ? '\n📝 Catatan: ' + d.catatan : '');
           return d.approved ? ('✅ *QC Disetujui*\n' + head + '\n\nKerja bagus! Item ini sudah di-approve.') : ('❌ *QC Ditolak — Perlu Revisi*\n' + head + '\n\nMohon segera perbaiki & upload ulang.');
         },
-        // DED — perlu review (ke Lead Engineer)
+        // DED — perlu review (ke Project Coordinator)
         dedLead: function (d) {
           return '📐 *Dokumen DED Baru Perlu Direview*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nDokumen: ' + d.label + '\n' + (d.count ? d.count + ' file PDF' : 'Dokumen') + ' diunggah oleh ' + (d.oleh || '-') + '.\n\nMohon segera direview di RenusPro.';
         },
@@ -131,7 +131,7 @@
             (d.mode !== 'Offline' && d.link ? 'Link: ' + d.link : ''), (d.mode !== 'Online' && d.lokasi ? 'Lokasi: ' + d.lokasi : ''),
             'Pembayaran: ' + d.bayarStr, 'Dijadwalkan oleh: ' + (d.oleh || '-'), ''].filter(_waNonEmpty).join('\n');
         },
-        // BOM diajukan untuk review (ke Lead Engineer)
+        // BOM diajukan untuk review (ke Project Coordinator)
         bomAjukan: function (d) {
           return '📋 *BOM Diajukan untuk Review*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\nDiajukan oleh: ' + (d.oleh || '-') + '\n\nRingkasan material:\n• Total: ' + d.total + ' item (' + d.kategori + ' kategori)\n• Menunggu review: ' + d.pending + '\n\nMohon segera direview di menu BOM RenusPro.';
         },
@@ -143,7 +143,7 @@
           lines.push(''); lines.push('Buka menu BOM untuk detail.');
           return lines.join('\n');
         },
-        // Reminder review QC/DED (ke Lead Engineer). d.modul, d.kata
+        // Reminder review QC/DED (ke Project Coordinator). d.modul, d.kata
         reminderReviewLead: function (d) {
           return '🔔 *Reminder Review ' + d.modul + '*\nWO: *' + d.noWO + '*' + (d.proj ? ' — ' + d.proj : '') + '\n' + d.pending + ' ' + d.kata + ' menunggu direview.\n\nMohon segera direview di RenusPro.';
         },
@@ -164,7 +164,7 @@
       async function _qcNotifLeadReview(noWO, kode, oleh, count, wasStatus) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.qcNotif === false) return; if ((wasStatus || '') === 'Pending') return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('qc_checklist'))[kode] || '';
-        _waSend(await _waPhonesByRole('leadengineer'), _WA_MSG.qcLead({ noWO: noWO, proj: proj, kode: kode, label: lbl, count: count, oleh: oleh }));
+        _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.qcLead({ noWO: noWO, proj: proj, kode: kode, label: lbl, count: count, oleh: oleh }));
       }
       async function _qcNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.qcNotif === false) return;
@@ -175,7 +175,7 @@
       async function _dedNotifLeadReview(noWO, kode, oleh, count, wasStatus) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.dedNotif === false) return; if ((wasStatus || '') === 'Pending') return;
         var proj = await _waProjName(noWO), lbl = (await _waLabelMap('ded_checklist'))[kode] || kode;
-        _waSend(await _waPhonesByRole('leadengineer'), _WA_MSG.dedLead({ noWO: noWO, proj: proj, label: lbl, count: count, oleh: oleh }));
+        _waSend(await _waPhonesByRole('projectcoordinator'), _WA_MSG.dedLead({ noWO: noWO, proj: proj, label: lbl, count: count, oleh: oleh }));
       }
       async function _dedNotifSiteReview(noWO, kode, keputusan, catatan) {
         if (!ENABLE_WA) return; var c = await _waCfg(); if (c.dedNotif === false) return;
@@ -288,7 +288,7 @@
               ded_lead: _WA_MSG.dedLead({ noWO: W, proj: P, label: 'Gambar Kerja', count: 2, oleh: 'Site Engineer' }),
               ded_site: _WA_MSG.dedSite({ noWO: W, proj: P, label: 'Gambar Kerja', catatan: '', approved: true }),
               bom_ajukan: _WA_MSG.bomAjukan({ noWO: W, proj: P, oleh: 'Site Engineer', total: 8, kategori: 3, pending: 8 }),
-              bom_hasil: _WA_MSG.bomHasil({ noWO: W, proj: P, oleh: 'Lead Engineer', approved: 6, rejectedCount: 2, pending: 0, rejectedList: [{ nama_material: 'Kabel NYY 3x2.5', catatan_review: 'Merek tidak sesuai' }, { nama_material: 'MCB 32A', catatan_review: '' }] }),
+              bom_hasil: _WA_MSG.bomHasil({ noWO: W, proj: P, oleh: 'Project Coordinator', approved: 6, rejectedCount: 2, pending: 0, rejectedList: [{ nama_material: 'Kabel NYY 3x2.5', catatan_review: 'Merek tidak sesuai' }, { nama_material: 'MCB 32A', catatan_review: '' }] }),
               assign: _WA_MSG.assignEngineer({ modul: 'BOM', noWO: W, proj: P }),
               po_gudang: _WA_MSG.poKeGudang({ noPO: 'PO-UJI', noWO: W, proj: P, supplier: 'PT Contoh Supplier', oleh: 'Procurement' }),
               barang_diterima: _WA_MSG.barangDiterima({ noPO: 'PO-UJI', noWO: W, proj: P, statusPO: 'Diterima', oleh: 'Warehouse', lengkap: true, catatanList: [] }),
@@ -334,11 +334,11 @@
             var items = bq.data || []; if (!items.length) return { success: false, message: 'Belum ada material di BOM.' };
             var pending = items.filter(function (x) { return (x.status || '') === 'Pending'; }).length;
             if (!pending) return { success: false, message: 'Tidak ada material Pending yang perlu diajukan.' };
-            var phones = await _waPhonesByRole('leadengineer'); if (!phones.length) return { success: false, message: 'Tidak ada Lead Engineer dengan No. WhatsApp.' };
+            var phones = await _waPhonesByRole('projectcoordinator'); if (!phones.length) return { success: false, message: 'Tidak ada Project Coordinator dengan No. WhatsApp.' };
             var kat = {}; items.forEach(function (x) { kat[(x.kategori || 'Lainnya')] = 1; });
             var proj = await _waProjName(noWO);
             _waSend(phones, _WA_MSG.bomAjukan({ noWO: noWO, proj: proj, oleh: oleh, total: items.length, kategori: Object.keys(kat).length, pending: pending }));
-            return { success: true, message: 'Pengajuan review terkirim ke ' + phones.length + ' Lead Engineer (' + pending + ' material menunggu review).' };
+            return { success: true, message: 'Pengajuan review terkirim ke ' + phones.length + ' Project Coordinator (' + pending + ' material menunggu review).' };
           }
         });
         window.gsRoute('kirimHasilReviewBOM', {
@@ -372,7 +372,7 @@
               var msg, phones;
               if (isLead) {
                 if (!s.pending) return { success: false, message: 'Tidak ada ' + kata + ' menunggu review.' };
-                phones = await _waPhonesByRole('leadengineer');
+                phones = await _waPhonesByRole('projectcoordinator');
                 msg = _WA_MSG.reminderReviewLead({ modul: modul, noWO: noWO, proj: proj, pending: s.pending, kata: kata });
               } else {
                 if (s.belum + s.rejected === 0) return { success: false, message: 'Tidak ada yang perlu dilengkapi.' };

@@ -45,11 +45,11 @@ function _qcUserNama() { return (typeof _currentUser !== 'undefined' && _current
 function _qcRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _qcUserId() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _qcCanUpload() { var r = _qcRole(); return r === 'siteengineer' || r === 'admin'; }
-function _qcCanReview() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
-function _qcCanAssign() { var r = _qcRole(); return r === 'leadengineer' || r === 'admin'; }
+function _qcCanReview() { var r = _qcRole(); return r === 'projectcoordinator' || r === 'admin'; }
+function _qcCanAssign() { var r = _qcRole(); return r === 'projectcoordinator' || r === 'admin'; }
 
 // Nav badge: jumlah task yang menunggu aksi user.
-// - Lead Engineer/Admin: item Pending (perlu direview).
+// - Project Coordinator/Admin: item Pending (perlu direview).
 // - Site Engineer: item Rejected (perlu revisi; sudah difilter ke WO-nya).
 function _qcBadgeCount(res) {
   var g = (res && res.global) ? res.global : {};
@@ -85,7 +85,7 @@ function _qcBadge(st) { var m = _QC_STATUS[st] || _QC_STATUS['Belum Upload']; re
 // ── Load ──────────────────────────────────────────────────────────
 window.loadQC = function(fromNav) {
   var hint = document.getElementById('qc-role-hint');
-  if (hint) hint.innerText = (_qcCanUpload() && _qcCanReview()) ? 'Admin' : (_qcCanReview() ? 'Lead Engineer' : (_qcCanUpload() ? 'Site Engineer' : 'Lihat'));
+  if (hint) hint.innerText = (_qcCanUpload() && _qcCanReview()) ? 'Admin' : (_qcCanReview() ? 'Project Coordinator' : (_qcCanUpload() ? 'Site Engineer' : 'Lihat'));
   document.getElementById('qc-detail').classList.add('hidden');
   document.getElementById('qc-manage').classList.add('hidden');
   document.getElementById('qc-home').classList.remove('hidden');
@@ -138,7 +138,7 @@ function _qcAgeLabel(d) {
   return { txt: d + ' hari', cls: 'text-rose-700 bg-rose-50' };
 }
 
-// ── Antrean Review + Umur Pending (Lead Engineer/Admin) ────────────────────
+// ── Antrean Review + Umur Pending (Project Coordinator/Admin) ────────────────────
 function _qcRenderReviewQueue() {
   var wrap = document.getElementById('qc-review-queue-wrap');
   if (!wrap) return;
@@ -169,7 +169,7 @@ function _qcRenderReviewQueue() {
   wrap.innerHTML = head + '<div class="space-y-1.5 max-h-80 overflow-y-auto">' + rows + '</div>' + more;
 }
 
-// ── Kinerja & Beban Tim per Site Engineer (Lead Engineer/Admin) ────────────
+// ── Kinerja & Beban Tim per Site Engineer (Project Coordinator/Admin) ────────────
 function _qcRenderTeamStats() {
   var wrap = document.getElementById('qc-team-wrap');
   if (!wrap) return;
@@ -206,7 +206,7 @@ function _qcRenderTeamStats() {
   wrap.innerHTML = head + '<div class="space-y-1.5 max-h-80 overflow-y-auto">' + rows + '</div>';
 }
 
-// ── Tambah Project ke QC (Lead Engineer / Admin) ──────────────────────────
+// ── Tambah Project ke QC (Project Coordinator / Admin) ──────────────────────────
 function _qcOpenAddProject() {
   document.getElementById('modal-qc-project').classList.remove('hidden');
   var woSel = document.getElementById('qc-project-wo');
@@ -320,7 +320,7 @@ function _qcRenderWOList() {
   if (!shown.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
       : (_qcTab === 'selesai' ? 'Belum ada QC yang Approved (100%).'
-      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
+      : (_qcRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Project Coordinator.' : 'Belum ada project QC. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-clipboard-list mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
@@ -379,7 +379,7 @@ function _qcCardRemind(noWO) {
   var isLead = _qcCanAssign();
   var msg = isLead
     ? 'Kirim reminder WhatsApp ke Site Engineer WO ' + noWO + ' untuk melengkapi QC yang belum upload / ditolak?'
-    : 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview QC WO ' + noWO + ' (Pending)?';
+    : 'Kirim reminder WhatsApp ke Project Coordinator untuk mereview QC WO ' + noWO + ' (Pending)?';
   showConfirm({ title: 'Kirim Reminder', message: msg, confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
     toggleLoader(true, 'Mengirim reminder...');
     var run = google.script.run.withSuccessHandler(function(res) {
@@ -692,7 +692,7 @@ function _qcRenderDetail(summary) {
   var actions = document.getElementById('qc-detail-actions');
   if (actions) {
     // Draft BAST/Garansi tersedia utk semua (site & lead engineer); Export PDF
-    // & Atur Site Engineer hanya untuk Lead Engineer / Admin.
+    // & Atur Site Engineer hanya untuk Project Coordinator / Admin.
     var canManage = _qcCanAssign();
     // Satu tombol "Draft Dokumen" berupa dropdown → pilih BAST / Surat Garansi.
     var draftBtns =
@@ -708,7 +708,7 @@ function _qcRenderDetail(summary) {
     var _qcDone = (_qcWO && _qcWO.selesaiManual) || pct === 100;
     var remindBtns = '';
     if (!_qcDone && _qcCanReview()) remindBtns += '<button onclick="_qcRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
-    if (!_qcDone && _qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
+    if (!_qcDone && _qcCanUpload()) remindBtns += '<button onclick="_qcRemindLead()" title="Ingatkan Project Coordinator via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan PC</span></button>';
     // Tandai/Batalkan QC selesai manual (Lead/Admin) — independen dari progress %.
     var selesaiBtn = (_qcWO && _qcWO.selesaiManual)
       ? '<button onclick="_qcBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> QC Approved</span></button>'
@@ -717,7 +717,7 @@ function _qcRenderDetail(summary) {
     var exportBtn = (canManage || _qcCanUpload())
       ? '<button onclick="_qcExportPDF()" title="Export PDF" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-file-pdf text-rose-500"></i><span class="hidden sm:inline"> Export PDF</span></button>'
       : '';
-    // Tandai Approved & Atur Site Engineer: hanya Lead Engineer / Admin.
+    // Tandai Approved & Atur Site Engineer: hanya Project Coordinator / Admin.
     var manageBtns = canManage
       ? selesaiBtn
         + '<div class="relative">'
@@ -833,7 +833,7 @@ function _qcRemindSite() {
 }
 function _qcRemindLead() {
   var no = _qcWO && _qcWO.noWO; if (!no) return;
-  showConfirm({ title: 'Ingatkan Lead Engineer', message: 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview QC yang telah terupload (Pending)?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+  showConfirm({ title: 'Ingatkan Project Coordinator', message: 'Kirim reminder WhatsApp ke Project Coordinator untuk mereview QC yang telah terupload (Pending)?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
     toggleLoader(true, 'Mengirim reminder...');
     google.script.run.withSuccessHandler(function(res) {
       toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error');
@@ -1007,7 +1007,7 @@ function _qcItemHtml(it) {
       + '</div>';
   }
 
-  // Panduan foto dari Lead Engineer: instruksi + foto contoh (agar site engineer tahu foto yang benar).
+  // Panduan foto dari Project Coordinator: instruksi + foto contoh (agar site engineer tahu foto yang benar).
   var contoh = it.contohFoto || [];
   var contohThumbs = contoh.map(function(f) {
     return '<button type="button" onclick="_qcViewFoto(\'' + f.fileId + '\', ' + _qcJs(f.fileUrl) + ')" class="block h-16 w-16 rounded-lg overflow-hidden border border-sky-200 bg-white cursor-zoom-in"><img src="' + _qcThumb(f.fileId, f.fileUrl) + '" alt="contoh" loading="lazy" class="h-full w-full object-cover"></button>';
@@ -1238,7 +1238,7 @@ async function _qcDownloadFoto() {
   } catch (e) { window.open(src, '_blank', 'noopener'); }
 }
 
-// ── Editor coret/anotasi foto (Lead Engineer) ─────────────────────
+// ── Editor coret/anotasi foto (Project Coordinator) ─────────────────────
 var _qcAnot = null;
 function _qcAnotOpen(fileId, noWO, kode) {
   toggleLoader(true, 'Memuat gambar untuk diedit...');
@@ -1403,7 +1403,7 @@ function _qcCancelApprove(kode) {
   });
 }
 
-// ── Penugasan Site Engineer (Lead Engineer / Admin) ───────────────
+// ── Penugasan Site Engineer (Project Coordinator / Admin) ───────────────
 function _qcCloseAssign() {
   var panel = document.getElementById('qc-assign-panel');
   if (panel) panel.classList.add('hidden');
@@ -1456,7 +1456,7 @@ function _qcSaveAssign() {
     .setQCAssignment(_qcWO.noWO, ids, _qcUserNama());
 }
 
-// ── Kelola Checklist QC (Lead Engineer / Admin) ───────────────────
+// ── Kelola Checklist QC (Project Coordinator / Admin) ───────────────────
 function bukaQCManage() {
   document.getElementById('qc-home').classList.add('hidden');
   document.getElementById('qc-detail').classList.add('hidden');
@@ -1521,7 +1521,7 @@ function _qcMgmtCall(fn, args, okMsg) {
   r[fn].apply(r, args);
 }
 
-// Upload foto contoh untuk subitem checklist (Lead Engineer).
+// Upload foto contoh untuk subitem checklist (Project Coordinator).
 function _qcUploadContoh(kode, input) {
   var files = Array.prototype.slice.call(input.files || []);
   input.value = '';

@@ -42,12 +42,17 @@
           if (p.error || !p.data) return { success: false, message: 'Profil user tidak ditemukan di app_user.' };
           if (p.data.aktif === false) return { success: false, message: 'Akun ini tidak aktif. Hubungi administrator.' };
 
+          // Role 'Lead Engineer' dihapus → fungsinya pindah ke Project Coordinator.
+          // Alias di sini sebagai pengaman bila masih ada user lama ber-role itu.
+          var _role = (p.data.role || 'sales').toLowerCase();
+          if (_role === 'leadengineer') _role = 'projectcoordinator';
+
           return {
             success: true,
             message: 'Selamat datang, ' + (p.data.nama || '') + '!',
             user: {
               id: p.data.id, nama: p.data.nama, username: p.data.username,
-              role: (p.data.role || 'sales').toLowerCase(), leadId: p.data.lead_id || ''
+              role: _role, leadId: p.data.lead_id || ''
             }
           };
         }

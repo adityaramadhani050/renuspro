@@ -1,7 +1,7 @@
 <script>
 // ================================================================
 //  DETAIL ENGINEERING DESIGN (DED) — upload dokumen (PDF) per Work
-//  Order dari Site Engineer; Lead Engineer approve/reject + catatan;
+//  Order dari Site Engineer; Project Coordinator approve/reject + catatan;
 //  master "Kelola Checklist" jenis dokumen (datar). Pola modul QC.
 // ================================================================
 
@@ -21,8 +21,8 @@ function _dedRole()     { return (typeof _currentUser !== 'undefined' && _curren
 function _dedUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _dedUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _dedCanUpload(){ var r = _dedRole(); return r === 'siteengineer' || r === 'admin'; }
-function _dedCanReview(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
-function _dedCanAssign(){ var r = _dedRole(); return r === 'leadengineer' || r === 'admin'; }
+function _dedCanReview(){ var r = _dedRole(); return r === 'projectcoordinator' || r === 'admin'; }
+function _dedCanAssign(){ var r = _dedRole(); return r === 'projectcoordinator' || r === 'admin'; }
 
 // Nav badge: task menunggu aksi user (Lead/Admin: Pending; Site Engineer: Rejected).
 function _dedBadgeCount(res) {
@@ -51,7 +51,7 @@ window.loadDED = function(fromNav) {
   document.getElementById('ded-detail').classList.add('hidden');
   document.getElementById('ded-manage').classList.add('hidden');
   var hint = document.getElementById('ded-role-hint');
-  if (hint) hint.innerText = (_dedCanReview() && _dedCanUpload()) ? 'Admin' : (_dedCanReview() ? 'Lead Engineer' : (_dedCanUpload() ? 'Site Engineer' : 'Lihat'));
+  if (hint) hint.innerText = (_dedCanReview() && _dedCanUpload()) ? 'Admin' : (_dedCanReview() ? 'Project Coordinator' : (_dedCanUpload() ? 'Site Engineer' : 'Lihat'));
   var mbtn = document.getElementById('ded-manage-btn'); if (mbtn) mbtn.classList.toggle('hidden', !_dedCanAssign());
   var abtn = document.getElementById('ded-add-project-btn'); if (abtn) abtn.classList.toggle('hidden', !_dedCanAssign());
 
@@ -139,7 +139,7 @@ function _dedRenderWOList() {
   if (!shown.length) {
     var emptyMsg = (q || fval) ? 'Tidak ada WO cocok.'
       : (_dedTab === 'selesai' ? 'Belum ada DED yang Approved.'
-      : (_dedRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project DED. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
+      : (_dedRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Project Coordinator.' : 'Belum ada project DED. Klik <b>Tambah Project</b> untuk menambahkan Work Order.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-file-pen mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
@@ -197,7 +197,7 @@ function _dedCardRemind(noWO) {
   var isLead = _dedCanAssign();
   var msg = isLead
     ? 'Kirim reminder WhatsApp ke Site Engineer WO ' + noWO + ' untuk melengkapi DED yang belum upload / ditolak?'
-    : 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview DED WO ' + noWO + ' (Pending)?';
+    : 'Kirim reminder WhatsApp ke Project Coordinator untuk mereview DED WO ' + noWO + ' (Pending)?';
   showConfirm({ title: 'Kirim Reminder', message: msg, confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
     toggleLoader(true, 'Mengirim reminder...');
     var run = google.script.run.withSuccessHandler(function(res) {
@@ -246,7 +246,7 @@ function _dedRenderDetail(summary) {
     // Reminder WA (Ingatkan Engineer/Lead) — slot sama seperti QC (sebelum Tandai/Atur SE).
     var _dedDone = (_dedWO && _dedWO.selesaiManual) || ((summary.pct || 0) === 100);
     if (!_dedDone && _dedCanReview()) btns += '<button onclick="_dedRemindSite()" title="Ingatkan Site Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Engineer</span></button>';
-    if (!_dedDone && _dedCanUpload()) btns += '<button onclick="_dedRemindLead()" title="Ingatkan Lead Engineer via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan Lead</span></button>';
+    if (!_dedDone && _dedCanUpload()) btns += '<button onclick="_dedRemindLead()" title="Ingatkan Project Coordinator via WhatsApp" class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-bell"></i><span class="hidden sm:inline"> Ingatkan PC</span></button>';
     if (_dedCanAssign()) {
       var selesaiBtn = (_dedWO && _dedWO.selesaiManual)
         ? '<button onclick="_dedBatalkanSelesai()" title="Batalkan status Approved" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 sm:px-3.5 py-2.5 rounded-xl shadow-md transition whitespace-nowrap"><i class="fa-solid fa-circle-check"></i><span> DED Approved</span></button>'
@@ -309,7 +309,7 @@ function _dedRefreshHead() { try { _dedRenderHead(_dedComputeSummary()); } catch
 
 function _dedRenderDetailBody() {
   var body = document.getElementById('ded-detail-body');
-  if (!_dedItems.length) { body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Belum ada jenis dokumen. Lead Engineer dapat menambahkan lewat <b>Kelola Checklist</b>.</div>'; return; }
+  if (!_dedItems.length) { body.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400">Belum ada jenis dokumen. Project Coordinator dapat menambahkan lewat <b>Kelola Checklist</b>.</div>'; return; }
   body.innerHTML = _dedItems.map(function(it) {
     return '<div class="bg-white rounded-2xl border border-slate-150 overflow-hidden">' + _dedItemHtml(it) + '</div>';
   }).join('');
@@ -346,7 +346,7 @@ function _dedItemHtml(it) {
       + '</a>' + del + '</div>';
   }).join('');
 
-  // Lampiran file revisi dari Lead Engineer (drawing beranotasi) — dilihat Site Engineer.
+  // Lampiran file revisi dari Project Coordinator (drawing beranotasi) — dilihat Site Engineer.
   var reviewFilesHtml = (it.reviewFiles && it.reviewFiles.length)
     ? '<div class="mt-1.5 flex flex-wrap gap-1.5">' + it.reviewFiles.map(function(rf) {
         return '<a href="' + _dedEsc(rf.fileUrl) + '" target="_blank" rel="noopener" data-fn="' + _dedEsc(rf.fileName || 'Revisi.pdf') + '" onclick="return bukaPreviewPDF(this.href, this.dataset.fn), false;" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 px-2.5 py-1 rounded-lg"><i class="fa-solid fa-file-pdf"></i>' + _dedEsc(rf.fileName || 'Revisi.pdf') + '</a>';
@@ -613,7 +613,7 @@ function _dedRemindSite() {
 }
 function _dedRemindLead() {
   if (!_dedWO) return;
-  showConfirm({ title: 'Ingatkan Lead Engineer', message: 'Kirim reminder WhatsApp ke Lead Engineer untuk mereview DED yang telah terupload (Pending)?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
+  showConfirm({ title: 'Ingatkan Project Coordinator', message: 'Kirim reminder WhatsApp ke Project Coordinator untuk mereview DED yang telah terupload (Pending)?', confirmText: 'Ya, Kirim', icon: 'fa-bell', onConfirm: function() {
     toggleLoader(true, 'Mengirim reminder...');
     google.script.run.withSuccessHandler(function(res) { toggleLoader(false); showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
       .withFailureHandler(function(err) { toggleLoader(false); showNotification((err && err.message) || 'Gagal mengirim reminder.', 'error'); })

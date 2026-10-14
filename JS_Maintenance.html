@@ -57,12 +57,12 @@ function _mtnFmtTs(s) {
 }
 
 // Cakupan daftar maintenance per role:
-// - PC, Lead Engineer, Admin → seluruh maintenance.
+// - PC, Project Coordinator, Admin → seluruh maintenance.
 // - Site Engineer → hanya yang ditugaskan ke dirinya.
 // - Lainnya (pengaju: sales/lead sales, dll.) → hanya yang mereka ajukan.
 function _mtnFilterByRole(list) {
   var r = _mtnRole();
-  if (r === 'projectcoordinator' || r === 'leadengineer' || r === 'admin') return list || [];
+  if (r === 'projectcoordinator' || r === 'admin') return list || [];
   if (r === 'siteengineer') return (list || []).filter(function(m){ return _mtnIsAssignedEngineer(m); });
   var unm = _mtnUser();
   return (list || []).filter(function(m){ return m.diajukanOleh && m.diajukanOleh === unm; });

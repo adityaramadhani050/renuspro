@@ -31,15 +31,15 @@ function _bomRole()     { return (typeof _currentUser !== 'undefined' && _curren
 function _bomSupplierEditable() { var r = _bomRole(); return r === 'procurement' || r === 'admin'; }
 function _bomUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _bomUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
-function _bomCanManage(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // assign site engineer
+function _bomCanManage(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // assign site engineer
 function _bomCanRequestKirim(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // request pengiriman
-function _bomCanReview(){ var r = _bomRole(); return r === 'leadengineer' || r === 'admin'; }  // approve/reject material
+function _bomCanReview(){ var r = _bomRole(); return r === 'projectcoordinator' || r === 'admin'; }  // approve/reject material
 function _bomCanReserve(){ var r = _bomRole(); return r === 'warehouse' || r === 'admin'; }  // reserve/alokasi dari stok (warehouse)
 function _bomCanBelanja(){ var r = _bomRole(); return r === 'warehouse' || r === 'procurement' || r === 'admin'; }  // lihat tab Perlu Dibelanjakan (warehouse & procurement)
 function _bomCanBuatPO(){ var r = _bomRole(); return r === 'procurement' || r === 'admin'; }  // tombol "Buat PO" pada item Tunggu Beli (procurement)
 
 // Nav badge: task yang menunggu aksi user (dijumlah dari perWO).
-// - Lead Engineer/Admin: item Pending (perlu direview).
+// - Project Coordinator/Admin: item Pending (perlu direview).
 // - Site Engineer: item Rejected (perlu revisi; sudah difilter ke WO-nya).
 // - Project Coordinator: material SIAP KIRIM = Approved (lead) yang sudah
 //   di-reserve warehouse & belum dikirim → PC bisa Request Pengiriman.
@@ -88,10 +88,10 @@ window.loadBOM = function(fromNav) {
   document.getElementById('bom-home').classList.remove('hidden');
   document.getElementById('bom-detail').classList.add('hidden');
   var hint = document.getElementById('bom-role-hint');
-  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Lead Engineer') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'warehouse' ? 'Warehouse' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat')));
+  if (hint) hint.innerText = _bomCanManage() ? (_bomRole() === 'admin' ? 'Admin' : 'Project Coordinator') : (_bomRole() === 'siteengineer' ? 'Site Engineer' : (_bomRole() === 'warehouse' ? 'Warehouse' : (_bomRole() === 'procurement' ? 'Procurement' : 'Lihat')));
   var addBtn = document.getElementById('bom-add-project-btn');
   if (addBtn) addBtn.classList.toggle('hidden', !_bomCanManage());
-  // Tab "Perlu Dibelanjakan" hanya untuk procurement / admin (bukan Lead Engineer).
+  // Tab "Perlu Dibelanjakan" hanya untuk procurement / admin (bukan Project Coordinator).
   var needBtn = document.getElementById('bom-tabbtn-need');
   if (needBtn) needBtn.classList.toggle('hidden', !_bomCanBelanja());
   _bomShowHomeTab(_bomHomeTab === 'need' ? 'proses' : _bomHomeTab);
@@ -178,7 +178,7 @@ function _bomRenderWOList() {
   if (!list.length) {
     var emptyMsg = q ? 'Tidak ada WO cocok.'
       : (_bomHomeTab === 'approved' ? 'Belum ada BOM yang selesai (Approved & sudah diproses warehouse).'
-      : (_bomRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Lead Engineer.' : 'Belum ada project BOM sedang proses.'));
+      : (_bomRole() === 'siteengineer' ? 'Belum ada Work Order yang ditugaskan ke Anda. Hubungi Project Coordinator.' : 'Belum ada project BOM sedang proses.'));
     box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-150 p-8 text-center text-slate-400"><i class="fa-solid fa-cubes-stacked mr-2"></i>' + emptyMsg + '</div>';
     return;
   }
@@ -231,7 +231,7 @@ function _bomCardRemind(noWO) {
   var title = isLead ? 'Kirim Hasil Review' : 'Ajukan Review';
   var msg = isLead
     ? 'Kirim notifikasi hasil review BOM WO ' + noWO + ' ke Site Engineer?'
-    : 'Ajukan BOM WO ' + noWO + ' ke Lead Engineer untuk direview?';
+    : 'Ajukan BOM WO ' + noWO + ' ke Project Coordinator untuk direview?';
   showConfirm({ title: title, message: msg, confirmText: 'Ya, Kirim', icon: 'fa-paper-plane', onConfirm: function() {
     showNotification('Mengirim...', 'success');
     var run = google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
@@ -696,7 +696,7 @@ function _bomStatusItemBadge(status) {
 }
 
 // Site Engineer/Admin (canEdit) → tabel editable inline (input/edit/hapus).
-// Lead Engineer → tampilan read-only + approve/reject.
+// Project Coordinator → tampilan read-only + approve/reject.
 function _bomRenderBody() {
   if (_bomCanEdit()) { _bomLoadPricelist(function(){ _bomRenderEditable(); }); return; }
   // Procurement/admin: butuh daftar supplier untuk dropdown supplier per item
@@ -721,7 +721,7 @@ function _bomAddable(it) {
   return sisaReserved - reqRem;
 }
 
-// ── Tampilan read-only + approve/reject (Lead Engineer) ─────────
+// ── Tampilan read-only + approve/reject (Project Coordinator) ─────────
 // Badge status procurement per material — komposisi dari 4 bucket qty.
 // Sub-badge Reserved dipecah: Diterima / Dikirim / Req. Kirim (yang diminta) /
 // Reserved (masih dialokasi, belum diminta kirim).
@@ -1206,7 +1206,7 @@ function _bomOptsForCat(kat) {
   // Material hanya dari pricelist supplier — tidak ada input manual.
   return opts;
 }
-// ── Review material (Lead Engineer) — loading inline di kolom aksi ──
+// ── Review material (Project Coordinator) — loading inline di kolom aksi ──
 // Tanpa loading full-screen: Lead bisa approve/reject material lain tanpa
 // menunggu. Tombol baris tsb diganti spinner + dikunci (anti double-click);
 // state lokal diperbarui lalu detail dirender ulang (spinner baris lain tetap).
@@ -1242,7 +1242,7 @@ function _bomAjukanReview() {
   if (!_bomWO) return;
   var pending = (_bomItems || []).filter(function(it){ return it.status !== 'Approved' && it.status !== 'Rejected'; }).length;
   if (!pending) { showNotification('Tidak ada material Pending untuk diajukan.', 'error'); return; }
-  showConfirm({ title: 'Ajukan Review ke Lead', message: 'Kirim notifikasi ke Lead Engineer bahwa BOM WO ' + _bomWO.noWO + ' (' + pending + ' material) siap direview?', confirmText: 'Ya, Ajukan', icon: 'fa-paper-plane', onConfirm: function() {
+  showConfirm({ title: 'Ajukan Review ke PC', message: 'Kirim notifikasi ke Project Coordinator bahwa BOM WO ' + _bomWO.noWO + ' (' + pending + ' material) siap direview?', confirmText: 'Ya, Ajukan', icon: 'fa-paper-plane', onConfirm: function() {
     showNotification('Mengirim pengajuan...', 'success');
     google.script.run.withSuccessHandler(function(res){ showNotification((res && res.message) || 'Selesai.', (res && res.success) ? 'success' : 'error'); })
       .withFailureHandler(function(err){ showNotification((err && err.message) || 'Gagal mengirim pengajuan.', 'error'); })

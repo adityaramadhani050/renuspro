@@ -1200,7 +1200,7 @@
     function _woBASTJabatan() {
       var LABEL = { admin: 'Admin', finance: 'Finance', sales: 'Sales', leadsales: 'Lead Sales',
         procurement: 'Procurement', warehouse: 'Warehouse', siteengineer: 'Site Engineer',
-        leadengineer: 'Lead Engineer', owner: 'Owner' };
+        projectcoordinator: 'Project Coordinator', owner: 'Owner' };
       var r = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : '';
       return LABEL[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1) : '-');
     }
