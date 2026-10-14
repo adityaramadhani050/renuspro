@@ -339,9 +339,15 @@
         }
       });
       async function _nextKwitansiNumber() {
+        var t = _jkMonthYear();
+        // Gapless & atomik via RPC next_doc_seq; fallback scan+max bila RPC error.
+        try {
+          var rr = await supa.rpc('next_doc_seq', { p_scope: 'kwitansi' });
+          if (rr && !rr.error && rr.data != null) { var nn = parseInt(rr.data, 10); if (nn > 0) return String(nn).padStart(3, '0') + '/RGI/KWT/' + _ROMAN_MO[t.mo] + '/' + t.yr; }
+        } catch (e) { /* fallback di bawah */ }
         var q = await _all('kwitansi', 'no_kwitansi'); var maxId = 0;
         (q.data || []).forEach(function (r) { var m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { var n = parseInt(m[1], 10); if (n > maxId) maxId = n; } });
-        var t = _jkMonthYear(); return String(maxId + 1).padStart(3, '0') + '/RGI/KWT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
+        return String(maxId + 1).padStart(3, '0') + '/RGI/KWT/' + _ROMAN_MO[t.mo] + '/' + t.yr;
       }
       window.gsRoute('simpanKwitansi', {
         mode: 'fn',

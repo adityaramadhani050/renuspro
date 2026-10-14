@@ -258,6 +258,15 @@
       async function _nextQuotationNumber() {
         return _fmtQuotationNo(await _nextQuotationSeqAtomic());
       }
+      // Nomor PO berikut (gapless & atomik via RPC next_doc_seq).
+      //  Fallback ke _nextRomanSeq (scan+max) bila RPC belum ter-deploy / error.
+      async function _nextPONumber() {
+        try {
+          var r = await supa.rpc('next_doc_seq', { p_scope: 'purchase_order' });
+          if (r && !r.error && r.data != null) { var n = parseInt(r.data, 10); if (n > 0) { var t = _jkMonthYear(); return String(n).padStart(3, '0') + '/RGI/PO/' + _ROMAN_MO[t.mo] + '/' + t.yr; } }
+        } catch (e) { /* fallback di bawah */ }
+        return _nextRomanSeq('purchase_order', 'no_po', 'RGI/PO', true);
+      }
       // term_conditions penawaran: buang 7 field angka internal, sisipkan catatan.
       function _cleanTC(tc, catatan) {
         var c = {}; tc = tc || {}; for (var k in tc) { if (Object.prototype.hasOwnProperty.call(tc, k)) c[k] = tc[k]; }
@@ -370,7 +379,7 @@
           if (!items.length) return { success: false, message: 'PO harus memiliki minimal 1 item.' };
           var noWO = (p.noWO || '').toString().trim();
           if (noWO) { var st = await _hoStatus(noWO); if (st !== 'Selesai') { var msg = st === 'Dijadwalkan' ? 'Hand Over WO ini masih Dijadwalkan — selesaikan HO dulu.' : st === 'Diminta' ? 'Hand Over WO ini baru Diminta — jadwalkan & selesaikan HO dulu.' : 'WO ini belum melewati Hand Over. Selesaikan Hand Over dulu sebelum lanjut.'; return { success: false, message: 'PO untuk WO ini belum bisa dibuat. ' + msg }; } }
-          var noPO = await _nextRomanSeq('purchase_order', 'no_po', 'RGI/PO', true), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
+          var noPO = await _nextPONumber(), calc = _hitungPO(items, p.diskonPersen, p.diskonNominal, p.ppnPersen);
           var ins = await supa.from('purchase_order').insert({
             no_po: noPO, tanggal: _isoDate(p.tanggal) || _todayIso(), id_supplier: idSupplier, nama_supplier: (p.namaSupplier || '').toString(), peruntukan: (p.peruntukan || '').toString(), no_wo: noWO,
             status_po: 'Aktif', subtotal: calc.subtotal, ppn_persen: calc.ppnPersen, ppn_nominal: calc.ppnNominal, grand_total: calc.grandTotal, catatan: (p.catatan || '').toString(), status_bayar: 'Belum Dibayar', total_dibayar: 0,

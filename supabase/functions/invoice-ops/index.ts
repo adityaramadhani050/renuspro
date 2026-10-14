@@ -53,6 +53,15 @@ Deno.serve(async (req: Request) => {
       for (const r of rows) { const id = (r[idField] || '').toString(); if (id.startsWith(prefix)) { const s = parseInt(id.slice(prefix.length), 10) || 0; if (s > max) max = s; } }
       return prefix + String(max + 1).padStart(3, '0');
     }
+    // Nomor dokumen gapless via RPC (invoice/kwitansi). Return null → pemanggil
+    // fallback ke scan+max bila RPC belum ter-deploy / error.
+    async function nextDocSeq(scope: string): Promise<number | null> {
+      try {
+        const r = await sb.rpc('next_doc_seq', { p_scope: scope });
+        if (!r.error && r.data != null) { const n = Number(r.data); if (n > 0) return n; }
+      } catch (_e) { /* fallback di pemanggil */ }
+      return null;
+    }
 
     // ═══════════════════════ CREATE ═══════════════════════
     if (action === 'create') {
@@ -101,13 +110,16 @@ Deno.serve(async (req: Request) => {
       let scope: any = []; try { scope = typeof wo.items === 'string' ? JSON.parse(wo.items || '[]') : (wo.items || []); } catch (_) { scope = []; }
       const meta = { scope, nilaiKontrak, inputMode: p.inputMode || 'persen' };
 
-      // Nomor invoice: NNN/RGI/INV/{roman}/{year}
-      let maxId = 0;
-      for (const r of inv) { const m = (r as any).no_invoice; } // no_invoice not selected above; re-scan:
-      const invIds = await all('invoice', 'no_invoice');
-      for (const r of invIds) { const m = (r.no_invoice || '').toString().match(/^(\d+)\/RGI(?:-INV|\/INV)/); if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; } }
+      // Nomor invoice: NNN/RGI/INV/{roman}/{year} — gapless via RPC, fallback scan.
+      let seqInv = await nextDocSeq('invoice');
+      if (seqInv == null) {
+        let maxId = 0;
+        const invIds = await all('invoice', 'no_invoice');
+        for (const r of invIds) { const m = (r.no_invoice || '').toString().match(/^(\d+)\/RGI(?:-INV|\/INV)/); if (m) { const n = parseInt(m[1], 10); if (n > maxId) maxId = n; } }
+        seqInv = maxId + 1;
+      }
       const { mon, yr } = romanMonthYear();
-      const noInvoice = `${String(maxId + 1).padStart(3, '0')}/RGI/INV/${mon}/${yr}`;
+      const noInvoice = `${String(seqInv).padStart(3, '0')}/RGI/INV/${mon}/${yr}`;
 
       const ins = await sb.from('invoice').insert({
         no_invoice: noInvoice, no_wo: isPredeal ? '' : p.noWO, no_penawaran: wo.id, tanggal: (p.tanggal && /^\d{4}-\d{2}-\d{2}/.test(p.tanggal)) ? p.tanggal.slice(0, 10) : todayIso(),
@@ -196,10 +208,14 @@ Deno.serve(async (req: Request) => {
         const kw = await sb.from('kwitansi').select('no_kwitansi').eq('no_invoice', idInvoice).maybeSingle();
         if (kw.data) { noKwitansi = kw.data.no_kwitansi; }
         else {
-          const kwIds = await all('kwitansi', 'no_kwitansi');
-          let kmax = 0; for (const r of kwIds) { const m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { const n = parseInt(m[1], 10); if (n > kmax) kmax = n; } }
+          let seqKw = await nextDocSeq('kwitansi');
+          if (seqKw == null) {
+            const kwIds = await all('kwitansi', 'no_kwitansi');
+            let kmax = 0; for (const r of kwIds) { const m = (r.no_kwitansi || '').toString().match(/^(\d+)\/RGI(?:-KW|\/KWT)/); if (m) { const n = parseInt(m[1], 10); if (n > kmax) kmax = n; } }
+            seqKw = kmax + 1;
+          }
           const { mon, yr } = romanMonthYear();
-          noKwitansi = `${String(kmax + 1).padStart(3, '0')}/RGI/KWT/${mon}/${yr}`;
+          noKwitansi = `${String(seqKw).padStart(3, '0')}/RGI/KWT/${mon}/${yr}`;
           const untuk = 'Pembayaran ' + jenis + (persen > 0 ? ' ' + persen + '%' : '') + ' - ' + (row.nama_project || '');
           const ik = await sb.from('kwitansi').insert({ no_kwitansi: noKwitansi, no_invoice: idInvoice, no_wo: row.no_wo || '', tanggal: todayIso(), terima_dari: row.nama_klien || '', jumlah: Number(row.total) || 0, untuk_pembayaran: untuk, metode: 'Transfer', catatan: '', dibuat_oleh: 'Sistem' });
           if (ik.error) return json({ success: false, message: ik.error.message });

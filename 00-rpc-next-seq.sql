@@ -89,9 +89,50 @@ begin
   return n;
 end $$;
 
+-- 3b) next_doc_seq(): nomor dokumen finansial GLOBAL & berkelanjutan (gapless) —
+--     invoice / kwitansi / purchase_order. Masing-masing deret TERPISAH (sesuai
+--     perilaku lama). Mengembalikan INTEGER; pemanggil memformat
+--     'NNN/RGI/<INV|KWT|PO>/<Romawi>/<Tahun>' seperti biasa (format tak berubah).
+--     Seed memakai angka DEPAN sebelum '/RGI' (mendukung varian lama RGI-INV &
+--     baru RGI/INV).
+create or replace function next_doc_seq(p_scope text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare cur bigint; n bigint;
+begin
+  if p_scope not in ('invoice', 'kwitansi', 'purchase_order') then
+    raise exception 'next_doc_seq: scope tidak diizinkan (%)', p_scope;
+  end if;
+
+  insert into app_seq(scope, val) values ('doc:' || p_scope, 0)
+    on conflict (scope) do nothing;
+  select val into cur from app_seq where scope = 'doc:' || p_scope for update;
+
+  if cur = 0 then
+    if p_scope = 'invoice' then
+      select coalesce(max((substring(no_invoice from '^(\d+)/RGI'))::bigint), 0)
+        into cur from invoice where no_invoice ~ '^\d+/RGI';
+    elsif p_scope = 'kwitansi' then
+      select coalesce(max((substring(no_kwitansi from '^(\d+)/RGI'))::bigint), 0)
+        into cur from kwitansi where no_kwitansi ~ '^\d+/RGI';
+    elsif p_scope = 'purchase_order' then
+      select coalesce(max((substring(no_po from '^(\d+)/RGI'))::bigint), 0)
+        into cur from purchase_order where no_po ~ '^\d+/RGI';
+    end if;
+  end if;
+
+  n := cur + 1;
+  update app_seq set val = n where scope = 'doc:' || p_scope;
+  return n;
+end $$;
+
 -- 4) Izin eksekusi (user login = role 'authenticated'; edge function = service_role).
 grant execute on function next_seq(text, text, text) to authenticated, service_role;
 grant execute on function next_quotation_seq()        to authenticated, service_role;
+grant execute on function next_doc_seq(text)          to authenticated, service_role;
 
 -- =============================================================================
 --  Verifikasi (opsional, read-only):
