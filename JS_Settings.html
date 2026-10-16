@@ -235,7 +235,7 @@ function _loadWAReminderSchedule() {
 function simpanJadwalReminder() {
   var jam          = parseInt(document.getElementById('wa-reminder-hour').value, 10);
   var intervalHari = parseInt(document.getElementById('wa-reminder-interval').value, 10);
-  if (isNaN(intervalHari) || intervalHari < 1) { showToast('Selang hari reminder ulang minimal 1.', 'error'); return; }
+  if (isNaN(intervalHari) || intervalHari < 0) { showToast('Selang hari reminder tidak boleh negatif. Isi 0 untuk reminder sekali saja (tidak diulang).', 'error'); return; }
   var btn = document.getElementById('wa-jadwal-save-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...'; }
   google.script.run

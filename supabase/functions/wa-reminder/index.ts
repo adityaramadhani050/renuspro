@@ -30,7 +30,9 @@ Deno.serve(async (req: Request) => {
     if (!(cfg.enabled === true) || !cfg.endpoint || !cfg.target) return json({ skipped: true, reason: 'disabled / endpoint / target kosong' });
     const hour = parseInt(cfg.reminderHour as string, 10) || 8;
     if (!force && wibHour() !== hour) return json({ skipped: true, reason: 'bukan jam terjadwal (WIB ' + wibHour() + ' != ' + hour + ')' });
-    const intervalHari = parseInt(cfg.reminderInterval as string, 10) || 3;
+    // reminderInterval: >0 = ulangi tiap N hari; 0 = SEKALI SAJA (tidak diulang).
+    let intervalHari = parseInt(cfg.reminderInterval as string, 10);
+    if (isNaN(intervalHari)) intervalHari = 3;
     const today = wibToday();
 
     const rows: Record<string, unknown>[] = []; let from = 0;
@@ -43,7 +45,8 @@ Deno.serve(async (req: Request) => {
     Object.keys(latest).forEach((no) => {
       const r = latest[no]; if (((r.status as string) || 'On-Progress') !== 'On-Progress') return;
       const vh = isoDate(r.valid_hingga); if (!vh) return; if (days(today, vh) > 1) return;
-      const last = isoDate(r.reminder_expired); if (!force && last && days(last, today) < intervalHari) return;
+      // intervalHari <= 0 → sekali saja: bila sudah pernah diingatkan, jangan ulang.
+      const last = isoDate(r.reminder_expired); if (!force && last && (intervalHari <= 0 || days(last, today) < intervalHari)) return;
       list.push({ noPenawaran: no, namaProject: ((r.nama_project as string) || '').toString(), namaKlien: km[((r.klien_id as string) || '').toString()] || ((r.klien_id as string) || '').toString(), dibuatOleh: ((r.dibuat_oleh as string) || '').toString(), validHingga: fmtTgl(vh) });
     });
     if (!list.length) return json({ sent: 0, count: 0 });

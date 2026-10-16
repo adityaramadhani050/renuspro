@@ -257,7 +257,7 @@
           var r = latest[no]; if ((r.status || 'On-Progress') !== 'On-Progress') return;
           var vh = _isoDate(r.valid_hingga); if (!vh) return;
           var mulai = _dDaysISO(todayISO, vh); if (mulai > 1) return;   // reminderMulai = valid-1hari; skip bila valid_hingga > besok
-          if (!forceAll) { var last = _isoDate(r.reminder_expired); if (last) { var gap = _dDaysISO(last, todayISO); if (gap != null && gap < (intervalHari || 3)) return; } }
+          if (!forceAll) { var last = _isoDate(r.reminder_expired); if (last) { var iv = (intervalHari == null ? 3 : intervalHari); if (iv <= 0) return; var gap = _dDaysISO(last, todayISO); if (gap != null && gap < iv) return; } }
           out.push({ noPenawaran: no, namaProject: (r.nama_project || '').toString(), namaKlien: km[(r.klien_id || '').toString()] || (r.klien_id || '').toString(), dibuatOleh: (r.dibuat_oleh || '').toString(), validHingga: _fmtTgl(vh) });
         });
         return out;
@@ -269,7 +269,7 @@
       // ── Route WA (aktif hanya bila ENABLE_WA) ─────────────────────────────
       if (ENABLE_WA) {
         window.gsRoute('getWAConfig', { mode: 'fn', handler: async function () { var c = await _waCfg(); return { success: true, enabled: c.enabled === true, endpoint: (c.endpoint || '').toString(), target: (c.target || '').toString(), token: (c.token || '').toString(), qcNotif: c.qcNotif !== false, testNumber: (c.testNumber || '').toString(), testGroup: (c.testGroup || '').toString() }; } });
-        window.gsRoute('saveWAConfig', { mode: 'fn', handler: async function (a) { var p = a[0] || {}; var patch = { enabled: !!p.enabled, endpoint: (p.endpoint || '').toString().trim().replace(/\/$/, ''), target: (p.target || '').toString().trim(), token: (p.token || '').toString().trim() }; if (p.qcNotif !== undefined) patch.qcNotif = !!p.qcNotif; if (p.testNumber !== undefined) patch.testNumber = (p.testNumber || '').toString().trim(); if (p.testGroup !== undefined) patch.testGroup = (p.testGroup || '').toString().trim(); if (p.reminderHour !== undefined) { var _jam = parseInt(p.reminderHour, 10); if (!isNaN(_jam) && _jam >= 0 && _jam <= 23) patch.reminderHour = _jam; } if (p.reminderInterval !== undefined) { var _iv = parseInt(p.reminderInterval, 10); if (!isNaN(_iv) && _iv >= 1) patch.reminderInterval = _iv; } var r = await _waCfgMerge(patch); return r.error ? { success: false, message: r.error.message } : { success: true, message: 'Konfigurasi WA Bot berhasil disimpan.' }; } });
+        window.gsRoute('saveWAConfig', { mode: 'fn', handler: async function (a) { var p = a[0] || {}; var patch = { enabled: !!p.enabled, endpoint: (p.endpoint || '').toString().trim().replace(/\/$/, ''), target: (p.target || '').toString().trim(), token: (p.token || '').toString().trim() }; if (p.qcNotif !== undefined) patch.qcNotif = !!p.qcNotif; if (p.testNumber !== undefined) patch.testNumber = (p.testNumber || '').toString().trim(); if (p.testGroup !== undefined) patch.testGroup = (p.testGroup || '').toString().trim(); if (p.reminderHour !== undefined) { var _jam = parseInt(p.reminderHour, 10); if (!isNaN(_jam) && _jam >= 0 && _jam <= 23) patch.reminderHour = _jam; } if (p.reminderInterval !== undefined) { var _iv = parseInt(p.reminderInterval, 10); if (!isNaN(_iv) && _iv >= 0) patch.reminderInterval = _iv; } var r = await _waCfgMerge(patch); return r.error ? { success: false, message: r.error.message } : { success: true, message: 'Konfigurasi WA Bot berhasil disimpan.' }; } });
         window.gsRoute('testWANotifSample', {
           mode: 'fn',
           handler: async function (a) {
@@ -310,8 +310,8 @@
             return { success: (d.sent || 0) > 0, message: (d.sent || 0) > 0 ? 'Pesan uji terkirim ke ' + (d.sent || 0) + ' tujuan.' : 'Tidak terkirim ke tujuan.' };
           }
         });
-        window.gsRoute('getWAReminderScheduleConfig', { mode: 'fn', handler: async function () { var c = await _waCfg(); return { success: true, jam: parseInt(c.reminderHour, 10) || 8, intervalHari: parseInt(c.reminderInterval, 10) || 3 }; } });
-        window.gsRoute('saveWAReminderScheduleConfig', { mode: 'fn', handler: async function (a) { var p = a[0] || {}; var jam = parseInt(p.jam, 10); if (isNaN(jam) || jam < 0 || jam > 23) jam = 8; var iv = parseInt(p.intervalHari, 10); if (isNaN(iv) || iv < 1) iv = 1; var r = await _waCfgMerge({ reminderHour: jam, reminderInterval: iv }); return r.error ? { success: false, message: r.error.message } : { success: true, message: 'Jadwal reminder disimpan: jam ' + jam + ':00, diulang tiap ' + iv + ' hari.' }; } });
+        window.gsRoute('getWAReminderScheduleConfig', { mode: 'fn', handler: async function () { var c = await _waCfg(); var _iv = parseInt(c.reminderInterval, 10); return { success: true, jam: parseInt(c.reminderHour, 10) || 8, intervalHari: isNaN(_iv) ? 3 : _iv }; } });
+        window.gsRoute('saveWAReminderScheduleConfig', { mode: 'fn', handler: async function (a) { var p = a[0] || {}; var jam = parseInt(p.jam, 10); if (isNaN(jam) || jam < 0 || jam > 23) jam = 8; var iv = parseInt(p.intervalHari, 10); if (isNaN(iv) || iv < 0) iv = 0; var r = await _waCfgMerge({ reminderHour: jam, reminderInterval: iv }); return r.error ? { success: false, message: r.error.message } : { success: true, message: 'Jadwal reminder disimpan: jam ' + jam + ':00, ' + (iv <= 0 ? 'reminder sekali saja (tidak diulang).' : 'diulang tiap ' + iv + ' hari.') }; } });
         window.gsRoute('testWANotif', {
           mode: 'fn', handler: async function (a) {
             var p = a[0] || {}, patch = {};
