@@ -170,6 +170,25 @@
       document.getElementById('modal-template').classList.remove('hidden');
     }
 
+    // Duplikat template: buka modal mode TAMBAH (ID baru otomatis) dengan nama
+    // "<nama> (Copy)" + seluruh item sumber; bisa diubah sebelum disimpan.
+    function duplikatTemplate(id) {
+      if (!erpState.produk || erpState.produk.length === 0) {
+        showNotification('Data produk belum termuat, coba lagi.', 'error');
+        return;
+      }
+      const tpl = erpState.templatePaket[id];
+      if (!tpl) return showNotification('Template tidak ditemukan.', 'error');
+
+      bukaModalTambahTemplate();   // reset form + ID baru
+      document.getElementById('modal-template-title').innerText = 'Duplikat Paket dari ' + id;
+      document.getElementById('template-nama').value = (tpl.nama || '') + ' (Copy)';
+      document.getElementById('tbody-template-items').innerHTML = '';
+      (tpl.items || []).forEach(item => tambahBarisTemplate(item));
+      if (!tpl.items || tpl.items.length === 0) tambahBarisTemplate();
+      hitungEstimasiTemplate();
+    }
+
     function tutupModalTemplate() {
       document.getElementById('modal-template').classList.add('hidden');
     }
