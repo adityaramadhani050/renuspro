@@ -285,11 +285,10 @@
       if (!tr || !custom) return;
       tr.classList.add('is-custom');
       const wrap = tr.querySelector('.wrap-pilih-produk'), sel = tr.querySelector('.select-produk');
-      const unit = tr.querySelector('.input-unit'), badge = tr.querySelector('.badge-custom');
+      const unit = tr.querySelector('.input-unit');
       if (sel) { sel.value = ''; sel.required = false; if (sel.id && typeof sdReset === 'function') { try { sdReset(sel.id); } catch (e) {} } }
       if (wrap) wrap.classList.add('hidden');
       if (unit) { unit.readOnly = false; unit.classList.remove('bg-slate-100', 'text-slate-500'); unit.classList.add('bg-white', 'text-slate-800'); unit.placeholder = 'unit'; }
-      if (badge) badge.classList.remove('hidden');
     }
     function tambahBarisItemCustom(trigger) {
       const tb = trigger.closest('.block-kelompok').querySelector('.tbody-item-kelompok');
