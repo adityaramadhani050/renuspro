@@ -278,40 +278,18 @@
     }
 
     // ── Item custom: diketik manual, tanpa produk dari katalog ─────────────
-    //  Mode custom: pemilih produk disembunyikan (tak wajib), Unit bisa diketik,
+    //  Hanya dibuat lewat tombol "Tambah Item Custom" di bawah sub-paket.
+    //  Pemilih produk disembunyikan (tak wajib), Unit bisa diketik,
     //  Deskripsi/Harga/HPP diisi manual. Disimpan dengan produkId '' + custom:true.
     function setModeItemCustom(tr, custom) {
-      if (!tr) return;
-      tr.classList.toggle('is-custom', !!custom);
+      if (!tr || !custom) return;
+      tr.classList.add('is-custom');
       const wrap = tr.querySelector('.wrap-pilih-produk'), sel = tr.querySelector('.select-produk');
-      const unit = tr.querySelector('.input-unit'), badge = tr.querySelector('.badge-custom'), btn = tr.querySelector('.btn-toggle-custom');
-      if (custom) {
-        if (sel) { sel.value = ''; sel.required = false; if (sel.id && typeof sdReset === 'function') { try { sdReset(sel.id); } catch (e) {} } }
-        if (wrap) wrap.classList.add('hidden');
-        if (unit) { unit.readOnly = false; unit.classList.remove('bg-slate-100', 'text-slate-500'); unit.classList.add('bg-white', 'text-slate-800'); unit.placeholder = 'unit'; }
-        if (badge) badge.classList.remove('hidden');
-        if (btn) btn.innerHTML = '<i class="fa-solid fa-list"></i> Pilih dari katalog';
-      } else {
-        if (sel) sel.required = true;
-        if (wrap) wrap.classList.remove('hidden');
-        if (unit) { unit.readOnly = true; unit.classList.add('bg-slate-100', 'text-slate-500'); unit.classList.remove('bg-white', 'text-slate-800'); unit.placeholder = ''; }
-        if (badge) badge.classList.add('hidden');
-        if (btn) btn.innerHTML = '<i class="fa-solid fa-pen"></i> Isi manual (custom)';
-      }
-    }
-    function toggleItemCustom(btn) {
-      const tr = btn.closest('tr'); if (!tr) return;
-      const keCustom = !tr.classList.contains('is-custom');
-      setModeItemCustom(tr, keCustom);
-      if (keCustom) {
-        // Isian yang ada dipertahankan (bisa diubah); fokus ke deskripsi.
-        const d = tr.querySelector('.custom-deskripsi'); if (d) d.focus();
-      } else {
-        // Kembali ke katalog → kosongkan agar produk dipilih ulang.
-        tr.querySelector('.custom-deskripsi').value = ''; tr.querySelector('.input-unit').value = '';
-        tr.querySelector('.input-harga').value = '0'; tr.querySelector('.input-hpp').value = '0';
-      }
-      hitungSubtotalBaris(btn);
+      const unit = tr.querySelector('.input-unit'), badge = tr.querySelector('.badge-custom');
+      if (sel) { sel.value = ''; sel.required = false; if (sel.id && typeof sdReset === 'function') { try { sdReset(sel.id); } catch (e) {} } }
+      if (wrap) wrap.classList.add('hidden');
+      if (unit) { unit.readOnly = false; unit.classList.remove('bg-slate-100', 'text-slate-500'); unit.classList.add('bg-white', 'text-slate-800'); unit.placeholder = 'unit'; }
+      if (badge) badge.classList.remove('hidden');
     }
     function tambahBarisItemCustom(trigger) {
       const tb = trigger.closest('.block-kelompok').querySelector('.tbody-item-kelompok');
