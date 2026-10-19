@@ -54,8 +54,12 @@
     <tr class="border-b border-slate-150 hover:bg-slate-50 transition duration-150 baris-item baris-kartu">
       <td class="p-2 text-center text-xs font-bold text-slate-400 item-index col-no">1</td>
       <td class="p-2 space-y-1 col-desk" data-label="Item Produk/Jasa">
-        <select onchange="onItemSelectChanged(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-blue-500 select-produk" required><option value="">-- Pilih Item --</option></select>
+        <span class="badge-custom hidden inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md"><i class="fa-solid fa-pen"></i> Item Custom</span>
+        <div class="wrap-pilih-produk">
+          <select onchange="onItemSelectChanged(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium bg-white focus:ring-1 focus:ring-blue-500 select-produk" required><option value="">-- Pilih Item --</option></select>
+        </div>
         <textarea placeholder="Deskripsi..." class="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs custom-deskripsi" rows="2" required></textarea>
+        <button type="button" onclick="toggleItemCustom(this)" class="btn-toggle-custom text-[10px] font-bold text-slate-500 hover:text-blue-600"><i class="fa-solid fa-pen"></i> Isi manual (custom)</button>
       </td>
       <td class="p-2 col-qty" data-label="Qty"><input type="number" step="any" min="0" value="1" oninput="hitungSubtotalBaris(this)" class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-center text-xs font-bold input-qty" required></td>
       <td class="p-2 col-unit" data-label="Unit"><input type="text" class="w-full px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-center text-xs text-slate-500 input-unit" readonly></td>
@@ -67,7 +71,13 @@
         <div class="font-extrabold text-slate-800 text-xs">Rp <span class="txt-subtotal-baris">0</span></div>
         <div class="text-[10px] text-rose-600 font-bold mt-1">HPP: Rp <span class="txt-hpp-baris" data-raw-hpp="0">0</span></div>
       </td>
-      <td class="p-2 text-center col-aksi"><button type="button" onclick="hapusBarisItem(this)" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition"><i class="fa-regular fa-trash-can"></i></button></td>
+      <td class="p-2 text-center col-aksi">
+        <div class="flex items-center justify-center gap-0.5">
+          <button type="button" onclick="geserBarisItem(this, -1)" title="Geser ke atas" class="btn-geser-atas text-slate-500 hover:bg-slate-100 p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+          <button type="button" onclick="geserBarisItem(this, 1)" title="Geser ke bawah" class="btn-geser-bawah text-slate-500 hover:bg-slate-100 p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+          <button type="button" onclick="hapusBarisItem(this)" title="Hapus" class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+      </td>
     </tr>
   </template>
 

@@ -164,8 +164,8 @@
           </div>
           <button type="button" onclick="hapusKelompok(this)" class="text-rose-500 text-xs font-bold flex-shrink-0 px-2 py-1"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>
         </div>
-        <div class="overflow-x-auto bg-white border border-slate-200 rounded-lg tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Deskripsi Produk/Jasa</th><th class="p-2 w-20 text-center">Qty</th><th class="p-2 w-20 text-center">Unit</th><th class="p-2 w-44">Harga Jual & HPP</th><th class="p-2 w-40 text-right">Total</th><th class="p-2 w-10 text-center">Aksi</th></tr></thead><tbody class="tbody-item-kelompok"></tbody></table></div>
-        <div class="flex justify-between items-center mt-3 gap-2 flex-wrap"><button type="button" onclick="tambahBarisItemDiKelompok(this)" class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button><div class="text-right"><div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok">0</span></span></div><div class="text-[11px] font-bold text-rose-600 mt-0.5">Sub-Total HPP: Rp <span class="txt-hpp-kelompok">0</span></div></div></div>
+        <div class="overflow-x-auto bg-white border border-slate-200 rounded-lg tabel-item-wrap"><table class="w-full text-left border-collapse tabel-item-penawaran"><thead><tr class="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase"><th class="p-2 w-10 text-center">No</th><th class="p-2">Deskripsi Produk/Jasa</th><th class="p-2 w-20 text-center">Qty</th><th class="p-2 w-20 text-center">Unit</th><th class="p-2 w-44">Harga Jual & HPP</th><th class="p-2 w-40 text-right">Total</th><th class="p-2 w-28 text-center">Aksi</th></tr></thead><tbody class="tbody-item-kelompok"></tbody></table></div>
+        <div class="flex justify-between items-center mt-3 gap-2 flex-wrap"><div class="flex items-center gap-1 flex-wrap"><button type="button" onclick="tambahBarisItemDiKelompok(this)" class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded"><i class="fa-solid fa-plus"></i> Tambah Item</button><button type="button" onclick="tambahBarisItemCustom(this)" class="text-amber-700 text-xs font-bold px-2 py-1 hover:bg-amber-50 rounded"><i class="fa-solid fa-pen"></i> Tambah Item Custom</button></div><div class="text-right"><div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok">0</span></span></div><div class="text-[11px] font-bold text-rose-600 mt-0.5">Sub-Total HPP: Rp <span class="txt-hpp-kelompok">0</span></div></div></div>
       `;
       cont.appendChild(div);
       if (idTpl) muatItemDariTemplate(div.querySelector('.tbody-item-kelompok'), idTpl);
@@ -231,7 +231,7 @@
 
         tb.appendChild(tr);
       });
-      tb.querySelectorAll('.baris-item').forEach((b, i) => b.querySelector('.item-index').innerText = i + 1);
+      _renumberItemKelompok(tb);
       // Upgrade select produk hasil paket menjadi searchable dropdown (sama
       // seperti penambahan item manual). Idempoten — aman meski dipanggil ganda.
       setTimeout(function() { _initSelectProdukDiBaris(tb); }, 30);
@@ -246,13 +246,81 @@
       const sortedProduk = [...(erpState.produk || [])].sort((a,b) => a.nama.localeCompare(b.nama,'id'));
       sortedProduk.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.text=p.nama; o.dataset.unit=p.unit; o.dataset.harga=p.harga; o.dataset.hpp=p.hpp; s.add(o); });
       tb.appendChild(tr);
-      tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1);
+      _renumberItemKelompok(tb);
       // Init searchable pada select yang baru ditambahkan
       const newTr = tb.lastElementChild;
       if (newTr) setTimeout(function() { _initSelectProdukDiBaris(newTr); }, 30);
+      return newTr;
     }
 
-    function hapusBarisItem(btn) { const tb=btn.closest('tbody'); if(tb.querySelectorAll('.baris-item').length>1) { btn.closest('tr').remove(); tb.querySelectorAll('.baris-item').forEach((b,i)=>b.querySelector('.item-index').innerText=i+1); hitungKalkulasiGabungan(); } }
+    function hapusBarisItem(btn) { const tb=btn.closest('tbody'); if(tb.querySelectorAll('.baris-item').length>1) { btn.closest('tr').remove(); _renumberItemKelompok(tb); hitungKalkulasiGabungan(); } else showNotification("Minimal 1 item dalam sub-paket!", "error"); }
+
+    // Nomor urut baris + status tombol geser (pertama tak bisa naik, terakhir tak bisa turun).
+    function _renumberItemKelompok(tb) {
+      if (!tb) return;
+      const rows = tb.querySelectorAll('.baris-item');
+      rows.forEach((b, i) => {
+        const idx = b.querySelector('.item-index'); if (idx) idx.innerText = i + 1;
+        const up = b.querySelector('.btn-geser-atas'), dn = b.querySelector('.btn-geser-bawah');
+        if (up) up.disabled = (i === 0);
+        if (dn) dn.disabled = (i === rows.length - 1);
+      });
+    }
+
+    // Geser baris item ke atas (dir=-1) / bawah (dir=1) di dalam sub-paketnya.
+    // Urutan baris = urutan item yang disimpan & tampil di PDF.
+    function geserBarisItem(btn, dir) {
+      const tr = btn.closest('tr'); if (!tr) return;
+      const tb = tr.parentNode;
+      if (dir < 0) { const p = tr.previousElementSibling; if (p) tb.insertBefore(tr, p); }
+      else { const n = tr.nextElementSibling; if (n) tb.insertBefore(n, tr); }
+      _renumberItemKelompok(tb);
+    }
+
+    // ── Item custom: diketik manual, tanpa produk dari katalog ─────────────
+    //  Mode custom: pemilih produk disembunyikan (tak wajib), Unit bisa diketik,
+    //  Deskripsi/Harga/HPP diisi manual. Disimpan dengan produkId '' + custom:true.
+    function setModeItemCustom(tr, custom) {
+      if (!tr) return;
+      tr.classList.toggle('is-custom', !!custom);
+      const wrap = tr.querySelector('.wrap-pilih-produk'), sel = tr.querySelector('.select-produk');
+      const unit = tr.querySelector('.input-unit'), badge = tr.querySelector('.badge-custom'), btn = tr.querySelector('.btn-toggle-custom');
+      if (custom) {
+        if (sel) { sel.value = ''; sel.required = false; if (sel.id && typeof sdReset === 'function') { try { sdReset(sel.id); } catch (e) {} } }
+        if (wrap) wrap.classList.add('hidden');
+        if (unit) { unit.readOnly = false; unit.classList.remove('bg-slate-100', 'text-slate-500'); unit.classList.add('bg-white', 'text-slate-800'); unit.placeholder = 'unit'; }
+        if (badge) badge.classList.remove('hidden');
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-list"></i> Pilih dari katalog';
+      } else {
+        if (sel) sel.required = true;
+        if (wrap) wrap.classList.remove('hidden');
+        if (unit) { unit.readOnly = true; unit.classList.add('bg-slate-100', 'text-slate-500'); unit.classList.remove('bg-white', 'text-slate-800'); unit.placeholder = ''; }
+        if (badge) badge.classList.add('hidden');
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-pen"></i> Isi manual (custom)';
+      }
+    }
+    function toggleItemCustom(btn) {
+      const tr = btn.closest('tr'); if (!tr) return;
+      const keCustom = !tr.classList.contains('is-custom');
+      setModeItemCustom(tr, keCustom);
+      if (keCustom) {
+        // Isian yang ada dipertahankan (bisa diubah); fokus ke deskripsi.
+        const d = tr.querySelector('.custom-deskripsi'); if (d) d.focus();
+      } else {
+        // Kembali ke katalog → kosongkan agar produk dipilih ulang.
+        tr.querySelector('.custom-deskripsi').value = ''; tr.querySelector('.input-unit').value = '';
+        tr.querySelector('.input-harga').value = '0'; tr.querySelector('.input-hpp').value = '0';
+      }
+      hitungSubtotalBaris(btn);
+    }
+    function tambahBarisItemCustom(trigger) {
+      const tb = trigger.closest('.block-kelompok').querySelector('.tbody-item-kelompok');
+      const tr = tambahBarisItemDiKelompok(tb, true);
+      setModeItemCustom(tr, true);
+      tr.querySelector('.input-harga').value = '0'; tr.querySelector('.input-hpp').value = '0';
+      hitungSubtotalBaris(tr.querySelector('.input-qty'));
+      const d = tr.querySelector('.custom-deskripsi'); if (d) d.focus();
+    }
 
     function onItemSelectChanged(sel) {
       const tr = sel.closest('tr'); const opt = sel.options[sel.selectedIndex];
@@ -560,7 +628,8 @@
       blocks.forEach(b => {
         const sub = { kelompok: b.dataset.letter, namaKelompok: b.querySelector('.nama-kelompok').value.toUpperCase(), subtotal: parseFloat(b.querySelector('.txt-subtotal-kelompok').dataset.rawSubtotal)||0, subItems: [] };
         b.querySelectorAll('.baris-item').forEach((row, i) => {
-          sub.subItems.push({ noItem: i+1, produkId: row.querySelector('.select-produk').value, deskripsi: row.querySelector('.custom-deskripsi').value, qty: parseFloat(row.querySelector('.input-qty').value)||0, unit: row.querySelector('.input-unit').value||"unit", harga: pN(row.querySelector('.input-harga').value), hpp: pN(row.querySelector('.input-hpp').value), total: parseFloat(row.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0 });
+          const isCustom = row.classList.contains('is-custom');   // item manual tanpa produk katalog
+          sub.subItems.push({ noItem: i+1, custom: isCustom, produkId: isCustom ? '' : row.querySelector('.select-produk').value, deskripsi: row.querySelector('.custom-deskripsi').value, qty: parseFloat(row.querySelector('.input-qty').value)||0, unit: row.querySelector('.input-unit').value||"unit", harga: pN(row.querySelector('.input-harga').value), hpp: pN(row.querySelector('.input-hpp').value), total: parseFloat(row.querySelector('.txt-subtotal-baris').dataset.rawTotal)||0 });
         }); payload.items.push(sub);
       });
 
@@ -1340,16 +1409,22 @@
               <th class="p-2 w-20 text-center">Unit</th>
               <th class="p-2 w-44">Harga Jual & HPP</th>
               <th class="p-2 w-40 text-right">Total</th>
-              <th class="p-2 w-10 text-center">Aksi</th>
+              <th class="p-2 w-28 text-center">Aksi</th>
             </tr></thead>
             <tbody class="tbody-item-kelompok"></tbody>
           </table>
         </div>
-        <div class="flex justify-between items-center mt-3">
-          <button type="button" onclick="tambahBarisItemDiKelompok(this)"
-            class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded">
-            <i class="fa-solid fa-plus"></i> Tambah Item
-          </button>
+        <div class="flex justify-between items-center mt-3 gap-2 flex-wrap">
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" onclick="tambahBarisItemDiKelompok(this)"
+              class="text-blue-600 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded">
+              <i class="fa-solid fa-plus"></i> Tambah Item
+            </button>
+            <button type="button" onclick="tambahBarisItemCustom(this)"
+              class="text-amber-700 text-xs font-bold px-2 py-1 hover:bg-amber-50 rounded">
+              <i class="fa-solid fa-pen"></i> Tambah Item Custom
+            </button>
+          </div>
           <div class="text-right">
             <div class="text-xs font-bold text-slate-700">Sub-Total ${letCode}: <span class="text-blue-900 text-sm ml-1">Rp <span class="txt-subtotal-kelompok" data-raw-subtotal="0">0</span></span></div>
             <div class="text-[11px] font-bold text-rose-600 mt-0.5">Sub-Total HPP: Rp <span class="txt-hpp-kelompok">0</span></div>
@@ -1391,7 +1466,10 @@
         spanHpp.dataset.rawHpp     = hbrs;   // ← konsisten
 
         tb.appendChild(tr);
+        // Item custom (tanpa produk katalog) → kembalikan ke mode custom.
+        if (si.custom || !si.produkId) setModeItemCustom(tb.lastElementChild, true);
       });
+      _renumberItemKelompok(tb);
 
       // ── Hitung sub-total kelompok dan tampilkan ──
       // BUG FIX 2: dataset.rawSubtotal (camelCase) konsisten dengan data-raw-subtotal (kebab)
