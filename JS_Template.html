@@ -56,10 +56,20 @@
           </div>
         </td>
         <td class="p-2 text-center">
-          <button type="button" onclick="hapusBarisTemplate(this)"
-            class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition">
-            <i class="fa-regular fa-trash-can text-xs"></i>
-          </button>
+          <div class="flex items-center justify-center gap-0.5">
+            <button type="button" onclick="geserBarisTemplate(this, -1)" title="Geser ke atas"
+              class="btn-geser-atas text-slate-500 hover:bg-slate-100 p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed">
+              <i class="fa-solid fa-arrow-up text-xs"></i>
+            </button>
+            <button type="button" onclick="geserBarisTemplate(this, 1)" title="Geser ke bawah"
+              class="btn-geser-bawah text-slate-500 hover:bg-slate-100 p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed">
+              <i class="fa-solid fa-arrow-down text-xs"></i>
+            </button>
+            <button type="button" onclick="hapusBarisTemplate(this)" title="Hapus"
+              class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-md transition">
+              <i class="fa-regular fa-trash-can text-xs"></i>
+            </button>
+          </div>
         </td>`;
 
       updateNomorBarisTemplate();
@@ -67,8 +77,29 @@
     }
 
     function updateNomorBarisTemplate() {
-      document.querySelectorAll('#tbody-template-items .baris-template')
-        .forEach((r, i) => { const idx = r.querySelector('.idx-baris'); if(idx) idx.innerText = i+1; });
+      const rows = document.querySelectorAll('#tbody-template-items .baris-template');
+      rows.forEach((r, i) => {
+        const idx = r.querySelector('.idx-baris'); if (idx) idx.innerText = i + 1;
+        // Baris pertama tak bisa naik, terakhir tak bisa turun.
+        const up = r.querySelector('.btn-geser-atas'), dn = r.querySelector('.btn-geser-bawah');
+        if (up) up.disabled = (i === 0);
+        if (dn) dn.disabled = (i === rows.length - 1);
+      });
+    }
+
+    // Geser baris item ke atas (dir=-1) / ke bawah (dir=1). Urutan baris di
+    // tabel = urutan item yang disimpan ke template.
+    function geserBarisTemplate(btn, dir) {
+      const tr = btn.closest('tr');
+      if (!tr) return;
+      if (dir < 0) {
+        const prev = tr.previousElementSibling;
+        if (prev) tr.parentNode.insertBefore(tr, prev);
+      } else {
+        const next = tr.nextElementSibling;
+        if (next) tr.parentNode.insertBefore(next, tr);
+      }
+      updateNomorBarisTemplate();
     }
 
     function tambahBarisTemplate(item = null) {
