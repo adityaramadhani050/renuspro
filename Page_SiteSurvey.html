@@ -95,19 +95,19 @@
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Arah Hadap Bangunan *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Arah Hadap Bangunan</label>
                 <select id="ss-arahBangunan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>Utara</option><option>Selatan</option><option>Timur</option><option>Barat</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tinggi Bangunan (meter) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tinggi Bangunan (meter)</label>
                 <input type="number" step="any" min="0" id="ss-tinggiBangunan" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Bangunan Tampak Depan *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Bangunan Tampak Depan</label>
               <div id="ss-foto-fotoBangunan" class="ss-foto-slot" data-field="fotoBangunan"></div>
             </div>
           </div>
@@ -117,35 +117,35 @@
             <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2"><i class="fa-solid fa-bolt text-amber-500"></i> B. Informasi Kelistrikan</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID Pelanggan PLN *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID Pelanggan PLN</label>
                 <input type="text" id="ss-idPelangganPLN" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="mis. 5312xxxxxxxx">
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phase Listrik *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phase Listrik</label>
                 <select id="ss-phase" onchange="_ssOnPhaseChange()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>1 Phase</option><option>3 Phase</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Daya PLN (VA) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Daya PLN (VA)</label>
                 <select id="ss-dayaPLN" disabled class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white disabled:bg-slate-50 disabled:text-slate-400">
                   <option value="">-- Pilih Phase Listrik dahulu --</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Rating Breaker Utama / MCB Ampere (A) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Rating Breaker Utama / MCB Ampere (A)</label>
                 <select id="ss-ratingBreaker" disabled class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white disabled:bg-slate-50 disabled:text-slate-400">
                   <option value="">-- Pilih Phase Listrik dahulu --</option>
                 </select>
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto kWh Meter *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto kWh Meter</label>
               <div id="ss-foto-fotoKwh" class="ss-foto-slot" data-field="fotoKwh"></div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Panel Hubung Bagi (PHB) *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Panel Hubung Bagi (PHB)</label>
               <div id="ss-foto-fotoPHB" class="ss-foto-slot" data-field="fotoPHB"></div>
             </div>
           </div>
@@ -154,31 +154,31 @@
           <div id="ss-step-3" class="ss-step hidden bg-white rounded-2xl border border-slate-150 p-5 space-y-4">
             <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2"><i class="fa-solid fa-server text-indigo-500"></i> C. Balance of System (BoS)</h3>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lokasi Penempatan *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lokasi Penempatan</label>
               <input type="text" id="ss-bosLokasi" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="mis. Sisi kanan rumah, dekat carport">
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lebar Area (m) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lebar Area (m)</label>
                 <input type="number" step="any" min="0" id="ss-bosLebar" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tinggi Area (m) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tinggi Area (m)</label>
                 <input type="number" step="any" min="0" id="ss-bosTinggi" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Tembok *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Tembok</label>
                 <input type="text" id="ss-bosJenisTembok" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="mis. Bata plester">
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jarak BoS ke Titik Interkoneksi (m) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jarak BoS ke Titik Interkoneksi (m)</label>
                 <input type="number" step="any" min="0" id="ss-bosJarakInterkoneksi" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Area BoS &amp; Titik Interkoneksi * <span class="text-slate-400 font-normal normal-case">(tandai area dgn kotak)</span></label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Area BoS &amp; Titik Interkoneksi <span class="text-slate-400 font-normal normal-case">(tandai area dgn kotak)</span></label>
               <div id="ss-foto-bosFoto" class="ss-foto-slot" data-field="bosFoto" data-anot="rect"></div>
             </div>
           </div>
@@ -188,28 +188,28 @@
             <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2"><i class="fa-solid fa-house-chimney text-rose-500"></i> D. Informasi Atap</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Atap *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Atap</label>
                 <select id="ss-atapJenis" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>Genteng Tanah Liat</option><option>Genteng Keramik</option><option>Genteng Beton</option><option>Spandek</option><option>Metal/Seng</option><option>uPVC</option><option>Bitumen</option><option>Asbes</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Arah Hadap Atap *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Arah Hadap Atap</label>
                 <select id="ss-atapArah" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>Utara</option><option>Selatan</option><option>Timur</option><option>Barat</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Rangka Atap *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Rangka Atap</label>
                 <select id="ss-atapRangka" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>Baja Ringan</option><option>Kayu</option><option>Baja (Profil WF / H-Beam)</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Mounting *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jenis Mounting</label>
                 <select id="ss-atapMounting" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                   <option value="">-- Pilih --</option>
                   <option>L-Feet</option><option>Roof Hook</option><option>Single Flashing</option><option>Rear-Front Leg</option>
@@ -217,7 +217,7 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jumlah Atap *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jumlah Atap</label>
               <select id="ss-atapJumlah" onchange="_ssRenderAtapUkuran()" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white">
                 <option value="1">1 atap</option><option value="2">2 atap</option><option value="3">3 atap</option>
                 <option value="4">4 atap</option><option value="5">5 atap</option><option value="6">6 atap</option>
@@ -226,19 +226,19 @@
               <p class="text-[11px] text-slate-400 mt-1">Isi jumlah bidang atap tempat pemasangan (multi-roof), ukuran diisi per atap.</p>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ukuran Atap (Panjang x Lebar) *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ukuran Atap (Panjang x Lebar)</label>
               <div id="ss-atapUkuranWrap" class="space-y-3"></div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Atap *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Atap</label>
               <div id="ss-foto-fotoAtap" class="ss-foto-slot" data-field="fotoAtap"></div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Rangka Atap *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Rangka Atap</label>
               <div id="ss-foto-fotoRangka" class="ss-foto-slot" data-field="fotoRangka"></div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Akses ke Atap *</label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Akses ke Atap</label>
               <div id="ss-foto-fotoAkses" class="ss-foto-slot" data-field="fotoAkses"></div>
             </div>
           </div>
@@ -248,20 +248,20 @@
             <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2"><i class="fa-solid fa-timeline text-emerald-500"></i> E. Jalur Kabel</h3>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Panjang Kabel PV (m) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Panjang Kabel PV (m)</label>
                 <input type="number" step="any" min="0" id="ss-panjangPV" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Panjang Kabel AC (m) *</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Panjang Kabel AC (m)</label>
                 <input type="number" step="any" min="0" id="ss-panjangAC" class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="0">
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Jalur Kabel PV * <span class="text-slate-400 font-normal normal-case">(tandai jalur dgn garis)</span></label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Jalur Kabel PV <span class="text-slate-400 font-normal normal-case">(tandai jalur dgn garis)</span></label>
               <div id="ss-foto-fotoPV" class="ss-foto-slot" data-field="fotoPV" data-anot="line"></div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Jalur Kabel AC * <span class="text-slate-400 font-normal normal-case">(tandai jalur dgn garis)</span></label>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Foto Jalur Kabel AC <span class="text-slate-400 font-normal normal-case">(tandai jalur dgn garis)</span></label>
               <div id="ss-foto-fotoAC" class="ss-foto-slot" data-field="fotoAC" data-anot="line"></div>
             </div>
           </div>

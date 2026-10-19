@@ -295,66 +295,18 @@ function _ssGotoStep(n) {
   if (host) host.scrollIntoView({ block: 'start' });
 }
 
-// Semua field per-langkah wajib diisi sebelum lanjut/submit.
+// Isian WAJIB hanya di Informasi Umum: Nama Site, Nama PIC, No. Telepon,
+// Alamat, Titik Koordinat. Seluruh isian & foto lain (langkah 1–5) opsional.
 var _SS_STEP_REQUIRED = {
   1: {
     fields: [
       { id: 'ss-namaSite', label: 'Nama Site' },
       { id: 'ss-namaPIC', label: 'Nama PIC Site' },
       { id: 'ss-telepon', label: 'No. Telepon' },
-      { id: 'ss-alamat', label: 'Alamat' },
-      { id: 'ss-arahBangunan', label: 'Arah Hadap Bangunan' },
-      { id: 'ss-tinggiBangunan', label: 'Tinggi Bangunan' }
+      { id: 'ss-alamat', label: 'Alamat' }
     ],
     coords: true,
-    fotos: [{ key: 'fotoBangunan', label: 'Foto Bangunan Tampak Depan' }]
-  },
-  2: {
-    fields: [
-      { id: 'ss-idPelangganPLN', label: 'ID Pelanggan PLN' },
-      { id: 'ss-phase', label: 'Phase Listrik' },
-      { id: 'ss-dayaPLN', label: 'Daya PLN' },
-      { id: 'ss-ratingBreaker', label: 'Rating Breaker Utama' }
-    ],
-    fotos: [{ key: 'fotoKwh', label: 'Foto kWh Meter' }, { key: 'fotoPHB', label: 'Foto Panel Hubung Bagi (PHB)' }]
-  },
-  3: {
-    fields: [
-      { id: 'ss-bosLokasi', label: 'Lokasi Penempatan BoS' },
-      { id: 'ss-bosLebar', label: 'Lebar Area BoS' },
-      { id: 'ss-bosTinggi', label: 'Tinggi Area BoS' },
-      { id: 'ss-bosJenisTembok', label: 'Jenis Tembok' },
-      { id: 'ss-bosJarakInterkoneksi', label: 'Jarak BoS ke Titik Interkoneksi' }
-    ],
-    fotos: [{ key: 'bosFoto', label: 'Foto Area BoS' }]
-  },
-  4: {
-    fields: [
-      { id: 'ss-atapJenis', label: 'Jenis Atap' },
-      { id: 'ss-atapArah', label: 'Arah Hadap Atap' },
-      { id: 'ss-atapRangka', label: 'Rangka Atap' },
-      { id: 'ss-atapMounting', label: 'Jenis Mounting' }
-    ],
-    custom: function() {
-      var jEl = document.getElementById('ss-atapJumlah');
-      var n = jEl ? parseInt(jEl.value, 10) : 0;
-      if (!n || n < 1) return 'Jumlah Atap wajib dipilih.';
-      for (var i = 0; i < n; i++) {
-        var p = document.getElementById('ss-atapP-' + i);
-        var l = document.getElementById('ss-atapL-' + i);
-        if (!p || !(p.value || '').trim()) return 'Ukuran Atap ' + (i + 1) + ' — Panjang wajib diisi.';
-        if (!l || !(l.value || '').trim()) return 'Ukuran Atap ' + (i + 1) + ' — Lebar wajib diisi.';
-      }
-      return null;
-    },
-    fotos: [{ key: 'fotoAtap', label: 'Foto Atap' }, { key: 'fotoRangka', label: 'Foto Rangka Atap' }, { key: 'fotoAkses', label: 'Foto Akses ke Atap' }]
-  },
-  5: {
-    fields: [
-      { id: 'ss-panjangPV', label: 'Panjang Kabel PV' },
-      { id: 'ss-panjangAC', label: 'Panjang Kabel AC' }
-    ],
-    fotos: [{ key: 'fotoPV', label: 'Foto Jalur Kabel PV' }, { key: 'fotoAC', label: 'Foto Jalur Kabel AC' }]
+    fotos: []
   }
 };
 
