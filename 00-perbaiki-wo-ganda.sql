@@ -38,14 +38,10 @@ union all select 'purchase_order',   o.no_wo, null, count(*) from purchase_order
 order by 2, 1;
 
 
--- ── LANGKAH 3 — Perbaikan (DRY-RUN: diakhiri ROLLBACK) ───────────────────────
---  Aturan: per No WO ganda, DIPERTAHANKAN penawaran yang status Deal/Closed &
---  tanggal deal PALING AWAL. Penawaran lain diberi No WO BARU (next_wo_seq).
---  Ikut dipindah otomatis: invoice (berdasar no_penawaran) & kwitansinya.
---  Lihat hasil tabel di akhir. Bila sudah benar, ganti ROLLBACK → COMMIT.
-begin;
-
-create temp table _wo_fix on commit drop as
+-- ── LANGKAH 3a — PRATINJAU (hanya SELECT, TIDAK mengubah data) ───────────────
+--  Aturan: per No WO ganda, DIPERTAHANKAN penawaran berstatus Deal/Closed dgn
+--  tanggal deal PALING AWAL. Baris yang tampil di sini = penawaran yang AKAN
+--  diberi No WO baru (beserta invoice & kwitansinya).
 with latest as (
   select distinct on (no_penawaran) no_penawaran, no_wo, status,
          coalesce(tanggal_deal, tanggal) as tgl, nama_project
@@ -58,23 +54,55 @@ with latest as (
          count(*) over (partition by no_wo) as cnt
   from latest l
 )
-select no_penawaran, no_wo as wo_lama, nama_project, status, tgl, null::text as wo_baru
-from ranked where cnt > 1 and rn > 1;
+select no_wo, no_penawaran, nama_project, status, tgl as tgl_deal,
+       case when rn = 1 then 'DIPERTAHANKAN' else 'DIBERI NO WO BARU' end as tindakan
+from ranked where cnt > 1
+order by no_wo, rn;
 
-update _wo_fix set wo_baru = next_wo_seq();          -- nomor baru, satu per baris
 
--- kwitansi dulu (lewat invoice yg masih ber-no_wo lama), lalu invoice, lalu penawaran
-update kwitansi k set no_wo = f.wo_baru
-  from invoice i join _wo_fix f on i.no_penawaran = f.no_penawaran and i.no_wo = f.wo_lama
- where k.no_invoice = i.no_invoice;
-update invoice i set no_wo = f.wo_baru
-  from _wo_fix f where i.no_penawaran = f.no_penawaran and i.no_wo = f.wo_lama;
-update penawaran p set no_wo = f.wo_baru
-  from _wo_fix f where p.no_penawaran = f.no_penawaran and p.no_wo = f.wo_lama;
+-- ── LANGKAH 3b — EKSEKUSI (jalankan bila pratinjau 3a sudah benar) ───────────
+--  Satu blok DO = satu transaksi: semua berhasil, atau bila ada error tidak
+--  ada yang berubah. Hasil dicatat di tabel wo_ganda_log untuk audit.
+--  Catatan: jangan dijalankan 2x tanpa cek — setelah sukses, 3a harus kosong.
+create table if not exists wo_ganda_log (
+  dibuat_pada  timestamptz default now(),
+  no_penawaran text, nama_project text, wo_lama text, wo_baru text
+);
 
-select no_penawaran, nama_project, status, tgl as tgl_deal, wo_lama, wo_baru from _wo_fix order by wo_lama;
+do $$
+declare r record; v_baru text;
+begin
+  for r in
+    with latest as (
+      select distinct on (no_penawaran) no_penawaran, no_wo, status,
+             coalesce(tanggal_deal, tanggal) as tgl, nama_project
+      from penawaran where coalesce(no_wo,'') <> ''
+      order by no_penawaran, rev desc
+    ), ranked as (
+      select l.*,
+             row_number() over (partition by no_wo
+               order by (status in ('Deal','Closed')) desc, tgl nulls last, no_penawaran) as rn,
+             count(*) over (partition by no_wo) as cnt
+      from latest l
+    )
+    select no_penawaran, no_wo as wo_lama, nama_project
+    from ranked where cnt > 1 and rn > 1
+    order by wo_lama, tgl nulls last
+  loop
+    v_baru := next_wo_seq();
+    -- kwitansi dulu (lewat invoice ber-no_wo lama), lalu invoice, lalu penawaran
+    update kwitansi k set no_wo = v_baru
+      from invoice i
+     where k.no_invoice = i.no_invoice and i.no_penawaran = r.no_penawaran and i.no_wo = r.wo_lama;
+    update invoice   set no_wo = v_baru where no_penawaran = r.no_penawaran and no_wo = r.wo_lama;
+    update penawaran set no_wo = v_baru where no_penawaran = r.no_penawaran and no_wo = r.wo_lama;
+    insert into wo_ganda_log(no_penawaran, nama_project, wo_lama, wo_baru)
+      values (r.no_penawaran, r.nama_project, r.wo_lama, v_baru);
+  end loop;
+end $$;
 
-rollback;   -- ← ganti menjadi COMMIT; setelah hasil di atas dicek benar
+-- Lihat hasil yang baru diproses:
+select * from wo_ganda_log order by dibuat_pada desc;
 
 
 -- ── LANGKAH 4 — Verifikasi (harus 0 baris) ───────────────────────────────────
