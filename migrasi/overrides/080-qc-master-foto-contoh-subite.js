@@ -342,7 +342,17 @@
           var noWO = (row.no_wo || '').toString();
           if (statusBaru === 'Deal') {
             if (statusLama !== 'Deal') {
-              if (!noWO) { noWO = await _nextWONumber(); upd.no_wo = noWO; }
+              if (!noWO) {
+                // Ambil nomor WO baru & pastikan BELUM dipakai penawaran lain
+                // (pengaman WO ganda bila penghitung tertinggal / transisi versi).
+                for (var _woTry = 0; _woTry < 10; _woTry++) {
+                  noWO = await _nextWONumber();
+                  var _woDup = await supa.from('penawaran').select('no_penawaran').eq('no_wo', noWO).neq('no_penawaran', noPen).limit(1);
+                  if (!_woDup.error && !(_woDup.data && _woDup.data.length)) break;
+                  if (_woTry === 9) return { success: false, message: 'Gagal membuat No WO unik (' + noWO + ' sudah dipakai). Coba lagi.' };
+                }
+                upd.no_wo = noWO;
+              }
               if (!row.tanggal_deal) upd.tanggal_deal = _todayIso();
               var invs = await _all('invoice', 'no_invoice,no_wo,no_penawaran', function (q) { return q.eq('no_penawaran', noPen); });
               var predeal = (invs.data || []).filter(function (x) { return !(x.no_wo || '').toString(); }).map(function (x) { return x.no_invoice; });

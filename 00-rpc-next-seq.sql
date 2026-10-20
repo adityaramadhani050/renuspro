@@ -121,18 +121,20 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare yy text; cur bigint; n bigint; v_scope text;
+declare yy text; cur bigint; mx bigint; n bigint; v_scope text;
 begin
   yy := to_char((now() at time zone 'Asia/Jakarta'), 'YY');
   v_scope := 'wo:' || yy;
   insert into app_seq(scope, val) values (v_scope, 0) on conflict (scope) do nothing;
-  select val into cur from app_seq where scope = v_scope for update;
-  if cur = 0 then
-    select coalesce(max(substring(no_wo from 3)::bigint), 0) into cur
-      from penawaran
-      where no_wo ~ ('^' || yy || '\d+$');
-  end if;
-  n := cur + 1;
+  select val into cur from app_seq where scope = v_scope for update;   -- kunci (serialisasi)
+  -- SELALU bandingkan dgn nomor tertinggi yg SUDAH ada di tabel. Penghitung
+  -- bisa tertinggal bila ada WO dibuat di luar fungsi ini (WO Manual, jalur
+  -- fallback/cache frontend lama) → tanpa ini nomor yg sudah dipakai bisa
+  -- dikeluarkan lagi (WO ganda).
+  select coalesce(max(substring(no_wo from 3)::bigint), 0) into mx
+    from penawaran
+    where no_wo ~ ('^' || yy || '\d+$');
+  n := greatest(coalesce(cur, 0), mx) + 1;
   update app_seq set val = n where scope = v_scope;
   return yy || lpad(n::text, 3, '0');
 end $$;
