@@ -775,7 +775,6 @@
           <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Role</label>
           <select id="modal-user-role" class="input-field text-sm" onchange="_onUserRoleChange()">
             <option value="sales">Sales</option>
-            <option value="leadsales">Lead Sales</option>
             <option value="finance">Finance</option>
             <option value="procurement">Procurement</option>
             <option value="warehouse">Warehouse</option>
@@ -785,12 +784,14 @@
             <option value="owner">Owner</option>
           </select>
         </div>
-        <div id="modal-user-lead-wrap" class="hidden">
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lead Sales</label>
-          <select id="modal-user-lead" class="input-field text-sm">
-            <option value="">— Tidak di-assign —</option>
+        <div id="modal-user-regional-wrap" class="hidden">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Regional</label>
+          <select id="modal-user-regional" class="input-field text-sm">
+            <option value="">— Belum ditentukan —</option>
+            <option value="Timur">Timur (Surabaya)</option>
+            <option value="Barat">Barat (Jakarta)</option>
           </select>
-          <p class="text-[11px] text-slate-400 mt-1">Assign sales person ini ke Lead Sales tertentu.</p>
+          <p class="text-[11px] text-slate-400 mt-1">Regional cabang sales ini — dipakai untuk filter Dashboard Sales.</p>
         </div>
       </div>
       <!-- No WhatsApp (untuk notifikasi WA) -->

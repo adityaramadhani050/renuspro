@@ -549,7 +549,7 @@
     // ================================================================
     // SITE SURVEY TERKAIT (panel read-only di detail WO)
     // ================================================================
-    // Menautkan/melepas survey: admin/lead sales/sales (reuse _canEditCatatanWO).
+    // Menautkan/melepas survey: admin/sales (reuse _canEditCatatanWO).
     // Tampil survey milik semua divisi yg buka WO — tapi hanya lihat (modal
     // detail Site Survey dibuka dgn readOnly, tanpa tombol Export/Edit/Hapus).
     function _woEsc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -733,7 +733,7 @@
     // DOKUMEN PROJECT (Kontrak manual + BAST/Garansi/Commissioning dari QC)
     // ================================================================
     // Kontrak: generate (menyusul) + upload versi bertandatangan. Boleh
-    // upload/hapus: admin/lead sales/sales (reuse _canEditCatatanWO).
+    // upload/hapus: admin/sales (reuse _canEditCatatanWO).
     // BAST/Garansi/Commissioning: read-only, ditarik dari item QC H1/H2/H3.
     let _woDok = null;
     var _WO_QC_DOC_ICONS = { bast: 'fa-file-signature', garansi: 'fa-shield-halved', commissioning: 'fa-plug-circle-check' };
@@ -1198,7 +1198,7 @@
     // Konsisten dgn draft Kontrak: jsPDF, font Times, layout A4. PIHAK PERTAMA
     // (nama & jabatan) diambil dari akun yang generate (_currentUser).
     function _woBASTJabatan() {
-      var LABEL = { admin: 'Admin', finance: 'Finance', sales: 'Sales', leadsales: 'Lead Sales',
+      var LABEL = { admin: 'Admin', finance: 'Finance', sales: 'Sales',
         procurement: 'Procurement', warehouse: 'Warehouse', siteengineer: 'Site Engineer',
         projectcoordinator: 'Project Coordinator', owner: 'Owner' };
       var r = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : '';
@@ -1724,11 +1724,11 @@
     // ================================================================
     // CATATAN CUSTOMER PER WORK ORDER
     // ================================================================
-    // Hanya admin/lead sales/sales yang boleh menambah/mengubah catatan;
+    // Hanya admin/sales yang boleh menambah/mengubah catatan;
     // role lain (finance, procurement, warehouse, engineer, dst) read-only.
     function _canEditCatatanWO() {
       var role = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : '';
-      return role === 'admin' || role === 'leadsales' || role === 'sales';
+      return role === 'admin' || role === 'sales';
     }
 
     window.bukaModalCatatanWO = function(item) {

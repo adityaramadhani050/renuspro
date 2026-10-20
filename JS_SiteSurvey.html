@@ -31,10 +31,10 @@ var _SS_STEP_DEFS = [
 function _ssUserNama() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
 function _ssUserId()   { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.id) ? _currentUser.id : ''; }
 function _ssRole()     { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
-// Hapus: Admin, Lead Sales, atau sales pembuat record itu sendiri.
+// Hapus: Admin, atau sales pembuat record itu sendiri.
 function _ssCanDelete(survey){
   var r = _ssRole();
-  if (r === 'admin' || r === 'leadsales') return true;
+  if (r === 'admin') return true;
   return _ssCanEditRecord(survey); // sales pembuat (via id/nama) boleh hapus miliknya
 }
 // Hanya Admin atau sales yang membuat record itu sendiri yang boleh mengedit.

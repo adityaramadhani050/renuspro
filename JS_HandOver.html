@@ -8,7 +8,7 @@ var _hoUsers = null;  // cache daftar user (peserta)
 function _hoEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function _hoRole(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _hoUserNama(){ return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.nama) ? _currentUser.nama : ''; }
-function _hoCanRequest(){ var r=_hoRole(); return r==='sales' || r==='leadsales' || r==='admin'; }
+function _hoCanRequest(){ var r=_hoRole(); return r==='sales' || r==='admin'; }
 function _hoCanManage(){ var r=_hoRole(); return r==='projectcoordinator' || r==='admin'; }
 function _hoPad(n){ return (n<10?'0':'') + n; }
 // Tanggal → dd/MM/yyyy (tahan Date mentah / GMT / ISO / yyyy-MM-dd).

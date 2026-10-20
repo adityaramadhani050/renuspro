@@ -44,7 +44,6 @@ const _ROLE_NAV = {
   admin:       ['dashboard','dashboardproject','dashboardpembelian','dashboardkeuangan','sitesurvey','penawaran','workorder','invoice','kwitansi','produk','template','customer','users','laporanfinance','settings','supplier','pricelist','purchaseorder','inventory','pengeluaran','laporanprofitabilitas','laporankeuangan','qc','bom','ded','schedule','maintenance'],
   finance:     ['workorder','invoice','kwitansi','laporanfinance','pengeluaran','laporanprofitabilitas','laporankeuangan'],
   sales:       ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
-  leadsales:   ['dashboard','sitesurvey','penawaran','workorder','produk','template','customer','schedule','maintenance'],
   procurement: ['workorder','purchaseorder','supplier','pricelist','bom','schedule'],
   warehouse:   ['workorder','inventory','bom','schedule'],
   siteengineer:['qc','bom','ded','schedule','maintenance'],
@@ -55,14 +54,13 @@ const _ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700',
   finance:     'bg-violet-100 text-violet-700',
   sales:       'bg-emerald-100 text-emerald-700',
-  leadsales:   'bg-orange-100 text-orange-700',
   procurement: 'bg-amber-100 text-amber-700',
   warehouse:   'bg-cyan-100 text-cyan-700',
   siteengineer:'bg-teal-100 text-teal-700',
   projectcoordinator:'bg-sky-100 text-sky-700',
   owner:       'bg-rose-100 text-rose-700'
 };
-const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', leadsales: 'LEAD SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', projectcoordinator: 'Project Coor', owner: 'OWNER' };
+const _ROLE_LABEL = { admin: 'ADMIN', finance: 'FINANCE', sales: 'SALES', procurement: 'PROCUREMENT', warehouse: 'WAREHOUSE', siteengineer: 'SITE ENGINEER', projectcoordinator: 'Project Coor', owner: 'OWNER' };
 
 // ── Render info user di sidebar ───────────────────────────────────────────
 function _renderUserSidebar(user) {
@@ -419,35 +417,11 @@ function filterTabelUsers() {
   });
 }
 
+// Regional (Timur/Barat) hanya relevan untuk role Sales.
 function _onUserRoleChange() {
   var role = document.getElementById('modal-user-role').value;
-  var leadWrap = document.getElementById('modal-user-lead-wrap');
-  if (leadWrap) {
-    if (role === 'sales') {
-      leadWrap.classList.remove('hidden');
-      _populateLeadDropdown();
-    } else {
-      leadWrap.classList.add('hidden');
-    }
-  }
-}
-
-function _populateLeadDropdown(selectedLeadId) {
-  var sel = document.getElementById('modal-user-lead');
-  if (!sel) return;
-  if (typeof google !== 'undefined') {
-    google.script.run
-      .withSuccessHandler(function(data) {
-        var leads = (data || []).filter(function(u) { return u.role === 'leadsales' && u.aktif; });
-        var opts = '<option value="">— Tidak di-assign —</option>';
-        leads.forEach(function(u) {
-          var sel2 = (selectedLeadId && u.id === selectedLeadId) ? ' selected' : '';
-          opts += '<option value="' + u.id + '"' + sel2 + '>' + u.nama + '</option>';
-        });
-        sel.innerHTML = opts;
-      })
-      .getUserList();
-  }
+  var wrap = document.getElementById('modal-user-regional-wrap');
+  if (wrap) wrap.classList.toggle('hidden', role !== 'sales');
 }
 
 function bukaModalTambahUser() {
@@ -463,8 +437,8 @@ function bukaModalTambahUser() {
   document.getElementById('modal-user-pw-hint').style.display = 'none';
   document.getElementById('modal-user-aktif-wrap').classList.add('hidden');
   _adminTtdReset();  // TTD hanya untuk user yang sudah ada (mode edit)
-  var leadWrap = document.getElementById('modal-user-lead-wrap');
-  if (leadWrap) { leadWrap.classList.remove('hidden'); _populateLeadDropdown(); }
+  var regAdd = document.getElementById('modal-user-regional'); if (regAdd) regAdd.value = '';
+  _onUserRoleChange();
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -482,15 +456,8 @@ function _bukaEditUser(u) {
   _adminTtdLoad(u.id);
   var waEdit = document.getElementById('modal-user-wa'); if (waEdit) waEdit.value = u.noWa || '';
   var emEdit = document.getElementById('modal-user-email'); if (emEdit) emEdit.value = u.email || '';
-  var leadWrap = document.getElementById('modal-user-lead-wrap');
-  if (leadWrap) {
-    if (u.role === 'sales') {
-      leadWrap.classList.remove('hidden');
-      _populateLeadDropdown(u.leadId || '');
-    } else {
-      leadWrap.classList.add('hidden');
-    }
-  }
+  var regEdit = document.getElementById('modal-user-regional'); if (regEdit) regEdit.value = u.regional || '';
+  _onUserRoleChange();
   document.getElementById('modal-user').classList.remove('hidden');
 }
 
@@ -554,8 +521,8 @@ function simpanUserModal() {
   const role     = document.getElementById('modal-user-role').value;
   const aktif    = document.getElementById('modal-user-aktif').checked;
   const target   = parseFloat(document.getElementById('modal-user-target').value) || 0;
-  const leadSel  = document.getElementById('modal-user-lead');
-  const leadId   = (leadSel && role === 'sales') ? (leadSel.value || '') : '';
+  const regSel   = document.getElementById('modal-user-regional');
+  const regional = (regSel && role === 'sales') ? (regSel.value || '') : '';
   const waEl     = document.getElementById('modal-user-wa');
   const noWa     = waEl ? waEl.value.trim() : '';
   const emEl     = document.getElementById('modal-user-email');
@@ -570,8 +537,8 @@ function simpanUserModal() {
   if (typeof google !== 'undefined') {
     const fn = id ? 'editUser' : 'simpanUser';
     const args = id
-      ? [id, nama, username, password, role, aktif, target, leadId, noWa, email]
-      : [nama, username, password, role, leadId, noWa, email];
+      ? [id, nama, username, password, role, aktif, target, regional, noWa, email]
+      : [nama, username, password, role, regional, noWa, email];
 
     google.script.run
       .withSuccessHandler(function(res) {

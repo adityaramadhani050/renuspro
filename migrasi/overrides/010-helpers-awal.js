@@ -46,6 +46,8 @@
           // Alias di sini sebagai pengaman bila masih ada user lama ber-role itu.
           var _role = (p.data.role || 'sales').toLowerCase();
           if (_role === 'leadengineer') _role = 'projectcoordinator';
+          // Role 'Lead Sales' dihapus (diganti sistem regional) → jadi Sales biasa.
+          if (_role === 'leadsales') _role = 'sales';
 
           return {
             success: true,

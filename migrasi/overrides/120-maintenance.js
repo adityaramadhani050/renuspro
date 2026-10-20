@@ -1,6 +1,6 @@
       // ══════════════════════════════════════════════════════════════════════
       //  MAINTENANCE — pengajuan & monitoring maintenance site terpasang
-      //  Sales/Lead Sales ajukan → Project Coordinator jadwalkan+tugaskan →
+      //  Sales ajukan → Project Coordinator jadwalkan+tugaskan →
       //  Site Engineer kerjakan → Selesai (laporan hasil). Notif WA ke PC.
       // ══════════════════════════════════════════════════════════════════════
 

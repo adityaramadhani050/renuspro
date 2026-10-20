@@ -347,8 +347,8 @@ function _pgRenderProduk(data) {
 
 function _prodComputeRole() {
   var role = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) || '';
-  // Katalog jual = alat sales: sales, leadsales, admin.
-  window._prodCanManage = (role === 'sales' || role === 'leadsales' || role === 'admin');
+  // Katalog jual = alat sales: sales, admin.
+  window._prodCanManage = (role === 'sales' || role === 'admin');
   var btn = document.getElementById('btn-tambah-produk');
   if (btn) btn.classList.toggle('hidden', !window._prodCanManage);
 }

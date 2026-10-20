@@ -58,19 +58,21 @@
 
       // ── Manajemen User (Auth.gs → getUserList) ────────────────────────────
       // Balikan lama: ARRAY [{ id, nama, username, role, aktif, targetBulanan,
-      //                 leadId, noWa, email }]
+      //                 regional, noWa, email }]
       window.gsRoute('getUserList', {
         mode: 'fn',
         handler: async function () {
           var q = await supa.from('app_user')
-            .select('id,nama,username,role,aktif,target_bulanan,lead_id,no_whatsapp,email').order('id');
+            .select('id,nama,username,role,aktif,target_bulanan,regional,no_whatsapp,email').order('id');
+          // Fallback bila kolom regional belum dibuat (SQL belum dijalankan).
+          if (q.error) q = await supa.from('app_user').select('id,nama,username,role,aktif,target_bulanan,no_whatsapp,email').order('id');
           if (q.error) { console.error('[getUserList]', q.error); return []; }
           return (q.data || []).map(function (r) {
             return {
               id: r.id || '', nama: r.nama || '', username: r.username || '',
               role: r.role || '', aktif: r.aktif !== false,
               targetBulanan: Number(r.target_bulanan) || 0,
-              leadId: r.lead_id || '', noWa: r.no_whatsapp || '', email: r.email || ''
+              regional: r.regional || '', noWa: r.no_whatsapp || '', email: r.email || ''
             };
           });
         }

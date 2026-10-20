@@ -110,8 +110,19 @@ function _dbGetPeriodParams() {
     dateFrom: _fmtDate(from),
     dateTo:   _fmtDate(to),
     isAdmin:  isAdmin,
-    namaUser: _currentUser ? _currentUser.nama : ''
+    namaUser: _currentUser ? _currentUser.nama : '',
+    regional: isAdmin ? _dbRegionalVal() : ''   // filter Regional (admin/owner)
   };
+}
+
+// Nilai filter Regional terpilih ('' = semua, 'Timur', 'Barat').
+function _dbRegionalVal() {
+  var el = document.getElementById('db-regional');
+  var v = el ? (el.value || '') : '';
+  return (v === 'Timur' || v === 'Barat') ? v : '';
+}
+function _dbRegionalLabel(v) {
+  return v === 'Timur' ? 'Regional Timur (Surabaya)' : v === 'Barat' ? 'Regional Barat (Jakarta)' : '';
 }
 
 function _dbPeriodToMs(params) {
@@ -265,34 +276,36 @@ function _dbShowError(msg) {
 // ── Main render ────────────────────────────────────────────────
 function _dbRenderAll(rawData, salesData) {
   var isAdmin = (typeof _currentUser !== 'undefined' && _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'owner'));
-  var isLeadSales = (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'leadsales');
+  var regional = isAdmin ? _dbRegionalVal() : '';
+
+  // Filter Regional hanya untuk admin/owner
+  var regWrap = document.getElementById('db-regional-wrap');
+  if (regWrap) { regWrap.classList.toggle('hidden', !isAdmin); regWrap.classList.toggle('flex', isAdmin); }
 
   // Dashboard title
   var titleEl = document.getElementById('dashboard-title');
   if (titleEl) {
     titleEl.textContent = isAdmin
-      ? 'Ringkasan Performa Tim Sales'
-      : isLeadSales
-        ? 'Ringkasan Performa Tim ' + (_currentUser ? _currentUser.nama : '')
-        : 'Ringkasan Performa ' + (_currentUser ? _currentUser.nama : '');
+      ? 'Ringkasan Performa Tim Sales' + (regional ? ' — ' + _dbRegionalLabel(regional) : '')
+      : 'Ringkasan Performa ' + (_currentUser ? _currentUser.nama : '');
   }
 
-  // Export button (admin or leadsales)
+  // Export button (admin/owner)
   var expBtn = document.getElementById('db-export-btn');
   if (expBtn) {
-    expBtn.classList.toggle('hidden', !(isAdmin || isLeadSales));
-    expBtn.classList.toggle('flex', isAdmin || isLeadSales);
+    expBtn.classList.toggle('hidden', !isAdmin);
+    expBtn.classList.toggle('flex', isAdmin);
   }
 
-  // Admin/leadsales sections
-  document.getElementById('db-leaderboard-section').classList.toggle('hidden', !(isAdmin || isLeadSales));
+  // Bagian tim (leaderboard, win/loss) — admin/owner
+  document.getElementById('db-leaderboard-section').classList.toggle('hidden', !isAdmin);
   var winlossSection = document.getElementById('db-winloss-section');
-  if (winlossSection) winlossSection.classList.toggle('hidden', !(isAdmin || isLeadSales));
+  if (winlossSection) winlossSection.classList.toggle('hidden', !isAdmin);
 
-  // Detail per sales: accordion (admin/leadsales) atau flat (sales) — tampil untuk semua
+  // Detail per sales: accordion (admin/owner) atau flat (sales) — tampil untuk semua
   document.getElementById('db-detail-section').classList.remove('hidden');
   var detailTitle = document.getElementById('db-detail-title');
-  if (detailTitle) detailTitle.textContent = (isAdmin || isLeadSales) ? 'Detail Per Sales' : 'Detail Penawaran Saya';
+  if (detailTitle) detailTitle.textContent = isAdmin ? 'Detail Per Sales' : 'Detail Penawaran Saya';
 
   var items   = (rawData && rawData.items) ? rawData.items : [];
   var summary = (salesData && salesData.summary) ? salesData.summary : {};
@@ -305,15 +318,12 @@ function _dbRenderAll(rawData, salesData) {
   var prev = (ms.fromMs && ms.toMs) ? _dbPrevKPI(items, ms.fromMs, ms.toMs) : { prevRevenue: 0, prevDeals: 0 };
 
   // Target tahunan:
-  // - admin      → target perusahaan penuh (Rp 25 M)
-  // - lead sales → target perusahaan ÷ jumlah lead sales aktif
-  // - sales      → target bulanannya sendiri × 12
+  // - admin, semua regional → target perusahaan penuh (DB_TARGET_TAHUNAN)
+  // - admin, 1 regional     → jumlah target bulanan sales aktif regional itu × 12
+  // - sales                 → target bulanannya sendiri × 12
   var annualTarget;
-  if (isAdmin) {
+  if (isAdmin && !regional) {
     annualTarget = DB_TARGET_TAHUNAN;
-  } else if (isLeadSales) {
-    var _lsCount = (summary.leadSalesCount && summary.leadSalesCount > 0) ? summary.leadSalesCount : 1;
-    annualTarget = DB_TARGET_TAHUNAN / _lsCount;
   } else {
     annualTarget = (summary.teamTarget || 0) * 12;
   }
@@ -324,7 +334,7 @@ function _dbRenderAll(rawData, salesData) {
   _dbRenderTrend(items);
   _dbRenderDonut(items, ms.fromMs, ms.toMs);
   _dbRenderChannel(items, ms.fromMs, ms.toMs);
-  if (isAdmin || isLeadSales) {
+  if (isAdmin) {
     _dbRenderLeaderboard(salesList);
     _dbRenderDetailAccordion(salesList);
     _dbRenderWinLossFactors(salesList);
@@ -1110,7 +1120,7 @@ function _dbRenderPipelineHealth(ph, annualTarget, yearRevenue) {
       // Akun sales: tampilkan statis (tanpa accordion) agar konsisten dgn
       // "Detail Penawaran Saya". Admin/lead sales: tetap accordion per sales.
       var _role = (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.role || '') : '';
-      var isSalesView = (_role !== 'admin' && _role !== 'owner' && _role !== 'leadsales');
+      var isSalesView = (_role !== 'admin' && _role !== 'owner');
 
       body.innerHTML = order.map(function(key, gi) {
         var g = groups[key];
@@ -1208,7 +1218,8 @@ window.exportDashboardPDF = function() {
     // Header
     doc.setFillColor(30,41,59); doc.rect(0,0,PW,24,'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(14);
-    doc.text('LAPORAN PERFORMA SALES', ML, 11);
+    var _regPdf = (s.regional === 'Timur' || s.regional === 'Barat') ? s.regional : '';
+    doc.text('LAPORAN PERFORMA SALES' + (_regPdf ? ' — REGIONAL ' + _regPdf.toUpperCase() : ''), ML, 11);
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(190,200,220);
     doc.text('PT. RENUS GLOBAL INDONESIA', ML, 17);
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(170,195,255);
@@ -1348,7 +1359,7 @@ window.exportDashboardPDF = function() {
       doc.text('Halaman ' + i + ' / ' + totalPages, PW/2, 292, { align:'center' });
       doc.text('PT. RENUS GLOBAL INDONESIA — KONFIDENSIAL', ML, 292);
     }
-    var fname = 'Dashboard_Sales_' + (data.dateFrom||'').replace(/\//g,'') + '-' + (data.dateTo||'').replace(/\//g,'') + '.pdf';
+    var fname = 'Dashboard_Sales_' + (_regPdf ? 'Regional' + _regPdf + '_' : '') + (data.dateFrom||'').replace(/\//g,'') + '-' + (data.dateTo||'').replace(/\//g,'') + '.pdf';
     doc.save(fname);
     showNotification('PDF berhasil diunduh!');
   } catch(e) {

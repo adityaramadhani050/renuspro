@@ -10,7 +10,7 @@ var _mtnFotoQueue = [];
 
 function _mtnRole() { return (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role) ? _currentUser.role : ''; }
 function _mtnUser() { return (typeof _currentUser !== 'undefined' && _currentUser) ? (_currentUser.nama || _currentUser.username || '') : ''; }
-function _mtnCanAjukan()  { var r = _mtnRole(); return r === 'sales' || r === 'leadsales' || r === 'admin'; }
+function _mtnCanAjukan()  { var r = _mtnRole(); return r === 'sales' || r === 'admin'; }
 function _mtnCanKelola()  { var r = _mtnRole(); return r === 'projectcoordinator' || r === 'admin'; }
 // Apakah user saat ini adalah teknisi yang ditugaskan pada maintenance ini.
 function _mtnIsAssignedEngineer(m) {
@@ -59,7 +59,7 @@ function _mtnFmtTs(s) {
 // Cakupan daftar maintenance per role:
 // - PC, Project Coordinator, Admin → seluruh maintenance.
 // - Site Engineer → hanya yang ditugaskan ke dirinya.
-// - Lainnya (pengaju: sales/lead sales, dll.) → hanya yang mereka ajukan.
+// - Lainnya (pengaju: sales, dll.) → hanya yang mereka ajukan.
 function _mtnFilterByRole(list) {
   var r = _mtnRole();
   if (r === 'projectcoordinator' || r === 'admin') return list || [];

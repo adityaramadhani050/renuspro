@@ -320,13 +320,34 @@
       // ── Manajemen user (auth admin) via EDGE FUNCTION user-ops ────────────
       //  Aktif hanya bila ENABLE_EDGE_USER = true (setelah deploy user-ops).
       if (ENABLE_EDGE_USER) {
+        // Regional (Timur/Barat) menggantikan assign Lead Sales. Disimpan langsung
+        // ke app_user SETELAH user-ops sukses (edge tak perlu redeploy); leadId
+        // dikirim kosong → assignment Lead Sales lama dibersihkan.
+        function _normRegional(v) { v = (v || '').toString().trim(); return (v === 'Timur' || v === 'Barat') ? v : null; }
         window.gsRoute('simpanUser', {
           mode: 'fn',
-          handler: function (a) { return _edgeInvoke('user-ops', { action: 'create', payload: { nama: a[0], username: a[1], password: a[2], role: a[3], leadId: a[4], noWa: a[5], email: a[6] } }, 'Gagal menyimpan user.'); }
+          handler: async function (a) {
+            var res = await _edgeInvoke('user-ops', { action: 'create', payload: { nama: a[0], username: a[1], password: a[2], role: a[3], leadId: '', noWa: a[5], email: a[6] } }, 'Gagal menyimpan user.');
+            if (res && res.success) {
+              var reg = (a[3] || '').toString().toLowerCase() === 'sales' ? _normRegional(a[4]) : null;
+              var uname = (a[1] || '').toString().trim().toLowerCase();
+              var ur = await supa.from('app_user').update({ regional: reg }).eq('username', uname);
+              if (ur.error) res.message += ' (Catatan: regional gagal disimpan — ' + ur.error.message + ')';
+            }
+            return res;
+          }
         });
         window.gsRoute('editUser', {
           mode: 'fn',
-          handler: function (a) { return _edgeInvoke('user-ops', { action: 'edit', payload: { id: a[0], nama: a[1], username: a[2], password: a[3], role: a[4], aktif: a[5], targetBulanan: a[6], leadId: a[7], noWa: a[8], email: a[9] } }, 'Gagal mengubah user.'); }
+          handler: async function (a) {
+            var res = await _edgeInvoke('user-ops', { action: 'edit', payload: { id: a[0], nama: a[1], username: a[2], password: a[3], role: a[4], aktif: a[5], targetBulanan: a[6], leadId: '', noWa: a[8], email: a[9] } }, 'Gagal mengubah user.');
+            if (res && res.success) {
+              var reg = (a[4] || '').toString().toLowerCase() === 'sales' ? _normRegional(a[7]) : null;
+              var ur = await supa.from('app_user').update({ regional: reg }).eq('id', (a[0] || '').toString().trim());
+              if (ur.error) res.message += ' (Catatan: regional gagal disimpan — ' + ur.error.message + ')';
+            }
+            return res;
+          }
         });
         window.gsRoute('hapusUser', {
           mode: 'fn',

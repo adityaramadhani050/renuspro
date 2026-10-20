@@ -7,13 +7,27 @@
       function _epochJk(iso) { return iso ? Date.parse(iso + 'T00:00:00+07:00') : null; }        // ms, Jakarta-midnight
       function _dDaysISO(a, b) { if (!a || !b) return null; return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000); }
       function _dInRange(d, from, to) { return !!(d && d >= from && d <= to); }                  // string ISO compare
+      // teamNames (array) = batasi ke daftar nama sales tsb (dipakai filter
+      // Regional admin/owner). null = tanpa batasan tim.
       function _accOK(pembuat, isAdmin, role, namaUser, teamNames) {
-        if (role === 'leadsales') return !!(teamNames && teamNames.indexOf(pembuat) >= 0);
+        if (teamNames) return teamNames.indexOf(pembuat) >= 0;
         if (!isAdmin) return pembuat === namaUser;
         return true;
       }
+      function _normRegionalDb(v) { v = (v || '').toString().trim(); return (v === 'Timur' || v === 'Barat') ? v : ''; }
+      // Nama semua user aktif di regional tsb (Timur/Barat). null bila tak difilter
+      // atau kolom regional belum ada (SQL belum dijalankan) → tampil semua.
+      async function _regionalTeamNames(isAdmin, regional) {
+        regional = _normRegionalDb(regional);
+        if (!isAdmin || !regional) return null;
+        var uq = await supa.from('app_user').select('nama,aktif,regional');
+        if (uq.error) return null;
+        var out = [];
+        (uq.data || []).forEach(function (u) { if (u.aktif !== false && (u.regional || '') === regional) { var nm = (u.nama || '').toString().trim(); if (nm) out.push(nm); } });
+        return out;
+      }
 
-      async function _dashboardRawData(namaUser, isAdmin, role, userId) {
+      async function _dashboardRawData(namaUser, isAdmin, role, userId, regional) {
         try {
           namaUser = (namaUser || '').toString();
           var pq = await _all('penawaran', 'no_penawaran,rev,tanggal,tanggal_deal,nama_project,klien_id,dibuat_oleh,subtotal,diskon,grand_total,total_hpp,status,channel_marketing,catatan_fail');
@@ -22,18 +36,13 @@
           var klienMap = {}; (kq.data || []).forEach(function (k) { if (k.id != null) klienMap[k.id.toString()] = k.nama_klien || ''; });
           var prodC = await supa.from('produk').select('id', { count: 'exact', head: true });
           var custC = await supa.from('klien').select('id', { count: 'exact', head: true });
-          var teamNames = null;
-          if (role === 'leadsales' && userId) {
-            var uq = await supa.from('app_user').select('id,nama,lead_id,aktif');
-            teamNames = []; if (namaUser) teamNames.push(namaUser.trim());
-            (uq.data || []).forEach(function (u) { if ((u.lead_id || '').toString().trim() === userId && u.aktif !== false) teamNames.push((u.nama || '').toString().trim()); });
-          }
+          var teamNames = await _regionalTeamNames(isAdmin, regional);
           var latest = {};
           (pq.data || []).forEach(function (r) {
             var no = (r.no_penawaran || '').toString(); if (!no) return;
             var pembuat = (r.dibuat_oleh || '').toString().trim();
-            if (!isAdmin && role !== 'leadsales') { if (namaUser && pembuat !== namaUser.trim()) return; }
-            else if (role === 'leadsales' && teamNames !== null) { if (teamNames.indexOf(pembuat) < 0) return; }
+            if (teamNames) { if (teamNames.indexOf(pembuat) < 0) return; }
+            else if (!isAdmin) { if (namaUser && pembuat !== namaUser.trim()) return; }
             var rev = parseInt(r.rev, 10) || 0;
             if (!latest[no] || rev > latest[no]._rev) { r._rev = rev; latest[no] = r; }
           });
@@ -47,7 +56,7 @@
               channelMarketing: (r.channel_marketing || '').toString(), catatanFail: (r.catatan_fail || '').toString()
             };
           });
-          return { success: true, items: items, totalProducts: prodC.count || 0, totalCustomers: custC.count || 0, isAdmin: !!isAdmin, namaUser: namaUser || '', isLeadSales: role === 'leadsales', teamNames: teamNames || [] };
+          return { success: true, items: items, totalProducts: prodC.count || 0, totalCustomers: custC.count || 0, isAdmin: !!isAdmin, namaUser: namaUser || '', regional: teamNames ? _normRegionalDb(regional) : '', teamNames: teamNames || [] };
         } catch (e) { return { success: false, items: [], totalProducts: 0, totalCustomers: 0, isAdmin: false, namaUser: '' }; }
       }
 
@@ -62,19 +71,16 @@
 
           var pq = await _all('penawaran', '*'); if (pq.error) return { success: false, error: pq.error.message };
           var kq = await _all('klien', 'id,nama_klien');
-          var uq = await supa.from('app_user').select('id,nama,role,aktif,target_bulanan,lead_id');
+          var uq = await supa.from('app_user').select('id,nama,role,aktif,target_bulanan');
           var klienMap = {}; (kq.data || []).forEach(function (k) { if (k.id != null) klienMap[k.id.toString()] = k.nama_klien || ''; });
-          var userMap = {}, leadSalesCount = 0;
+          var userMap = {};
           (uq.data || []).forEach(function (u) {
             var nm = (u.nama || '').toString().trim(); if (!nm) return;
-            userMap[nm] = { target: Number(u.target_bulanan) || 0 };
-            if (u.aktif !== false && (u.role || '') === 'leadsales') leadSalesCount++;
+            userMap[nm] = { target: Number(u.target_bulanan) || 0, aktif: u.aktif !== false };
           });
-          var teamNames = null;
-          if (role === 'leadsales') {
-            teamNames = []; if (namaUser) teamNames.push(namaUser);
-            (uq.data || []).forEach(function (u) { if ((u.lead_id || '').toString().trim() === userId && u.aktif !== false) teamNames.push((u.nama || '').toString().trim()); });
-          }
+          // Filter Regional (admin/owner): batasi ke sales aktif di regional itu.
+          var regionalSel = _normRegionalDb(params.regional);
+          var teamNames = await _regionalTeamNames(isAdmin, regionalSel);
 
           // latest rev per no_penawaran
           var latest = {};
@@ -144,9 +150,11 @@
           // team summary
           var teamRevenue = 0, teamHppDeal = 0, teamPenawaran = 0, teamNilaiPenawaran = 0, teamDealCount = 0, teamDealCohort = 0, teamPipelineValue = 0, teamPipelineCount = 0, teamMarginSum = 0, teamMarginCount = 0;
           salesList.forEach(function (s) { teamRevenue += s.dealRevenue; teamHppDeal += s.dealHpp; teamPenawaran += s.totalPenawaran; teamNilaiPenawaran += s.totalNilaiPenawaran; teamDealCount += s.dealCount; teamDealCohort += s.dealCohort; teamPipelineValue += s.pipelineValue; teamPipelineCount += s.pipelineCount; teamMarginSum += s.dealMarginSum; teamMarginCount += s.dealMarginCount; });
+          // Target: regional → jumlah target bulanan sales aktif di regional itu;
+          // admin (semua) → jumlah semua target; sales → targetnya sendiri.
           var teamTarget = 0;
-          if (isAdmin) { Object.keys(userMap).forEach(function (nm) { teamTarget += userMap[nm].target; }); }
-          else if (role === 'leadsales' && teamNames && teamNames.length) { teamNames.forEach(function (nm) { teamTarget += (userMap[nm] ? userMap[nm].target : 0); }); }
+          if (teamNames) { teamNames.forEach(function (nm) { teamTarget += (userMap[nm] ? userMap[nm].target : 0); }); }
+          else if (isAdmin) { Object.keys(userMap).forEach(function (nm) { teamTarget += userMap[nm].target; }); }
           else { teamTarget = userMap[namaUser] ? userMap[namaUser].target : 0; }
 
           // pipeline health
@@ -204,7 +212,7 @@
               teamWinRate: teamPenawaran > 0 ? (teamDealCohort / teamPenawaran) * 100 : 0,
               teamPipelineValue: teamPipelineValue, teamPipelineCount: teamPipelineCount,
               teamAvgMarginDeal: teamMarginCount > 0 ? (teamMarginSum / teamMarginCount) : 0,
-              teamAvgSalesCycle: teamCycleCount > 0 ? teamCycleSum / teamCycleCount : null, leadSalesCount: leadSalesCount
+              teamAvgSalesCycle: teamCycleCount > 0 ? teamCycleSum / teamCycleCount : null, regional: teamNames ? regionalSel : ''
             },
             trend: { labels: months.map(function (m) { return m.label; }), values: months.map(function (m) { return m.val; }) },
             salesList: salesList, recentDeals: recent, pipelineHealth: pipelineHealth, isAdmin: isAdmin
@@ -218,7 +226,7 @@
         mode: 'fn',
         handler: async function (a) {
           var params = a[0] || {};
-          try { var raw = await _dashboardRawData(params.namaUser, params.isAdmin, params.role, params.userId); var sales = await _salesReportData(params); return { raw: raw, sales: sales }; }
+          try { var raw = await _dashboardRawData(params.namaUser, params.isAdmin, params.role, params.userId, params.regional); var sales = await _salesReportData(params); return { raw: raw, sales: sales }; }
           catch (e) { return { raw: { success: false, items: [] }, sales: { success: false } }; }
         }
       });
