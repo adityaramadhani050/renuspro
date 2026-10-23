@@ -312,6 +312,7 @@
       window.gsRoute('restoreRevisiPenawaran', {
         mode: 'fn',
         handler: async function (a) {
+          var _ro = await _tolakPenawaranReadOnly(); if (_ro) return _ro;   // finance: read-only
           var noPen = (a[0] || '').toString(), rev = parseInt(a[1], 10); if (isNaN(rev)) rev = 0; var namaUser = (a[2] || '').toString();
           var rows = await _all('penawaran', '*', function (q) { return q.eq('no_penawaran', noPen); });
           var list = rows.data || []; if (!list.length) return { success: false, message: 'Revisi tidak ditemukan.' };

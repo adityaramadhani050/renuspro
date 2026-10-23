@@ -292,6 +292,7 @@
       window.gsRoute('simpanPenawaranKeSheet', {
         mode: 'fn',
         handler: async function (a) {
+          var _ro = await _tolakPenawaranReadOnly(); if (_ro) return _ro;   // finance: read-only
           var p = a[0] || {}, tc = p.termConditions || {};
           var base = { rev: 0, tanggal: _isoDate(p.tanggal) || _todayIso(), valid_hingga: _isoDate(p.validUntil),
             nama_project: (p.namaProject || '').toString(), klien_id: (p.klienId || '') || null, dibuat_oleh: (p.namaUser || 'Sales Executive').toString(),
@@ -317,6 +318,7 @@
       window.gsRoute('editPenawaran', {
         mode: 'fn',
         handler: async function (a) {
+          var _ro = await _tolakPenawaranReadOnly(); if (_ro) return _ro;   // finance: read-only
           var p = a[0] || {}, noPen = (p.noPenawaran || '').toString();
           if (!noPen) return { success: false, message: 'No Penawaran wajib.' };
           var rows = await _all('penawaran', '*', function (q) { return q.eq('no_penawaran', noPen); });

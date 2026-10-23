@@ -1,5 +1,6 @@
 <script>
     function salinPenawaran(item) {
+      if (typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) return;   // finance read-only
   // Pastikan tidak dalam edit mode
   window._editMode = null;
   document.getElementById('btnSubmitForm').innerHTML =
@@ -577,6 +578,7 @@
 
     function handleFormSubmission(e) {
       e.preventDefault();
+      if (typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) return;   // finance read-only
       if(!document.getElementById('klienSelect').value) return showNotification("Silakan hubungkan Klien!", "error");
       if(!document.getElementById('channelMarketing').value) return showNotification("Silakan pilih Channel Marketing!", "error");
       const blocks = document.querySelectorAll('.block-kelompok'); if(blocks.length===0) return showNotification("Minimal 1 sub-paket!", "error");
@@ -823,6 +825,7 @@
 
     // --- KONFIRMASI HAPUS UNIVERSAL ---
     function konfirmasiHapus(tipe, id, nama) {
+      if (tipe === 'penawaran' && typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) return;
       document.getElementById('hapus-nama-item').innerText = nama;
       const btnHapus = document.getElementById('btn-konfirmasi-hapus');
       btnHapus.onclick = () => eksekusiHapus(tipe, id);
@@ -1119,6 +1122,7 @@
     }
 
     function ubahStatusPenawaran(noPenawaran, rev, selectEl) {
+      if (typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) { if (selectEl && selectEl.dataset.prevStatus) selectEl.value = selectEl.dataset.prevStatus; return; }   // finance read-only
       const statusBaru = selectEl.value;
       const prevStatus = selectEl.getAttribute('data-prev-status') || '';
 
@@ -1277,6 +1281,7 @@
 
       // --- MUAT DATA PENAWARAN KE FORM UNTUK DIEDIT ---
     function muatPenawaranKeForm(item) {
+      if (typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) return;   // finance read-only
       if (item.status === 'Deal' && !_isDealEditableBulanIni(item)) {
         showNotification("Penawaran Deal tidak dapat direvisi — " + (typeof _dealLockReason === 'function' ? _dealLockReason(item) : 'terkunci') + ".", "error");
         return;

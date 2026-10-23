@@ -1,5 +1,6 @@
 <script>
     function bukaTambahPenawaran() {
+      if (typeof _penTolakReadOnly === 'function' && _penTolakReadOnly()) return;   // finance read-only
       // Jika sedang dalam edit mode, reset dulu sepenuhnya
       if (window._editMode) {
         window._editMode = null;

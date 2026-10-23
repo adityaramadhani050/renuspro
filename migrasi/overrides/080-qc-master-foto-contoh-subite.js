@@ -323,6 +323,7 @@
       window.gsRoute('hapusPenawaran', {
         mode: 'fn',
         handler: async function (a) {
+          var _ro = await _tolakPenawaranReadOnly(); if (_ro) return _ro;   // finance: read-only
           var noPen = (a[0] || '').toString();
           var del = await supa.from('penawaran').delete().eq('no_penawaran', noPen).select();
           if (del.error) return { success: false, message: del.error.message };
@@ -333,6 +334,7 @@
       window.gsRoute('updateStatusPenawaran', {
         mode: 'fn',
         handler: async function (a) {
+          var _ro = await _tolakPenawaranReadOnly(); if (_ro) return _ro;   // finance: read-only
           var noPen = (a[0] || '').toString(); var rev = parseInt(a[1], 10); if (isNaN(rev)) rev = 0;
           var statusBaru = (a[2] || '').toString(); var extra = a[4] || {};
           var cur = await supa.from('penawaran').select('*').eq('no_penawaran', noPen).eq('rev', rev).maybeSingle();

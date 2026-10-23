@@ -72,6 +72,27 @@
 
       // Helper: ambil SEMUA baris via pagination (.range) — menembus batas 1000
       // baris default Supabase/PostgREST. apply(qb) untuk .order()/.eq() dsb.
+      // Role user yg sedang login (dari sesi Supabase → app_user), cache per uid.
+      // Dipakai menjaga rute tulis dari role read-only (mis. finance di Penawaran).
+      var _sessRoleCache = { uid: null, role: '' };
+      async function _sessionRole() {
+        try {
+          var s = await supa.auth.getSession();
+          var uid = s && s.data && s.data.session && s.data.session.user ? s.data.session.user.id : null;
+          if (!uid) return '';
+          if (_sessRoleCache.uid === uid) return _sessRoleCache.role;
+          var p = await supa.from('app_user').select('role').eq('auth_uid', uid).maybeSingle();
+          var role = ((p.data && p.data.role) || '').toString().toLowerCase();
+          _sessRoleCache = { uid: uid, role: role };
+          return role;
+        } catch (e) { return ''; }
+      }
+      // Penawaran: finance hanya boleh melihat (read-only).
+      async function _tolakPenawaranReadOnly() {
+        return (await _sessionRole()) === 'finance'
+          ? { success: false, message: 'Akun Finance hanya dapat melihat penawaran (read-only).' } : null;
+      }
+
       async function _all(table, sel, apply) {
         var size = 1000, from = 0, out = [], error = null;
         for (;;) {

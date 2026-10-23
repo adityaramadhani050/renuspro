@@ -84,8 +84,20 @@
         selTahun.add(o);
       });
     }
+    // Finance: menu Penawaran read-only (lihat, riwayat revisi, export PDF saja).
+    function _penReadOnly() {
+      return !!(typeof _currentUser !== 'undefined' && _currentUser && _currentUser.role === 'finance');
+    }
+    function _penTolakReadOnly() {
+      if (!_penReadOnly()) return false;
+      showNotification('Akun Finance hanya dapat melihat penawaran (read-only).', 'error');
+      return true;
+    }
     function _renderTabelPenawaran(data) {
       const tbody = document.getElementById('table-penawaran');
+      const ro = _penReadOnly();
+      const btnBuat = document.getElementById('btn-buat-penawaran');
+      if (btnBuat) btnBuat.classList.toggle('hidden', ro);
       if (!data || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">
           <i class="fas fa-search mr-2"></i>Tidak ada penawaran yang sesuai filter.
@@ -122,14 +134,18 @@
                 <span class="text-xs font-extrabold px-2 py-1 rounded-lg ${marginClass}">${parseFloat(i.marginPersen).toFixed(1)}%</span>
               </td>
               <td class="p-4 text-center" data-label="Status">
-                <select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)" data-prev-status="${i.status}"
+                ${ro
+                  ? `<span class="inline-block text-[11px] font-bold px-2 py-1 rounded-lg ${statusClass}"
+                      ${i.status==='Fail' && i.catatanFail ? `title="Kode Lost: ${(i.kodeLost||'-').replace(/"/g,'&quot;')} — Catatan: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
+                      ${i.status==='Deal' && i.kodeWin ? `title="Kode Win: ${i.kodeWin.replace(/"/g,'&quot;')}"` : ''}>${i.status}</span>`
+                  : `<select onchange="ubahStatusPenawaran('${i.id}','${i.rev}',this)" data-prev-status="${i.status}"
                   ${i.status==='Fail' && i.catatanFail ? `title="Kode Lost: ${(i.kodeLost||'-').replace(/"/g,'&quot;')} — Catatan: ${i.catatanFail.replace(/"/g,'&quot;')}"` : ''}
                   ${i.status==='Deal' && i.kodeWin ? `title="Kode Win: ${i.kodeWin.replace(/"/g,'&quot;')}"` : ''}
                   class="text-[11px] font-bold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${statusClass}">
                   <option value="On-Progress" ${i.status==='On-Progress'?'selected':''}>On-Progress</option>
                   <option value="Deal"        ${i.status==='Deal'?'selected':''}>Deal</option>
                   <option value="Fail"        ${i.status==='Fail'?'selected':''}>Fail</option>
-                </select>
+                </select>`}
               </td>
               <td class="p-4 text-center" data-label="Revisi">
                 <button onclick="bukaRiwayatRevisi('${i.id}', '${i.namaProject}')"
@@ -144,6 +160,12 @@
               </td>
               <td class="p-4 text-center rp-actions">
                 <div class="flex items-center justify-center gap-1">
+                ${ro
+                  ? `<button onclick='exportPenawaranPDF(${JSON.stringify(i).replace(/'/g,"&#39;")})'
+                      class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Export Quotation PDF">
+                      <i class="fa-solid fa-file-pdf"></i>
+                    </button>`
+                  : `
                 ${i.status === 'Deal'
                   ? `<button onclick='bukaCatatanWin(${JSON.stringify(i).replace(/'/g,"&#39;")})'
                       class="${i.kodeWin ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'} p-1.5 rounded-lg transition" title="${i.kodeWin ? 'Edit' : 'Input'} Analisa Win">
@@ -184,7 +206,7 @@
                   <button onclick="konfirmasiHapus('penawaran','${i.id}|${i.rev}','${i.id}')"
                     class="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Hapus">
                     <i class="fa-regular fa-trash-can"></i>
-                  </button>
+                  </button>`}
                 </div>
               </td>
             </tr>`;
